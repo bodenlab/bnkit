@@ -1,3 +1,21 @@
+/*
+    bnkit -- software for building and using Bayesian networks
+    Copyright (C) 2014  M. Boden et al.
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package bn;
 
 import java.io.Serializable;
@@ -11,16 +29,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Defines a Bayesian Network.
- * The class will manage efficient access to the nodes, based on the structure.
+ * Defines a Bayesian Network. The class will manage efficient access to the
+ * nodes, based on the structure.
+ *
  * @author m.boden
  */
 public class BNet implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /** Indicate if the nodes are organised (prepared for inference) or not */
-    private boolean compiled = true; 
+    /**
+     * Indicate if the nodes are organised (prepared for inference) or not
+     */
+    private boolean compiled = true;
 
     /**
      * All nodes of the BN
@@ -29,15 +50,17 @@ public class BNet implements Serializable {
     private final Map<Variable, BNode> nodesByVar = new HashMap<Variable, BNode>();
 
     /**
-     * Linking children-to-parents, happens when BN is compiled (@see BNet.compile())
+     * Linking children-to-parents, happens when BN is compiled (@see
+     * BNet.compile())
      */
     private Map<BNode, Set<BNode>> ch2par = new HashMap<BNode, Set<BNode>>();
-    
+
     /**
-     * Linking parent-to-children, happens when BN is compiled (@see BNet.compile())
+     * Linking parent-to-children, happens when BN is compiled (@see
+     * BNet.compile())
      */
     private Map<BNode, Set<BNode>> par2ch = new HashMap<BNode, Set<BNode>>();
- 
+
     /**
      * Listing variables in a top-down ordered fashion, for quick query
      * processing.
@@ -65,21 +88,23 @@ public class BNet implements Serializable {
     }
 
     /**
-     * Add a list of nodes to the BN. 
-     * All nodes must implement the BNode interface.
+     * Add a list of nodes to the BN. All nodes must implement the BNode
+     * interface.
      *
      * @param nodes the nodes (each a CPT, GDT or any other BNode instance)
      */
     public void add(BNode... nodes) {
-        for (BNode node : nodes)
+        for (BNode node : nodes) {
             add(node);
+        }
     }
-    
+
     /**
      * Compile and finalise the information in the Bayesian network so that
-     * inference and other computationally complex processes can be done. 
-     * (For example: linking ancestors and descendants.) Most (if not all) functions will call
-     * this automatically so typically explicit calls are not required.
+     * inference and other computationally complex processes can be done. (For
+     * example: linking ancestors and descendants.) Most (if not all) functions
+     * will call this automatically so typically explicit calls are not
+     * required.
      */
     public void compile() {
         if (!compiled) {
@@ -139,8 +164,10 @@ public class BNet implements Serializable {
         }
         return roots;
     }
+
     /**
      * Retrieve all the nodes in the network.
+     *
      * @return the nodes
      */
     public Collection<BNode> getNodes() {
@@ -250,6 +277,7 @@ public class BNet implements Serializable {
 
     /**
      * Retrieve all the descendants of a node (recursively)
+     *
      * @param nodeName name of node
      * @return list of nodes
      */
@@ -263,6 +291,7 @@ public class BNet implements Serializable {
 
     /**
      * Retrieve all the descendants of a node (recursively)
+     *
      * @param node root node for search
      * @return list of nodes
      */
@@ -290,7 +319,8 @@ public class BNet implements Serializable {
     }
 
     /**
-     * Retrieve all nodes in order (from root/s to leaves; with parallel paths in arbitrary order).
+     * Retrieve all nodes in order (from root/s to leaves; with parallel paths
+     * in arbitrary order).
      */
     public List<BNode> getOrdered() {
         if (!compiled) {
@@ -351,7 +381,8 @@ public class BNet implements Serializable {
      * GIVEN evidence ie parents' instantiations.
      *
      * @param node
-     * @return the (partial) key that applies to the current instantiation of nodes in the BN
+     * @return the (partial) key that applies to the current instantiation of
+     * nodes in the BN
      */
     public Object[] getEvidenceKey(BNode node) {
         List<EnumVariable> parents = node.getParents();
@@ -404,6 +435,7 @@ public class BNet implements Serializable {
 
     /**
      * Utility function to create an array from a set of String.
+     *
      * @param set set
      * @return an array
      */
@@ -420,6 +452,7 @@ public class BNet implements Serializable {
 
     /**
      * Utility function to create a set from an array of String,
+     *
      * @param array an array of String
      * @return set with String
      */
@@ -434,7 +467,8 @@ public class BNet implements Serializable {
 }
 
 /**
- * Exceptions for the BNet class 
+ * Exceptions for the BNet class
+ *
  * @author mikael
  */
 class BNetRuntimeException extends RuntimeException {
