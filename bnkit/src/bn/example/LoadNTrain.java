@@ -2,6 +2,8 @@
  * 
  */
 package bn.example;
+import bn.alg.LearningAlg;
+import bn.alg.EM;
 import java.util.List;
 
 import bn.*;

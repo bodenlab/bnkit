@@ -27,12 +27,7 @@ Most variants can be achieved using pre-defined variable types, like so:<br>
 </pre>
 You will find a bunch of these factory methods in {@link bn.Predef}. When you want to save and load Bayesian networks to XML files, you must either (a) use only predefined types, or (b) amend the class {@link bn.Predef} with all the details.
 <br>
-Continuous variables are more general than enumerables, so we define an example "Y", like so:<br>
-<pre>
-    Continuous myDomain = new Continuous();
-    Variable&lt;Continuous&gt; varY = new Variable&lt;&gt;(domain, name);
-</pre>
-Alternatively, using {@link bn.Predef}:<br>
+Continuous variables are less constrained since they can be assigned an infinite number of values. They do not have a variable class specific to them. Currently, the easiest way is to use {@link bn.Predef}:<br>
 <pre>
     Variable varY = Predef.Real("Y");
 </pre>
@@ -105,9 +100,9 @@ Then finally, we use an inference engine (that should implement the interface {@
 To enable optimisations to occur inside the inference engine, we provide query variables to it, and the engine come up with a useful representation.
 (In some applications, the same query may be posed many times, but with different evidence, or vice versa.)
 <pre>
-    VarElim ve = new VarElim();
+    alg.VarElim ve = new alg.VarElim();
     ve.instantiate(bn);
-    Query q = ve.makeQuery(new Variable[] {B});
+    alg.Query q = ve.makeQuery(new Variable[] {B});
 </pre>
 The final step is to let the inference run. It returns a joint probability table (JPT) with the query variable(s). 
 You can extract specific probabilities from the JPT, using a handy {@link bn.JPT#get(Object[])} method, where you provide

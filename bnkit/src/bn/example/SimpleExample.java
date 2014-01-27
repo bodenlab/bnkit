@@ -10,8 +10,8 @@ import bn.EnumVariable;
 import bn.Enumerable;
 import bn.JPT;
 import bn.Predef;
-import bn.Query;
-import bn.VarElim;
+import bn.alg.Query;
+import bn.alg.VarElim;
 import bn.Variable;
 import bn.file.BNBuf;
 

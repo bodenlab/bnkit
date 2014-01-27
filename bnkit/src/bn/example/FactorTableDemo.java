@@ -8,12 +8,14 @@ package bn.example;
 
 import bn.BNet;
 import bn.CPT;
+import bn.Continuous;
 import bn.EnumDistrib;
 import bn.EnumVariable;
 import bn.Enumerable;
 import bn.FactorTable;
 import bn.JPT;
 import bn.Predef;
+import bn.Variable;
 
 /**
  *
@@ -41,7 +43,7 @@ public class FactorTableDemo {
         CPT a = new CPT(A,    B, E);
         CPT j = new CPT(J,    A);
         CPT m = new CPT(M,    A);
-
+        
         // Parameterise the nodes using our "expertise"
         b.put(new EnumDistrib(Enumerable.bool, 0.001, 0.999));
         e.put(new EnumDistrib(Enumerable.bool, 0.002, 0.998));
@@ -53,6 +55,12 @@ public class FactorTableDemo {
         j.put(new EnumDistrib(Enumerable.bool, 0.05, 0.95), false);
         m.put(new EnumDistrib(Enumerable.bool, 0.70, 0.30), true);
         m.put(new EnumDistrib(Enumerable.bool, 0.01, 0.99), false);
+
+        b.print();
+        e.print();
+        a.print();
+        j.print();
+        m.print();
 
         // Put all the nodes into the Bayesian network data structure
         // The BNet class manages efficient access to the nodes, based on the structure.

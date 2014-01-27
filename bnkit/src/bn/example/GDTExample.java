@@ -10,7 +10,7 @@ import bn.GDT;
 import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Predef;
-import bn.VarElim;
+import bn.alg.VarElim;
 import bn.Variable;
 import bn.file.BNBuf;
 
