@@ -77,7 +77,7 @@ public class EM extends LearningAlg {
     /**
      * Train the BN using EM.
      *
-     * @see bn.LearningAlg#train(java.lang.Object[][], bn.Variable[], long)
+     * @see bn.alg.LearningAlg#train(java.lang.Object[][], bn.Variable[], long)
      * @param values the values of the variables [row][variable], if a value is
      * null, it means "unspecified"
      * @param vars the variables that correspond to the values
