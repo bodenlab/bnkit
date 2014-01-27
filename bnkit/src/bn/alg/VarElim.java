@@ -121,7 +121,7 @@ public class VarElim implements Inference {
             }
             if (!added) // if not added as per sum-out variable 
             {
-                if (ft.nParents > 0) {
+                if (ft.getParents().size() > 0) {
                     throw new RuntimeException("Node can not be eliminated in inference: " + node.getName());
                 } // put it in the last bucket?
                 //buckets.get(buckets.size() - 1).put(ft);
@@ -209,7 +209,7 @@ public class VarElim implements Inference {
 
         @Override
         public int compare(FactorTable o1, FactorTable o2) {
-            return o1.nParents - o2.nParents;
+            return o1.getParents().size() - o2.getParents().size();
         }
     }
 
@@ -276,7 +276,7 @@ public class VarElim implements Inference {
 
         boolean hasFactorWith(EnumVariable var) {
             for (FactorTable ft : factors) {
-                if (ft.parents.contains(var)) {
+                if (ft.getParents().contains(var)) {
                     return true;
                 }
             }
