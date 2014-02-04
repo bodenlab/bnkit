@@ -59,7 +59,7 @@ public class VarElim implements Inference {
      */
     @SuppressWarnings("rawtypes")
     @Override
-    public Query makeQuery(Variable[] qvars) {
+    public Query makeQuery(Variable... qvars) {
 		// Find out which variables in the BN that will be summed out and organise them into "buckets".
         // They will be listed in "topological order" (parents before children) as per heuristics given in Dechter.
         // Each sumout variable will be assigned a bucket.
