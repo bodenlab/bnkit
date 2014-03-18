@@ -139,9 +139,10 @@ public class BNet implements Serializable {
                 ordered_from_root.add(root);
                 for (BNode node : getDescendants(root)) {
                     if (ordered.contains(node)) {
-                        break;
+                        ;
+                    } else {
+                        ordered_from_root.add(node);
                     }
-                    ordered_from_root.add(node);
                 }
                 ordered.addAll(0, ordered_from_root); // making sure that any new sub-trees are added "on-top"
             }
