@@ -257,9 +257,13 @@ public class FactorTable extends EnumTable<Double> {
 
     public double getLogLikelihood() {
         double sum = 0.0;
+        if (map.isEmpty()) 
+            return 0.0;
         for (Map.Entry<Integer, Double> entry : this.getMapEntries()) {
             sum += entry.getValue().doubleValue();
         }
+        if (sum == 0.0)
+            throw new RuntimeException("All outcomes are impossible: Log-likelihood is " + Math.log(sum));
         return Math.log(sum);
     }
 
