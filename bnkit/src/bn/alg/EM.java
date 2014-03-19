@@ -209,7 +209,7 @@ public class EM extends LearningAlg {
                                 Object[] jpt_key = jpt.table.getKey(entry.getKey().intValue());
 				// jpt_key will contain values for latent variables
                                 // other variables are already instantiated
-                                if (ovalue == null) {
+                                if (node.getInstance() == null) {
                                     ovalue = jpt_key[jpt_key.length - 1];
                                 }
                                 double prob = entry.getValue().doubleValue();
