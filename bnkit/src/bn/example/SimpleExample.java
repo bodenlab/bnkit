@@ -64,7 +64,7 @@ public class SimpleExample {
 		System.out.println("Variable elimination--------------");
 		VarElim ve = new VarElim();
 		ve.instantiate(bn);
-		Query q = ve.makeQuery(new Variable[] {B});
+		Query q = ve.makeQuery(B);
 		JPT jpt = ve.infer(q);
 		jpt.display();
 		j.setInstance(false);
