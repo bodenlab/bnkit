@@ -158,6 +158,16 @@ public class EnumTable<E> {
     }
 
     /**
+     * Check if there is a value assigned to the entry identified by the given index
+     *
+     * @param index the entry
+     * @return true if assigned, false otherwise
+     */
+    public boolean hasValue(int index) {
+        return map.containsKey(index);
+    }
+
+    /**
      * Retrieve the value of the entry identified by the given index
      *
      * @param index the entry

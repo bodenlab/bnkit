@@ -340,14 +340,19 @@ public class GDT implements BNode, Serializable {
         return trainable;
     }
 
+    /**
+     * Put random entries in the GDT if not already set.
+     */
     public void randomize(long seed) {
         Random rand = new Random(seed);
         if (table == null) {
-            prior = new GaussianDistrib(rand.nextGaussian(), rand.nextDouble());
+            if (prior == null)
+                prior = new GaussianDistrib(rand.nextGaussian(), rand.nextDouble());
         } else {
             int nrows = table.getSize();
             for (int i = 0; i < nrows; i++) {
-                table.setValue(i, new GaussianDistrib(rand.nextGaussian(), rand.nextDouble()));
+                if (!table.hasValue(i))
+                    table.setValue(i, new GaussianDistrib(rand.nextGaussian(), rand.nextDouble()));
             }
         }
     }
@@ -539,6 +544,7 @@ public class GDT implements BNode, Serializable {
             }
         } else {
             for (String line : dump.split("\n")) {
+                line = line.trim();
                 // 0: 0.4, 0.6; (true, true)
                 String[] specline = line.split(";");
                 if (specline.length >= 1) {

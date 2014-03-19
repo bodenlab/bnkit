@@ -599,16 +599,18 @@ public class CPT implements BNode, Serializable {
     }
 
     /**
-     * Put random entries in the CPT.
+     * Put random entries in the CPT if not already set.
      */
     public void randomize(long seed) {
         Random rand = new Random(seed);
         if (table == null) {
-            prior = EnumDistrib.random(var.getDomain());
+            if (prior == null)
+                prior = EnumDistrib.random(var.getDomain());
         } else {
             int nrows = table.getSize();
             for (int i = 0; i < nrows; i++) {
-                table.setValue(i, EnumDistrib.random(var.getDomain()));
+                if (!table.hasValue(i))
+                    table.setValue(i, EnumDistrib.random(var.getDomain()));
             }
         }
     }
