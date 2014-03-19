@@ -98,7 +98,7 @@ public class VarElim implements Inference {
     @Override
     public JPT infer(Query query) {
         JPT answer = null;
-		// All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
+	// All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
         // Evidence will be incorporated into the factor when it is constructed.
         // Create list of buckets: first one has query variables, then all sum-outs in topological ordering
         VEQuery q = (VEQuery) query;
@@ -131,13 +131,13 @@ public class VarElim implements Inference {
                 } // put it in the last bucket?
                 //buckets.get(buckets.size() - 1).put(ft);
                 else
-					; // all variables had been factored out so ignore
+                    ; // all variables had been factored out so ignore
             }
         }
         // Purge buckets, merge sum-out variables
         for (int i = 1; i < nBuckets; i++) { // ignore query bucket
             Bucket b = buckets.get(i);
-            if (b.factors.size() == 0) { // no factors, put sum-out variables in other bucket(s)
+            if (b.factors.isEmpty()) { // no factors, put sum-out variables in other bucket(s)
                 for (EnumVariable sumout : b.vars) { // check each sum-out variable
                     for (int jj = i + 1; jj < nBuckets; jj++) { // search suitable bucket for sum-out
                         Bucket b2 = buckets.get(jj);
@@ -163,7 +163,7 @@ public class VarElim implements Inference {
             }
             int nFactors = b.factors.size();
             if (nFactors > 0 && !ignore) {
-                List<FactorTable> fts = new ArrayList<FactorTable>(b.factors);
+                List<FactorTable> fts = new ArrayList<>(b.factors);
                 Collections.sort(fts, new FTCompare()); // sort the factors in order of variable-count (smaller-to-greater)				
                 FactorTable result = fts.get(0); // perform products in that order
                 for (int j = 1; j < nFactors; j++) {
