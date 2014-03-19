@@ -221,7 +221,11 @@ public class EM extends LearningAlg {
                                             parent_key[p] = jpt_key[parent_map[p]];
                                         }
                                     }
-                                    node.countInstance(parent_key, ovalue, prob);
+                                    try {
+                                        node.countInstance(parent_key, ovalue, prob);
+                                    } catch (java.lang.RuntimeException e) {
+                                        throw new EMRuntimeException("Problem with sample #"+(i+1)+": " + e.getMessage());
+                                    }
                                 }
                             }
 

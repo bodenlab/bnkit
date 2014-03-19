@@ -55,16 +55,18 @@ public class VarElim implements Inference {
      * of inference. There are three types of variables (given the BN): 1.
      * Evidence variables E--which have been assigned values via the BN 2. Query
      * variables Q--for which probabilities are sought P(Q|E) 3. Other variables
-     * X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X)
+     * X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
+     * Note that inference should return a JPT with variables in the *same* order 
+     * as that specified by Q.
      */
     @SuppressWarnings("rawtypes")
     @Override
     public Query makeQuery(Variable... qvars) {
-		// Find out which variables in the BN that will be summed out and organise them into "buckets".
+	// Find out which variables in the BN that will be summed out and organise them into "buckets".
         // They will be listed in "topological order" (parents before children) as per heuristics given in Dechter.
         // Each sumout variable will be assigned a bucket.
-        Set<EnumVariable> Q = new HashSet<EnumVariable>();
-        Set<Variable> E = new HashSet<Variable>();
+        List<EnumVariable> Q = new ArrayList<EnumVariable>();
+        List<Variable> E = new ArrayList<Variable>();
         List<EnumVariable> X = new ArrayList<EnumVariable>();
         List<Variable> ordered = new ArrayList<Variable>();
         try {
@@ -215,11 +217,11 @@ public class VarElim implements Inference {
 
     public class VEQuery implements Query {
 
-        final Set<EnumVariable> Q;
-        final Set<Variable> E;
+        final List<EnumVariable> Q;
+        final List<Variable> E;
         final List<EnumVariable> X;
 
-        VEQuery(Set<EnumVariable> Q, Set<Variable> E, List<EnumVariable> X) {
+        VEQuery(List<EnumVariable> Q, List<Variable> E, List<EnumVariable> X) {
             this.Q = Q;
             this.E = E;
             this.X = X;
@@ -233,8 +235,8 @@ public class VarElim implements Inference {
      */
     public class Bucket {
 
-        Set<FactorTable> factors;
-        Set<EnumVariable> vars = new HashSet<EnumVariable>();
+        List<FactorTable> factors;
+        List<EnumVariable> vars = new ArrayList<EnumVariable>();
 
         /**
          * Create a bucket by identifying the variable it processes
@@ -243,7 +245,7 @@ public class VarElim implements Inference {
          */
         Bucket(EnumVariable var) {
             this.vars.add(var);
-            this.factors = new HashSet<FactorTable>();
+            this.factors = new ArrayList<FactorTable>();
         }
 
         /**
@@ -251,9 +253,9 @@ public class VarElim implements Inference {
          *
          * @param var the variable
          */
-        Bucket(Set<EnumVariable> vars) {
+        Bucket(List<EnumVariable> vars) {
             this.vars = vars;
-            this.factors = new HashSet<FactorTable>();
+            this.factors = new ArrayList<FactorTable>();
         }
 
         /**
@@ -287,7 +289,7 @@ public class VarElim implements Inference {
             factors.add(f);
         }
 
-        Set<FactorTable> get() {
+        List<FactorTable> get() {
             return factors;
         }
     }
