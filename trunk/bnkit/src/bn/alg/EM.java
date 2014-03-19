@@ -241,7 +241,7 @@ public class EM extends LearningAlg {
             // finally complete the M-step by transferring counts to probabilities
             for (BNode node : update) {
                 if (node.isTrainable()) {
-                    node.maximizeInstance();
+                        node.maximizeInstance();
                 }
             }
 

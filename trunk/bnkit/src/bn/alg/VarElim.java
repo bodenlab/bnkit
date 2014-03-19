@@ -19,6 +19,8 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
+import bn.CountTable;
+import bn.EnumTable;
 import bn.EnumVariable;
 import bn.FactorTable;
 import bn.JPT;
@@ -28,6 +30,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -176,7 +179,31 @@ public class VarElim implements Inference {
                         }
                     }
                 } else { // last bucket so we should not marginalize out query variables, instead return the JPT from the final factor
-                    answer = new JPT(result);
+                    List<EnumVariable> f_parents = result.getParents();
+                    List<EnumVariable> q_parents = q.Q;
+                    int[] map2q = new int[q_parents.size()];
+                    for (int jf = 0; jf < map2q.length; jf ++) {
+                        map2q[jf] = -1;
+                        for (int jq = 0; jq < map2q.length; jq ++) {
+                            if (f_parents.get(jf).getName().equals(q_parents.get(jq).getName()))  {
+                                map2q[jf] = jq;
+                                break;
+                            }
+                        }
+                    }
+                    for (int j = 0; j < map2q.length; j ++) {
+                        if (map2q[j] == -1)
+                            throw new RuntimeException("Invalid inference result");
+                    }
+                    EnumTable<Double> et = new EnumTable<Double>(q_parents);
+                    for (Map.Entry<Integer, Double> entry : result.getMapEntries()) {
+                        Object[] fkey = result.getKey(entry.getKey().intValue());
+                        Object[] qkey = new Object[fkey.length];
+                        for (int j = 0; j < fkey.length; j ++)
+                            qkey[map2q[j]] = fkey[j];
+                        et.setValue(qkey, entry.getValue());
+                    }
+                    answer = new JPT(et);
                     logLikelihood = result.getLogLikelihood();
                     return answer;
                 }
