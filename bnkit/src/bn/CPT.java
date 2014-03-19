@@ -571,7 +571,7 @@ public class CPT implements BNode, Serializable {
                 Object[] cntkey = count.table.getKey(entry.getKey().intValue());
                 Object[] cptkey = new Object[cntkey.length - 1];
                 for (int i = 0; i < cptkey.length; i++) {
-                    cptkey[0] = cntkey[i + 1];
+                    cptkey[i] = cntkey[i + 1];
                 }
                 EnumDistrib d = this.table.getValue(cptkey);
                 if (d == null) {
