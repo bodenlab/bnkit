@@ -317,7 +317,7 @@ public class GDT implements BNode, Serializable {
             {
                 count = new SampleTable<Double>(this.getParents());
             }
-            count.count(key, prob);
+            count.count(key, (Double)value, prob);
         }
     }
 
