@@ -18,11 +18,13 @@ public class GaussianDistrib implements Distrib, Serializable {
 
     private double normConst;
 
+    @Override
     public double get(Object input) {
         double y = this.getDensity((Double) input);
         return y;
     }
 
+    @Override
     public String toString() {
         return String.format("%4.2f;%4.2f", mu, sigmaSquared);
     }
@@ -40,11 +42,13 @@ public class GaussianDistrib implements Distrib, Serializable {
     private final double ROOT_2PI = Math.sqrt(2 * Math.PI);
     private final double LOG_ROOT_2PI = 0.5 * (Math.log(2) + Math.log(Math.PI));
 
-    private Random rand = new Random();
+    private final Random rand = new Random();
 
     /**
      * Creates a univariate Gaussian distribution with the given fixed mean and
      * variance.
+     * @param mean
+     * @param variance
      */
     public GaussianDistrib(double mean, double variance) {
         setMean(mean);
@@ -56,6 +60,8 @@ public class GaussianDistrib implements Distrib, Serializable {
      * This method should only be called if the mean and variance were set in
      * the constructor (internal calls are ok if the private method
      * <code>initParams</code> is called first).
+     * @param x input value
+     * @return density of x
      */
     public double getDensity(double x) {
         return (Math.exp(-Math.pow((x - mu), 2) / (2 * sigmaSquared)) / normConst);
@@ -63,9 +69,11 @@ public class GaussianDistrib implements Distrib, Serializable {
 
     /**
      * Returns the natural log of the density of this Gaussian distribution at
-     * the given value. This method should only be called if the meand and
+     * the given value. This method should only be called if the mean and
      * variance were set in the constructor, or if <code>initParams</code> has
      * been called.
+     * @param x input value
+     * @return the log of the density of x
      */
     public double getLogDensity(double x) {
         return (-Math.pow((x - mu), 2) / (2 * sigmaSquared)) - logNormConst;
@@ -83,6 +91,7 @@ public class GaussianDistrib implements Distrib, Serializable {
      * Ann. Math. Stat 29:610-611]. See also
      * http://www.cs.princeton.edu/introcs/26function/MyMath.java.html
      */
+    @Override
     public Double sample() {
         double U = rand.nextDouble();
         double V = rand.nextDouble();
@@ -106,9 +115,9 @@ public class GaussianDistrib implements Distrib, Serializable {
     }
 
     public void randomize(int seed) {
-        Random rand = new Random(seed);
-        setMean(rand.nextGaussian());
-        setVariance(rand.nextDouble());
+        Random rand1 = new Random(seed);
+        setMean(rand1.nextGaussian());
+        setVariance(rand1.nextDouble());
     }
 
 }
