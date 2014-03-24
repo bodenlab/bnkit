@@ -29,6 +29,9 @@ import java.util.Map;
  * A factor table is a data structure for efficiently processing products and
  * sums over nodes. It can represent a CPT or GDT (when the continuous variable
  * is instantiated). The class implements basic operations over factor tables.
+ * 
+ * It is extended to manage the introduction of non-enumerable variables in some
+ * contexts by evaluating them by sampling.
  *
  * @author Mikael Boden
  */
@@ -36,7 +39,13 @@ public class FactorTable extends EnumTable<Double> {
 
     public boolean evidenced = false; // flag to indicate if the Factor was reduced due to evidence (used by inference)
     public boolean function = false;  // flag to indicate if the factor was the result of a product or marginalization
-
+    /**
+     * To manage variables that cannot be directly factorized, their distributions corresponding to 
+     * the keyed/instantiated variables are stored as separate tables, for "lazy evaluation".
+     * Empty initially.
+     */
+    private Map<Variable, EnumTable<Distrib>> nonEnumTables = null;
+    
     /**
      * Data structure for holding entries associated with keys. Keys are defined
      * by a size (of elements), and for each element, a valence (a number ]2,n[
@@ -59,9 +68,50 @@ public class FactorTable extends EnumTable<Double> {
         super(useParents);
     }
 
+    /**
+     * FactorTable is a data structure for holding entries associated with keys. 
+     * Keys are defined by a size (of elements), and for each element, a valence (a number ]2,n[
+     * where n>2). 
+     * 
+     * Use this constructor for FactorTable with non-Enumerable variables to be evaluated lazily.
+     *
+     * @param enumVars the variables that are included in the table
+     * @param nonEnumVars the variables that are included but not evaluated explicitly as part of the standard operations
+     */
+    public FactorTable(Collection<EnumVariable> enumVars, Collection<Variable> nonEnumVars) {
+        super(enumVars);
+        nonEnumTables = new HashMap<>();
+        for (Variable v : nonEnumVars)
+            nonEnumTables.put(v, new EnumTable<Distrib>(enumVars));
+    }
+
+    /**
+     * FactorTable is a data structure for holding entries associated with keys. 
+     * Keys are defined by a size (of elements), and for each element, a valence (a number ]2,n[
+     * where n>2). 
+     * 
+     * Use this constructor for FactorTable with non-Enumerable variables to be evaluated lazily.
+     *
+     * @param enumVars the variables that are included in the table
+     * @param nonEnumVars the variables that are included but not evaluated explicitly as part of the standard operations
+     */
+    public FactorTable(EnumVariable[] enumVars, Variable[] nonEnumVars) {
+        super(enumVars);
+        nonEnumTables = new HashMap<>();
+        for (Variable v : nonEnumVars)
+            nonEnumTables.put(v, new EnumTable<Distrib>(enumVars));
+    }
+
+    
     @Override
     public int setValue(Object[] key, Double value) {
         return super.setValue(key, value);
+    }
+
+    public int setValue(Object[] key, Double value, Variable nonenum, Distrib d) {
+        int index = super.setValue(key, value);
+        EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
+        return nonEnumTable.setValue(index, d);
     }
 
     @Override
@@ -130,7 +180,7 @@ public class FactorTable extends EnumTable<Double> {
      * @return the new FactorTable containing the remaining variables
      */
     public FactorTable marginalize(Collection<EnumVariable> parentsToSumOut) {
-        Collection<EnumVariable> newparents = new ArrayList<EnumVariable>(nParents - parentsToSumOut.size());
+        Collection<EnumVariable> newparents = new ArrayList<>(nParents - parentsToSumOut.size());
         for (int i = 0; i < nParents; i++) {
             if (!parentsToSumOut.contains(this.parents.get(i))) {
                 newparents.add(this.parents.get(i));

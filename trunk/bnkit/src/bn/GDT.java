@@ -84,10 +84,10 @@ public class GDT implements BNode, Serializable {
      * @param bn the BNet instance that can be used to check the status of nodes
      * so that factoring can be done (instantiation of variables are done for a
      * BNet node).
+     * @return the FactorTable created from the GDT, provided instantiations of BN
      */
     @Override
     public FactorTable makeFactor(BNet bn) {
-        // TODO: fix factorisation of un-instantiated continuous variables, perhaps by discretizing...
         List<EnumVariable> vars_old = this.getParents();
         Object varinstance = null;
         BNode cnode = bn.getNode(var);
@@ -96,7 +96,7 @@ public class GDT implements BNode, Serializable {
         }
         if (vars_old != null) { // there are parent variables
             Object[] searchkey = new Object[vars_old.size()];
-            List<EnumVariable> vars_new = new ArrayList<EnumVariable>(vars_old.size() + 1);
+            List<EnumVariable> vars_new = new ArrayList<>(vars_old.size() + 1);
             for (int i = 0; i < vars_old.size(); i++) {
                 EnumVariable parent = vars_old.get(i);
                 BNode pnode = bn.getNode(parent);
@@ -107,11 +107,13 @@ public class GDT implements BNode, Serializable {
                     vars_new.add(parent);
                 }
             }
+            FactorTable ft;
             if (varinstance == null) {
-                throw new RuntimeException("GDTs can not be factorised if continuous variable is un-instantiated");
-            }
-            FactorTable ft = new FactorTable(vars_new);
-            if (varinstance != null) {
+                List<Variable> nonEnums = new ArrayList<>();
+                nonEnums.add(this.var);
+                ft = new FactorTable(vars_new, nonEnums);
+            } else {
+                ft = new FactorTable(vars_new);
                 ft.evidenced = true;
             }
             int[] indices = table.getIndices(searchkey);
@@ -129,7 +131,7 @@ public class GDT implements BNode, Serializable {
                     if (varinstance != null) { // the variable for this GDT is instantiated
                         ft.addValue(newkey, d.get(varinstance));
                     } else { // the variable for this GDT is NOT instantiated...
-                        throw new RuntimeException("GDTs can not be factorised if continuous variable is un-instantiated");
+                        ft.setValue(newkey, 1.0, this.var, d);
                     }
                 } else { // this entry is null
                     //
@@ -141,7 +143,7 @@ public class GDT implements BNode, Serializable {
             {
                 return null;
             }
-            throw new RuntimeException("GDTs can not be factorised if continuous variable is un-instantiated");
+            throw new RuntimeException("GDTs can not be factorised unless it has enumerable parent variables");
         }
     }
 
