@@ -485,6 +485,7 @@ public class CPT implements BNode, Serializable {
     /**
      * Pretty-print of whole table
      */
+    @Override
     public void print() {
         System.out.println(formatTitle());
         if (!isPrior()) { // variables in condition
@@ -504,6 +505,7 @@ public class CPT implements BNode, Serializable {
      *
      * @param value the value that is assigned to this instantiated CPT
      */
+    @Override
     public void setInstance(Object value) {
         instance = value;
     }
@@ -511,6 +513,7 @@ public class CPT implements BNode, Serializable {
     /**
      * Set the variable of this CPT to unspecified, or NOT instantiated.
      */
+    @Override
     public void resetInstance() {
         instance = null;
     }
@@ -521,6 +524,7 @@ public class CPT implements BNode, Serializable {
      * @return the value of this CPT if instantiated, null if the CPT is not
      * instantiated.
      */
+    @Override
     public Object getInstance() {
         return instance;
     }
@@ -535,6 +539,7 @@ public class CPT implements BNode, Serializable {
      * see it, otherwise the probability)
      * @see bn.CPT#maximizeInstance()
      */
+    @Override
     public void countInstance(Object[] key, Object value, Double prob) {
         if (count == null) { // create count table if none exists
             List<EnumVariable> cond = new ArrayList<EnumVariable>();
@@ -560,6 +565,7 @@ public class CPT implements BNode, Serializable {
      * {@link bn.CPT#countInstance(Object[], Object, Double)}, ie implement the
      * M-step locally.
      */
+    @Override
     public void maximizeInstance() {
         if (count == null) {
             return;
