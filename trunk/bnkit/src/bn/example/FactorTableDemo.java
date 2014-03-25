@@ -8,11 +8,13 @@ package bn.example;
 
 import bn.BNet;
 import bn.CPT;
+import bn.GDT;
 import bn.Continuous;
 import bn.EnumDistrib;
 import bn.EnumVariable;
 import bn.Enumerable;
 import bn.FactorTable;
+import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Predef;
 import bn.Variable;
@@ -25,7 +27,7 @@ public class FactorTableDemo {
 
     /**
      * Demo of how FactorTable can be used in variable elimination inference.
-     * Example taken from Russell and Norvig (2003; p. 493-494).
+     * Example amended from Russell and Norvig (2003; p. 493-494).
      * @param args
      */
     public static void main(String[] args) {
@@ -33,6 +35,7 @@ public class FactorTableDemo {
         // Define variables
         EnumVariable B = Predef.Boolean("Burglary");
         EnumVariable E = Predef.Boolean("Earthquake");
+        Variable S     = Predef.Real("Seismic signal");
         EnumVariable A = Predef.Boolean("Alarm");
         EnumVariable J = Predef.Boolean("John calls");
         EnumVariable M = Predef.Boolean("Mary calls");
@@ -43,6 +46,7 @@ public class FactorTableDemo {
         CPT a = new CPT(A,    B, E);
         CPT j = new CPT(J,    A);
         CPT m = new CPT(M,    A);
+        GDT s = new GDT(S,    E);
         
         // Parameterise the nodes using our "expertise"
         b.put(new EnumDistrib(Enumerable.bool, 0.001, 0.999));
@@ -55,21 +59,25 @@ public class FactorTableDemo {
         j.put(new EnumDistrib(Enumerable.bool, 0.05, 0.95), false);
         m.put(new EnumDistrib(Enumerable.bool, 0.70, 0.30), true);
         m.put(new EnumDistrib(Enumerable.bool, 0.01, 0.99), false);
-
+        s.put(new GaussianDistrib(6.0, 3.0), true);
+        s.put(new GaussianDistrib(2.0, 3.0), false);
+        
         b.print();
         e.print();
         a.print();
         j.print();
         m.print();
-
+        s.print();
+        
         // Put all the nodes into the Bayesian network data structure
         // The BNet class manages efficient access to the nodes, based on the structure.
         BNet bn = new BNet();
-	bn.add(b, e, a, j, m);
+	bn.add(b, e, a, j, m, s);
 
         // Once in the BNet, variables (through the nodes) can be instantiated to values from their respective domains.
         j.setInstance(true);
         m.setInstance(true);
+        //s.setInstance(3.0);
         
         // Variable elimination works by factorising CPTs, and then by performing products and variable sum-outs in
         // an order that heuristically is computationally efficient.
@@ -97,6 +105,12 @@ public class FactorTableDemo {
         FactorTable ft_m = m.makeFactor(bn);
         System.out.println("Factor M");
         ft_m.display();
+        
+        FactorTable ft_s = s.makeFactor(bn);
+        System.out.println("Factor S");
+        ft_s.display();
+        
+        
 
         // To produce a JPT, all FactorTables relevant to the query need to enter into the product
         // at some point. From a theoretical point of view the order has no impact.
@@ -106,6 +120,10 @@ public class FactorTableDemo {
         // may also be very helpful to use. See Dechter's paper.
         FactorTable ft = FactorTable.product(ft_b, ft_e);
         System.out.println("Factor B * E");
+        ft.display();
+
+        ft = FactorTable.product(ft, ft_s);
+        System.out.println("Factor (B * E) * S");
         ft.display();
 
         ft = FactorTable.product(ft, ft_a);
@@ -124,6 +142,7 @@ public class FactorTableDemo {
         // Note that we could have done this earlier, and this would have resulted in smaller products.
         // Variable elimination also optimises when variables are summed-out.
         ft = ft.marginalize(new EnumVariable[] {A, E});
+        ft.display();
         
         // Normalise the FT, make it into a JPT with the query variables CONDITIONED on the instantiated variables removed above
         JPT p_burglary = new JPT(ft); 

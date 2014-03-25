@@ -43,7 +43,7 @@ public class FactorTable extends EnumTable<Double> {
     /**
      * To manage variables that cannot be directly factorized, their distributions corresponding to 
      * the keyed/instantiated variables are stored as separate tables, for "lazy evaluation".
-     * Empty initially.
+     * Empty to begin with.
      */
     private Map<Variable, EnumTable<Distrib>> nonEnumTables = null;
     
@@ -117,31 +117,46 @@ public class FactorTable extends EnumTable<Double> {
         return nonEnumTable.setValue(index, d);
     }
 
-    public int addDistrib(Object[] key, Variable nonenum, Distrib d) {
+    public int setDistrib(Object[] key, Variable nonenum, Distrib d) {
+        EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
+        if (nonEnumTable == null)
+            throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " is not valid for FactorTable");
+        int key_index = nonEnumTable.getIndex(key);
+        return nonEnumTable.setValue(key_index, d);
+    }
+
+    public int setDistrib(int key_index, Variable nonenum, Distrib d) {
+        EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
+        if (nonEnumTable == null)
+            throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " is not valid for FactorTable");
+        return nonEnumTable.setValue(key_index, d);
+    }
+
+    public int addDistrib(Object[] key, Variable nonenum, Distrib d, double weight) {
         EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
         if (nonEnumTable == null)
             throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " is not valid for FactorTable");
         int key_index = nonEnumTable.getIndex(key);
         Distrib prev_d = nonEnumTable.getValue(key_index);
-        if (prev_d == null)
-            return nonEnumTable.setValue(key_index, d);
-        else {
-            if (prev_d != d)
-                throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " cannot be marginalized");
+        if (prev_d == null) {
+            MixtureDistrib md = new MixtureDistrib(d, weight);
+            return nonEnumTable.setValue(key_index, md);
+        } else {
+            ((MixtureDistrib)prev_d).addDistrib(d, weight);
             return key_index;
         }
     }
 
-    public int addDistrib(int key_index, Variable nonenum, Distrib d) {
+    public int addDistrib(int key_index, Variable nonenum, Distrib d, double weight) {
         EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
         if (nonEnumTable == null)
             throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " is not valid for FactorTable");
         Distrib prev_d = nonEnumTable.getValue(key_index);
-        if (prev_d == null)
-            return nonEnumTable.setValue(key_index, d);
-        else {
-            if (prev_d != d)
-                throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " cannot be marginalized");
+        if (prev_d == null) {
+            MixtureDistrib md = new MixtureDistrib(d, weight);
+            return nonEnumTable.setValue(key_index, md);
+        } else {
+            ((MixtureDistrib)prev_d).addDistrib(d, weight);
             return key_index;
         }
     }
@@ -246,10 +261,11 @@ public class FactorTable extends EnumTable<Double> {
             ft = new FactorTable(newparents, this.getNonEnumVariables());
         for (Map.Entry<Integer, Double> entry : this.map.entrySet()) {
             int oldindex = entry.getKey().intValue();
+            double weight = entry.getValue().doubleValue();
             int newindex = maskIndex(oldindex, parentsToSumOut);
-            ft.addValue(newindex, entry.getValue());
+            ft.addValue(newindex, weight);
             for (Variable nonenum : this.getNonEnumVariables())
-                ft.addDistrib(newindex, nonenum, getDistrib(oldindex, nonenum));
+                ft.addDistrib(newindex, nonenum, getDistrib(oldindex, nonenum), weight);
         }
         ft.function = true;
         return ft;
@@ -325,7 +341,13 @@ public class FactorTable extends EnumTable<Double> {
             newparents.add(ft1.parents.get(i));
         }
         newparents.addAll(unique_ft2);
-        FactorTable ft3 = new FactorTable(newparents);
+        Collection<Variable> newEnumParents = new ArrayList<>(ft1.getNonEnumVariables());
+        newEnumParents.addAll(ft2.getNonEnumVariables());
+        FactorTable ft3 = null;
+        if (newEnumParents.size() > 0)
+            ft3 = new FactorTable(newparents, newEnumParents);
+        else
+            ft3 = new FactorTable(newparents);
         for (Map.Entry<Integer, Double> entry1 : ft1.map.entrySet()) {
             if (entry1.getValue() == 0.0) // if the value associated with the entry is 0, the product will be zero, 
             {
@@ -357,9 +379,9 @@ public class FactorTable extends EnumTable<Double> {
                     }
                     int ft3_index = ft3.addValue(ft3_key, entry1.getValue() * entry2.getValue());
                     for (Variable ft1_nonenum : ft1.getNonEnumVariables())
-                        ft3.addDistrib(ft3_index, ft1_nonenum, ft1.getDistrib(ft1_index, ft1_nonenum));
+                        ft3.setDistrib(ft3_index, ft1_nonenum, ft1.getDistrib(ft1_index, ft1_nonenum));
                     for (Variable ft2_nonenum : ft2.getNonEnumVariables())
-                        ft3.addDistrib(ft3_index, ft2_nonenum, ft2.getDistrib(ft2_index, ft2_nonenum));
+                        ft3.setDistrib(ft3_index, ft2_nonenum, ft2.getDistrib(ft2_index, ft2_nonenum));
                 }
             }
         }
@@ -411,9 +433,46 @@ public class FactorTable extends EnumTable<Double> {
         for (Variable v : this.parents) {
             sbuf.append(v.toString()).append(";");
         }
+        sbuf.append(";");
+        for (Variable v : this.getNonEnumVariables()) {
+            sbuf.append(v.toString()).append(";");
+        }
         return sbuf.toString() + ")";
     }
-
+    
+    private String constantLength(String s, int len) {
+        if (s.length() > len)
+            return s.substring(0, len);
+        else return String.format("%-10s", s);
+        
+    }
+    
+    @Override
+    public void display() {
+        System.out.print("Idx ");
+        for (int j = 0; j < this.nParents; j++)
+            System.out.print(String.format("[%10s]", constantLength(this.parents.get(j).toString(), 10)));
+        List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
+        for (Variable nonenum : nonenums) 
+            System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));
+        System.out.println(" F");
+        for (int i = 0; i < this.getSize(); i++) {
+            System.out.print(String.format("%3d ", i));
+            Object[] key = this.getKey(i);
+            for (Object key1 : key)
+                System.out.print(String.format(" %-10s ", constantLength(key1.toString(), 10)));
+            for (Variable nonenum : nonenums) {
+                Distrib d = this.getDistrib(i, nonenum);
+                System.out.print(String.format(" %s ", d.toString()));
+                //System.out.print(String.format(" %-10s ", constantLength(d.toString(), 10)));
+            }
+            Object val = this.getValue(i);
+            if (val != null) 
+                System.out.println(String.format(" %7.5f", this.getValue(i)));
+            else
+                System.out.println(" null ");
+        }
+    }
 }
 
 class FactorTableRuntimeException extends RuntimeException {
