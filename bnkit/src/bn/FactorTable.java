@@ -19,11 +19,12 @@ package bn;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A factor table is a data structure for efficiently processing products and
@@ -111,9 +112,61 @@ public class FactorTable extends EnumTable<Double> {
     public int setValue(Object[] key, Double value, Variable nonenum, Distrib d) {
         int index = super.setValue(key, value);
         EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
+        if (nonEnumTable == null)
+            throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " is not valid for FactorTable");
         return nonEnumTable.setValue(index, d);
     }
 
+    public int addDistrib(Object[] key, Variable nonenum, Distrib d) {
+        EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
+        if (nonEnumTable == null)
+            throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " is not valid for FactorTable");
+        int key_index = nonEnumTable.getIndex(key);
+        Distrib prev_d = nonEnumTable.getValue(key_index);
+        if (prev_d == null)
+            return nonEnumTable.setValue(key_index, d);
+        else {
+            if (prev_d != d)
+                throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " cannot be marginalized");
+            return key_index;
+        }
+    }
+
+    public int addDistrib(int key_index, Variable nonenum, Distrib d) {
+        EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
+        if (nonEnumTable == null)
+            throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " is not valid for FactorTable");
+        Distrib prev_d = nonEnumTable.getValue(key_index);
+        if (prev_d == null)
+            return nonEnumTable.setValue(key_index, d);
+        else {
+            if (prev_d != d)
+                throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " cannot be marginalized");
+            return key_index;
+        }
+    }
+
+    public Distrib getDistrib(Object[] key, Variable nonenum) {
+        EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
+        if (nonEnumTable == null)
+            throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " is not valid for FactorTable");
+        return nonEnumTable.getValue(key);
+    }
+    
+    public Distrib getDistrib(int key_index, Variable nonenum) {
+        EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
+        if (nonEnumTable == null)
+            throw new FactorTableRuntimeException("Non-enumerable variable " + nonenum.getName() + " is not valid for FactorTable");
+        return nonEnumTable.getValue(key_index);
+    }
+    
+    public Set<Variable> getNonEnumVariables() {
+        if (nonEnumTables == null)
+            return Collections.EMPTY_SET;
+        else 
+            return nonEnumTables.keySet();
+    }
+    
     @Override
     public Double getValue(Object[] key) {
         Double y = super.getValue(key);
@@ -186,10 +239,17 @@ public class FactorTable extends EnumTable<Double> {
                 newparents.add(this.parents.get(i));
             }
         }
-        FactorTable ft = new FactorTable(newparents);
+        FactorTable ft; 
+        if (nonEnumTables == null)
+            ft = new FactorTable(newparents);
+        else
+            ft = new FactorTable(newparents, this.getNonEnumVariables());
         for (Map.Entry<Integer, Double> entry : this.map.entrySet()) {
-            int newindex = maskIndex(entry.getKey(), parentsToSumOut);
+            int oldindex = entry.getKey().intValue();
+            int newindex = maskIndex(oldindex, parentsToSumOut);
             ft.addValue(newindex, entry.getValue());
+            for (Variable nonenum : this.getNonEnumVariables())
+                ft.addDistrib(newindex, nonenum, getDistrib(oldindex, nonenum));
         }
         ft.function = true;
         return ft;
@@ -226,7 +286,7 @@ public class FactorTable extends EnumTable<Double> {
     }
 
     public static Collection<EnumVariable> union(Collection<EnumVariable> ft1, Collection<EnumVariable> ft2) {
-        Collection<EnumVariable> isect = new HashSet<EnumVariable>();
+        Collection<EnumVariable> isect = new HashSet<>();
         isect.addAll(ft1);
         isect.addAll(ft2);
         return isect;
@@ -242,9 +302,9 @@ public class FactorTable extends EnumTable<Double> {
      * @return the factor table that is the product of the specified factors
      */
     public static FactorTable product(FactorTable ft1, FactorTable ft2) {
-        Map<Integer, Integer> overlap = new HashMap<Integer, Integer>();
-        List<EnumVariable> unique_ft2 = new ArrayList<EnumVariable>(); // in ft2 but not in ft1
-        List<Integer> unique_ft2_idx = new ArrayList<Integer>(); // in ft2 but not in ft1
+        Map<Integer, Integer> overlap = new HashMap<>();
+        List<EnumVariable> unique_ft2 = new ArrayList<>(); // in ft2 but not in ft1
+        List<Integer> unique_ft2_idx = new ArrayList<>(); // in ft2 but not in ft1
         for (int i = 0; i < ft2.nParents; i++) {
             boolean match = false;
             for (int j = 0; j < ft1.nParents; j++) {
@@ -260,7 +320,7 @@ public class FactorTable extends EnumTable<Double> {
                 unique_ft2_idx.add(i);
             }
         }
-        Collection<EnumVariable> newparents = new ArrayList<EnumVariable>(ft1.nParents);
+        Collection<EnumVariable> newparents = new ArrayList<>(ft1.nParents);
         for (int i = 0; i < ft1.nParents; i++) {
             newparents.add(ft1.parents.get(i));
         }
@@ -269,35 +329,37 @@ public class FactorTable extends EnumTable<Double> {
         for (Map.Entry<Integer, Double> entry1 : ft1.map.entrySet()) {
             if (entry1.getValue() == 0.0) // if the value associated with the entry is 0, the product will be zero, 
             {
-                continue; // ... so we abort
+                continue; // ... so we abort, to save time as there is no point in doing any calculations
             }
             for (Map.Entry<Integer, Double> entry2 : ft2.map.entrySet()) {
                 if (entry2.getValue() == 0.0) // if the value associated with the entry is 0, the product will be zero, 
                 {
-                    continue; // ... so we abort
+                    continue; // ... so we abort as there is no point in doing any more calculcations
                 }
-                Object[] ft1_key = ft1.getKey(entry1.getKey().intValue());
-                Object[] ft2_key = ft2.getKey(entry2.getKey().intValue());
+                int ft1_index = entry1.getKey().intValue();
+                int ft2_index = entry2.getKey().intValue();
+                Object[] ft1_key = ft1.getKey(ft1_index);
+                Object[] ft2_key = ft2.getKey(ft2_index);
                 boolean match = true;
                 for (Map.Entry<Integer, Integer> link : overlap.entrySet()) {
-                    int index_ft1 = link.getKey();
-                    int index_ft2 = link.getValue();
-                    if (ft1_key[index_ft1] != ft2_key[index_ft2]) {
+                    if (ft1_key[link.getKey()] != ft2_key[link.getValue()]) {
                         match = false;
                         break;
                     }
                 }
                 if (match) { // all linked variables have the same value
                     Object[] ft3_key = new Object[ft3.nParents];
-                    for (int i = 0; i < ft1.nParents; i++) {
-                        ft3_key[i] = ft1_key[i];
-                    }
+                    System.arraycopy(ft1_key, 0, ft3_key, 0, ft1.nParents);
                     int i = ft1.nParents;
                     for (int ft2_idx : unique_ft2_idx) {
                         ft3_key[i] = ft2_key[ft2_idx];
                         i++;
                     }
-                    ft3.addValue(ft3_key, entry1.getValue() * entry2.getValue());
+                    int ft3_index = ft3.addValue(ft3_key, entry1.getValue() * entry2.getValue());
+                    for (Variable ft1_nonenum : ft1.getNonEnumVariables())
+                        ft3.addDistrib(ft3_index, ft1_nonenum, ft1.getDistrib(ft1_index, ft1_nonenum));
+                    for (Variable ft2_nonenum : ft2.getNonEnumVariables())
+                        ft3.addDistrib(ft3_index, ft2_nonenum, ft2.getDistrib(ft2_index, ft2_nonenum));
                 }
             }
         }
@@ -318,31 +380,6 @@ public class FactorTable extends EnumTable<Double> {
     }
 
     public static void main(String[] args) {
-        /*
-         EnumVariable a = EnumVariable.Boolean();
-         EnumVariable d = EnumVariable.Boolean();
-         EnumVariable b = EnumVariable.Boolean();
-         EnumVariable c = EnumVariable.Number(30);
-		
-         FactorTable ft1 = new FactorTable(new EnumVariable[] {a, b, d});
-         ft1.setValue(new Object[] {true,  false, false}, 0.1);
-         ft1.setValue(new Object[] {false,  false, false}, 0.3);
-         ft1.setValue(new Object[] {true,  true, false},  0.6);
-		
-         FactorTable ft2 = new FactorTable(new EnumVariable[] {d, b, c});
-         ft2.setValue(new Object[] {true, true, 0}, 0.3);
-         ft2.setValue(new Object[] {true, false, 1}, 0.2);
-         ft2.setValue(new Object[] {false, true,  1}, 0.4);
-         ft2.setValue(new Object[] {false, false, 0}, 0.1);
-		
-         ft1.display();
-         ft2.display();
-		
-         FactorTable ft3 = FactorTable.product(ft1, ft2);
-		
-         ft3.display();
-         */
-
         EnumVariable v1 = Predef.Boolean();
         EnumVariable v2 = Predef.Number(4);
         EnumVariable v3 = Predef.Nominal(new String[]{"Yes", "No", "Maybe"});
@@ -368,10 +405,11 @@ public class FactorTable extends EnumTable<Double> {
         System.out.println("Size of ft3: " + ft3.getSize());
     }
 
+    @Override
     public String toString() {
-        StringBuffer sbuf = new StringBuffer("F(");
+        StringBuilder sbuf = new StringBuilder("F(");
         for (Variable v : this.parents) {
-            sbuf.append(v.toString() + ";");
+            sbuf.append(v.toString()).append(";");
         }
         return sbuf.toString() + ")";
     }
