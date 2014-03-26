@@ -142,8 +142,8 @@ public class FactorTableDemo {
         // Note that we could have done this earlier, and this would have resulted in smaller products.
         // Variable elimination also optimises when variables are summed-out.
         ft = ft.marginalize(new EnumVariable[] {A, E});
-        ft.display();
-        
+        ft.displaySampled();
+
         // Normalise the FT, make it into a JPT with the query variables CONDITIONED on the instantiated variables removed above
         JPT p_burglary = new JPT(ft); 
         
