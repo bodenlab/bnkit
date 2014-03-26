@@ -28,12 +28,10 @@ import java.util.Set;
 
 /**
  * A factor table is a data structure for efficiently processing products and
- * sums over nodes. It can represent a CPT or GDT (when the continuous variable
- * is instantiated). The class implements basic operations over factor tables.
+ * sums over nodes--sometimes referred to as "local" computations. 
+ * It can represent a CPT or GDT (when the continuous variable
+ * is instantiated or when it occurs as a child of an enumerable variable).
  * 
- * It is extended to manage the introduction of non-enumerable variables in some
- * contexts by evaluating them by sampling.
- *
  * @author Mikael Boden
  */
 public class FactorTable extends EnumTable<Double> {
@@ -43,7 +41,7 @@ public class FactorTable extends EnumTable<Double> {
     /**
      * To manage variables that cannot be directly factorized, their distributions corresponding to 
      * the keyed/instantiated variables are stored as separate tables, for "lazy evaluation".
-     * Empty to begin with.
+     * These are empty to begin with.
      */
     private Map<Variable, EnumTable<Distrib>> nonEnumTables = null;
     
@@ -52,10 +50,10 @@ public class FactorTable extends EnumTable<Double> {
      * by a size (of elements), and for each element, a valence (a number ]2,n[
      * where n>2). An entry is always a double.
      *
-     * @param useParents the variables that are included in the table
+     * @param enumVars the enumerable variables that are included in the table
      */
-    public FactorTable(Collection<EnumVariable> useParents) {
-        super(useParents);
+    public FactorTable(Collection<EnumVariable> enumVars) {
+        super(enumVars);
     }
 
     /**
@@ -63,10 +61,10 @@ public class FactorTable extends EnumTable<Double> {
      * by a size (of elements), and for each element, a valence (a number ]2,n[
      * where n>2). An entry is always a double.
      *
-     * @param useParents the variables that are included in the table
+     * @param enumVars the enumerable variables that are included in the table
      */
-    public FactorTable(EnumVariable[] useParents) {
-        super(useParents);
+    public FactorTable(EnumVariable[] enumVars) {
+        super(enumVars);
     }
 
     /**
@@ -103,12 +101,25 @@ public class FactorTable extends EnumTable<Double> {
             nonEnumTables.put(v, new EnumTable<Distrib>(enumVars));
     }
 
-    
+    /**
+     * Set the value in a FactorTable. Use with care.
+     * @param key the key identifying the setting of the enumerable variables
+     * @param value the value to assign the entry
+     * @return the index of the entry
+     */
     @Override
     public int setValue(Object[] key, Double value) {
         return super.setValue(key, value);
     }
 
+    /**
+     * Set the value in a FactorTable. Use with care.
+     * @param key the key identifying the setting of the enumerable variables
+     * @param value the value to assign the entry
+     * @param nonenum the non-enumerable variable to be set
+     * @param d the distribution that applies to the non-enumerable variable
+     * @return the index of the entry
+     */
     public int setValue(Object[] key, Double value, Variable nonenum, Distrib d) {
         int index = super.setValue(key, value);
         EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
@@ -117,6 +128,13 @@ public class FactorTable extends EnumTable<Double> {
         return nonEnumTable.setValue(index, d);
     }
 
+    /**
+     * Set the value in a FactorTable. Use with care.
+     * @param key the key identifying the setting of the enumerable variables
+     * @param nonenum the non-enumerable variable to be set
+     * @param d the distribution that applies to the non-enumerable variable
+     * @return the index of the entry
+     */
     public int setDistrib(Object[] key, Variable nonenum, Distrib d) {
         EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
         if (nonEnumTable == null)
@@ -125,6 +143,13 @@ public class FactorTable extends EnumTable<Double> {
         return nonEnumTable.setValue(key_index, d);
     }
 
+    /**
+     * Set the value in a FactorTable. Use with care.
+     * @param key_index the key index identifying the setting of the enumerable variables
+     * @param nonenum the non-enumerable variable to be set
+     * @param d the distribution that applies to the non-enumerable variable
+     * @return the index of the entry
+     */
     public int setDistrib(int key_index, Variable nonenum, Distrib d) {
         EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
         if (nonEnumTable == null)
@@ -132,6 +157,14 @@ public class FactorTable extends EnumTable<Double> {
         return nonEnumTable.setValue(key_index, d);
     }
 
+    /**
+     * Add a non-enumerable distribution as required by marginalisation of enumerable variables.
+     * @param key the key identifying the setting of the enumerable variables
+     * @param nonenum the non-enumerable variable to be set
+     * @param d the distribution that applies to the non-enumerable variable
+     * @param weight the weight assigned to the distribution
+     * @return the index for the key
+     */
     public int addDistrib(Object[] key, Variable nonenum, Distrib d, double weight) {
         EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
         if (nonEnumTable == null)
@@ -147,6 +180,14 @@ public class FactorTable extends EnumTable<Double> {
         }
     }
 
+    /**
+     * Add a non-enumerable distribution as required by marginalisation of enumerable variables.
+     * @param key_index the key index identifying the setting of the enumerable variables
+     * @param nonenum the non-enumerable variable to be set
+     * @param d the distribution that applies to the non-enumerable variable
+     * @param weight the weight assigned to the distribution
+     * @return the index for the key
+     */
     public int addDistrib(int key_index, Variable nonenum, Distrib d, double weight) {
         EnumTable<Distrib> nonEnumTable = nonEnumTables.get(nonenum);
         if (nonEnumTable == null)
@@ -242,6 +283,10 @@ public class FactorTable extends EnumTable<Double> {
      * Sums-out (marginalizes) one or more parents from the current table. Time
      * complexity is O(n+m*3n) where n is the number of parents and m is the
      * specified number of entries in the current table.
+     * 
+     * This method has been partially adapted for continuous (non-enumerable) variables.
+     * Specifically, it is able to sum out enumerable variables even if continuous variables 
+     * are uninstantiated, by convolution of densities into mixtures.
      *
      * @param parentsToSumOut variables that will be summed out from the current
      * table
@@ -275,7 +320,11 @@ public class FactorTable extends EnumTable<Double> {
      * Sums-out (marginalizes) one or more parents from the current table. Time
      * complexity is O(n+m*3n) where n is the number of parents and m is the
      * specified number of entries in the current table.
-     *
+     * 
+     * This method has been partially adapted for continuous (non-enumerable) variables.
+     * Specifically, it is able to sum out enumerable variables even if continuous variables 
+     * are uninstantiated, by convolution of densities into mixtures.
+     * 
      * @param parentsToSumOut variables that will be summed out from the current
      * table
      * @return the new FactorTable containing the remaining variables
@@ -312,6 +361,11 @@ public class FactorTable extends EnumTable<Double> {
      * Takes the product between the two factors provided as arguments.
      * Variables to be "joined" from the factors must have the same name and
      * implement the same domain for the product to be determined.
+     *
+     * This method has been partially adapted for continuous variables, but it assumes
+     * that continuous variables cannot be reached by multiple paths. For that
+     * to work, they have to be joined the same way as discrete variables. Currently,
+     * continuous variables are just added without checking if the other factors has them.
      *
      * @param ft1 factor one
      * @param ft2 factor two
@@ -465,6 +519,36 @@ public class FactorTable extends EnumTable<Double> {
                 Distrib d = this.getDistrib(i, nonenum);
                 System.out.print(String.format(" %s ", d.toString()));
                 //System.out.print(String.format(" %-10s ", constantLength(d.toString(), 10)));
+            }
+            Object val = this.getValue(i);
+            if (val != null) 
+                System.out.println(String.format(" %7.5f", this.getValue(i)));
+            else
+                System.out.println(" null ");
+        }
+    }
+
+    public void displaySampled() {
+        System.out.print("Idx ");
+        for (int j = 0; j < this.nParents; j++)
+            System.out.print(String.format("[%10s]", constantLength(this.parents.get(j).toString(), 10)));
+        List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
+        for (Variable nonenum : nonenums) 
+            System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));
+        System.out.println(" F");
+        for (int i = 0; i < this.getSize(); i++) {
+            System.out.print(String.format("%3d ", i));
+            Object[] key = this.getKey(i);
+            for (Object key1 : key)
+                System.out.print(String.format(" %-10s ", constantLength(key1.toString(), 10)));
+            for (Variable nonenum : nonenums) {
+                Distrib d = this.getDistrib(i, nonenum);
+                double sum = 0;
+                for (int j = 0; j < 1000; j ++) {
+                    Double sample = (Double)d.sample();
+                    sum += sample.doubleValue();
+                }
+                System.out.print(String.format(" %5.3f ", sum/1000.0));
             }
             Object val = this.getValue(i);
             if (val != null) 

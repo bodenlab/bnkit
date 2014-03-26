@@ -4,9 +4,9 @@ import java.io.Serializable;
 import java.util.Random;
 
 /**
- * The multivariate Gaussian density function. Implementation is based on
+ * The univariate Gaussian density function. Implementation is based on
  * Bayesian Logic (BLOG) inference engine version 0.3 (see copyright message
- * below)
+ * below).
  */
 public class GaussianDistrib implements Distrib, Serializable {
 
