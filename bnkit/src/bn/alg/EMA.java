@@ -224,6 +224,7 @@ public class EMA extends LearningAlg {
                                     ovalue = jpt_key[jpt_key.length - 1];
                                 }
                                 double prob = entry.getValue().doubleValue();
+                                //Some sort of bug here - null as key?
                                 if (node.isRoot()) { // if prior
                                     node.countInstance(null, ovalue, prob);
                                 } else { // if node has parents
