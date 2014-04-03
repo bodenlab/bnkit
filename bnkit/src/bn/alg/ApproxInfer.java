@@ -134,13 +134,13 @@ public class ApproxInfer implements Inference {
     		//With the new data structure I'm unsure how to specify which node to look at??
     		for (Variable qVar : q.X) {
     			List<EnumVariable> parList = storeTable.table.getParents();
-    			Object[] parents = parList.toArray();
-    			Object[] key = new Object[parents.length];
-    			for (int i = 0; i < parents.length; i ++) {
-    				Object at = parents[i];
-    				key[i] = cbn.getNode((Variable)parents[i]).getInstance();
+    			List<Object> instances = new ArrayList<Object>();
+    			for (EnumVariable par : parList) {
+    				instances.add(cbn.getNode(par).getInstance());
     			}
-    			storeTable.count(key);
+    			storeTable.count(instances.toArray());
+    		System.out.println("StoreTable complete");
+    	    storeTable.display();
     			
 //    			if (parList.size() > 1) {
 //    				Object[] parents = parList.toArray();
@@ -159,8 +159,8 @@ public class ApproxInfer implements Inference {
     			
     		}
     	}
-
-    	storeTable.display();
+//    	System.out.println("StoreTable complete");
+//    	storeTable.display();
     	Collection<Double> values = storeTable.table.getValues();
     	Object[] points = list.toArray();
     	
