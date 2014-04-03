@@ -95,41 +95,23 @@ public class ApproxInfer implements Inference {
     			//Randomize the index
     			cbn.getNode(var).setInstance(params[0]);
     		} else {
-    			String test = var.getParams();
         		String[] params = var.getParams().split(";");
         		//make index into params random?
         		cbn.getNode(var).setInstance(params[0]);
     		}
     	}
     	
-    	//Initialise a structure for storing the results of the query
-    	//Must have space for all possible parameters of query
+    	//Count Table for tracking state of query
+    	List<EnumVariable> list = new ArrayList<EnumVariable>(q.X.size());
+    	Object[] test = q.X.toArray();
+    	for (Variable var : q.X) {
+    		EnumVariable nVar = (EnumVariable)var;
+            list.add(nVar);
+        }
+    	CountTable storeTable = new CountTable(list);  	
+    	System.out.println("StoreTable");
+    	storeTable.display();    	
     	
-    	//For the query and associated hashMap
-    	//Associated map stores parameters with final scores
-    	Map<Variable, Map> store = new HashMap<Variable, Map>();
-    	//Look at all variables in query
-    	for (Variable param : q.X) {
-    		//For the parameter and associated count
-    		Map<Object, Integer> inner = new HashMap<Object, Integer>();
-    		if (param.getPredef().equals("Boolean")){
-    			Object[] parameters = {true, false};
-        		for (Object parameter : parameters){
-        			//Add each parameter with an initial count 0
-        			inner.put(parameter, 0);    			
-        		}
-    		} else {
-    			String[] parameters = param.getParams().split(";");
-        		for (String parameter : parameters){
-        			//Add each parameter with an initial count 0
-        			inner.put(parameter, 0);    			
-        		}
-    		}
-
-    		//Add the map with parameters and counts to the map with node as key
-    		store.put(param, inner);
-    	}
-
     	//Iterations of sampling needs to be flexible
     	//Have to set it in EM? Earlier?
     	int N = 100;
@@ -146,58 +128,50 @@ public class ApproxInfer implements Inference {
     			// Update Query count here? Outside loop is better?
     		}
     		//Update Query count
+    		//Confused about what I'm doing below, think I've gotten a bit mixed up about what I'm looking for
+    		//This data structure has possibly gotten out of hand...
+    		//Should find the instance of 1 query and count that
+    		//With the new data structure I'm unsure how to specify which node to look at??
     		for (Variable qVar : q.X) {
-    			Object key = cbn.getNode(qVar).getInstance();
-    			// try/catch?
-
-    			if (key instanceof java.lang.Boolean){
-    				Integer result = (Integer)store.get(qVar).get(key);
-        			result++;
-        			store.get(qVar).put(key, result);
-    			} else {
-    				Integer result = (Integer)store.get(qVar).get(key.toString());
-        			result++;
-        			store.get(qVar).put(key, result);
+    			List<EnumVariable> parList = storeTable.table.getParents();
+    			Object[] parents = parList.toArray();
+    			Object[] key = new Object[parents.length];
+    			for (int i = 0; i < parents.length; i ++) {
+    				Object at = parents[i];
+    				key[i] = cbn.getNode((Variable)parents[i]).getInstance();
     			}
-
-    		}   		
-    	}
-    	// Normalise the query counts
-    	//Translate to distrib
-    	//Method to sample from distrib
-    	for (Variable qVar : q.X) {
-    		Collection values = store.get(qVar).values();
-    		Object[] vals = values.toArray();
-    		double[] data = new double[values.size()];
-        	for (int i = 0; i < values.size(); i++){
-        		double res = (double)((int)vals[i]);
-        		data[i] = res;
-        	}
-    		EnumDistrib dist = new EnumDistrib((Enumerable)qVar.getDomain(), data);
-    		System.out.println(dist.toString());
-    		System.out.println(qVar.toString());   		
-    		
-    		EnumTable update = cbn.getNode(qVar).getTable();
-    		//Node currently has no associated CPT
-    		//Does this always mean it's a root node?
-    		//Should there be a check if it's a root?
-    		if (update == null){
-    			if (cbn.getNode(qVar).isRoot()) {
-    				System.out.println("Create CPT for root");
-    				CPT output = new CPT((EnumVariable)qVar);
-        			output.put(dist);
-    			} else {
-    				//What if it isn't the root but the table is null?
-    			}
-    		} else {
-    			//How to update a CPT with new distribution?
-    			System.out.println("CPT already exists - not updated");
-    			System.out.println(update.toString());
+    			storeTable.count(key);
+    			
+//    			if (parList.size() > 1) {
+//    				Object[] parents = parList.toArray();
+//	    			Object[] key = new Object[parents.length + 1];
+//	    			key[key.length -1] = cbn.getNode(qVar).getInstance();
+//	    			for (int i = 0; i < parents.length; i ++) {
+//	    				System.out.println(parents.toString());
+//	    				key[i] = cbn.getNode(parents[i].toString()).getInstance();
+//	    			}
+//	    			storeTable.count(key);
+//    			} else {
+//    				Object[] key = {cbn.getNode(qVar).getInstance()};
+//    				storeTable.count(key);
+//    			}
+    			
     			
     		}
-//    		FactorTable fin = output.makeFactor();
-//    		answer = new JPT(update);
     	}
+
+    	storeTable.display();
+    	Collection<Double> values = storeTable.table.getValues();
+    	Object[] points = list.toArray();
+    	
+    	//Having a null in the jpt causes problems down the line...
+    	System.out.println("To JPT");
+    	answer = new JPT(storeTable.table);
+    	System.out.println("JPT created");
+    	
+    	//Unsure about this factor table...am I passing in the right list?
+    	FactorTable out2 = new FactorTable(answer.getParents());
+    	logLikelihood = out2.getLogLikelihood();
     	
     	return answer;
     }
