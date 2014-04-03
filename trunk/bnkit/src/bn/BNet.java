@@ -433,6 +433,97 @@ public class BNet implements Serializable {
         nbn.compile();
         return nbn;
     }
+    
+    /**
+     * Get the Markov Blanket (mb) of a query node.
+     * Returns the parents, children and parents of children 
+     * for the query node
+     * 
+     * @param query variable to query
+     * @return a new BN with relevant CPTs and GDTs
+     */
+    
+    public BNet getMB(Variable query) {
+    	BNet mbn = new BNet();
+    	String qName = query.getName();
+    	BNode qNode = getNode(query);
+    	Set<String> parents = new HashSet<String>();
+    	//get children of query node
+    	Set<String> children = new HashSet<String>();
+    	//add the parents of the query node unless it is a root node
+    	if (getParents(qName) != null ) {
+    		parents.addAll(getParents(qName));
+    	}
+    	//add children of query node unless it's a leaf node
+    	Collection<String> test = getChildren(qNode);
+    	if (getChildren(qNode) != null ) {
+    		children.addAll(getChildren(qNode));
+    	} else {
+    		children.add(qNode.getName());
+    	}
+    	//for each child get its parents and add to the parents Set
+    	for (String child : children) {
+    		//child will always have at least one parent (query)
+    		Set<String> newParents = getParents(child);
+    		//query node will always be listed here as a parent
+    		for (String parent : newParents) {
+    			parents.add(parent);
+    		}
+    	}
+    	for (BNode node : nodes.values()) {
+    		//add all parents and children to the markov blanket network
+    		//query node will be in parents set - unless no children!
+    		if (parents.contains(node.getVariable().toString()) || children.contains(node.getName())){
+    			mbn.add(node);
+    		}
+    	}
+    	mbn.compile();
+    	return mbn;
+    }
+    
+    
+    /**
+     * Given the Markov Blanket network of a query, 
+     * return a sample from the distribution of P(X|mb(X))
+     * 
+     * @param mbNet mb network of query
+     * @param query 
+     * @return sample from distribution
+     */
+    public Object getMBProb(BNet mbNet, BNode query) {  	
+    	
+    	query.resetInstance();
+    	Set<FactorTable> fTables = new HashSet<FactorTable>();
+    	//Query node not included in set, used for initial factor table
+    	for (BNode node : mbNet.getNodes()){
+    		if (node.getName() != query.getName()) {
+    			String test = node.getVariable().getParams();
+    			FactorTable fact = node.makeFactor(mbNet);
+    			//only works when prior prob available?
+    			//Nodes without CPT do not weigh in on result
+    			if (fact != null ){
+    				fTables.add(node.makeFactor(mbNet));
+    			}
+    		}
+    	}
+    	//Get the factor table for the query and make it the product start point
+    	FactorTable ft = query.makeFactor(mbNet);
+    	//For each factor table, add it to the product
+    	for (FactorTable factor : fTables) {
+    		ft = FactorTable.product(ft, factor);    		
+    	}
+    	Collection values = ft.map.values();
+    	Object[] vals = values.toArray();
+		double[] data = new double[values.size()];
+    	for (int i = 0; i < values.size(); i++){
+    		double res = (double)(vals[i]);
+    		data[i] = res;
+    	}
+		Distrib dist = new EnumDistrib((Enumerable)query.getVariable().getDomain(), data);
+		Object end = dist.sample(); 	
+		
+    	return end;
+    }
 
     /**
      * Utility function to create an array from a set of String.
