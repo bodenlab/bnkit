@@ -2,8 +2,10 @@
  * 
  */
 package bn.example;
+import bn.alg.EMA;
 import bn.alg.LearningAlg;
 import bn.alg.EM;
+
 import java.util.List;
 
 import bn.*;
@@ -29,7 +31,8 @@ public class LoadNTrain {
 		List<BNode> nodes = bn.getOrdered();
 		Object[][] data = DataBuf.load(data_file, nodes);
 
-		LearningAlg em = new EM(bn);
+//		LearningAlg em = new EM(bn);
+		LearningAlg em = new EMA(bn);
 		em.train(data, nodes);
 		BNBuf.save(bn, bn_file + ".new");
 		//Test commit
