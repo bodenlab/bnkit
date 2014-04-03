@@ -513,6 +513,14 @@ public class BNet implements Serializable {
     		ft = FactorTable.product(ft, factor);    		
     	}
     	Collection values = ft.map.values();
+    	
+    	//BUG
+    	//ft map is empty so you're creating a distribution out of nothing returning NaN's 
+    	
+    	if (ft.map.isEmpty()) {
+    		System.out.println("Empty map");
+    	}
+    	ft.display();
     	Object[] vals = values.toArray();
 		double[] data = new double[values.size()];
     	for (int i = 0; i < values.size(); i++){
