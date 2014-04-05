@@ -106,6 +106,7 @@ public class ApproxInfer implements Inference {
     	Object[] test = q.X.toArray();
     	for (Variable var : q.X) {
     		EnumVariable nVar = (EnumVariable)var;
+    		System.out.println(nVar.toString());
             list.add(nVar);
         }
     	CountTable storeTable = new CountTable(list);  	
@@ -139,8 +140,8 @@ public class ApproxInfer implements Inference {
     				instances.add(cbn.getNode(par).getInstance());
     			}
     			storeTable.count(instances.toArray());
-    		System.out.println("StoreTable complete");
-    	    storeTable.display();
+//    		System.out.println("StoreTable complete");
+//    	    storeTable.display();
     			
 //    			if (parList.size() > 1) {
 //    				Object[] parents = parList.toArray();
@@ -167,6 +168,7 @@ public class ApproxInfer implements Inference {
     	//Having a null in the jpt causes problems down the line...
     	System.out.println("To JPT");
     	answer = new JPT(storeTable.table);
+    	answer.display();
     	System.out.println("JPT created");
     	
     	//Unsure about this factor table...am I passing in the right list?
