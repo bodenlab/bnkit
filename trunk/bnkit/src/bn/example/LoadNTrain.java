@@ -35,7 +35,6 @@ public class LoadNTrain {
 		LearningAlg em = new EMA(bn);
 		em.train(data, nodes);
 		BNBuf.save(bn, bn_file + ".new");
-		//Test commit
 	}
 
 }

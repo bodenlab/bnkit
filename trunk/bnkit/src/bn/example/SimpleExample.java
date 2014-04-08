@@ -10,6 +10,7 @@ import bn.EnumVariable;
 import bn.Enumerable;
 import bn.JPT;
 import bn.Predef;
+import bn.alg.ApproxInfer;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.Variable;
@@ -71,7 +72,20 @@ public class SimpleExample {
 		jpt = ve.infer(q);
 		jpt.display();
 		
-		BNBuf.save(bn, "data/bn_simple.xml");
+		j.setInstance(true);
+		m.setInstance(true);
+		System.out.println("Approximate Inference------------");
+		ApproxInfer ai = new ApproxInfer();
+		ai.instantiate(bn);
+		Query qq = ai.makeQuery(B);
+		JPT jpt1 = ai.infer(qq);
+		jpt1.display();
+		j.setInstance(false);
+		jpt1 = ai.infer(qq);
+		jpt1.display();
+		
+		
+//		BNBuf.save(bn, "data/bn_simple.xml");
 		
 		/*
 
