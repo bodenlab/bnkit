@@ -493,16 +493,22 @@ public class BNet implements Serializable {
     public Object getMBProb(BNet mbNet, BNode query) {  	
     	
     	query.resetInstance();
+//    	System.out.println("Query node");
+//    	System.out.println(query.toString());
     	Set<FactorTable> fTables = new HashSet<FactorTable>();
-    	//Query node not included in set, used for initial factor table
+    	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNet.getNodes()){
     		if (node.getName() != query.getName()) {
     			String test = node.getVariable().getParams();
     			FactorTable fact = node.makeFactor(mbNet);
+    			
     			//only works when prior prob available?
     			//Nodes without CPT do not weigh in on result
     			if (fact != null ){
     				fTables.add(node.makeFactor(mbNet));
+    				if (fact.map.isEmpty()) {
+        				System.out.println("Empty from start");
+        			}
     			}
     		}
     	}
@@ -510,7 +516,11 @@ public class BNet implements Serializable {
     	FactorTable ft = query.makeFactor(mbNet);
     	//For each factor table, add it to the product
     	for (FactorTable factor : fTables) {
-    		ft = FactorTable.product(ft, factor);    		
+//    		System.out.println("Factor Table");
+//    		factor.display();
+    		ft = FactorTable.product(ft, factor); 
+//    		System.out.println("Product Table");
+//    		ft.display();
     	}
     	Collection values = ft.map.values();
     	
@@ -518,7 +528,8 @@ public class BNet implements Serializable {
     	//ft map is empty so you're creating a distribution out of nothing returning NaN's 
     	
     	if (ft.map.isEmpty()) {
-//    		System.out.println("Empty map");
+    		System.out.println("Empty Map");
+    		ft.display();
     	}
 //    	ft.display();
     	Object[] vals = values.toArray();
