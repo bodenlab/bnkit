@@ -22,6 +22,7 @@ import bn.BNode;
 import bn.EnumVariable;
 import bn.JPT;
 import bn.Variable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -172,7 +173,6 @@ public class EM extends LearningAlg {
                 for (BNode node : update) {
 
                     if (node.isTrainable()) {
-
                         List<Variable> query_vars = new ArrayList<Variable>();
                         List<EnumVariable> parents = node.getParents();
                         Object[] parent_key = null;
