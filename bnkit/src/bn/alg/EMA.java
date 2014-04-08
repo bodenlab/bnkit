@@ -182,12 +182,18 @@ public class EMA extends LearningAlg {
                 for (BNode node : update) {
 
                     if (node.isTrainable()) {
-
+//                    	System.out.println("Node");
+//                    	System.out.println(node.toString());
+//                    	System.out.println(node.getInstance());
                         List<Variable> query_vars = new ArrayList<Variable>();
                         List<EnumVariable> parents = node.getParents();
                         Object[] parent_key = null;
                         int[] parent_map = null;
                         if (parents != null) {
+//                        	System.out.println("parents");
+//                            for (EnumVariable pa : parents) {
+//                            	System.out.println(bn.getNode(pa).toString());
+//                            }
                             parent_key = new Object[parents.size()];
                             parent_map = new int[parents.size()];
                             int index_in_query = 0;
