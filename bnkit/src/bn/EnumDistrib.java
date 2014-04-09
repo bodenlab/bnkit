@@ -89,7 +89,7 @@ public class EnumDistrib implements Distrib {
         this.distrib = mydistrib;
         normalise();
     }
-
+    
     /**
      * Set the seed for the random number generation that may be used for
      * sampling etc.
