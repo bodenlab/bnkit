@@ -22,6 +22,7 @@ import bn.BNode;
 import bn.EnumVariable;
 import bn.JPT;
 import bn.Variable;
+import bn.file.BNBuf;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -248,6 +249,7 @@ public class EM extends LearningAlg {
             conv_rate = Math.abs(log_prob - prev_prob); // use abs because the joint prob may exceed 1 (it is not normalized)
             if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1) {
                 System.err.println("Completed " + round + " round(s), L=" + log_prob);
+                BNBuf.save(bn, "antonTest1.new");
             }
         }
 

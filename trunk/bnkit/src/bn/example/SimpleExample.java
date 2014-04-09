@@ -77,6 +77,7 @@ public class SimpleExample {
 		System.out.println("Approximate Inference------------");
 		ApproxInfer ai = new ApproxInfer();
 		ai.instantiate(bn);
+		ai.setIterations(10000);
 		Query qq = ai.makeQuery(B);
 		JPT jpt1 = ai.infer(qq);
 		jpt1.display();

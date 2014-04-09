@@ -21,11 +21,14 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
+import bn.CPT;
 import bn.Distrib;
+import bn.EnumTable;
 import bn.EnumVariable;
 import bn.FactorTable;
 import bn.JPT;
 import bn.Variable;
+import bn.file.BNBuf;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -266,6 +269,7 @@ public class EMA extends LearningAlg {
             conv_rate = Math.abs(log_prob - prev_prob); // use abs because the joint prob may exceed 1 (it is not normalized)
             if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1) {
                 System.err.println("Completed " + round + " round(s), L=" + log_prob);
+//                BNBuf.save(bn, "antonTrain1.new");
             }
         }
 
@@ -273,8 +277,9 @@ public class EMA extends LearningAlg {
         for (BNode node : bn.getNodes()) {
             node.resetInstance();
         }
-        if (EM_PRINT_STATUS) {
+        if (EM_PRINT_STATUS || round == 180) {
             System.err.println("Completed " + round + " rounds, L=" + log_prob + ". Done.");
+            BNBuf.save(bn, "antonTrain2.new");
         }
     }
 
