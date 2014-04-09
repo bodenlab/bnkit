@@ -443,6 +443,8 @@ public class BNet implements Serializable {
      * @return a new BN with relevant CPTs and GDTs
      */
     
+    //Should this method return a list of nodes in the mb instead?
+    //Use of factor tables to get product could be influenced by cutting off parts of network?
     public BNet getMB(Variable query) {
     	BNet mbn = new BNet();
     	String qName = query.getName();
@@ -473,7 +475,7 @@ public class BNet implements Serializable {
     	for (BNode node : nodes.values()) {
     		//add all parents and children to the markov blanket network
     		//query node will be in parents set - unless no children!
-    		if (parents.contains(node.getVariable().toString()) || children.contains(node.getName())){
+    		if (parents.contains(node.getVariable().toString()) || children.contains(node.getName()) || node.getVariable().equals(query)){
     			mbn.add(node);
     		}
     	}
@@ -495,13 +497,11 @@ public class BNet implements Serializable {
     	//Store the instance incase the map is empty and you have to reset the node
     	Object qInstance = query.getInstance();
     	query.resetInstance();
-//    	System.out.println("Query node");
-//    	System.out.println(query.toString());
+    	//Store all factor tables for query to iterate over to find product
     	Set<FactorTable> fTables = new HashSet<FactorTable>();
     	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNet.getNodes()){
     		if (node.getName() != query.getName()) {
-    			String test = node.getVariable().getParams();
     			FactorTable fact = node.makeFactor(mbNet);
     			
     			//only works when prior prob available?
@@ -515,24 +515,24 @@ public class BNet implements Serializable {
     	FactorTable ft = query.makeFactor(mbNet);
     	//For each factor table, add it to the product
     	for (FactorTable factor : fTables) {
-//    		System.out.println("Factor Table");
-//    		factor.display();
     		ft = FactorTable.product(ft, factor); 
-//    		System.out.println("Product Table");
-//    		ft.display();
     	}
-    	Collection values = ft.map.values();
+    	Collection<Double> values = ft.map.values();
+    	for (Double val : values ) { 
+    		
+    	}
     	
-    	//BUG
-    	//ft map is empty so you're creating a distribution out of nothing returning NaN's 
-    	
+    	 
+    	//BUG??
+    	//Empty maps occur and in this situation the node is reset and sample ignored
     	if (ft.map.isEmpty()) {
     		System.out.println("Empty Map");
     		//Need to reset the instance or the next iteration will fail
     		query.setInstance(qInstance);
     		return null;
     	}
-//    	ft.display();
+    	
+    	//How to get distribution from factor table?
     	Object[] vals = values.toArray();
 		double[] data = new double[values.size()];
     	for (int i = 0; i < values.size(); i++){
@@ -540,6 +540,7 @@ public class BNet implements Serializable {
     		data[i] = res;
     	}
 		Distrib dist = new EnumDistrib((Enumerable)query.getVariable().getDomain(), data);
+//    	Distrib dist = new EnumDistrib(ft.map);
 		Object end = dist.sample(); 	
 		
     	return end;
