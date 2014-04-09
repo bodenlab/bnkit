@@ -492,6 +492,8 @@ public class BNet implements Serializable {
      */
     public Object getMBProb(BNet mbNet, BNode query) {  	
     	
+    	//Store the instance incase the map is empty and you have to reset the node
+    	Object qInstance = query.getInstance();
     	query.resetInstance();
 //    	System.out.println("Query node");
 //    	System.out.println(query.toString());
@@ -506,9 +508,6 @@ public class BNet implements Serializable {
     			//Nodes without CPT do not weigh in on result
     			if (fact != null ){
     				fTables.add(node.makeFactor(mbNet));
-    				if (fact.map.isEmpty()) {
-        				System.out.println("Empty from start");
-        			}
     			}
     		}
     	}
@@ -529,7 +528,9 @@ public class BNet implements Serializable {
     	
     	if (ft.map.isEmpty()) {
     		System.out.println("Empty Map");
-    		ft.display();
+    		//Need to reset the instance or the next iteration will fail
+    		query.setInstance(qInstance);
+    		return null;
     	}
 //    	ft.display();
     	Object[] vals = values.toArray();

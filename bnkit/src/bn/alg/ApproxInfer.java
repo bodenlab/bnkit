@@ -22,12 +22,15 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 public class ApproxInfer implements Inference {
 	
     public BNet bn;
-    private double logLikelihood = 0;
+    private double logLikelihood = 1;
+    private Random randomGenerator = new Random();
+    private int iterations = 50;
 
     /** 
      * Approximate inference in Bayesian network by Gibbs algorithm (MCMC).
@@ -90,14 +93,21 @@ public class ApproxInfer implements Inference {
     	//Should be done randomly**
     	for (Variable var : q.Z) {
     		String pre = var.getPredef();
+    		//getParams() did not return suitable results for boolean nodes
+    		//Set manually
     		if (pre.equals("Boolean")){
     			Object[] params = {true, false};
-    			//Randomize the index
-    			cbn.getNode(var).setInstance(params[0]);
+    			//Generate a pseudo random number to select parameter
+    			int len = params.length;
+    			int index = randomGenerator.nextInt(len);
+    			//Randomly set the instance for the node
+    			cbn.getNode(var).setInstance(params[index]);
     		} else {
         		String[] params = var.getParams().split(";");
-        		//make index into params random?
-        		cbn.getNode(var).setInstance(params[0]);
+        		//Generate a pseudo random number to select parameter
+        		int index = randomGenerator.nextInt(params.length);
+        		//Randomly set the instance for the node
+        		cbn.getNode(var).setInstance(params[index]); 
     		}
     	}
     	
@@ -116,7 +126,7 @@ public class ApproxInfer implements Inference {
     	
     	//Iterations of sampling needs to be flexible
     	//Have to set it in EM? Earlier?
-    	int N = 1000;
+    	int N = iterations;
     	
     	//The main loop for the algorithm
     	for (int j = 0; j < N; j ++) {
@@ -126,14 +136,14 @@ public class ApproxInfer implements Inference {
     			//Z is an ordered list
     			BNet mbVar = cbn.getMB(var);
     			Object result = mbVar.getMBProb(mbVar, mbVar.getNode(var));
-    			cbn.getNode(var).setInstance(result);
+    			if (result != null) {
+    				cbn.getNode(var).setInstance(result);
+    			}
+    			
     			// Update Query count here? Outside loop is better?
     		}
     		//Update Query count
     		//Confused about what I'm doing below, think I've gotten a bit mixed up about what I'm looking for
-    		//This data structure has possibly gotten out of hand...
-    		//Should find the instance of 1 query and count that
-    		//With the new data structure I'm unsure how to specify which node to look at??
     		for (Variable qVar : q.X) {
     			List<EnumVariable> parList = storeTable.table.getParents();
     			List<Object> instances = new ArrayList<Object>();
@@ -142,41 +152,23 @@ public class ApproxInfer implements Inference {
     			}
     			//How do you know parent query is in right order?
     			//Query is a parent
+    			if (instances.contains(null)) {
+    				System.out.println("Stop");
+    			}
     			storeTable.count(instances.toArray());
 //    		System.out.println("StoreTable complete");
-//    	    storeTable.display();
-    			
-//    			if (parList.size() > 1) {
-//    				Object[] parents = parList.toArray();
-//	    			Object[] key = new Object[parents.length + 1];
-//	    			key[key.length -1] = cbn.getNode(qVar).getInstance();
-//	    			for (int i = 0; i < parents.length; i ++) {
-//	    				System.out.println(parents.toString());
-//	    				key[i] = cbn.getNode(parents[i].toString()).getInstance();
-//	    			}
-//	    			storeTable.count(key);
-//    			} else {
-//    				Object[] key = {cbn.getNode(qVar).getInstance()};
-//    				storeTable.count(key);
-//    			}
-    			
-    			
+//    	    storeTable.display();    			
     		}
     	}
 //    	System.out.println("StoreTable complete");
-//    	storeTable.display();
-    	Collection<Double> values = storeTable.table.getValues();
-    	Object[] points = list.toArray();
+////    	storeTable.display();
+//    	Collection<Double> values = storeTable.table.getValues();
+//    	Object[] points = list.toArray();
     	
-    	//Having a null in the jpt causes problems down the line...
 //    	System.out.println("To JPT");
     	answer = new JPT(storeTable.table);
-//    	answer.display();
-    	System.out.println("JPT created");
     	
-    	//Unsure about this factor table...am I passing in the right list?
-    	FactorTable out2 = new FactorTable(answer.getParents());
-    	logLikelihood = out2.getLogLikelihood();
+    	logLikelihood += 1;
     	
     	//Reset all unevidenced nodes in network
     	for (BNode node : cbn.getNodes()) {
@@ -207,25 +199,12 @@ public class ApproxInfer implements Inference {
         return logLikelihood;
     }    
     
-    public double getMarkovBlanket(BNet mbNet, BNode query) {
-    	query.resetInstance();
-    	Set<FactorTable> fTables = new HashSet<FactorTable>();
-    	//Don't include query node in Set
-    	//Save it for initialising ft
-    	for (BNode node : mbNet.getNodes()){
-    		if (node.getName() != query.getName()) {
-    			fTables.add(node.makeFactor(mbNet));
-    		}
-    	}
-    	//Get the factor table for the query and make it the product start point
-    	FactorTable ft = query.makeFactor(mbNet);
-    	//For each factor table, add it to the product
-    	for (FactorTable factor : fTables) {
-    		ft = FactorTable.product(ft, factor);    		
-    	}
-    	ft.display();
-    	return 0.0;
+    public int getIterations() {
+    	return iterations;
     }
-
+    
+    public void setIterations(int iter) {
+    	iterations = iter;
+    }
 }
 
