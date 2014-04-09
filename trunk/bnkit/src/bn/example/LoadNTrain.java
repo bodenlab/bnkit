@@ -31,8 +31,8 @@ public class LoadNTrain {
 		List<BNode> nodes = bn.getOrdered();
 		Object[][] data = DataBuf.load(data_file, nodes);
 
-		LearningAlg em = new EM(bn);
-//		LearningAlg em = new EMA(bn);
+//		LearningAlg em = new EM(bn);
+		LearningAlg em = new EMA(bn);
 		em.train(data, nodes);
 		BNBuf.save(bn, bn_file + "1.new");
 	}

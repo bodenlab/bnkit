@@ -36,6 +36,8 @@ public class ApproxInfer implements Inference {
      * Approximate inference in Bayesian network by Gibbs algorithm (MCMC).
      * In accordance with the method described in Russell and Norvig, 
      * Artificial Intelligence: A Modern Approach, 3e, 2009.
+     * 
+     * Convergence of algorithm is incomplete
      */
     @Override
     public void instantiate(BNet bn) {
@@ -47,7 +49,7 @@ public class ApproxInfer implements Inference {
      * Construct the data structure for the query
      * X - query variable (non-evidence)
      * E - evidence variables in bn
-     * Z - all other non-evidence variables
+     * Z - all non-evidence variables
      */
     @SuppressWarnings("rawtypes")
     @Override
@@ -80,7 +82,7 @@ public class ApproxInfer implements Inference {
     }
     
     /**
-     * Perform Approximate inference
+     * Perform Approximate inference using Gibbs sampling algorithm
      */
     @SuppressWarnings("rawtypes")
     @Override
@@ -111,30 +113,28 @@ public class ApproxInfer implements Inference {
     		}
     	}
     	
-    	//Count Table for tracking state of query
+    	//Create count Table for tracking state of query
     	List<EnumVariable> list = new ArrayList<EnumVariable>(q.X.size());
-//    	Object[] test = q.X.toArray();
-//    	System.out.println("Query");
     	for (Variable var : q.X) {
     		EnumVariable nVar = (EnumVariable)var;
-//    		System.out.println(nVar.toString());
             list.add(nVar);
         }
-    	CountTable storeTable = new CountTable(list);  	
-//    	System.out.println("StoreTable");
-//    	storeTable.display();    	
+    	CountTable storeTable = new CountTable(list);  	   	
     	
-    	//Iterations of sampling needs to be flexible
-    	//Have to set it in EM? Earlier?
+    	//Iterations of sampling
     	int N = iterations;
     	
     	//The main loop for the algorithm
     	for (int j = 0; j < N; j ++) {
+    		//Iterate over all non-evidenced nodes
     		for (Variable var : q.Z) { 
     			//Consider what order this is happening?
     			//Top down? Should it be randomised?
     			//Z is an ordered list
+    			
+    			//Get the markov blanket of the current node
     			BNet mbVar = cbn.getMB(var);
+    			//Sample from the mb distribution
     			Object result = mbVar.getMBProb(mbVar, mbVar.getNode(var));
     			if (result != null) {
     				cbn.getNode(var).setInstance(result);
@@ -143,7 +143,8 @@ public class ApproxInfer implements Inference {
     			// Update Query count here? Outside loop is better?
     		}
     		//Update Query count
-    		//Confused about what I'm doing below, think I've gotten a bit mixed up about what I'm looking for
+    		//Unsure if the count table is being updated accurately 
+    		//Unsure of how it works with multiple queries
     		for (Variable qVar : q.X) {
     			List<EnumVariable> parList = storeTable.table.getParents();
     			List<Object> instances = new ArrayList<Object>();
@@ -155,19 +156,14 @@ public class ApproxInfer implements Inference {
     			if (instances.contains(null)) {
     				System.out.println("Stop");
     			}
-    			storeTable.count(instances.toArray());
-//    		System.out.println("StoreTable complete");
-//    	    storeTable.display();    			
+    			storeTable.count(instances.toArray());			
     		}
     	}
-//    	System.out.println("StoreTable complete");
-////    	storeTable.display();
-//    	Collection<Double> values = storeTable.table.getValues();
-//    	Object[] points = list.toArray();
-    	
-//    	System.out.println("To JPT");
+
+    	//After sampling the distribution, convert countTable to JPT
     	answer = new JPT(storeTable.table);
     	
+    	//Convergence of algorithm is incomplete
     	logLikelihood += 1;
     	
     	//Reset all unevidenced nodes in network
@@ -199,10 +195,18 @@ public class ApproxInfer implements Inference {
         return logLikelihood;
     }    
     
+    /**
+     * Get the number of iterations sampling will complete
+     * @return iterations
+     */
     public int getIterations() {
     	return iterations;
     }
     
+    /**
+     * Set the number of iterations sampling will complete
+     * @return iterations
+     */
     public void setIterations(int iter) {
     	iterations = iter;
     }
