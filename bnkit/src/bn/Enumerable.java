@@ -61,7 +61,7 @@ public class Enumerable implements Domain {
             throw new RuntimeException("Value " + value.toString() + " unknown to enumerable domain " + this.toString());
         } else {
             for (int i = 0; i < values.length; i++) {
-                if (value == values[i]) {
+                if (value.equals(values[i])) {
                     return i;
                 }
             }
