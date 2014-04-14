@@ -239,6 +239,7 @@ public class EM extends LearningAlg {
                             }
                         } else { // all variables are instantiated, no need to do inference
                             node.countInstance(parent_key, ovalue, 1.0);
+                            System.out.println();
                         }
                     }
                 }
@@ -256,7 +257,7 @@ public class EM extends LearningAlg {
             conv_rate = Math.abs(log_prob - prev_prob); // use abs because the joint prob may exceed 1 (it is not normalized)
             if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1) {
                 System.err.println("Completed " + round + " round(s), L=" + log_prob);
-                BNBuf.save(bn, "antonTest1.new");
+                //BNBuf.save(bn, "antonTest1.new");
             }
         }
 
