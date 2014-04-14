@@ -19,7 +19,6 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
-import bn.CountTable;
 import bn.EnumTable;
 import bn.EnumVariable;
 import bn.FactorTable;
@@ -28,10 +27,8 @@ import bn.Variable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Exact inference in Bayesian network by variable elimination, more
@@ -86,7 +83,7 @@ public class VarElim implements Inference {
                 }
             }
         } catch (RuntimeException e) {
-            throw new RuntimeException("Cannot perform variable elimination on non-enumerable nodes");
+            throw new VarElimRuntimeException("Cannot perform variable elimination on non-enumerable nodes");
         }
         return new VEQuery(Q, E, X);
     }
@@ -127,7 +124,7 @@ public class VarElim implements Inference {
             if (!added) // if not added as per sum-out variable 
             {
                 if (ft.getParents().size() > 0) {
-                    throw new RuntimeException("Node can not be eliminated in inference: " + node.getName());
+                    throw new VarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
                 } // put it in the last bucket?
                 //buckets.get(buckets.size() - 1).put(ft);
                 else
@@ -193,7 +190,7 @@ public class VarElim implements Inference {
                     }
                     for (int j = 0; j < map2q.length; j ++) {
                         if (map2q[j] == -1)
-                            throw new RuntimeException("Invalid inference result");
+                            throw new VarElimRuntimeException("Invalid inference result");
                     }
                     EnumTable<Double> et = new EnumTable<Double>(q_parents);
                     for (Map.Entry<Integer, Double> entry : result.getMapEntries()) {
@@ -325,4 +322,14 @@ public class VarElim implements Inference {
     public double getLogLikelihood() {
         return logLikelihood;
     }
+    
+    public class VarElimRuntimeException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public VarElimRuntimeException(String message) {
+            super(message);
+        }
+    }
+
 }
+
