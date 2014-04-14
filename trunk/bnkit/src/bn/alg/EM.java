@@ -22,6 +22,7 @@ import bn.BNode;
 import bn.EnumVariable;
 import bn.JPT;
 import bn.Variable;
+import bn.alg.VarElim.VarElimRuntimeException;
 import bn.file.BNBuf;
 
 import java.util.ArrayList;
@@ -200,36 +201,42 @@ public class EM extends LearningAlg {
                             query_vars.add(var);
                         }
                         if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
-                            latentVariablesExist = true;
-                            Variable[] query_arr = new Variable[query_vars.size()];
-                            query_vars.toArray(query_arr);
-                            Query q = inf.makeQuery(query_arr);
-                            JPT jpt = inf.infer(q);
-                            log_prob += inf.getLogLikelihood();
-                            for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
-                                Object[] jpt_key = jpt.table.getKey(entry.getKey().intValue());
-				// jpt_key will contain values for latent variables
-                                // other variables are already instantiated
-                                if (node.getInstance() == null) {
-                                    ovalue = jpt_key[jpt_key.length - 1];
-                                }
-                                double prob = entry.getValue().doubleValue();
-                                if (node.isRoot()) { // if prior
-                                    node.countInstance(null, ovalue, prob);
-                                } else { // if node has parents
-                                    for (int p = 0; p < parent_key.length; p++) {
-                                        if (parent_map[p] >= 0) {
-                                            parent_key[p] = jpt_key[parent_map[p]];
+                            try {
+                                latentVariablesExist = true;
+                                Variable[] query_arr = new Variable[query_vars.size()];
+                                query_vars.toArray(query_arr);
+                                Query q = inf.makeQuery(query_arr);
+                                JPT jpt = inf.infer(q);
+                                log_prob += inf.getLogLikelihood();
+                                for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
+                                    Object[] jpt_key = jpt.table.getKey(entry.getKey().intValue());
+                                    // jpt_key will contain values for latent variables
+                                    // other variables are already instantiated
+                                    if (node.getInstance() == null) {
+                                        ovalue = jpt_key[jpt_key.length - 1];
+                                    }
+                                    double prob = entry.getValue().doubleValue();
+                                    if (node.isRoot()) { // if prior
+                                        node.countInstance(null, ovalue, prob);
+                                    } else { // if node has parents
+                                        for (int p = 0; p < parent_key.length; p++) {
+                                            if (parent_map[p] >= 0) {
+                                                parent_key[p] = jpt_key[parent_map[p]];
+                                            }
+                                        }
+                                        try {
+                                            node.countInstance(parent_key, ovalue, prob);
+                                        } catch (java.lang.RuntimeException e) {
+                                            throw new EMRuntimeException("Problem with sample #"+(i+1)+": " + e.getMessage());
                                         }
                                     }
-                                    try {
-                                        node.countInstance(parent_key, ovalue, prob);
-                                    } catch (java.lang.RuntimeException e) {
-                                        throw new EMRuntimeException("Problem with sample #"+(i+1)+": " + e.getMessage());
-                                    }
-                                }
+                                } 
+                            } catch (VarElimRuntimeException e) {
+                                ; // This happens when a variable cannot be queried, e.g. a continuous variable.
+                                ; // Since we do not currently properly check the scope of instantiated variables
+                                ; // to remove such variables for appropriate reasons, the problem is ignored. 
+                                ; // /Mikael--FIXME later
                             }
-
                         } else { // all variables are instantiated, no need to do inference
                             node.countInstance(parent_key, ovalue, 1.0);
                         }
