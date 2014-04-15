@@ -239,7 +239,6 @@ public class EM extends LearningAlg {
                             }
                         } else { // all variables are instantiated, no need to do inference
                             node.countInstance(parent_key, ovalue, 1.0);
-                            System.out.println();
                         }
                     }
                 }
