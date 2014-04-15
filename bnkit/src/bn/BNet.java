@@ -434,65 +434,54 @@ public class BNet implements Serializable {
         return nbn;
     }
     
+   
     /**
      * Get the Markov Blanket (mb) of a query node.
-     * Returns the parents, children and parents of children 
-     * for the query node
+     * 
+     * Only need the factor tables of node and children
+     * 
      * 
      * @param query variable to query
-     * @return a new BN with relevant CPTs and GDTs
+     * @return a list of relevant factor tables
      */
     
     //Should this method return a list of nodes in the mb instead?
     //Use of factor tables to get product could be influenced by cutting off parts of network?
-    public BNet getMB(Variable query) {
-    	BNet mbn = new BNet();
+    public List<BNode> getMB(Variable query) {
+    	List<BNode> mbNodes = new ArrayList<BNode>();
+//    	BNet mbn = new BNet();
     	String qName = query.getName();
     	BNode qNode = getNode(query);
-    	Set<String> parents = new HashSet<String>();
     	//get children of query node
     	Set<String> children = new HashSet<String>();
-    	//add the parents of the query node unless it is a root node
-    	if (getParents(qName) != null ) {
-    		parents.addAll(getParents(qName));
-    	}
     	//add children of query node unless it's a leaf node
-    	Collection<String> test = getChildren(qNode);
     	if (getChildren(qNode) != null ) {
     		children.addAll(getChildren(qNode));
     	} else {
     		children.add(qNode.getName());
     	}
-    	//for each child get its parents and add to the parents Set
-    	for (String child : children) {
-    		//child will always have at least one parent (query)
-    		Set<String> newParents = getParents(child);
-    		//query node will always be listed here as a parent
-    		for (String parent : newParents) {
-    			parents.add(parent);
-    		}
-    	}
     	for (BNode node : nodes.values()) {
-    		//add all parents and children to the markov blanket network
-    		//query node will be in parents set - unless no children!
-    		if (parents.contains(node.getVariable().toString()) || children.contains(node.getName()) || node.getVariable().equals(query)){
-    			mbn.add(node);
+    		//markov blanket calculation requires factor tables of query node and children only
+    		if (children.contains(node.getName()) || node.getVariable().equals(query)){
+    			mbNodes.add(node);
     		}
     	}
-    	mbn.compile();
-    	return mbn;
+//    	mbn.compile();
+    	return mbNodes;
     }
     
     
+
     /**
      * Given the Markov Blanket network of a query, 
      * return a sample from the distribution of P(X|mb(X))
      * 
      * @param mbNet mb network of query
      * @param query 
+     * @param cbn the current bayesian network
      * @return sample from distribution
      */
-    public Object getMBProb(BNet mbNet, BNode query) {  	
+    public Object getMBProb(List<BNode> mbNodes, BNode query, BNet cbn) {  	
     	
     	//Store the instance incase the map is empty and you have to reset the node
     	Object qInstance = query.getInstance();
@@ -500,28 +489,23 @@ public class BNet implements Serializable {
     	//Store all factor tables for query to iterate over to find product
     	Set<FactorTable> fTables = new HashSet<FactorTable>();
     	//Query node not included in set, used for initial factor table in product
-    	for (BNode node : mbNet.getNodes()){
+    	for (BNode node : mbNodes){
     		if (node.getName() != query.getName()) {
-    			FactorTable fact = node.makeFactor(mbNet);
+    			FactorTable fact = node.makeFactor(cbn);
     			
-    			//only works when prior prob available?
-    			//Nodes without CPT do not weigh in on result
+    			//instantiated priors cannot be used to factorise
     			if (fact != null ){
-    				fTables.add(node.makeFactor(mbNet));
+    				fTables.add(fact);
     			}
     		}
     	}
     	//Get the factor table for the query and make it the product start point
-    	FactorTable ft = query.makeFactor(mbNet);
+    	FactorTable ft = query.makeFactor(cbn);
     	//For each factor table, add it to the product
     	for (FactorTable factor : fTables) {
     		ft = FactorTable.product(ft, factor); 
     	}
-    	Collection<Double> values = ft.map.values();
-    	for (Double val : values ) { 
-    		
-    	}
-    	
+    	Collection<Double> values = ft.map.values();   	
     	 
     	//BUG??
     	//Empty maps occur and in this situation the node is reset and sample ignored
@@ -545,7 +529,7 @@ public class BNet implements Serializable {
 		
     	return end;
     }
-
+    
     /**
      * Utility function to create an array from a set of String.
      *
