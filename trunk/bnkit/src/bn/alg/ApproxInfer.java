@@ -105,11 +105,16 @@ public class ApproxInfer implements Inference {
     			//Randomly set the instance for the node
     			cbn.getNode(var).setInstance(params[index]);
     		} else {
-        		String[] params = var.getParams().split(";");
-        		//Generate a pseudo random number to select parameter
-        		int index = randomGenerator.nextInt(params.length);
-        		//Randomly set the instance for the node
-        		cbn.getNode(var).setInstance(params[index]); 
+        		String parm = var.getParams();
+        		String[] params;
+        		////ELSE REQUIRED HERE??
+        		if (parm != null) {
+        			params = parm.split(";");
+	        		//Generate a pseudo random number to select parameter
+	        		int index = randomGenerator.nextInt(params.length);
+	        		//Randomly set the instance for the node
+	        		cbn.getNode(var).setInstance(params[index]); 
+        		}
     		}
     	}
     	
@@ -133,9 +138,11 @@ public class ApproxInfer implements Inference {
     			//Z is an ordered list
     			
     			//Get the markov blanket of the current node
-    			BNet mbVar = cbn.getMB(var);
+//    			BNet mbVar = cbn.getMB(var);
+    			List<BNode> mbVar = cbn.getMB(var);
     			//Sample from the mb distribution
-    			Object result = mbVar.getMBProb(mbVar, mbVar.getNode(var));
+//    			Object result = mbVar.getMBProb(mbVar, mbVar.getNode(var));
+    			Object result = bn.getMBProb(mbVar, bn.getNode(var), bn);
     			if (result != null) {
     				cbn.getNode(var).setInstance(result);
     			}
