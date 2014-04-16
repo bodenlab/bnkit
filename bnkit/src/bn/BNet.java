@@ -412,7 +412,9 @@ public class BNet implements Serializable {
         }
         // first add all instantiated/evidence variables and queried variables
         for (BNode node : nodes.values()) {
-            if (node.getInstance() != null || qset.contains(node.getName())) {
+//            if (node.getInstance() != null || qset.contains(node.getName())) {
+        	// query is list of variables and node name and variable name are different
+        	if (node.getInstance() != null || qset.contains(node.getVariable().toString())){
                 nbn.add(node);
             }
         }
