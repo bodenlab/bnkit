@@ -486,11 +486,16 @@ public class BNet implements Serializable {
     	//Store the instance incase the map is empty and you have to reset the node
     	Object qInstance = query.getInstance();
     	query.resetInstance();
+//    	System.out.println("Next Query");
+//    	System.out.println(query.toString());
     	//Store all factor tables for query to iterate over to find product
     	Set<FactorTable> fTables = new HashSet<FactorTable>();
     	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNodes){
-    		if (node.getName() != query.getName()) {
+    		if (node.getName() != query.getName()){
+    			for (BNode n : cbn.getNodes()) {
+//    				System.out.println(n.toString());
+    			}
     			FactorTable fact = node.makeFactor(cbn);
     			
     			//instantiated priors cannot be used to factorise
@@ -504,8 +509,7 @@ public class BNet implements Serializable {
     	//For each factor table, add it to the product
     	for (FactorTable factor : fTables) {
     		ft = FactorTable.product(ft, factor); 
-    	}
-    	Collection<Double> values = ft.map.values();   	
+    	} 	
     	 
     	//BUG??
     	//Empty maps occur and in this situation the node is reset and sample ignored
@@ -517,14 +521,31 @@ public class BNet implements Serializable {
     	}
     	
     	//How to get distribution from factor table?
-    	Object[] vals = values.toArray();
-		double[] data = new double[values.size()];
-    	for (int i = 0; i < values.size(); i++){
-    		double res = (double)(vals[i]);
+    	//Current method seems excessive
+    	
+    	Collection<Double> values = ft.map.values();  
+    	
+    	if (query.getName().equals("H3K27ac")){
+    		System.out.println("STOP");
+    	}
+    	
+    	Double[] d = (Double[]) values.toArray(new Double[values.size()]);
+    	double[] data = new double[d.length];
+    	for (int i = 0; i < d.length; i++){
+    		double res = (double)(d[i]);
     		data[i] = res;
     	}
+		
+    	
+		Map<Object, Double> nFt = new HashMap<Object, Double>();
+		for (Map.Entry<Integer, Double> entry : ft.getMapEntries()) {
+			nFt.put((Object)entry.getKey(), entry.getValue());
+		}
+		
 		Distrib dist = new EnumDistrib((Enumerable)query.getVariable().getDomain(), data);
-//    	Distrib dist = new EnumDistrib(ft.map);
+    	Distrib dist1 = new EnumDistrib(nFt);
+    	Object end1 = dist1.sample();
+    	
 		Object end = dist.sample(); 	
 		
     	return end;
