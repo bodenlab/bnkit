@@ -66,10 +66,10 @@ public class SimpleExample {
 		VarElim ve = new VarElim();
 		ve.instantiate(bn);
 		Query q = ve.makeQuery(B);
-		JPT jpt = ve.infer(q);
+		JPT jpt = ve.infer(q).getJPT();
 		jpt.display();
 		j.setInstance(false);
-		jpt = ve.infer(q);
+		jpt = ve.infer(q).getJPT();
 		jpt.display();
 		
 		j.setInstance(true);
