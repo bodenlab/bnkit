@@ -284,9 +284,9 @@ public class FactorTable extends EnumTable<Double> {
      * complexity is O(n+m*3n) where n is the number of parents and m is the
      * specified number of entries in the current table.
      * 
-     * This method has been partially adapted for continuous (non-enumerable) variables.
-     * Specifically, it is able to sum out enumerable variables even if continuous variables 
-     * are uninstantiated, by convolution of densities into mixtures.
+     * This method has been partially adapted to accommodate continuous (non-enumerable) variables
+     * that are associated with summed-out variables:
+     * densities are combined into mixtures, which need to be resolved later.
      *
      * @param parentsToSumOut variables that will be summed out from the current
      * table

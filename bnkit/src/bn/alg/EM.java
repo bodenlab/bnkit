@@ -23,6 +23,7 @@ import bn.EnumVariable;
 import bn.JPT;
 import bn.Variable;
 import bn.alg.VarElim.VarElimRuntimeException;
+import bn.alg.CGVarElim.CGVarElimRuntimeException;
 import bn.file.BNBuf;
 
 import java.util.ArrayList;
@@ -56,7 +57,7 @@ public class EM extends LearningAlg {
      * @param bn
      */
     public EM(BNet bn) {
-        this(bn, new VarElim());
+        this(bn, new CGVarElim());
     }
 
     /**
@@ -206,7 +207,8 @@ public class EM extends LearningAlg {
                                 Variable[] query_arr = new Variable[query_vars.size()];
                                 query_vars.toArray(query_arr);
                                 Query q = inf.makeQuery(query_arr);
-                                JPT jpt = inf.infer(q);
+                                QueryResult qr = inf.infer(q);
+                                JPT jpt = qr.getJPT();
                                 log_prob += inf.getLogLikelihood();
                                 for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
                                     Object[] jpt_key = jpt.table.getKey(entry.getKey().intValue());
@@ -249,7 +251,7 @@ public class EM extends LearningAlg {
             // finally complete the M-step by transferring counts to probabilities
             for (BNode node : update) {
                 if (node.isTrainable()) {
-                        node.maximizeInstance();
+                    node.maximizeInstance();
                 }
             }
 
