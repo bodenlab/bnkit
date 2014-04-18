@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<bnet>
+<def>
+<var name="Burglary" type="Boolean"/>
+<var name="John calls" type="Boolean"/>
+<var name="Earthquake" type="Boolean"/>
+<var name="Mary calls" type="Boolean"/>
+<var name="Alarm" type="Boolean"/>
+</def>
+<node type="CPT" var="Burglary">
+<params>
+0.001, 0.999;
+</params>
+</node>
+<node type="CPT" var="John calls">
+<parent var="Alarm"/>
+<params>
+0: 0.9, 0.1; (true)
+1: 0.05, 0.95; (false)
+</params>
+</node>
+<node type="CPT" var="Earthquake">
+<params>
+0.002, 0.998;
+</params>
+</node>
+<node type="CPT" var="Mary calls">
+<parent var="Alarm"/>
+<params>
+0: 0.7, 0.3; (true)
+1: 0.01, 0.99; (false)
+</params>
+</node>
+<node type="CPT" var="Alarm">
+<parent var="Burglary"/>
+<parent var="Earthquake"/>
+<params>
+0: 0.95, 0.05; (true, true)
+1: 0.94, 0.06; (true, false)
+2: 0.29, 0.71; (false, true)
+3: 0.001, 0.999; (false, false)
+</params>
+</node>
+</bnet>

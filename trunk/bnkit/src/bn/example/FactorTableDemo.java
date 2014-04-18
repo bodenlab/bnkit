@@ -18,6 +18,9 @@ import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Predef;
 import bn.Variable;
+import bn.alg.CGVarElim;
+import bn.alg.Query;
+import bn.alg.QueryResult;
 
 /**
  *
@@ -77,7 +80,7 @@ public class FactorTableDemo {
         // Once in the BNet, variables (through the nodes) can be instantiated to values from their respective domains.
         j.setInstance(true);
         m.setInstance(true);
-        //s.setInstance(3.0);
+        // s.setInstance(5.5);
         
         // Variable elimination works by factorising CPTs, and then by performing products and variable sum-outs in
         // an order that heuristically is computationally efficient.
@@ -149,6 +152,15 @@ public class FactorTableDemo {
         
         System.out.println("JPT of Factor (((B * E) * A) * J) * M) - (A, E)");
         p_burglary.display();
+
+        CGVarElim ve = new CGVarElim();
+        ve.instantiate(bn);
+        Query q = ve.makeQuery(new Variable[] {B});
+        QueryResult qr = ve.infer(q);
+        JPT jpt = qr.getJPT();
+        jpt.display();
+        
+
     }
 }
 

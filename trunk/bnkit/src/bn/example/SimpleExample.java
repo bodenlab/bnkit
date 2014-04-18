@@ -14,6 +14,7 @@ import bn.alg.ApproxInfer;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.Variable;
+import bn.alg.CGVarElim;
 import bn.file.BNBuf;
 
 /**
@@ -63,7 +64,7 @@ public class SimpleExample {
 		//e.setInstance(false);
 
 		System.out.println("Variable elimination--------------");
-		VarElim ve = new VarElim();
+		CGVarElim ve = new CGVarElim();
 		ve.instantiate(bn);
 		Query q = ve.makeQuery(B);
 		JPT jpt = ve.infer(q).getJPT();
@@ -77,16 +78,16 @@ public class SimpleExample {
 		System.out.println("Approximate Inference------------");
 		ApproxInfer ai = new ApproxInfer();
 		ai.instantiate(bn);
-		ai.setIterations(10000);
+		ai.setIterations(1000);
 		Query qq = ai.makeQuery(B);
-		JPT jpt1 = ai.infer(qq);
+		JPT jpt1 = ai.infer(qq).getJPT();
 		jpt1.display();
 		j.setInstance(false);
-		jpt1 = ai.infer(qq);
+		jpt1 = ai.infer(qq).getJPT();
 		jpt1.display();
 		
 		
-//		BNBuf.save(bn, "data/bn_simple.xml");
+		BNBuf.save(bn, "data/bn_simple.xml");
 		
 		/*
 

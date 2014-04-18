@@ -105,8 +105,12 @@ public class CGVarElim implements Inference {
         Bucket first_bucket = new Bucket(q.Q);
         buckets.add(first_bucket);
         for (Variable x : q.X) {
-            if (!(x.getDomain() instanceof bn.Enumerable)) // only create buckets for enumerable variables
-                buckets.add(new Bucket(x));
+            // only create buckets for enumerable variables
+            try {
+                buckets.add(new Bucket((EnumVariable)x));
+            } catch (ClassCastException e) {
+                ;
+            }
         }
         int nBuckets = buckets.size();
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")

@@ -86,7 +86,7 @@ public class ApproxInfer implements Inference {
      */
     @SuppressWarnings("rawtypes")
     @Override
-    public JPT infer(Query query) {
+    public QueryResult infer(Query query) {
     	JPT answer = null;
     	AQuery q = (AQuery) query;
     	//Take a copy of the current state of network
@@ -180,9 +180,9 @@ public class ApproxInfer implements Inference {
     		}
     	}
     	
-    	return answer;
+    	return new AResult(answer);
     }
-    
+
     public class AQuery implements Query {
 
         final List<Variable> X;
@@ -195,6 +195,20 @@ public class ApproxInfer implements Inference {
             this.Z = Z;
         }
     }
+
+    public class AResult implements QueryResult {
+
+        final private JPT jpt;
+        public AResult(JPT jpt) {
+            this.jpt = jpt;
+        }
+        
+        @Override
+        public JPT getJPT() {
+            return this.jpt;
+        }
+    }
+
 
     
     @Override

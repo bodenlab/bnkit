@@ -19,6 +19,7 @@ package bn.file;
 
 import bn.alg.VarElim;
 import bn.*;
+import bn.alg.CGVarElim;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -258,7 +259,7 @@ public class BNBuf {
     }
 
     public static void main(String[] argv) {
-        BNet bn = BNBuf.load("data/bn_simple1.xml");
+        BNet bn = BNBuf.load("data/bn_simple.xml");
 
         BNode j = bn.getNode("John calls");
         BNode m = bn.getNode("Mary calls");
@@ -267,9 +268,9 @@ public class BNBuf {
         j.setInstance(true);
         m.setInstance(true);
 
-        VarElim ve = new VarElim();
+        CGVarElim ve = new CGVarElim();
         ve.instantiate(bn);
-        JPT jpt = ve.infer(b);
+        JPT jpt = ve.infer(b).getJPT();
         jpt.display();
 
         //IOBuf.save(bn, "data/bn_simple2.xml");

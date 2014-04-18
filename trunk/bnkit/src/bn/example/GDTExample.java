@@ -12,6 +12,7 @@ import bn.JPT;
 import bn.Predef;
 import bn.alg.VarElim;
 import bn.Variable;
+import bn.alg.CGVarElim;
 import bn.file.BNBuf;
 
 public class GDTExample {
@@ -61,9 +62,10 @@ public class GDTExample {
 		sun.setInstance("Partly sunny");
 		sprinkler.setInstance(false);
 		
-		VarElim ve = new VarElim();
+		CGVarElim ve = new CGVarElim();
 		ve.instantiate(bn);
-		JPT jpt=ve.infer(new EnumVariable[] {WETGRASS});
+                
+		JPT jpt=ve.infer(new EnumVariable[] {WETGRASS}).getJPT();
 		jpt.display();
 		
 		BNBuf.save(bn, "data/sprinkler1.xml");
@@ -83,9 +85,9 @@ public class GDTExample {
 		//cloudy.setInstance(true);
 		sprinkler.setInstance(false);
 		
-		VarElim ve = new VarElim();
+		CGVarElim ve = new CGVarElim();
 		ve.instantiate(bn);
-		JPT jpt=ve.infer(wetgrass);
+		JPT jpt=ve.infer(wetgrass).getJPT();
 		jpt.display();
 		
 	}
