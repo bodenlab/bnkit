@@ -264,7 +264,10 @@ public class CPT implements BNode, Serializable {
                         }
                     }
                     if (varinstance != null) { // the variable for this CPT is instantiated
-                        ft.addValue(newkey, d.get(varinstance));
+                        if (newkey.length == 0) // atomic FactorTable
+                            ft.setValue(null, d.get(varinstance));
+                        else
+                            ft.addValue(newkey, d.get(varinstance));
                     } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
                         for (int j = 0; j < dom.size(); j++) {
                             newkey[newkey.length - 1] = dom.get(j);
@@ -280,9 +283,10 @@ public class CPT implements BNode, Serializable {
             }
             return ft;
         } else { // no parents, just a prior
-            if (varinstance != null) // instantiated prior is not possible to factorise
-            {
-                return null;
+            if (varinstance != null) { // instantiated prior
+                FactorTable ft = new FactorTable();
+                ft.setValue(null, this.prior.get(varinstance));
+                return ft;
             }
             List<EnumVariable> vars_new = new ArrayList<EnumVariable>(1);
             vars_new.add(var);

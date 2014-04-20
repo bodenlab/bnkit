@@ -17,7 +17,11 @@
  */
 package bn.alg;
 
+import bn.Distrib;
+import bn.EnumTable;
 import bn.JPT;
+import bn.Variable;
+import java.util.Map;
 
 /**
  * Interface for Bayesian network query results.
@@ -26,5 +30,5 @@ import bn.JPT;
 public interface QueryResult {
     
     JPT getJPT();
-    
+    Map<Variable, EnumTable<Distrib>> getNonEnum();
 }

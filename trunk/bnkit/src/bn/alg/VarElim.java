@@ -19,6 +19,7 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
+import bn.Distrib;
 import bn.EnumTable;
 import bn.EnumVariable;
 import bn.FactorTable;
@@ -123,7 +124,7 @@ public class VarElim implements Inference {
             }
             if (!added) // if not added as per sum-out variable 
             {
-                if (ft.getParents().size() > 0) {
+                if (ft.getEnumVariables().size() > 0) {
                     throw new VarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
                 } // put it in the last bucket?
                 //buckets.get(buckets.size() - 1).put(ft);
@@ -176,7 +177,7 @@ public class VarElim implements Inference {
                         }
                     }
                 } else { // last bucket so we should not marginalize out query variables, instead return the JPT from the final factor
-                    List<EnumVariable> f_parents = result.getParents();
+                    List<EnumVariable> f_parents = result.getEnumVariables();
                     List<EnumVariable> q_parents = q.Q;
                     int[] map2q = new int[q_parents.size()];
                     for (int jf = 0; jf < map2q.length; jf ++) {
@@ -235,7 +236,7 @@ public class VarElim implements Inference {
 
         @Override
         public int compare(FactorTable o1, FactorTable o2) {
-            return o1.getParents().size() - o2.getParents().size();
+            return o1.getEnumVariables().size() - o2.getEnumVariables().size();
         }
     }
 
@@ -263,6 +264,10 @@ public class VarElim implements Inference {
         public JPT getJPT() {
             return this.jpt;
         }
+        public Map<Variable, EnumTable<Distrib>> getNonEnum() {
+            throw new RuntimeException("Not implemented");
+        }
+
     }
 
     /**
@@ -304,7 +309,7 @@ public class VarElim implements Inference {
          * false otherwise
          */
         boolean match(FactorTable f) {
-            List<EnumVariable> fvars = f.getParents();
+            List<EnumVariable> fvars = f.getEnumVariables();
             for (EnumVariable fvar : fvars) {
                 if (vars.contains(fvar)) {
                     return true;
@@ -315,7 +320,7 @@ public class VarElim implements Inference {
 
         boolean hasFactorWith(EnumVariable var) {
             for (FactorTable ft : factors) {
-                if (ft.getParents().contains(var)) {
+                if (ft.getEnumVariables().contains(var)) {
                     return true;
                 }
             }
@@ -331,11 +336,6 @@ public class VarElim implements Inference {
         }
     }
 
-    @Override
-    public double getLogLikelihood() {
-        return logLikelihood;
-    }
-    
     public class VarElimRuntimeException extends RuntimeException {
         private static final long serialVersionUID = 1L;
 

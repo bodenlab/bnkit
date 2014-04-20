@@ -207,14 +207,13 @@ public class ApproxInfer implements Inference {
         public JPT getJPT() {
             return this.jpt;
         }
+        
+        public Map<Variable, EnumTable<Distrib>> getNonEnum() {
+            throw new RuntimeException("Not implemented");
+        }
     }
 
 
-    
-    @Override
-    public double getLogLikelihood() {
-        return logLikelihood;
-    }    
     
     /**
      * Get the number of iterations sampling will complete
