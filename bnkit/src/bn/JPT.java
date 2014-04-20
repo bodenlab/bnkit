@@ -37,12 +37,26 @@ public class JPT {
      * @param counts the table with counts
      */
     public JPT(EnumTable<Double> counts) {
-        table = new EnumTable<Double>(counts.getParents());
+        table = new EnumTable<>(counts.getParents());
         double sum = 0.0;
         for (Map.Entry<Integer, Double> entry : counts.map.entrySet()) {
             sum += entry.getValue();
         }
         for (Map.Entry<Integer, Double> entry : counts.map.entrySet()) {
+            table.setValue(entry.getKey(), entry.getValue() / sum);
+        }
+    }
+
+    /**
+     * Construct a JPT from a FactorTable.
+     * Useful after training.
+     * This is simply a normalisation exercise.
+     * @param ft the table with counts
+     */
+    public JPT(FactorTable ft) {
+        table = new EnumTable<>(ft.getEnumVariables());
+        double sum = ft.getSum();
+        for (Map.Entry<Integer, Double> entry : ft.getMapEntries()) {
             table.setValue(entry.getKey(), entry.getValue() / sum);
         }
     }
@@ -124,11 +138,12 @@ public class JPT {
      * Dense print-representation of the JPT.
      * @return string representation useful for debugging
      */
+    @Override
     public String toString() {
         String[] parents = table.getLabels();
-        StringBuffer sbuf = new StringBuffer();
+        StringBuilder sbuf = new StringBuilder();
         for (int i = 0; i < parents.length; i++) {
-            sbuf.append(parents[i] + (i < parents.length - 1 ? "," : ""));
+            sbuf.append(parents[i]).append(i < parents.length - 1 ? "," : "");
         }
         return "JPT(" + sbuf.toString() + ")";
     }

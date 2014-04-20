@@ -18,6 +18,7 @@
 
 package bn;
 
+import bn.alg.Query;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -202,7 +203,7 @@ public class BNet implements Serializable {
         if (parents == null) {
             return null;
         }
-        Set<String> str = new HashSet<String>();
+        Set<String> str = new HashSet<>();
         for (EnumVariable var : parents) {
             str.add(var.toString());
         }
@@ -239,7 +240,7 @@ public class BNet implements Serializable {
         if (parents == null) {
             return null;
         }
-        List<BNode> nonredundant = new ArrayList<BNode>();
+        List<BNode> nonredundant = new ArrayList<>();
         nonredundant.addAll(parents);
         for (BNode p : parents) {
             List<BNode> ancestors = getAncestors(p);
@@ -269,7 +270,7 @@ public class BNet implements Serializable {
         if (children == null) {
             return null;
         }
-        Set<String> names = new HashSet<String>();
+        Set<String> names = new HashSet<>();
         for (BNode n : children) {
             names.add(n.getName());
         }
@@ -304,7 +305,7 @@ public class BNet implements Serializable {
         if (children == null) {
             return null;
         }
-        List<BNode> nonredundant = new ArrayList<BNode>();
+        List<BNode> nonredundant = new ArrayList<>();
         nonredundant.addAll(children);
         for (BNode c : children) {
             List<BNode> descendants = getDescendants(c);
@@ -322,6 +323,7 @@ public class BNet implements Serializable {
     /**
      * Retrieve all nodes in order (from root/s to leaves; with parallel paths
      * in arbitrary order).
+     * @return return nodes in a defined topological order
      */
     public List<BNode> getOrdered() {
         if (!compiled) {
@@ -406,9 +408,9 @@ public class BNet implements Serializable {
      */
     public BNet getRelevant(Variable[] query) {
         BNet nbn = new BNet();
-        Set<String> qset = new HashSet<String>();
-        for (int i = 0; i < query.length; i++) {
-            qset.add(query[i].toString());
+        Set<String> qset = new HashSet<>();
+        for (Variable query1 : query) {
+            qset.add(query1.toString());
         }
         // first add all instantiated/evidence variables and queried variables
         for (BNode node : nodes.values()) {
@@ -419,7 +421,7 @@ public class BNet implements Serializable {
             }
         }
         // next add the ancestors of those already added
-        Set<BNode> aset = new HashSet<BNode>();
+        Set<BNode> aset = new HashSet<>();
         Set<String> direct = nbn.getNames();
         for (String name : direct) {
             List<BNode> ancestors = getAncestors(name);
@@ -450,12 +452,12 @@ public class BNet implements Serializable {
     //Should this method return a list of nodes in the mb instead?
     //Use of factor tables to get product could be influenced by cutting off parts of network?
     public List<BNode> getMB(Variable query) {
-    	List<BNode> mbNodes = new ArrayList<BNode>();
+    	List<BNode> mbNodes = new ArrayList<>();
 //    	BNet mbn = new BNet();
     	String qName = query.getName();
     	BNode qNode = getNode(query);
     	//get children of query node
-    	Set<String> children = new HashSet<String>();
+    	Set<String> children = new HashSet<>();
     	//add children of query node unless it's a leaf node
     	if (getChildren(qNode) != null ) {
     		children.addAll(getChildren(qNode));
@@ -478,7 +480,7 @@ public class BNet implements Serializable {
      * Given the Markov Blanket network of a query, 
      * return a sample from the distribution of P(X|mb(X))
      * 
-     * @param mbNet mb network of query
+     * @param mbNodes
      * @param query 
      * @param cbn the current bayesian network
      * @return sample from distribution
@@ -491,7 +493,7 @@ public class BNet implements Serializable {
 //    	System.out.println("Next Query");
 //    	System.out.println(query.toString());
     	//Store all factor tables for query to iterate over to find product
-    	Set<FactorTable> fTables = new HashSet<FactorTable>();
+    	Set<FactorTable> fTables = new HashSet<>();
     	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNodes){
     		if (node.getName() != query.getName()){
@@ -515,7 +517,7 @@ public class BNet implements Serializable {
     	 
     	//BUG??
     	//Empty maps occur and in this situation the node is reset and sample ignored
-    	if (ft.map.isEmpty()) {
+    	if (ft.isAtomic()) {
     		System.out.println("Empty Map");
     		//Need to reset the instance or the next iteration will fail
     		query.setInstance(qInstance);
@@ -525,7 +527,7 @@ public class BNet implements Serializable {
     	//How to get distribution from factor table?
     	//Current method seems excessive
     	
-    	Collection<Double> values = ft.map.values();  
+    	Collection<Double> values = ft.getValues();  
     	
     	if (query.getName().equals("H3K27ac")){
     		System.out.println("STOP");

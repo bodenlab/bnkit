@@ -13,6 +13,7 @@ import bn.Predef;
 import bn.alg.VarElim;
 import bn.Variable;
 import bn.alg.CGVarElim;
+import bn.alg.QueryResult;
 import bn.file.BNBuf;
 
 public class GDTExample {
@@ -64,8 +65,8 @@ public class GDTExample {
 		
 		CGVarElim ve = new CGVarElim();
 		ve.instantiate(bn);
-                
-		JPT jpt=ve.infer(new EnumVariable[] {WETGRASS}).getJPT();
+                QueryResult qr = ve.infer(new EnumVariable[] {WETGRASS});
+		JPT jpt=qr.getJPT();
 		jpt.display();
 		
 		BNBuf.save(bn, "data/sprinkler1.xml");

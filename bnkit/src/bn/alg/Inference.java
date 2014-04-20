@@ -49,5 +49,4 @@ public interface Inference {
      */
     public QueryResult infer(Query q);
 
-    public double getLogLikelihood();
 }

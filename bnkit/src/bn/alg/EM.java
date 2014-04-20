@@ -19,6 +19,8 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
+import bn.Distrib;
+import bn.EnumTable;
 import bn.EnumVariable;
 import bn.JPT;
 import bn.Variable;
@@ -209,13 +211,20 @@ public class EM extends LearningAlg {
                                 Query q = inf.makeQuery(query_arr);
                                 QueryResult qr = inf.infer(q);
                                 JPT jpt = qr.getJPT();
-                                log_prob += inf.getLogLikelihood();
+                                log_prob += Math.log(((CGVarElim)inf).likelihood());
                                 for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
                                     Object[] jpt_key = jpt.table.getKey(entry.getKey().intValue());
                                     // jpt_key will contain values for latent variables
                                     // other variables are already instantiated
                                     if (node.getInstance() == null) {
-                                        ovalue = jpt_key[jpt_key.length - 1];
+                                        try {
+                                            ((EnumVariable)node.getVariable()).getName();
+                                            ovalue = jpt_key[jpt_key.length - 1];
+                                        } catch (ClassCastException e) {
+                                            EnumTable<Distrib> tab = qr.getNonEnum().get(node.getVariable());
+                                            Distrib d = tab.getValue(entry.getKey().intValue());
+                                            ovalue = d.sample();
+                                        }
                                     }
                                     double prob = entry.getValue().doubleValue();
                                     if (node.isRoot()) { // if prior

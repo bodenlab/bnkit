@@ -224,7 +224,7 @@ public class EMA extends LearningAlg {
                             Query q = inf.makeQuery(query_arr);
                             QueryResult qr = inf.infer(q);
                             JPT jpt = qr.getJPT();
-                            log_prob += inf.getLogLikelihood();
+                            //log_prob += inf.likelihood();
 //                            Set<Map.Entry<Integer, Double>> test = jpt.table.getMapEntries();
                             for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
                                 Object[] jpt_key = jpt.table.getKey(entry.getKey().intValue());
