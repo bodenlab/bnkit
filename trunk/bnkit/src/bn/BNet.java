@@ -490,16 +490,15 @@ public class BNet implements Serializable {
     	//Store the instance incase the map is empty and you have to reset the node
     	Object qInstance = query.getInstance();
     	query.resetInstance();
-//    	System.out.println("Next Query");
-//    	System.out.println(query.toString());
+    	System.out.println("NEW QUERY");
     	//Store all factor tables for query to iterate over to find product
     	Set<FactorTable> fTables = new HashSet<>();
+    	//Check if root and GDT - special case
+    	Boolean leafQuery = false;
     	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNodes){
+    		System.out.println(node.toString());
     		if (node.getName() != query.getName()){
-    			for (BNode n : cbn.getNodes()) {
-//    				System.out.println(n.toString());
-    			}
     			FactorTable fact = node.makeFactor(cbn);
     			
     			//instantiated priors cannot be used to factorise
@@ -508,6 +507,7 @@ public class BNet implements Serializable {
     			}
     		}
     	}
+    	
     	//Get the factor table for the query and make it the product start point
     	FactorTable ft = query.makeFactor(cbn);
     	//For each factor table, add it to the product
@@ -515,46 +515,51 @@ public class BNet implements Serializable {
     		ft = FactorTable.product(ft, factor); 
     	} 	
     	 
-    	//BUG??
-    	//Empty maps occur and in this situation the node is reset and sample ignored
+    	//Distribution never altered by factor when cg is leaf node
+    	if (ft.hasNonEnumVariables()) { 
+    		Distrib d = ft.getDistrib(0, query.getVariable());
+    		Object result = d.sample();
+//    		System.out.println(result);
+    		return result;
+    	}
+    	
+    	//FIXME
+    	//Where a network is properly parameterised, an atomic ft represents 
+    	//a non-initialised real node as query - USING THIS ALGORITHM
+    	//CAN IT REPRESENT ANYTHING ELSE??? 
+    	//Is this accurate for training or only for querying the final network?
     	if (ft.isAtomic()) {
-    		System.out.println("Empty Map");
-    		//Need to reset the instance or the next iteration will fail
-    		query.setInstance(qInstance);
-    		return null;
+//    		System.out.println("Atomic Map getMBProbReal");
+    		Distrib d = ft.getDistrib(0, query.getVariable());
+    		Object result = d.sample();
+//    		System.out.println(result);
+    		return result;
     	}
     	
     	//How to get distribution from factor table?
-    	//Current method seems excessive
+    	//Two choices for method currently
     	
     	Collection<Double> values = ft.getValues();  
     	
-    	if (query.getName().equals("H3K27ac")){
-    		System.out.println("STOP");
+//    	Double[] d = (Double[]) values.toArray(new Double[values.size()]);
+//    	double[] data = new double[d.length];
+//    	for (int i = 0; i < d.length; i++){
+//    		double res = (double)(d[i]);
+//    		data[i] = res;
+//    	}
+//		Distrib dist = new EnumDistrib((Enumerable)query.getVariable().getDomain(), data);
+//    	Object end = dist.sample(); 
+
+    	Map<Object, Double> nFt = new HashMap<Object, Double>();
+    	for (Map.Entry<Integer, Double> entry : ft.getMapEntries()) {
+    		nFt.put((Object)entry.getKey(), entry.getValue());
     	}
-    	
-    	Double[] d = (Double[]) values.toArray(new Double[values.size()]);
-    	double[] data = new double[d.length];
-    	for (int i = 0; i < d.length; i++){
-    		double res = (double)(d[i]);
-    		data[i] = res;
-    	}
-		
-    	
-		Map<Object, Double> nFt = new HashMap<Object, Double>();
-		for (Map.Entry<Integer, Double> entry : ft.getMapEntries()) {
-			nFt.put((Object)entry.getKey(), entry.getValue());
-		}
-		
-		Distrib dist = new EnumDistrib((Enumerable)query.getVariable().getDomain(), data);
-    	Distrib dist1 = new EnumDistrib(nFt);
-    	Object end1 = dist1.sample();
-    	
-		Object end = dist.sample(); 	
-		
-    	return end;
+    	Distrib dist = new EnumDistrib(nFt, (Enumerable)query.getVariable().getDomain());
+        Object end = dist.sample();
+        	
+        return end;   		    	
     }
-    
+     
     /**
      * Utility function to create an array from a set of String.
      *
