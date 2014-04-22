@@ -140,8 +140,12 @@ public class FactorTable {
     }
 
     public boolean hasNonEnumVariables() {
-        if (this.nonEnumTables != null)
+        if (this.nonEnumTables != null) {
             return this.nonEnumTables.size() > 0;
+        }
+        if (atomicNonEnumDistribs != null) {
+        	return this.atomicNonEnumDistribs.size() > 0;
+        }
         return false;
     }
     
