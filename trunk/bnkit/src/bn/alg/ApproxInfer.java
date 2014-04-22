@@ -10,8 +10,10 @@ import bn.EnumTable;
 import bn.EnumVariable;
 import bn.Enumerable;
 import bn.FactorTable;
+import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Variable;
+import bn.alg.AICon.ApproxInferRuntimeException;
 import bn.alg.VarElim.VEQuery;
 
 import java.util.ArrayList;
@@ -60,7 +62,7 @@ public class ApproxInfer implements Inference {
         List<Variable> ordered = new ArrayList<Variable>();
         try {
             for (int i = 0; i < qvars.length; i++) {
-                X.add((EnumVariable) qvars[i]);
+                X.add(qvars[i]);
             }
             for (BNode node : bn.getOrdered()) {
                 Variable var = node.getVariable();
@@ -100,20 +102,30 @@ public class ApproxInfer implements Inference {
     		if (pre.equals("Boolean")){
     			Object[] params = {true, false};
     			//Generate a pseudo random number to select parameter
-    			int len = params.length;
-    			int index = randomGenerator.nextInt(len);
+    			int index = randomGenerator.nextInt(params.length);
     			//Randomly set the instance for the node
     			cbn.getNode(var).setInstance(params[index]);
+    		} else if (pre.equals("Real")){
+    			// Ultimately want to sample from one of the possible distributions
+    			// FIXME - better way to do this sampling? Something without odd casts
+    			Object[] nodeDistribs = cbn.getNode(var).getTable().getValues().toArray();
+    			int index = randomGenerator.nextInt(nodeDistribs.length);
+    			//Get individual mu and sigma from random distribution
+    			String[] values = nodeDistribs[index].toString().split(";");
+    			//Create distribution to sample from
+    			Distrib d = new GaussianDistrib(Double.parseDouble(values[0]), Double.parseDouble(values[1]));
+    			cbn.getNode(var).setInstance(d.sample());
     		} else {
         		String parm = var.getParams();
         		String[] params;
-        		////ELSE REQUIRED HERE??
         		if (parm != null) {
         			params = parm.split(";");
 	        		//Generate a pseudo random number to select parameter
 	        		int index = randomGenerator.nextInt(params.length);
 	        		//Randomly set the instance for the node
 	        		cbn.getNode(var).setInstance(params[index]); 
+        		} else {
+        			throw new ApproxInferRuntimeException("Node must contain parameters");
         		}
     		}
     	}
@@ -122,7 +134,7 @@ public class ApproxInfer implements Inference {
     	List<EnumVariable> list = new ArrayList<EnumVariable>(q.X.size());
     	for (Variable var : q.X) {
     		EnumVariable nVar = (EnumVariable)var;
-            list.add(nVar);
+    		list.add(nVar);
         }
     	CountTable storeTable = new CountTable(list);  	   	
     	
@@ -137,15 +149,15 @@ public class ApproxInfer implements Inference {
     			//Top down? Should it be randomised?
     			//Z is an ordered list
     			
-    			//Get the markov blanket of the current node
-//    			BNet mbVar = cbn.getMB(var);
+    			//Get the children of node and node for factors
     			List<BNode> mbVar = cbn.getMB(var);
     			//Sample from the mb distribution
-//    			Object result = mbVar.getMBProb(mbVar, mbVar.getNode(var));
     			Object result = bn.getMBProb(mbVar, bn.getNode(var), bn);
     			if (result != null) {
     				cbn.getNode(var).setInstance(result);
     			}
+//    			System.out.println("New Assignment");
+//    			System.out.println(cbn.getNode(var).toString());
     			
     			// Update Query count here? Outside loop is better?
     		}
@@ -229,6 +241,14 @@ public class ApproxInfer implements Inference {
      */
     public void setIterations(int iter) {
     	iterations = iter;
+    }
+    
+    public class ApproxInferRuntimeException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public ApproxInferRuntimeException(String message) {
+            super(message);
+        }
     }
 }
 
