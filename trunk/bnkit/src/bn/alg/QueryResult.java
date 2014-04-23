@@ -31,4 +31,5 @@ public interface QueryResult {
     
     JPT getJPT();
     Map<Variable, EnumTable<Distrib>> getNonEnum();
+    Map<Variable, Distrib> getNonEnumDistrib();
 }
