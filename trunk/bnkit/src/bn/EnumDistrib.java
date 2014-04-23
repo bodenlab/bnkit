@@ -91,6 +91,27 @@ public class EnumDistrib implements Distrib {
     }
     
     /**
+     * Initialise a probability distribution from a map that both defines the
+     * values of a domain (which will be constructed internally) and the
+     * corresponding probabilities.
+     *
+     * @param enumdistrib map with values and their probabilities (will be
+     * normalised if necessary)
+     * @param discrete the categorical domain (that defines enumerable values)
+     */
+    public EnumDistrib(Map<Object, Double> enumdistrib, Enumerable discrete) {
+        double[] mydistrib = new double[enumdistrib.size()];
+        int i = 0;
+        for (Map.Entry<Object, Double> entry : enumdistrib.entrySet()) {
+            mydistrib[i] = entry.getValue().doubleValue();
+            i++;
+        }
+        this.domain = discrete;
+        this.distrib = mydistrib;
+        normalise();
+    }
+    
+    /**
      * Set the seed for the random number generation that may be used for
      * sampling etc.
      *
