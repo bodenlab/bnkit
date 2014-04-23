@@ -254,11 +254,14 @@ public class CGVarElim implements Inference {
                             }
                         }
                     }
-                    answer = new JPT(et);
-                    if (nonEnumTables != null) 
+                    
+                    if (nonEnumTables != null) {
+                    	answer = new JPT(et);
                         return new CGResult(answer, nonEnumTables);
+                    }
                     if (nonEnumDistribs != null)
                         return new CGResult(nonEnumDistribs);
+                    answer = new JPT(et);
                     return new CGResult(answer);
                 }
             }
@@ -450,6 +453,10 @@ public class CGVarElim implements Inference {
         
         public Map<Variable, EnumTable<Distrib>> getNonEnum() {
             return this.nonEnumTables;
+        }
+        
+        public Map<Variable, Distrib> getNonEnumDistrib() {
+        	return this.nonEnumDistribs;
         }
     }
 
