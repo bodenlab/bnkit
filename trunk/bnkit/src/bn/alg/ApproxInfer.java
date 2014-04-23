@@ -210,9 +210,26 @@ public class ApproxInfer implements Inference {
 
     public class AResult implements QueryResult {
 
-        final private JPT jpt;
+    	final private JPT jpt;
+        final private Map<Variable, EnumTable<Distrib>> nonEnumTables;
+        final private Map<Variable, Distrib> nonEnumDistribs;
+        
         public AResult(JPT jpt) {
             this.jpt = jpt;
+            this.nonEnumTables = null;
+            this.nonEnumDistribs = null;
+        }
+
+        public AResult(JPT jpt, Map<Variable, EnumTable<Distrib>> nonEnum) {
+            this.jpt = jpt;
+            this.nonEnumTables = nonEnum;
+            this.nonEnumDistribs = null;
+        }
+        
+        public AResult(Map<Variable, Distrib> nonEnum) {
+            this.jpt = null;
+            this.nonEnumTables = null;
+            this.nonEnumDistribs = nonEnum;
         }
         
         @Override
@@ -223,6 +240,10 @@ public class ApproxInfer implements Inference {
         public Map<Variable, EnumTable<Distrib>> getNonEnum() {
             throw new RuntimeException("Not implemented");
         }
+        
+        public Map<Variable, Distrib> getNonEnumDistrib() {
+        	return this.nonEnumDistribs;
+        } 
     }
 
 
