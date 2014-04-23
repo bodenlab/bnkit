@@ -142,7 +142,7 @@ public class FactorTable {
     public boolean hasNonEnumVariables() {
         if (this.nonEnumTables != null) {
             return this.nonEnumTables.size() > 0;
-        }
+        } 
         if (atomicNonEnumDistribs != null) {
             return this.atomicNonEnumDistribs.size() > 0;
         }
@@ -567,7 +567,10 @@ public class FactorTable {
      */
     public static FactorTable product(FactorTable ft1, FactorTable ft2) {
         if (ft1.enumTable == null && ft2.enumTable == null) {
-            FactorTable ft3 = new FactorTable();
+            List<Variable> nonEnums = new ArrayList<>();
+            nonEnums.addAll(ft1.getNonEnumVariables());
+            nonEnums.addAll(ft2.getNonEnumVariables());
+            FactorTable ft3 = new FactorTable(Collections.EMPTY_LIST, nonEnums);
             ft3.atomic = ft1.atomic * ft2.atomic;
             for (Variable ft1_nonenum : ft1.getNonEnumVariables())
                 ft3.setDistrib(-1, ft1_nonenum, ft1.getDistrib(-1, ft1_nonenum));
@@ -575,7 +578,10 @@ public class FactorTable {
                 ft3.setDistrib(-1, ft2_nonenum, ft2.getDistrib(-1, ft2_nonenum));
             return ft3;
         } else if (ft1.enumTable == null) {
-            FactorTable ft3 = new FactorTable(ft2.enumTable.getParents());
+            List<Variable> nonEnums = new ArrayList<>();
+            nonEnums.addAll(ft1.getNonEnumVariables());
+            nonEnums.addAll(ft2.getNonEnumVariables());
+            FactorTable ft3 = new FactorTable(ft2.enumTable.getParents(), nonEnums);
             for (Map.Entry<Integer, Double> entry2 : ft2.enumTable.getMapEntries()) {
                 int ft3_index = ft3.enumTable.setValue(entry2.getKey(), entry2.getValue() * ft1.atomic);
                 for (Variable ft1_nonenum : ft1.getNonEnumVariables())
@@ -586,7 +592,10 @@ public class FactorTable {
             ft3.function = true;
             return ft3;
         } else if (ft2.enumTable == null) {
-            FactorTable ft3 = new FactorTable(ft1.enumTable.getParents());
+            List<Variable> nonEnums = new ArrayList<>();
+            nonEnums.addAll(ft1.getNonEnumVariables());
+            nonEnums.addAll(ft2.getNonEnumVariables());
+            FactorTable ft3 = new FactorTable(ft1.enumTable.getParents(), nonEnums);
             for (Map.Entry<Integer, Double> entry : ft1.enumTable.getMapEntries()) {
                 int ft3_index = ft3.enumTable.setValue(entry.getKey(), entry.getValue() * ft2.atomic);
                 for (Variable ft1_nonenum : ft1.getNonEnumVariables())
@@ -620,11 +629,11 @@ public class FactorTable {
             newparents.add(ft1.enumTable.parents.get(i));
         }
         newparents.addAll(unique_ft2);
-        Collection<Variable> newEnumParents = new ArrayList<>(ft1.getNonEnumVariables());
-        newEnumParents.addAll(ft2.getNonEnumVariables());
+        Collection<Variable> newNonEnumParents = new ArrayList<>(ft1.getNonEnumVariables());
+        newNonEnumParents.addAll(ft2.getNonEnumVariables());
         FactorTable ft3 = null;
-        if (newEnumParents.size() > 0)
-            ft3 = new FactorTable(newparents, newEnumParents);
+        if (newNonEnumParents.size() > 0)
+            ft3 = new FactorTable(newparents, newNonEnumParents);
         else
             ft3 = new FactorTable(newparents);
         for (Map.Entry<Integer, Double> entry1 : ft1.enumTable.getMapEntries()) {
