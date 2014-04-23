@@ -563,6 +563,37 @@ public class CPT implements BNode, Serializable {
         }
         count.count(mykey, prob);
     }
+    
+    /**
+     * Prob can be set to 1.0 because when counted the value is being observed??
+     * Count this observation. Note that for it (E-step in EM) to affect the
+     * CPT, {@link bn.CPT#maximizeInstance()} must be called.
+     *
+     * @param key the setting of the parent variables in the observation
+     * @param value the setting of the CPT variable
+     * @see bn.CPT#maximizeInstance()
+     */
+    @Override
+    public void countInstance(Object[] key, Object value) {
+        if (count == null) { // create count table if none exists
+            List<EnumVariable> cond = new ArrayList<EnumVariable>();
+            cond.add(var); // first variable is always the conditioned variable
+            if (table != null) { // then add parents, if any
+                cond.addAll(table.getParents());
+            }
+            count = new CountTable(cond);
+        }
+        if (key == null) {
+            key = new Object[0];
+        }
+        Object[] mykey = new Object[key.length + 1];
+        mykey[0] = value;
+        for (int i = 0; i < key.length; i++) {
+            mykey[i + 1] = key[i];
+        }
+        //FIXME - is prob = 1.0 for observed instance accurate?
+        count.count(mykey, 1.0);
+    }
 
     /**
      * Take stock of all observations counted via

@@ -322,6 +322,20 @@ public class GDT implements BNode, Serializable {
             count.count(key, (Double)value, prob);
         }
     }
+    
+    
+    public void countInstance(Object[] key, Object value) {
+        if (this.isRoot()) {
+            throw new RuntimeException("GDT can not be trained as root, should be implemented soon...");
+            // same process as for extries with parents, just a single queue of observations...
+        } else {
+            if (count == null) // create count table if none exists
+            {
+                count = new SampleTable<Double>(this.getParents());
+            }
+            count.count(key, (Double)value);
+        }
+    }
 
     /**
      * Set this CDT to be trained when the Bayesian network it is part of is
