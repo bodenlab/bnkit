@@ -146,7 +146,15 @@ public interface BNode {
      * @param prob the expectation
      */
     public void countInstance(Object[] key, Object value, Double prob);
-
+    
+    /**
+     * Method used to modify the CPT/CDT to be modified (ApproxInfer uses this).
+     *
+     * @param key the boolean key (how conditioning variables are set)
+     * @param value the value of the conditioned variable
+     */
+    public void countInstance(Object[] key, Object value);
+    
     /**
      * For countInstance to have an effect on the actual CPT, this method needs
      * to be called. It should compute the CPT that maximizes the likelihood of
