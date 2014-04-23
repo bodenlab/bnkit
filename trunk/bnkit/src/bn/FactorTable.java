@@ -338,7 +338,11 @@ public class FactorTable {
     }
     
     public Set<Map.Entry<Integer, Double>> getMapEntries() {
-        return enumTable.map.entrySet();
+    	if (enumTable == null){
+    		return Collections.EMPTY_SET;
+    	} else {
+    		return enumTable.map.entrySet();
+    	}
     }
     
     public Object[] getKey(int index) {
