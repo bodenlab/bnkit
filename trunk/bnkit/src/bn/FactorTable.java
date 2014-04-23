@@ -144,7 +144,7 @@ public class FactorTable {
             return this.nonEnumTables.size() > 0;
         }
         if (atomicNonEnumDistribs != null) {
-        	return this.atomicNonEnumDistribs.size() > 0;
+            return this.atomicNonEnumDistribs.size() > 0;
         }
         return false;
     }
@@ -569,6 +569,10 @@ public class FactorTable {
         if (ft1.enumTable == null && ft2.enumTable == null) {
             FactorTable ft3 = new FactorTable();
             ft3.atomic = ft1.atomic * ft2.atomic;
+            for (Variable ft1_nonenum : ft1.getNonEnumVariables())
+                ft3.setDistrib(-1, ft1_nonenum, ft1.getDistrib(-1, ft1_nonenum));
+            for (Variable ft2_nonenum : ft2.getNonEnumVariables())
+                ft3.setDistrib(-1, ft2_nonenum, ft2.getDistrib(-1, ft2_nonenum));
             return ft3;
         } else if (ft1.enumTable == null) {
             FactorTable ft3 = new FactorTable(ft2.enumTable.getParents());

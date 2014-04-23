@@ -120,11 +120,14 @@ public class CGVarElim implements Inference {
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
         for (BNode node : bn.getNodes()) {
             FactorTable ft = node.makeFactor(bn);
-            if (ft.isAtomic()) // the FT is empty. 
-                continue;
             boolean added = false;
+            if (ft.isAtomic()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
+                buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
+                added = true;
+                continue;
+            }
             // go through buckets in reverse order, choosing the first (from end) which "matches" the variables of the FT
-            for (int i = nBuckets - 1; i >= 0; i--) { 
+            for (int i = nBuckets - 1; i >= 0 && !added; i--) { 
                 Bucket b = buckets.get(i);
                 if (b.match(ft)) {
                     b.put(ft);
@@ -133,14 +136,8 @@ public class CGVarElim implements Inference {
                 }
             }
             if (!added) { // if not added as per sum-out variable 
-                // can happen if non-enumerable... which we deal with 
-                if (!ft.isAtomic())
-                    first_bucket.put(ft);
-                else // OR, this could happen if the FT is somehow corrupt, e.g. no variables
-                    throw new CGVarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
-                // put it in the last bucket?
-                //  buckets.get(buckets.size() - 1).put(ft);
-                // all variables had been factored out so ignore
+                // FT is somehow corrupt, e.g. no variables
+                throw new CGVarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
             }
         }
         // Purge buckets, merge sum-out variables
@@ -187,11 +184,15 @@ public class CGVarElim implements Inference {
                         for (Variable bvar : b.vars) 
                             evars.add((EnumVariable)bvar);
                         result = result.marginalize(evars);   // sum-out variables of bucket
-                        for (int jj = i - 1; jj >= 0; jj--) { // find a new bucket for the result factor
-                            Bucket b2 = buckets.get(jj);      // FIXME: problem if FT is atomic (ie no variables)
-                            if (b2.match(result)) {
-                                b2.put(result);
-                                break;
+                        if (result.isAtomic())          // if no enumerable variables, we may still have non-enumerables
+                            buckets.get(0).put(result); // so we put the factor in the first bucket
+                        else {                          // there are enumerables so...
+                            for (int jj = i - 1; jj >= 0; jj--) { // find a new bucket for the result factor
+                                Bucket b2 = buckets.get(jj);      
+                                if (b2.match(result)) {
+                                    b2.put(result);
+                                    break;
+                                }
                             }
                         }
                     } catch (ClassCastException e) {
@@ -201,7 +202,7 @@ public class CGVarElim implements Inference {
                     // This is the final (first) bucket so we should not marginalize out query variables (and non-enumerables), 
                     // instead we should extract query results from the final factor, including a JPT.
                     // If Q is only a non-enumerable variable or list there-of, we will not be able to create a JPT.
-                
+                    // The first section below is just making sure that the variables are presented in the same order as that in the query
                     List<EnumVariable> f_parents = result.getEnumVariables();
                     List<EnumVariable> q_parents = new ArrayList<>();
                     for (Variable q_par : q.Q) {
@@ -227,10 +228,17 @@ public class CGVarElim implements Inference {
                     }
                     EnumTable<Double> et = new EnumTable<Double>(q_parents);
                     Map<Variable, EnumTable<Distrib>> nonEnumTables = null;
+                    Map<Variable, Distrib> nonEnumDistribs = null;
                     if (result.hasNonEnumVariables()) {
-                        nonEnumTables = new HashMap<>();
-                        for (Variable nonenum : result.getNonEnumVariables())
-                            nonEnumTables.put(nonenum, new EnumTable<Distrib>(q_parents));
+                        if (result.isAtomic()) {
+                            nonEnumDistribs = new HashMap<>();
+                            for (Variable nonenum : result.getNonEnumVariables())
+                                nonEnumDistribs.put(nonenum, result.getDistrib(-1, nonenum));
+                        } else {
+                            nonEnumTables = new HashMap<>();
+                            for (Variable nonenum : result.getNonEnumVariables())
+                                nonEnumTables.put(nonenum, new EnumTable<Distrib>(q_parents));
+                        }
                     }
                     for (Map.Entry<Integer, Double> entry : result.getMapEntries()) {
                         Object[] fkey = result.getKey(entry.getKey().intValue());
@@ -249,6 +257,8 @@ public class CGVarElim implements Inference {
                     answer = new JPT(et);
                     if (nonEnumTables != null) 
                         return new CGResult(answer, nonEnumTables);
+                    if (nonEnumDistribs != null)
+                        return new CGResult(nonEnumDistribs);
                     return new CGResult(answer);
                 }
             }
@@ -413,14 +423,24 @@ public class CGVarElim implements Inference {
 
         final private JPT jpt;
         final private Map<Variable, EnumTable<Distrib>> nonEnumTables;
+        final private Map<Variable, Distrib> nonEnumDistribs;
         
         public CGResult(JPT jpt) {
             this.jpt = jpt;
             this.nonEnumTables = null;
+            this.nonEnumDistribs = null;
         }
+
         public CGResult(JPT jpt, Map<Variable, EnumTable<Distrib>> nonEnum) {
             this.jpt = jpt;
             this.nonEnumTables = nonEnum;
+            this.nonEnumDistribs = null;
+        }
+        
+        public CGResult(Map<Variable, Distrib> nonEnum) {
+            this.jpt = null;
+            this.nonEnumTables = null;
+            this.nonEnumDistribs = nonEnum;
         }
         
         @Override
