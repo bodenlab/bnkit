@@ -242,7 +242,7 @@ public class EM extends LearningAlg {
                                         }
                                     }
                                 } 
-                            } catch (VarElimRuntimeException e) {
+                            } catch (CGVarElimRuntimeException e) {
                                 ; // This happens when a variable cannot be queried, e.g. a continuous variable.
                                 ; // Since we do not currently properly check the scope of instantiated variables
                                 ; // to remove such variables for appropriate reasons, the problem is ignored. 
