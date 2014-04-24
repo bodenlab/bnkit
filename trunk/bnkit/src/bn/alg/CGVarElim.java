@@ -458,6 +458,11 @@ public class CGVarElim implements Inference {
         public Map<Variable, Distrib> getNonEnumDistrib() {
         	return this.nonEnumDistribs;
         }
+        
+        public Distrib getDistrib(Variable query) {
+            
+            return null;
+        }
     }
 
     /**
