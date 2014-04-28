@@ -97,7 +97,6 @@ public class CGVarElim implements Inference {
     @SuppressWarnings("rawtypes")
     @Override
     public QueryResult infer(Query query) {
-        JPT answer = null;
 	// All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
         // Evidence will be incorporated into the factor when it is constructed.
         // Create list of buckets: first one has query variables, then all sum-outs in topological ordering (as sorted by the constructor)
@@ -203,72 +202,78 @@ public class CGVarElim implements Inference {
                     // instead we should extract query results from the final factor, including a JPT.
                     // If Q is only a non-enumerable variable or list there-of, we will not be able to create a JPT.
                     // The first section below is just making sure that the variables are presented in the same order as that in the query
-                    List<EnumVariable> f_parents = result.getEnumVariables();
-                    List<EnumVariable> q_parents = new ArrayList<>();
-                    for (Variable q_par : q.Q) {
-                        try {
-                            q_parents.add((EnumVariable)q_par);
-                        } catch (ClassCastException e) {
-                            ; // ignore non-enumerable variables since they will not be parents in the resulting JPT
-                        }
-                    }
-                    int[] map2q = new int[q_parents.size()];
-                    for (int jf = 0; jf < map2q.length; jf ++) {
-                        map2q[jf] = -1;
-                        for (int jq = 0; jq < map2q.length; jq ++) {
-                            if (f_parents.get(jf).getName().equals(q_parents.get(jq).getName()))  {
-                                map2q[jf] = jq;
-                                break;
-                            }
-                        }
-                    }
-                    for (int j = 0; j < map2q.length; j ++) {
-                        if (map2q[j] == -1)
-                            throw new CGVarElimRuntimeException("Invalid inference result");
-                    }
-                    EnumTable<Double> et = new EnumTable<Double>(q_parents);
-                    Map<Variable, EnumTable<Distrib>> nonEnumTables = null;
-                    Map<Variable, Distrib> nonEnumDistribs = null;
-                    if (result.hasNonEnumVariables()) {
-                        if (result.isAtomic()) {
-                            nonEnumDistribs = new HashMap<>();
-                            for (Variable nonenum : result.getNonEnumVariables())
-                                nonEnumDistribs.put(nonenum, result.getDistrib(-1, nonenum));
-                        } else {
-                            nonEnumTables = new HashMap<>();
-                            for (Variable nonenum : result.getNonEnumVariables())
-                                nonEnumTables.put(nonenum, new EnumTable<Distrib>(q_parents));
-                        }
-                    }
-                    for (Map.Entry<Integer, Double> entry : result.getMapEntries()) {
-                        Object[] fkey = result.getKey(entry.getKey().intValue());
-                        Object[] qkey = new Object[fkey.length];
-                        for (int j = 0; j < fkey.length; j ++)
-                            qkey[map2q[j]] = fkey[j];
-                        et.setValue(qkey, entry.getValue());
-                        if (nonEnumTables != null) {
-                            for (Variable nonenum : result.getNonEnumVariables()) {
-                                Distrib d = result.getDistrib(fkey, nonenum);
-                                EnumTable<Distrib> table = nonEnumTables.get(nonenum);
-                                table.setValue(qkey, d);
-                            }
-                        }
-                    }
-                    
-                    if (nonEnumTables != null) {
-                    	answer = new JPT(et);
-                        return new CGResult(answer, nonEnumTables);
-                    }
-                    if (nonEnumDistribs != null)
-                        return new CGResult(nonEnumDistribs);
-                    answer = new JPT(et);
-                    return new CGResult(answer);
+                    return extractResult(result, q.Q);
                 }
             }
         }
-        return new CGResult(answer);
+        throw new CGVarElimRuntimeException("Variable elimination failed");
     }
 
+    private CGResult extractResult(FactorTable result, List<Variable> query) {
+        JPT answer = null;
+        List<EnumVariable> f_parents = result.getEnumVariables();
+        List<EnumVariable> q_parents = new ArrayList<>();
+        for (Variable q_par : query) {
+            try {
+                q_parents.add((EnumVariable)q_par);
+            } catch (ClassCastException e) {
+                ; // ignore non-enumerable variables since they will not be parents in the resulting JPT
+            }
+        }
+        int[] map2q = new int[q_parents.size()];
+        for (int jf = 0; jf < map2q.length; jf ++) {
+            map2q[jf] = -1;
+            for (int jq = 0; jq < map2q.length; jq ++) {
+                if (f_parents.get(jf).getName().equals(q_parents.get(jq).getName()))  {
+                    map2q[jf] = jq;
+                    break;
+                }
+            }
+        }
+        for (int j = 0; j < map2q.length; j ++) {
+            if (map2q[j] == -1)
+                throw new CGVarElimRuntimeException("Invalid inference result");
+        }
+        EnumTable<Double> et = new EnumTable<Double>(q_parents);
+        Map<Variable, EnumTable<Distrib>> nonEnumTables = null;
+        Map<Variable, Distrib> nonEnumDistribs = null;
+        if (result.hasNonEnumVariables()) {
+            if (result.isAtomic()) {
+                nonEnumDistribs = new HashMap<>();
+                for (Variable nonenum : result.getNonEnumVariables())
+                    nonEnumDistribs.put(nonenum, result.getDistrib(-1, nonenum));
+            } else {
+                nonEnumTables = new HashMap<>();
+                for (Variable nonenum : result.getNonEnumVariables())
+                    nonEnumTables.put(nonenum, new EnumTable<Distrib>(q_parents));
+            }
+        }
+        for (Map.Entry<Integer, Double> entry : result.getMapEntries()) {
+            Object[] fkey = result.getKey(entry.getKey().intValue());
+            Object[] qkey = new Object[fkey.length];
+            for (int j = 0; j < fkey.length; j ++)
+                qkey[map2q[j]] = fkey[j];
+            et.setValue(qkey, entry.getValue());
+            if (nonEnumTables != null) {
+                for (Variable nonenum : result.getNonEnumVariables()) {
+                    Distrib d = result.getDistrib(fkey, nonenum);
+                    EnumTable<Distrib> table = nonEnumTables.get(nonenum);
+                    table.setValue(qkey, d);
+                }
+            }
+        }
+
+        if (nonEnumTables != null) {
+            answer = new JPT(et);
+            return new CGResult(result, answer, nonEnumTables);
+        }
+        if (nonEnumDistribs != null)
+            return new CGResult(result, nonEnumDistribs);
+        answer = new JPT(et);
+        return new CGResult(result, answer);
+    }
+        
+    
     @SuppressWarnings("rawtypes")
     public QueryResult infer(Variable[] query_vars) {
         return infer(makeQuery(query_vars));
@@ -424,23 +429,27 @@ public class CGVarElim implements Inference {
 
     public class CGResult implements QueryResult {
 
+        final FactorTable ft;
         final private JPT jpt;
         final private Map<Variable, EnumTable<Distrib>> nonEnumTables;
         final private Map<Variable, Distrib> nonEnumDistribs;
         
-        public CGResult(JPT jpt) {
+        public CGResult(FactorTable ft, JPT jpt) {
+            this.ft = ft;
             this.jpt = jpt;
             this.nonEnumTables = null;
             this.nonEnumDistribs = null;
         }
 
-        public CGResult(JPT jpt, Map<Variable, EnumTable<Distrib>> nonEnum) {
+        public CGResult(FactorTable ft, JPT jpt, Map<Variable, EnumTable<Distrib>> nonEnum) {
+            this.ft = ft;
             this.jpt = jpt;
             this.nonEnumTables = nonEnum;
             this.nonEnumDistribs = null;
         }
         
-        public CGResult(Map<Variable, Distrib> nonEnum) {
+        public CGResult(FactorTable ft, Map<Variable, Distrib> nonEnum) {
+            this.ft = ft;
             this.jpt = null;
             this.nonEnumTables = null;
             this.nonEnumDistribs = nonEnum;
@@ -459,9 +468,28 @@ public class CGVarElim implements Inference {
         	return this.nonEnumDistribs;
         }
         
+        /**
+         * Method to retrieve a single distribution with all other variables in original query unspecified.
+         * @param query the query variable
+         * @return 
+         */
         public Distrib getDistrib(Variable query) {
+            return getDistrib(query, null);
+        }
+
+        /**
+         * Method to retrieve a single distribution GIVEN some optional evidence.
+         * @param query the query variable
+         * @return 
+         */
+        public Distrib getDistrib(Variable query, Evidence... evid) {
             
             return null;
+        }
+        
+        public class Evidence {
+            public Variable var; Object val;
+            public Evidence(Variable var, Object val) { this.var = var; this.val = val; }
         }
     }
 

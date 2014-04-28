@@ -265,7 +265,12 @@ public class VarElim implements Inference {
             return this.jpt;
         }
         public Map<Variable, EnumTable<Distrib>> getNonEnum() {
-            throw new RuntimeException("Not implemented");
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public Map<Variable, Distrib> getNonEnumDistrib() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
     }
