@@ -17,6 +17,7 @@
  */
 package bn;
 
+import bn.alg.CGVarElim;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -679,6 +680,62 @@ public class FactorTable {
         }
         ft3.function = true;
         return ft3;
+    }
+
+        /**
+     * Change the order of defining parents.
+     * @param ordered the variables in new order
+     * @return 
+     */
+    private FactorTable rehash(List<Variable> ordered) {
+        List<EnumVariable> f_parents = getEnumVariables();
+        List<EnumVariable> q_parents = new ArrayList<>();
+        List<Variable> c_parents = new ArrayList<>();
+        for (Variable var : ordered) {
+            try {
+                q_parents.add((EnumVariable)var);
+            } catch (ClassCastException e) {
+                c_parents.add(var);
+                ; // non-enumerable variables do not define indices in the resulting table
+            }
+        }
+        int[] map2q = new int[q_parents.size()];
+        for (int jf = 0; jf < map2q.length; jf ++) {
+            map2q[jf] = -1;
+            for (int jq = 0; jq < map2q.length; jq ++) {
+                if (f_parents.get(jf).getName().equals(q_parents.get(jq).getName()))  {
+                    map2q[jf] = jq;
+                    break;
+                }
+            }
+        }
+        for (int j = 0; j < map2q.length; j ++) {
+            if (map2q[j] == -1)
+                throw new FactorTableRuntimeException("Invalid list of variables to extract");
+        }
+        FactorTable et = new FactorTable(q_parents, c_parents);
+
+        if (this.hasNonEnumVariables()) {
+            if (this.isAtomic()) {
+                for (Variable nonenum : this.getNonEnumVariables())
+                    et.setDistrib(-1, nonenum, this.getDistrib(-1, nonenum));
+            } 
+        }
+        et.atomic = this.atomic;
+        for (Map.Entry<Integer, Double> entry : this.getMapEntries()) {
+            Object[] fkey = this.getKey(entry.getKey().intValue());
+            Object[] qkey = new Object[fkey.length];
+            for (int j = 0; j < fkey.length; j ++)
+                qkey[map2q[j]] = fkey[j];
+            et.setValue(qkey, entry.getValue());
+            if (nonEnumTables != null) {
+                for (Variable nonenum : this.getNonEnumVariables()) {
+                    Distrib d = this.getDistrib(fkey, nonenum);
+                    et.setDistrib(qkey, nonenum, d);
+                }
+            }
+        }
+        return et;
     }
 
     public double getLogLikelihood() {

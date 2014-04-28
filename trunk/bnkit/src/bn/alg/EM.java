@@ -211,7 +211,8 @@ public class EM extends LearningAlg {
                                 Query q = inf.makeQuery(query_arr);
                                 QueryResult qr = inf.infer(q);
                                 JPT jpt = qr.getJPT();
-                                log_prob += Math.log(((CGVarElim)inf).likelihood());
+                                if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
+                                    log_prob += Math.log(((CGVarElim)inf).likelihood());
                                 for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
                                     Object[] jpt_key = jpt.table.getKey(entry.getKey().intValue());
                                     // jpt_key will contain values for latent variables
@@ -264,8 +265,8 @@ public class EM extends LearningAlg {
                 }
             }
 
-            conv_rate = Math.abs(log_prob - prev_prob); // use abs because the joint prob may exceed 1 (it is not normalized)
             if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1) {
+                conv_rate = Math.abs(log_prob - prev_prob); // use abs because the joint prob may exceed 1 (it is not normalized)
                 System.err.println("Completed " + round + " round(s), L=" + log_prob);
                 //BNBuf.save(bn, "antonTest1.new");
             }

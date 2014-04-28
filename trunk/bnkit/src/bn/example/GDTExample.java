@@ -18,7 +18,7 @@ import bn.file.BNBuf;
 
 public class GDTExample {
 
-	public static void main0(String[] args) {
+	public static void main(String[] args) {
 		EnumVariable CLOUDY = Predef.Boolean("Cloudy");
 		EnumVariable SPRINKLER = Predef.Boolean("Sprinkler");
 		Variable HUMIDITY = Predef.Real("Humidity");
@@ -72,7 +72,7 @@ public class GDTExample {
 		BNBuf.save(bn, "data/sprinkler1.xml");
 	}
 	
-	public static void main(String[] args) {
+	public static void main2(String[] args) {
 		BNet bn = BNBuf.load("data/sprinkler1.xml");
 		
 		BNode cloudy = bn.getNode("Cloudy");
