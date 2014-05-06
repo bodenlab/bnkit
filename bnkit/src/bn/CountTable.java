@@ -78,6 +78,51 @@ public class CountTable implements Serializable {
         count(key, 1.0);
         this.totalNeedsUpdate = true;
     }
+    
+    /**
+     * Take stock of all observations counted via
+     * {@link bn.CountTable#count(Object[])}, ie implement the
+     * M-step locally.
+     * 
+     * @param qTab query table containing sample table and query node
+     */
+    public void maximizeInstance(QueryTable qTab) {
+    	BNode query = qTab.getQuery();
+    	EnumVariable var = (EnumVariable)query.getVariable();
+    	//FIXME - check parents in enumTable!!
+    	if (query.getTable() != null){
+    		// add the counts to the CPT
+    		for (Map.Entry<Integer, Double> entry : table.getMapEntries()) {
+    			double nobserv = entry.getValue().doubleValue();
+    			Object[] cntkey = table.getKey(entry.getKey().intValue());
+    			Object[] cptkey = new Object[cntkey.length - 1];
+    			for (int i = 0; i < cptkey.length; i++) {
+    				cptkey[i] = cntkey[i + 1];
+    			}
+    			EnumDistrib d = (EnumDistrib)query.getTable().getValue(cptkey);
+    			if (d == null) {
+    				d = new EnumDistrib(var.getDomain());
+    				d.set(cntkey[0], nobserv);
+    				//directly alters the CPT of the node - changed in future versions
+    				query.getTable().setValue(cptkey,  d);
+    			} else {
+    				d.set(cntkey[0], nobserv);
+    				//directly alters the CPT of the node - changed in future versions
+    				query.getTable().setValue(cptkey, d);
+    			}
+    		} // normalisation happens internally when values are required			
+    	} else { // there are no parents
+    		Object[] cntkey = new Object[1];
+    		double[] cnts = new double[var.size()];
+    		for (int i = 0; i < var.size(); i++) {
+    			cntkey[0] = var.getDomain().get(i);
+    			cnts[i] = this.get(cntkey);
+    		}
+    		EnumDistrib prior = (EnumDistrib) query.getDistrib();
+    		prior = new EnumDistrib(var.getDomain(), cnts);	// EnumDistrib normalises the counts internally
+    	}
+    	//RESET COUNTS?
+    }
 
     /**
      * Calculate the sum of all entries.
