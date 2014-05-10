@@ -25,10 +25,7 @@ import bn.EnumVariable;
 import bn.JPT;
 import bn.Variable;
 import bn.alg.CGVarElim.CGVarElimRuntimeException;
-import bn.file.BNBuf;
-
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -98,11 +95,11 @@ public class EM extends LearningAlg {
 
         // below we create the list of nodes that will be updated during training
         // note that only named nodes (variables) will be included, and their parents or children (the latter as latent variables)
-        Set<Variable> updateVars = new HashSet<Variable>();
+        Set<Variable> updateVars = new HashSet<>();
         for (int i = 0; i < vars.length; i++) {
             updateVars.add(vars[i]);
         }
-        Set<BNode> update = new HashSet<BNode>(); 			// the set of nodes that may need to be updated:
+        Set<BNode> update = new HashSet<>(); 			// the set of nodes that may need to be updated:
         for (BNode node : bn.getNodes()) {      			// check all nodes
             Variable var = node.getVariable();				// this is the variable of the node
             if (updateVars.contains(var)) {					// is it in the data set?
@@ -177,7 +174,7 @@ public class EM extends LearningAlg {
                 for (BNode node : update) {
 
                     if (node.isTrainable()) {
-                        List<Variable> query_vars = new ArrayList<Variable>();
+                        List<Variable> query_vars = new ArrayList<>();
                         List<EnumVariable> parents = node.getParents();
                         Object[] parent_key = null;
                         int[] parent_map = null;
@@ -221,6 +218,9 @@ public class EM extends LearningAlg {
                                             ((EnumVariable)node.getVariable()).getName();
                                             ovalue = jpt_key[jpt_key.length - 1];
                                         } catch (ClassCastException e) {
+                                            // TODO: The learning of continuous variables is not quite right:
+                                            // First, should use CGTable functionality.
+                                            // Second, should either sample more extensively or derive new density from all inferred densities.
                                             EnumTable<Distrib> tab = qr.getNonEnum().get(node.getVariable());
                                             Distrib d = tab.getValue(entry.getKey().intValue());
                                             ovalue = d.sample();
