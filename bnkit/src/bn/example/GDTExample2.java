@@ -19,15 +19,17 @@ package bn.example;
 
 import bn.BNet;
 import bn.CPT;
+import bn.Distrib;
 import bn.EnumDistrib;
 import bn.EnumVariable;
 import bn.Enumerable;
-import bn.FactorTable;
 import bn.GDT;
 import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Predef;
 import bn.Variable;
+import bn.Variable.Assignment;
+import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.alg.QueryResult;
@@ -126,11 +128,17 @@ public class GDTExample2 {
         
         CGVarElim ve = new CGVarElim();
         ve.instantiate(bn);
-        Query q = ve.makeQuery(new Variable[] {M});
-        QueryResult qr = ve.infer(q);
-        JPT jpt = qr.getJPT();
-        jpt.display();
-
+        Query q = ve.makeQuery(new Variable[] {M,E,N,R});
+        CGTable qr = (CGTable) ve.infer(q);
+        qr.display();
+        Distrib d = qr.query(R);
+        System.out.println(d);
+        d = qr.query(N, new Assignment[] {
+            //Variable.assign(E, false), 
+            Variable.assign(R, 0.01),
+            Variable.assign(M, true),
+            });
+        System.out.println(d);
     }
 
 }

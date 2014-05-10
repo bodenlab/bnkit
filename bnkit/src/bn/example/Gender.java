@@ -47,17 +47,26 @@ public class Gender {
         
         BNet bn = new BNet();
         bn.add(g,h,w);
-        h.setInstance(172.0);
+        h.setInstance(175.0);
         CGVarElim inf = new CGVarElim();
         inf.instantiate(bn);
         Query q = inf.makeQuery(W);
-        QueryResult r = inf.infer(q);
-        Map<Variable, Distrib> map = r.getNonEnumDistrib();
-        Distrib d = map.get(W);
+        CGTable r = (CGTable) inf.infer(q);
+        Distrib d = r.query(W);
         double sum = 0;
-        for (int i = 0; i < 1000; i ++)
-            sum += (Double)d.sample();
+        int nElem = 50;
+        int minw = 50;
+        int maxw = 100;
+        double[] hist = new double[nElem];
+        for (int i = 0; i < 1000; i ++) {
+            double s = (Double)d.sample();
+            if (s > minw)
+                hist[(int)((s - minw) * ((maxw - minw) / nElem))] += 1;
+            sum += s;
+        }
         System.out.println("Avg weight = " + sum / 1000.0);
-        
+        for (int i = 0; i < hist.length; i ++) {
+            System.out.println((i * ((maxw - minw) / nElem)) + minw + "kg\t" + hist[i]);
+        }
     }
 }

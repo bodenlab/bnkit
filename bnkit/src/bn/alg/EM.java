@@ -24,7 +24,6 @@ import bn.EnumTable;
 import bn.EnumVariable;
 import bn.JPT;
 import bn.Variable;
-import bn.alg.VarElim.VarElimRuntimeException;
 import bn.alg.CGVarElim.CGVarElimRuntimeException;
 import bn.file.BNBuf;
 
@@ -239,7 +238,7 @@ public class EM extends LearningAlg {
                                         try {
                                             node.countInstance(parent_key, ovalue, prob);
                                         } catch (java.lang.RuntimeException e) {
-                                            throw new EMRuntimeException("Problem with sample #"+(i+1)+": " + e.getMessage());
+                                            throw new EMRuntimeException("Problem with sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
                                         }
                                     }
                                 } 

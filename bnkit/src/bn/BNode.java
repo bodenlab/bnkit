@@ -136,7 +136,7 @@ public interface BNode {
     /**
      * Make BNode into a FactorTable
      */
-    public FactorTable makeFactor(BNet bn);
+    public Factor makeFactor(BNet bn);
 
     /**
      * Method used to modify the CPT/CDT to be modified (EM uses this).

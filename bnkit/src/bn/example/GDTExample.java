@@ -10,7 +10,6 @@ import bn.GDT;
 import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Predef;
-import bn.alg.VarElim;
 import bn.Variable;
 import bn.alg.CGVarElim;
 import bn.alg.QueryResult;

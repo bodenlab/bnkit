@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014 M. Boden et al.
+    bnkit -- software for building and using Bayesian networks
+    Copyright (C) 2014  M. Boden et al.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -76,6 +77,24 @@ public class MixtureDistrib implements Distrib {
         return mixture.containsKey(d2);
     }
     
+    /**
+     * Generate a clone which is normalized.
+     * @return mixture with weights that add up to 1
+     */
+    public MixtureDistrib getNormalizedClone() {
+        double sum = 0;
+        for (Double weight : mixture.values()) 
+            sum += weight.doubleValue();
+        MixtureDistrib md = null;
+        for (Map.Entry<Distrib, Double> entry : mixture.entrySet()) {
+            if (md == null) 
+                md = new MixtureDistrib(entry.getKey(), entry.getValue().doubleValue() / sum);
+            else
+                md.addDistrib(entry.getKey(), entry.getValue().doubleValue() / sum);
+        }
+        return md;
+    }
+    
     @Override
     public double get(Object value) {
         double p = 0.0;
@@ -105,7 +124,7 @@ public class MixtureDistrib implements Distrib {
     public String toString() {
         StringBuilder sb = new StringBuilder("^" + mixture.size());
         for (Map.Entry<Distrib, Double> entry : mixture.entrySet())
-            sb.append("{" + entry.getKey() + "*" + String.format("%3.1e", entry.getValue()) + "}");
+            sb.append("{" + entry.getKey() + "*" + String.format("%6.4f", entry.getValue()) + "}");
         return sb.toString();
     }
     

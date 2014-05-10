@@ -182,4 +182,29 @@ public class Variable<E extends Domain> {
         return this.params;
     }
 
+    /**
+     * A class to associate a variable to a value.
+     * Useful for passing variable/value pairs to methods where multiples of these are required.
+     */
+    public static class Assignment {
+        public final Variable var;
+        public final Object val;
+        public Assignment(Variable var, Object val) {
+            this.var = var; 
+            this.val = val;
+        }
+    }
+
+    /**
+     * A factory method for creating a single variable/value pair.
+     * @param var
+     * @param val
+     * @return the variable paired with a value
+     */
+    public static Assignment assign(Variable var, Object val) {
+        return new Variable.Assignment(var, val);
+    }
+    
+
 }
+

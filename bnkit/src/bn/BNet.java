@@ -492,14 +492,14 @@ public class BNet implements Serializable {
     	query.resetInstance();
     	System.out.println("NEW QUERY");
     	//Store all factor tables for query to iterate over to find product
-    	Set<FactorTable> fTables = new HashSet<>();
+    	Set<Factor> fTables = new HashSet<>();
     	//Check if root and GDT - special case
     	Boolean leafQuery = false;
     	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNodes){
     		System.out.println(node.toString());
     		if (node.getName() != query.getName()){
-    			FactorTable fact = node.makeFactor(cbn);
+    			Factor fact = node.makeFactor(cbn);
     			
     			//instantiated priors cannot be used to factorise
     			if (fact != null ){
@@ -509,10 +509,10 @@ public class BNet implements Serializable {
     	}
     	
     	//Get the factor table for the query and make it the product start point
-    	FactorTable ft = query.makeFactor(cbn);
+    	Factor ft = query.makeFactor(cbn);
     	//For each factor table, add it to the product
-    	for (FactorTable factor : fTables) {
-    		ft = FactorTable.product(ft, factor); 
+    	for (Factor factor : fTables) {
+    		ft = Factor.product(ft, factor); 
     	} 	
     	 
     	//Distribution never altered by factor when cg is leaf node
@@ -539,7 +539,7 @@ public class BNet implements Serializable {
     	//How to get distribution from factor table?
     	//Two choices for method currently
     	
-    	Collection<Double> values = ft.getValues();  
+    	Collection<Double> values = ft.getFactors();  
     	
 //    	Double[] d = (Double[]) values.toArray(new Double[values.size()]);
 //    	double[] data = new double[d.length];

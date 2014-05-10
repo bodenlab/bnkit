@@ -13,11 +13,12 @@ import bn.Continuous;
 import bn.EnumDistrib;
 import bn.EnumVariable;
 import bn.Enumerable;
-import bn.FactorTable;
+import bn.Factor;
 import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Predef;
 import bn.Variable;
+import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.alg.QueryResult;
@@ -80,7 +81,7 @@ public class FactorTableDemo {
         // Once in the BNet, variables (through the nodes) can be instantiated to values from their respective domains.
         j.setInstance(true);
         m.setInstance(true);
-        // s.setInstance(5.5);
+        //s.setInstance(5.5);
         
         // Variable elimination works by factorising CPTs, and then by performing products and variable sum-outs in
         // an order that heuristically is computationally efficient.
@@ -89,27 +90,27 @@ public class FactorTableDemo {
         // We assume that all nodes are involved in the inference, though that is not always going to be true.
         // In fact, BNet has a method for creating a new BNet instance that does not contain nodes that are
         // irrelevant to a particular query.
-        FactorTable ft_b = b.makeFactor(bn);
+        Factor ft_b = b.makeFactor(bn);
         System.out.println("Factor B");
         ft_b.display();
         
-        FactorTable ft_e = e.makeFactor(bn);
+        Factor ft_e = e.makeFactor(bn);
         System.out.println("Factor E");
         ft_e.display();
         
-        FactorTable ft_a = a.makeFactor(bn);
+        Factor ft_a = a.makeFactor(bn);
         System.out.println("Factor A");
         ft_a.display();
         
-        FactorTable ft_j = j.makeFactor(bn);
+        Factor ft_j = j.makeFactor(bn);
         System.out.println("Factor J");
         ft_j.display();
         
-        FactorTable ft_m = m.makeFactor(bn);
+        Factor ft_m = m.makeFactor(bn);
         System.out.println("Factor M");
         ft_m.display();
         
-        FactorTable ft_s = s.makeFactor(bn);
+        Factor ft_s = s.makeFactor(bn);
         System.out.println("Factor S");
         ft_s.display();
         
@@ -121,23 +122,23 @@ public class FactorTableDemo {
         // of operations that are required. Smaller, overlapping FTs give smaller 
         // products. We thus combine those that have variables in common. The topological order
         // may also be very helpful to use. See Dechter's paper.
-        FactorTable ft = FactorTable.product(ft_b, ft_e);
+        Factor ft = Factor.product(ft_b, ft_e);
         System.out.println("Factor B * E");
         ft.display();
 
-        ft = FactorTable.product(ft, ft_s);
+        ft = Factor.product(ft, ft_s);
         System.out.println("Factor (B * E) * S");
         ft.display();
 
-        ft = FactorTable.product(ft, ft_a);
+        ft = Factor.product(ft, ft_a);
         System.out.println("Factor (B * E) * A");
         ft.display();
 
-        ft = FactorTable.product(ft, ft_j);
+        ft = Factor.product(ft, ft_j);
         System.out.println("Factor ((B * E) * A) * J");
         ft.display();
 
-        ft = FactorTable.product(ft, ft_m);
+        ft = Factor.product(ft, ft_m);
         System.out.println("Factor (((B * E) * A) * J) * M)");
         ft.display();
 
@@ -147,18 +148,17 @@ public class FactorTableDemo {
         ft = ft.marginalize(new EnumVariable[] {A, E});
         ft.displaySampled();
 
-        // Normalise the FT, make it into a JPT with the query variables CONDITIONED on the instantiated variables removed above
-        JPT p_burglary = new JPT(ft); 
+        // Normalise the FT
+        ft.normalize();
         
-        System.out.println("JPT of Factor (((B * E) * A) * J) * M) - (A, E)");
-        p_burglary.display();
+        System.out.println("Factor (((B * E) * A) * J) * M) - (A, E)");
+        ft.display();
 
         CGVarElim ve = new CGVarElim();
         ve.instantiate(bn);
         Query q = ve.makeQuery(new Variable[] {B});
-        QueryResult qr = ve.infer(q);
-        JPT jpt = qr.getJPT();
-        jpt.display();
+        CGTable qr = (CGTable) ve.infer(q);
+        qr.display();
         
 
     }
