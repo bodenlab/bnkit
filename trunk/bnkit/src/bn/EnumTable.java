@@ -44,7 +44,7 @@ public class EnumTable<E> {
     }
 
     public EnumTable(Collection<EnumVariable> useParents) {
-        this.parents = new ArrayList<EnumVariable>(useParents.size());
+        this.parents = new ArrayList<>(useParents.size());
         this.nParents = useParents.size();
         this.step = new int[this.nParents];
         this.period = new int[this.nParents];
@@ -58,7 +58,7 @@ public class EnumTable<E> {
             prod *= this.parents.get(parent).size();
             this.period[parent] = prod;
         }
-        this.map = new HashMap<Integer, E>();
+        this.map = new HashMap<>();
     }
 
     /**
@@ -301,6 +301,20 @@ public class EnumTable<E> {
     }
 
     /**
+     * Get indices for all non-null entries.
+     * @return the indices
+     */
+    public int[] getIndices() {
+        Set<Integer> all = map.keySet();
+        int[] arr = new int[all.size()];
+        int i = 0;
+        for (Integer y : all) 
+            arr[i ++] = y.intValue();
+        return arr;
+    }
+    
+
+    /**
      * Takes an entry index of the current table and "masks" out a subset of
      * parents, to determine the index in a table with only the parents that are
      * not masked. Time complexity is O(3n) where n is the number of parents in
@@ -342,6 +356,27 @@ public class EnumTable<E> {
         }
         return sum;
     }
+
+    /**
+     * Get a key from a partial assignment of variables defined for the table.
+     * @param evid
+     * @return 
+     */
+    public Object[] getKey(Variable.Assignment[] evid) {
+        Object[] key = new Object[nParents]; // key is initialised to nulls by default
+        for (Variable.Assignment e : evid) {
+            try {
+                EnumVariable evar = (EnumVariable) e.var;
+                int var_index = parents.indexOf(evar);
+                if (var_index >= 0)
+                    key[var_index] = e.val;
+            } catch (ClassCastException exception) {
+                ; // ignore non-enumerable variables
+            }
+        }
+        return key;
+    }
+
 
     public void display() {
         System.out.print("Idx ");

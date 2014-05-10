@@ -12,7 +12,6 @@ import bn.JPT;
 import bn.Predef;
 import bn.alg.ApproxInfer;
 import bn.alg.Query;
-import bn.alg.VarElim;
 import bn.Variable;
 import bn.alg.CGVarElim;
 import bn.file.BNBuf;

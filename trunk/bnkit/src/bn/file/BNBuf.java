@@ -17,7 +17,6 @@
  */
 package bn.file;
 
-import bn.alg.VarElim;
 import bn.*;
 import bn.alg.CGVarElim;
 

@@ -20,18 +20,20 @@ package bn.alg;
 import bn.BNet;
 import bn.BNode;
 import bn.Distrib;
+import bn.EnumDistrib;
 import bn.EnumTable;
 import bn.EnumVariable;
-import bn.FactorTable;
+import bn.Factor;
+import bn.JDF;
 import bn.JPT;
 import bn.Variable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Exact inference in Bayesian network by variable elimination, more
@@ -58,11 +60,12 @@ public class CGVarElim implements Inference {
     /**
      * Construct the data structure for the specified variables in preparation
      * of inference. There are three types of variables (given the BN): 
-     * 1. Evidence variables E--which have been assigned values via the BN 
-     * 2. Query variables Q--for which probabilities are sought P(Q|E) 
-     * 3. Other variables X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
-     * Note that inference should return a JPT with variables in the *same* order 
-     * as that specified by Q.
+ 1. Assignment variables E--which have been assigned values via the BN 
+ 2. Query variables Q--for which probabilities are sought P(Q|E) 
+ 3. Other variables X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
+ Note that inference should return a JPT with variables in the *same* order 
+ as that specified by Q.
+     * @param qvars variables to include in query
      */
     @SuppressWarnings("rawtypes")
     @Override
@@ -71,15 +74,11 @@ public class CGVarElim implements Inference {
         // They will be listed in "topological order" (parents before children) as per heuristics given in Dechter.
         // Each sumout variable will be assigned a bucket.
         List<Variable> Q = new ArrayList<>(); // Query
-        List<Variable> E = new ArrayList<>(); // Evidence
+        List<Variable> E = new ArrayList<>(); // Assignment
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
-        List<Variable> ordered = new ArrayList<>();
-        for (int i = 0; i < qvars.length; i++) {
-            Q.add(qvars[i]);
-        }
+        Q.addAll(Arrays.asList(qvars));
         for (BNode node : bn.getOrdered()) {
             Variable var = node.getVariable();
-            ordered.add(var);
             if (node.getInstance() != null) {
                 E.add(var);
             } else if (!Q.contains(var)) {
@@ -98,7 +97,7 @@ public class CGVarElim implements Inference {
     @Override
     public QueryResult infer(Query query) {
 	// All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
-        // Evidence will be incorporated into the factor when it is constructed.
+        // Assignment will be incorporated into the factor when it is constructed.
         // Create list of buckets: first one has query variables, then all sum-outs in topological ordering (as sorted by the constructor)
         CGQuery q = (CGQuery) query;
         Variable[] qarr = new Variable[q.Q.size()];
@@ -118,7 +117,7 @@ public class CGVarElim implements Inference {
         int nBuckets = buckets.size();
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
         for (BNode node : bn.getNodes()) {
-            FactorTable ft = node.makeFactor(bn);
+            Factor ft = node.makeFactor(bn);
             boolean added = false;
             if (ft.isAtomic()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
                 buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
@@ -159,7 +158,7 @@ public class CGVarElim implements Inference {
         for (int i = nBuckets - 1; i >= 0; i--) {
             Bucket b = buckets.get(i);
             boolean ignore = true; //  It is safe to ignore buckets with no evidence and no newly computed factor (function of other factors)
-            for (FactorTable ft : b.factors) {
+            for (Factor ft : b.factors) {
                 if (ft.function || ft.evidenced || i == 0) {
                     ignore = false;
                     break;
@@ -167,12 +166,12 @@ public class CGVarElim implements Inference {
             }
             int nFactors = b.factors.size();
             if (nFactors > 0 && !ignore) {
-                List<FactorTable> fts = new ArrayList<>(b.factors);
+                List<Factor> fts = new ArrayList<>(b.factors);
                 // The order in which FTs are multiplied can have big influence on efficiency, the strategy below is naive
                 Collections.sort(fts, new FTCompare()); // sort the factors in order of variable-count (smaller-to-greater)				
-                FactorTable result = fts.get(0); // perform products in that order
+                Factor result = fts.get(0); // perform products in that order
                 for (int j = 1; j < nFactors; j++) {
-                    result = FactorTable.product(result, fts.get(j));
+                    result = Factor.product(result, fts.get(j));
                 }
                 if (i > 0) { // not the last bucket, so normal operation 
                     // The code below assumes that all buckets except the first have only enumerable variables to be summed out
@@ -202,77 +201,14 @@ public class CGVarElim implements Inference {
                     // instead we should extract query results from the final factor, including a JPT.
                     // If Q is only a non-enumerable variable or list there-of, we will not be able to create a JPT.
                     // The first section below is just making sure that the variables are presented in the same order as that in the query
-                    return extractResult(result, q.Q);
+                    
+                    //return extractResult(result, q.Q);
+                    return new CGTable(result.rehash(q.Q));
                 }
             }
         }
         throw new CGVarElimRuntimeException("Variable elimination failed");
     }
-
-    private CGResult extractResult(FactorTable result, List<Variable> query) {
-        JPT answer = null;
-        List<EnumVariable> f_parents = result.getEnumVariables();
-        List<EnumVariable> q_parents = new ArrayList<>();
-        for (Variable q_par : query) {
-            try {
-                q_parents.add((EnumVariable)q_par);
-            } catch (ClassCastException e) {
-                ; // ignore non-enumerable variables since they will not be parents in the resulting JPT
-            }
-        }
-        int[] map2q = new int[q_parents.size()];
-        for (int jf = 0; jf < map2q.length; jf ++) {
-            map2q[jf] = -1;
-            for (int jq = 0; jq < map2q.length; jq ++) {
-                if (f_parents.get(jf).getName().equals(q_parents.get(jq).getName()))  {
-                    map2q[jf] = jq;
-                    break;
-                }
-            }
-        }
-        for (int j = 0; j < map2q.length; j ++) {
-            if (map2q[j] == -1)
-                throw new CGVarElimRuntimeException("Invalid inference result");
-        }
-        EnumTable<Double> et = new EnumTable<Double>(q_parents);
-        Map<Variable, EnumTable<Distrib>> nonEnumTables = null;
-        Map<Variable, Distrib> nonEnumDistribs = null;
-        if (result.hasNonEnumVariables()) {
-            if (result.isAtomic()) {
-                nonEnumDistribs = new HashMap<>();
-                for (Variable nonenum : result.getNonEnumVariables())
-                    nonEnumDistribs.put(nonenum, result.getDistrib(-1, nonenum));
-            } else {
-                nonEnumTables = new HashMap<>();
-                for (Variable nonenum : result.getNonEnumVariables())
-                    nonEnumTables.put(nonenum, new EnumTable<Distrib>(q_parents));
-            }
-        }
-        for (Map.Entry<Integer, Double> entry : result.getMapEntries()) {
-            Object[] fkey = result.getKey(entry.getKey().intValue());
-            Object[] qkey = new Object[fkey.length];
-            for (int j = 0; j < fkey.length; j ++)
-                qkey[map2q[j]] = fkey[j];
-            et.setValue(qkey, entry.getValue());
-            if (nonEnumTables != null) {
-                for (Variable nonenum : result.getNonEnumVariables()) {
-                    Distrib d = result.getDistrib(fkey, nonenum);
-                    EnumTable<Distrib> table = nonEnumTables.get(nonenum);
-                    table.setValue(qkey, d);
-                }
-            }
-        }
-
-        if (nonEnumTables != null) {
-            answer = new JPT(et);
-            return new CGResult(result, answer, nonEnumTables);
-        }
-        if (nonEnumDistribs != null)
-            return new CGResult(result, nonEnumDistribs);
-        answer = new JPT(et);
-        return new CGResult(result, answer);
-    }
-        
     
     @SuppressWarnings("rawtypes")
     public QueryResult infer(Variable[] query_vars) {
@@ -298,11 +234,12 @@ public class CGVarElim implements Inference {
     /**
      * Determine the log-transformed probability of the instantiated variables. 
      * This function does not integrate over/marginalize continuous variables in case they are not instantiated.
+     * @return the likelihood of the evidence (instantiated nodes)
      */
     public double likelihood() {
         JPT answer = null;
 	// All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
-        // Evidence will be incorporated into the factor when it is constructed.
+        // Assignment will be incorporated into the factor when it is constructed.
         List<Variable> E = new ArrayList<>(); // evidence variables
         List<Variable> X = new ArrayList<>(); // unspecified variables, to-be summed-out
         for (BNode node : bn.getOrdered()) {
@@ -324,7 +261,7 @@ public class CGVarElim implements Inference {
         int nBuckets = buckets.size();
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
         for (BNode node : bn.getNodes()) {
-            FactorTable ft = node.makeFactor(bn);
+            Factor ft = node.makeFactor(bn);
             boolean added = false;
             if (ft.isAtomic()) { // this happen if the FT has no variables
                 buckets.get(0).put(ft);
@@ -363,7 +300,7 @@ public class CGVarElim implements Inference {
         for (int i = nBuckets - 1; i >= 0; i--) {
             Bucket b = buckets.get(i);
             boolean ignore = true; //  It is safe to ignore buckets with no evidence and no newly computed factor (function of other factors)
-            for (FactorTable ft : b.factors) {
+            for (Factor ft : b.factors) {
                 if (ft.function || ft.evidenced || i == 0) {
                     ignore = false;
                     break;
@@ -371,12 +308,12 @@ public class CGVarElim implements Inference {
             }
             int nFactors = b.factors.size();
             if (nFactors > 0 && !ignore) {
-                List<FactorTable> fts = new ArrayList<>(b.factors);
+                List<Factor> fts = new ArrayList<>(b.factors);
                 // The order in which FTs are multiplied can have big influence on efficiency, the strategy below is naive
                 Collections.sort(fts, new FTCompare()); // sort the factors in order of variable-count (smaller-to-greater)				
-                FactorTable result = fts.get(0); // perform products in that order
+                Factor result = fts.get(0); // perform products in that order
                 for (int j = 1; j < nFactors; j++) {
-                    result = FactorTable.product(result, fts.get(j));
+                    result = Factor.product(result, fts.get(j));
                 }
                 if (i > 0) { // not the last bucket, so normal operation 
                     // The code below assumes that all buckets except the first have only enumerable variables to be summed out
@@ -406,20 +343,17 @@ public class CGVarElim implements Inference {
         throw new CGVarElimRuntimeException("Exited variable elimination prematurely");
     }
     
-    public class FTCompare implements Comparator<FactorTable> {
-
+    public class FTCompare implements Comparator<Factor> {
         @Override
-        public int compare(FactorTable o1, FactorTable o2) {
+        public int compare(Factor o1, Factor o2) {
             return o1.getEnumVariables().size() - o2.getEnumVariables().size();
         }
     }
 
     public class CGQuery implements Query {
-
         final List<Variable> Q;
         final List<Variable> E;
         final List<Variable> X;
-
         CGQuery(List<Variable> Q, List<Variable> E, List<Variable> X) {
             this.Q = Q;
             this.E = E;
@@ -427,72 +361,7 @@ public class CGVarElim implements Inference {
         }
     }
 
-    public class CGResult implements QueryResult {
-
-        final FactorTable ft;
-        final private JPT jpt;
-        final private Map<Variable, EnumTable<Distrib>> nonEnumTables;
-        final private Map<Variable, Distrib> nonEnumDistribs;
-        
-        public CGResult(FactorTable ft, JPT jpt) {
-            this.ft = ft;
-            this.jpt = jpt;
-            this.nonEnumTables = null;
-            this.nonEnumDistribs = null;
-        }
-
-        public CGResult(FactorTable ft, JPT jpt, Map<Variable, EnumTable<Distrib>> nonEnum) {
-            this.ft = ft;
-            this.jpt = jpt;
-            this.nonEnumTables = nonEnum;
-            this.nonEnumDistribs = null;
-        }
-        
-        public CGResult(FactorTable ft, Map<Variable, Distrib> nonEnum) {
-            this.ft = ft;
-            this.jpt = null;
-            this.nonEnumTables = null;
-            this.nonEnumDistribs = nonEnum;
-        }
-        
-        @Override
-        public JPT getJPT() {
-            return this.jpt;
-        }
-        
-        public Map<Variable, EnumTable<Distrib>> getNonEnum() {
-            return this.nonEnumTables;
-        }
-        
-        public Map<Variable, Distrib> getNonEnumDistrib() {
-        	return this.nonEnumDistribs;
-        }
-        
-        /**
-         * Method to retrieve a single distribution with all other variables in original query unspecified.
-         * @param query the query variable
-         * @return 
-         */
-        public Distrib getDistrib(Variable query) {
-            return getDistrib(query, null);
-        }
-
-        /**
-         * Method to retrieve a single distribution GIVEN some optional evidence.
-         * @param query the query variable
-         * @return 
-         */
-        public Distrib getDistrib(Variable query, Evidence... evid) {
-            
-            return null;
-        }
-        
-        public class Evidence {
-            public Variable var; Object val;
-            public Evidence(Variable var, Object val) { this.var = var; this.val = val; }
-        }
-    }
-
+    
     /**
      * A bucket holds factor tables and one variable
      *
@@ -500,7 +369,7 @@ public class CGVarElim implements Inference {
      */
     public class Bucket {
 
-        List<FactorTable> factors;
+        List<Factor> factors;
         List<Variable> vars = new ArrayList<>();
 
         /**
@@ -531,9 +400,9 @@ public class CGVarElim implements Inference {
          * @return true if the bucket can be used to process the factor table,
          * false otherwise
          */
-        boolean match(FactorTable f) {
+        boolean match(Factor f) {
             List<EnumVariable> fvars = f.getEnumVariables();
-            Set<Variable> nvars = f.getNonEnumVariables();
+            List<Variable> nvars = f.getNonEnumVariables();
             for (EnumVariable fvar : fvars) {
                 if (vars.contains(fvar)) 
                     return true;
@@ -547,7 +416,7 @@ public class CGVarElim implements Inference {
         }
 
         boolean hasFactorWith(Variable var) {
-            for (FactorTable ft : factors) {
+            for (Factor ft : factors) {
                 if (ft.getEnumVariables().contains(var)) 
                     return true;
                 if (ft.getNonEnumVariables().contains(var))
@@ -556,11 +425,11 @@ public class CGVarElim implements Inference {
             return false;
         }
 
-        void put(FactorTable f) {
+        void put(Factor f) {
             factors.add(f);
         }
 
-        List<FactorTable> get() {
+        List<Factor> get() {
             return factors;
         }
     }

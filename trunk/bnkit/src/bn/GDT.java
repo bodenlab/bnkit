@@ -87,7 +87,7 @@ public class GDT implements BNode, Serializable {
      * @return the FactorTable created from the GDT, provided instantiations of BN
      */
     @Override
-    public FactorTable makeFactor(BNet bn) {
+    public Factor makeFactor(BNet bn) {
         List<EnumVariable> vars_old = this.getParents();
         Object varinstance = null;
         BNode cnode = bn.getNode(var);
@@ -96,28 +96,23 @@ public class GDT implements BNode, Serializable {
         }
         if (vars_old != null) { // there are parent variables
             Object[] searchkey = new Object[vars_old.size()];
-            List<EnumVariable> vars_new = new ArrayList<>(vars_old.size() + 1);
+            List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
             for (int i = 0; i < vars_old.size(); i++) {
                 EnumVariable parent = vars_old.get(i);
                 BNode pnode = bn.getNode(parent);
-                if (pnode != null) {
+                if (pnode != null)
                     searchkey[i] = pnode.getInstance();
-                }
-                if (searchkey[i] == null) {
+                if (searchkey[i] == null)
                     vars_new.add(parent);
-                }
             }
-            FactorTable ft;
-            if (varinstance == null) {
-                List<Variable> nonEnums = new ArrayList<>();
-                nonEnums.add(this.var);
-                ft = new FactorTable(vars_new, nonEnums);
-            } else {
-                ft = new FactorTable(vars_new);
+            Factor ft;
+            if (varinstance == null)
+                vars_new.add(this.var);
+            ft = new Factor(vars_new);
+            if (varinstance != null)
                 ft.evidenced = true;
-            }
             int[] indices = table.getIndices(searchkey);
-            Object[] newkey = new Object[vars_new.size()];
+            Object[] newkey = new Object[ft.getNEnum()];
             for (int index : indices) {
                 GaussianDistrib d = table.getValue(index);
                 if (d != null) {
@@ -129,9 +124,10 @@ public class GDT implements BNode, Serializable {
                         }
                     }
                     if (varinstance != null) { // the variable for this GDT is instantiated
-                        ft.addValue(newkey, d.get(varinstance));
+                        ft.addFactor(newkey, d.get(varinstance));
                     } else { // the variable for this GDT is NOT instantiated...
-                        ft.setValue(newkey, 1.0, this.var, d);
+                        ft.addFactor(newkey, 1.0);
+                        ft.setDistrib(newkey, this.var, d);
                     }
                 } else { // this entry is null
                     //
@@ -140,9 +136,7 @@ public class GDT implements BNode, Serializable {
             return ft;
         } else { // no parents, just a prior
             if (varinstance != null) // instantiated prior is not possible to factorise
-            {
                 return null;
-            }
             throw new RuntimeException("GDTs can not be factorised unless it has enumerable parent variables");
         }
     }

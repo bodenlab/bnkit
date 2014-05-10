@@ -19,7 +19,6 @@ package bn;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -72,7 +71,7 @@ public class CPT implements BNode, Serializable {
         this.var = var;
         if (parents != null) {
             if (parents.length > 0) {
-                this.table = new EnumTable<EnumDistrib>(EnumVariable.toList(parents));
+                this.table = new EnumTable<>(EnumVariable.toList(parents));
                 this.prior = null;
                 this.nParents = parents.length;
                 return;
@@ -102,7 +101,7 @@ public class CPT implements BNode, Serializable {
      */
     public CPT(JPT jpt, EnumVariable var) {
         this.var = var;
-        List<EnumVariable> cptParents = new ArrayList<EnumVariable>(jpt.getParents().size() - 1);
+        List<EnumVariable> cptParents = new ArrayList<>(jpt.getParents().size() - 1);
         int index = -1;
         for (int i = 0; i < jpt.getParents().size(); i++) {
             EnumVariable jptParent = jpt.getParents().get(i);
@@ -115,7 +114,7 @@ public class CPT implements BNode, Serializable {
         if (index == -1) {
             throw new RuntimeException("Invalid variable " + var + " for creating CPT");
         }
-        if (cptParents.size() == 0) { // no parents in CPT
+        if (cptParents.isEmpty()) { // no parents in CPT
             this.table = null;
             this.prior = new EnumDistrib(var.getDomain());
             for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
@@ -125,7 +124,7 @@ public class CPT implements BNode, Serializable {
             this.prior.normalise();
             this.nParents = 0;
         } else { // there are parents
-            this.table = new EnumTable<EnumDistrib>(cptParents);
+            this.table = new EnumTable<>(cptParents);
             for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
                 Object[] jptkey = jpt.table.getKey(entry.getKey().intValue());
                 Object[] cptkey = new Object[jptkey.length - 1];
@@ -215,7 +214,7 @@ public class CPT implements BNode, Serializable {
      * BNet node).
      */
     @Override
-    public FactorTable makeFactor(BNet bn) {
+    public Factor makeFactor(BNet bn) {
         List<EnumVariable> vars_old = this.getParents();
         EnumVariable var = this.getVariable();
         Object varinstance = null;
@@ -226,7 +225,7 @@ public class CPT implements BNode, Serializable {
         Enumerable dom = var.getDomain();
         if (vars_old != null) { // there are parent variables
             Object[] searchkey = new Object[vars_old.size()];
-            List<EnumVariable> vars_new = new ArrayList<EnumVariable>(vars_old.size() + 1);
+            List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
             for (int i = 0; i < vars_old.size(); i++) {
                 EnumVariable parent = vars_old.get(i);
                 BNode pnode = bn.getNode(parent);
@@ -240,7 +239,7 @@ public class CPT implements BNode, Serializable {
             if (varinstance == null) {
                 vars_new.add(var);
             }
-            FactorTable ft = new FactorTable(vars_new);
+            Factor ft = new Factor(vars_new);
             if (varinstance != null) {
                 ft.evidenced = true;
             } else {
@@ -265,15 +264,15 @@ public class CPT implements BNode, Serializable {
                     }
                     if (varinstance != null) { // the variable for this CPT is instantiated
                         if (newkey.length == 0) // atomic FactorTable
-                            ft.setValue(null, d.get(varinstance));
+                            ft.setFactor(null, d.get(varinstance));
                         else
-                            ft.addValue(newkey, d.get(varinstance));
+                            ft.addFactor(newkey, d.get(varinstance));
                     } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
                         for (int j = 0; j < dom.size(); j++) {
                             newkey[newkey.length - 1] = dom.get(j);
                             Double p = d.get(j);
                             if (p != null) {
-                                ft.addValue(newkey, p);
+                                ft.addFactor(newkey, p);
                             }
                         }
                     }
@@ -284,18 +283,18 @@ public class CPT implements BNode, Serializable {
             return ft;
         } else { // no parents, just a prior
             if (varinstance != null) { // instantiated prior
-                FactorTable ft = new FactorTable();
-                ft.setValue(null, this.prior.get(varinstance));
+                Factor ft = new Factor();
+                ft.setFactor(this.prior.get(varinstance));
                 return ft;
             }
-            List<EnumVariable> vars_new = new ArrayList<EnumVariable>(1);
+            List<Variable> vars_new = new ArrayList<>(1);
             vars_new.add(var);
-            FactorTable ft = new FactorTable(vars_new);
+            Factor ft = new Factor(vars_new);
             Object[] newkey = new Object[1];
             EnumDistrib d = this.prior;
             for (int j = 0; j < dom.size(); j++) {
                 newkey[0] = dom.get(j);
-                ft.addValue(newkey, d.get(j));
+                ft.addFactor(newkey, d.get(j));
             }
             return ft;
         }
