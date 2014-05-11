@@ -50,8 +50,9 @@ public class Gender {
         h.setInstance(175.0);
         CGVarElim inf = new CGVarElim();
         inf.instantiate(bn);
-        Query q = inf.makeQuery(W);
+        Query q = inf.makeQuery(G,W);
         CGTable r = (CGTable) inf.infer(q);
+        r.display();
         Distrib d = r.query(W);
         double sum = 0;
         int nElem = 50;
