@@ -205,24 +205,23 @@ public class EM extends LearningAlg {
                                 Variable[] query_arr = new Variable[query_vars.size()];
                                 query_vars.toArray(query_arr);
                                 Query q = inf.makeQuery(query_arr);
-                                QueryResult qr = inf.infer(q);
+                                CGTable qr = (CGTable) inf.infer(q);
                                 JPT jpt = qr.getJPT();
                                 if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
                                     log_prob += Math.log(((CGVarElim)inf).likelihood());
                                 for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
-                                    Object[] jpt_key = jpt.table.getKey(entry.getKey().intValue());
+                                    int key_index = entry.getKey().intValue();
+                                    Object[] jpt_key = jpt.table.getKey(key_index);
                                     // jpt_key will contain values for latent variables
                                     // other variables are already instantiated
                                     if (node.getInstance() == null) {
                                         try {
-                                            ((EnumVariable)node.getVariable()).getName();
+                                            ((EnumVariable)var).getName();
                                             ovalue = jpt_key[jpt_key.length - 1];
                                         } catch (ClassCastException e) {
                                             // TODO: The learning of continuous variables is not quite right:
-                                            // First, should use CGTable functionality.
-                                            // Second, should either sample more extensively or derive new density from all inferred densities.
-                                            EnumTable<Distrib> tab = qr.getNonEnum().get(node.getVariable());
-                                            Distrib d = tab.getValue(entry.getKey().intValue());
+                                            // Should either sample more extensively or derive new density from inferred densities.
+                                            Distrib d = qr.getDistrib(key_index, var);
                                             ovalue = d.sample();
                                         }
                                     }
@@ -247,6 +246,8 @@ public class EM extends LearningAlg {
                                 ; // Since we do not currently properly check the scope of instantiated variables
                                 ; // to remove such variables for appropriate reasons, the problem is ignored. 
                                 ; // /Mikael--FIXME later
+                                throw new EMRuntimeException("Cannot query for sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
+
                             }
                         } else { // all variables are instantiated, no need to do inference
                             node.countInstance(parent_key, ovalue, 1.0);
