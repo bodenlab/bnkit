@@ -27,13 +27,11 @@ import bn.JDF;
 import bn.JPT;
 import bn.MixtureDistrib;
 import bn.Variable;
-import bn.alg.QueryResult;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Conditional Gaussian Table.
@@ -58,7 +56,7 @@ public class CGTable implements QueryResult {
     private final List<EnumVariable> evars;       // all enumerable variables associated with this factor table
     private final List<Variable> nvars;           // all non-enumerable variables
     
-    private final Double atomicFactor; // if there are no enumerable variables, here's where the constant factor
+    private final Double atomicFactor;    // if there are no enumerable variables, here's where the constant factor is
     private final JDF    atomicDensity;   // if there are no enumerable but some non-enumerable variables, here's where the only joint density is stored
     
     public CGTable(Factor f) {
@@ -75,8 +73,8 @@ public class CGTable implements QueryResult {
             atomicFactor = null;
             double sum = f.getSum();
             for (Map.Entry<Integer, Double> entry : f.getMapEntries()) {
-                int key_index = entry.getKey().intValue();
-                double p = entry.getValue().doubleValue() / sum;
+                int key_index = entry.getKey();
+                double p = entry.getValue() / sum;
                 factorTable.setValue(key_index, p);
                 if (hasNonEnum) {
                     JDF f_jdf = f.getJDF(key_index);
@@ -382,10 +380,10 @@ public class CGTable implements QueryResult {
         if (factorTable != null) {
             double sum = 0.0;
             for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) 
-                sum += entry.getValue().doubleValue();
+                sum += entry.getValue();
             return sum;
         } else {
-            return atomicFactor.doubleValue();
+            return atomicFactor;
         }
     }
 
@@ -399,7 +397,7 @@ public class CGTable implements QueryResult {
         if (factorTable != null) {
             return getSum(factorTable.getIndices(key));
         } else {
-            return atomicFactor.doubleValue();
+            return atomicFactor;
         }
     }
     
@@ -415,7 +413,7 @@ public class CGTable implements QueryResult {
                 sum += factorTable.getValue(index);
             return sum;
         } else {
-            return atomicFactor.doubleValue();
+            return atomicFactor;
         }
     }
     
@@ -428,8 +426,8 @@ public class CGTable implements QueryResult {
         if (factorTable != null) {
             double sum = 0.0;
             for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) {
-                int index = entry.getKey().intValue();
-                double p1 = entry.getValue().doubleValue(); //  joint prob of enumerables
+                int index = entry.getKey();
+                double p1 = entry.getValue(); //  joint prob of enumerables
                 double p2 = 1.0;
                 if (densityTable != null) {
                     JDF jdf = densityTable.getValue(index);
@@ -440,8 +438,8 @@ public class CGTable implements QueryResult {
             return sum;
         } else {
             if (atomicDensity != null)
-                return atomicFactor.doubleValue() * atomicDensity.density(evid); // joint prob of non-enumerable evidence
-            return atomicFactor.doubleValue();
+                return atomicFactor * atomicDensity.density(evid); // joint prob of non-enumerable evidence
+            return atomicFactor;
         }
     }
 
@@ -457,8 +455,8 @@ public class CGTable implements QueryResult {
             return getSum(factorTable.getIndices(key), evid);
         } else {
             if (atomicDensity != null)
-                return atomicFactor.doubleValue() * atomicDensity.density(evid); // joint prob of non-enumerable evidence
-            return atomicFactor.doubleValue();
+                return atomicFactor * atomicDensity.density(evid); // joint prob of non-enumerable evidence
+            return atomicFactor;
         }
     }
     
@@ -483,8 +481,8 @@ public class CGTable implements QueryResult {
             return sum;
         } else {
             if (atomicDensity != null)
-                return atomicFactor.doubleValue() * atomicDensity.density(evid); // joint prob of non-enumerable evidence
-            return atomicFactor.doubleValue();
+                return atomicFactor * atomicDensity.density(evid); // joint prob of non-enumerable evidence
+            return atomicFactor;
         }
     }
     
@@ -620,7 +618,7 @@ public class CGTable implements QueryResult {
                 double sum = 0;
                 for (int j = 0; j < 1000; j ++) {
                     Double sample = (Double)jdf.sample(nonenum);
-                    sum += sample.doubleValue();
+                    sum += sample;
                 }
                 System.out.print(String.format(" %5.3f ", sum/1000.0));
             }
@@ -681,12 +679,10 @@ public class CGTable implements QueryResult {
                 if (query_index == -1) 
                     throw new RuntimeException("Error in query variable: " + equery);
                 double[] p = new double[equery.size()];
-                double sum = 0.0;
                 for (int i = 0; i < equery.size(); i++) {
                     Object instance = equery.getDomain().get(i);
                     key[query_index] = instance;
                     p[i] = getSum(key, evid);
-                    sum += p[i];
                 }
                 EnumDistrib d = new EnumDistrib(equery.getDomain(), p);
                 return d;

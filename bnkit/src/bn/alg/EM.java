@@ -20,7 +20,6 @@ package bn.alg;
 import bn.BNet;
 import bn.BNode;
 import bn.Distrib;
-import bn.EnumTable;
 import bn.EnumVariable;
 import bn.JPT;
 import bn.Variable;
@@ -175,10 +174,10 @@ public class EM extends LearningAlg {
 
                     if (node.isTrainable()) {
                         List<Variable> query_vars = new ArrayList<>();
-                        List<EnumVariable> parents = node.getParents();
                         Object[] parent_key = null;
                         int[] parent_map = null;
-                        if (parents != null) {
+                        if (!node.isRoot()) {
+                            List<EnumVariable> parents = node.getParents();
                             parent_key = new Object[parents.size()];
                             parent_map = new int[parents.size()];
                             int index_in_query = 0;
@@ -210,8 +209,9 @@ public class EM extends LearningAlg {
                                 if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
                                     log_prob += Math.log(((CGVarElim)inf).likelihood());
                                 for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
-                                    int key_index = entry.getKey().intValue();
+                                    int key_index = entry.getKey();
                                     Object[] jpt_key = jpt.table.getKey(key_index);
+                                    double prob = entry.getValue();
                                     // jpt_key will contain values for latent variables
                                     // other variables are already instantiated
                                     if (node.getInstance() == null) {
@@ -225,7 +225,6 @@ public class EM extends LearningAlg {
                                             ovalue = d.sample();
                                         }
                                     }
-                                    double prob = entry.getValue().doubleValue();
                                     if (node.isRoot()) { // if prior
                                         node.countInstance(null, ovalue, prob);
                                     } else { // if node has parents
@@ -242,12 +241,10 @@ public class EM extends LearningAlg {
                                     }
                                 } 
                             } catch (CGVarElimRuntimeException e) {
-                                ; // This happens when a variable cannot be queried, e.g. a continuous variable.
-                                ; // Since we do not currently properly check the scope of instantiated variables
-                                ; // to remove such variables for appropriate reasons, the problem is ignored. 
-                                ; // /Mikael--FIXME later
+                                // This happens when a variable cannot be queried, e.g. a continuous variable.
+                                // Since we do not currently properly check the scope of instantiated variables
+                                // to remove such variables for appropriate reasons, the problem is ignored. 
                                 throw new EMRuntimeException("Cannot query for sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
-
                             }
                         } else { // all variables are instantiated, no need to do inference
                             node.countInstance(parent_key, ovalue, 1.0);
@@ -255,7 +252,6 @@ public class EM extends LearningAlg {
                     }
                 }
                 // Principal way 2: not yet implemented but see old bioalg:ml.bayes which does it this way.
-                ;;
 
             }
             // finally complete the M-step by transferring counts to probabilities
