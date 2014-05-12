@@ -35,7 +35,7 @@ import java.util.Random;
 public class GDT implements BNode, Serializable {
 
     private static final long serialVersionUID = 1L;
-    private boolean tieVariances = false;
+    private boolean tieVariances = true;
     final private Variable<Continuous> var;
     private GaussianDistrib prior = null;
     private EnumTable<GaussianDistrib> table = null;
@@ -440,9 +440,9 @@ public class GDT implements BNode, Serializable {
     /**
      * Find the best parameter setting for the observed data.
      * Note that this uses observed Double:s which are looked at directly, and 
-     * observed Distrib:s which are used to generate samples. We cannot use distributions
-     * directly since they can be of any kind, as long as defined over a single continuous 
-     * variable.
+     * observed Distrib:s which are used to stochastically generate samples. 
+     * We cannot use distributions directly since they can be of any kind, as 
+     * long as defined over a single continuous variable.
      */
     @Override
     public void maximizeInstance() {
@@ -451,6 +451,7 @@ public class GDT implements BNode, Serializable {
         double maxVar = 0;                      // the largest variance of any class  
         double[] means = new double[maxrows];   // save the means 
         double[] vars = new double[maxrows]; 	// save the variances
+        double[] n = new double[maxrows]; 	// save the numbers of samples
         double middleMean = 0; 			// the mean of all values
         double middleVar = 0;			// the variance of all values
         double middleTot = 0;			// the sum of counts for all parent configs
@@ -470,7 +471,7 @@ public class GDT implements BNode, Serializable {
             else if (samplesDouble != null) 
                 y = new double[samplesDouble.size()];	
             else
-                return;                 // no samples of any kind
+                continue;                 // no samples of any kind
             double[] p = new double[y.length]; 	// how often do we see this score GIVEN the parents (an absolute count)
             int j = 0;                  // sample count
             // go through observed distributions... if any
@@ -495,6 +496,7 @@ public class GDT implements BNode, Serializable {
                     j++;
                 }
             }
+            n[index] = tot; // save the number of possibly fractional samples on which the estimates were based
             // calculate mean
             means[index] = sum / tot;
             // now for calculating the variance
@@ -510,24 +512,39 @@ public class GDT implements BNode, Serializable {
                 maxVar = vars[index];
             }
             // note the same key/index for both the CPT and the Sample table
-            this.put(index, new GaussianDistrib(means[index], vars[index]));
             middleTot += tot;
             middleMean += sum;
         }
         middleMean /= middleTot;
 
-        if (tieVariances) { // re-compute variances if they need to be tied
+
+        if (!tieVariances) { // if we use the individual variances
+            for (int i = 0; i < maxrows; i ++) {
+                if (n[i] > 0)
+                    this.put(i, new GaussianDistrib(means[i], vars[i]));
+            }
+        } else { // re-compute variances if they need to be tied
             // there are different ways of dealing with this
             if (USE_MAX_VARIANCE) {
                 // (1) simply use the max of the existing variances
-                for (Map.Entry<Integer, GaussianDistrib> entry : table.getMapEntries()) {
-                    int index = entry.getKey().intValue();
-                    Object[] key = countDouble.table.getKey(index); // the values of the parent nodes
-                    this.put(key, new GaussianDistrib(means[index], maxVar));
+                for (int i = 0; i < maxrows; i ++) {
+                    if (n[i] > 0)
+                        this.put(i, new GaussianDistrib(means[i], maxVar));
                 }
             } else if (USE_POOLED_VARIANCE) { 
                 // (2) use the pooled existing variances (http://en.wikipedia.org/wiki/Pooled_variance)
-                throw new RuntimeException("This variant of tied variance is not yet implemented");
+                double num = 0.0;
+                double denom = 0.0;
+                for (int i = 0; i < maxrows; i ++) {
+                    if (n[i] >= 1) {
+                        num += (n[i] - 1) * vars[i];
+                        denom += (n[i] - 1);
+                    }
+                }
+                for (int i = 0; i < maxrows; i ++) {
+                    if (n[i] > 0) 
+                        this.put(i, new GaussianDistrib(means[i], num / denom));
+                }
             } else {
                 // (3) compute the variance of all the values (Hastie and Tibshirani did this--but I have not had great success with this /MB)
                 throw new RuntimeException("This variant of tied variance is not yet implemented");
