@@ -219,10 +219,11 @@ public class EM extends LearningAlg {
                                             ((EnumVariable)var).getName();
                                             ovalue = jpt_key[jpt_key.length - 1];
                                         } catch (ClassCastException e) {
-                                            // TODO: The learning of continuous variables is not quite right:
-                                            // Should either sample more extensively or derive new density from inferred densities.
+                                            // If the variable is not specified and inferred, CGTable gives a distribution.
+                                            // GDT implements counting and maximisation of distributions (in addition to actual doubles)
                                             Distrib d = qr.getDistrib(key_index, var);
-                                            ovalue = d.sample();
+                                            //ovalue = d.sample();
+                                            ovalue = d;
                                         }
                                     }
                                     if (node.isRoot()) { // if prior

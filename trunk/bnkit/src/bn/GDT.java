@@ -39,7 +39,8 @@ public class GDT implements BNode, Serializable {
     final private Variable<Continuous> var;
     private GaussianDistrib prior = null;
     private EnumTable<GaussianDistrib> table = null;
-    private SampleTable<Double> count = null; // the table that will contain all samples during learning
+    private SampleTable<Double> countDouble = null; // the table that will contain all samples of the type "Double" during learning
+    private SampleTable<Distrib> countDistrib = null; // the table that will contain all samples of the type "Distrib" during learning
 
     /**
      * Create a Gaussian density table for a variable. The variable is
@@ -193,6 +194,7 @@ public class GDT implements BNode, Serializable {
      * @param value the value of the variable represented by this CDT
      * @return the probability of the variable set to specified value
      */
+    @Override
     public Double get(Object value) {
         if (prior != null) {
             return prior.get(value);
@@ -218,10 +220,12 @@ public class GDT implements BNode, Serializable {
 //	public GaussianDistrib get(Object[] key) {
 //		return table.getValue(key);
 //	}
+    @Override
     public EnumTable getTable() {
         return table;
     }
 
+    @Override
     public GaussianDistrib getDistrib() {
         return prior;
     }
@@ -241,6 +245,17 @@ public class GDT implements BNode, Serializable {
      * Set entry (or entries) of the CDT to the specified probability
      * distribution
      *
+     * @param index the index for the key (probabilistic condition)
+     * @param distr the distribution
+     */
+    public void put(int index, GaussianDistrib distr) {
+        table.setValue(index, distr);
+    }
+
+    /**
+     * Set entry (or entries) of the CDT to the specified probability
+     * distribution
+     *
      * @param distr the distribution
      * @param key the boolean key (probabilistic condition)
      */
@@ -252,9 +267,10 @@ public class GDT implements BNode, Serializable {
         prior = distr;
     }
 
+    @Override
     public String toString() {
         List<EnumVariable> parents = table.getParents();
-        StringBuffer sbuf = new StringBuffer();
+        StringBuilder sbuf = new StringBuilder();
         for (int i = 0; i < parents.size(); i++) {
             sbuf.append(parents.get(i).getName() + (i < parents.size() - 1 ? "," : ""));
         }
@@ -269,6 +285,7 @@ public class GDT implements BNode, Serializable {
         return String.format("<%s>", x.toString());
     }
 
+    @Override
     public void print() {
         if (table.nParents > 0) // variables in condition
         {
@@ -288,6 +305,7 @@ public class GDT implements BNode, Serializable {
 
     private Double instance = null;
 
+    @Override
     public void setInstance(Object value) {
         try {
             instance = (Double) value;
@@ -296,39 +314,37 @@ public class GDT implements BNode, Serializable {
         }
     }
 
+    @Override
     public void resetInstance() {
         instance = null;
     }
 
+    @Override
     public Double getInstance() {
         return instance;
     }
 
+    @Override
     public void countInstance(Object[] key, Object value, Double prob) {
         if (this.isRoot()) {
-            throw new RuntimeException("GDT can not be trained as root, should be implemented soon...");
-            // same process as for extries with parents, just a single queue of observations...
+            throw new RuntimeException("GDT can not be trained as root");
+            // same process as for entries with parents, just a single queue of observations...
         } else {
-            if (count == null) // create count table if none exists
-            {
-                count = new SampleTable<Double>(this.getParents());
+            if (countDouble == null) // create countDouble table if none exists
+                countDouble = new SampleTable<>(this.getParents());
+            if (countDistrib == null)
+                countDistrib = new SampleTable<>(this.getParents());
+            try {
+                countDouble.count(key, (Double)value, prob);
+            } catch (ClassCastException e) {
+                countDistrib.count(key, (Distrib)value, prob);
             }
-            count.count(key, (Double)value, prob);
         }
     }
     
-    
+    @Override
     public void countInstance(Object[] key, Object value) {
-        if (this.isRoot()) {
-            throw new RuntimeException("GDT can not be trained as root, should be implemented soon...");
-            // same process as for extries with parents, just a single queue of observations...
-        } else {
-            if (count == null) // create count table if none exists
-            {
-                count = new SampleTable<Double>(this.getParents());
-            }
-            count.count(key, (Double)value);
-        }
+        countInstance(key, value, 1.0);
     }
 
     /**
@@ -346,6 +362,7 @@ public class GDT implements BNode, Serializable {
     /**
      * Check if this GDT should be trained or not
      */
+    @Override
     public boolean isTrainable() {
         return trainable;
     }
@@ -353,6 +370,7 @@ public class GDT implements BNode, Serializable {
     /**
      * Put random entries in the GDT if not already set.
      */
+    @Override
     public void randomize(long seed) {
         Random rand = new Random(seed);
         if (table == null) {
@@ -416,34 +434,70 @@ public class GDT implements BNode, Serializable {
      * Use the maximum of any variance as the global variance (set to false if
      * the variance of all values should be used instead)
      */
-    public static boolean USE_MAX_VARIANCE = true;
-
+    public static boolean USE_MAX_VARIANCE = false;
+    public static boolean USE_POOLED_VARIANCE = true;
+    
+    /**
+     * Find the best parameter setting for the observed data.
+     * Note that this uses observed Double:s which are looked at directly, and 
+     * observed Distrib:s which are used to generate samples. We cannot use distributions
+     * directly since they can be of any kind, as long as defined over a single continuous 
+     * variable.
+     */
+    @Override
     public void maximizeInstance() {
         int maxrows = table.getSize();
-        double maxVar = 0;  				// the largest variance of any class  
-        double[] means = new double[maxrows]; // save the means 
+        int nSample = 20;                       // how many samples that should be generated for observed distributions
+        double maxVar = 0;                      // the largest variance of any class  
+        double[] means = new double[maxrows];   // save the means 
         double[] vars = new double[maxrows]; 	// save the variances
-        double middleMean = 0; 				// the mean of all values
-        double middleVar = 0;					// the variance of all values
-        double middleTot = 0;					// the sum of count for all parent configs
-        // go through each possible setting of the parent nodes
-        for (Map.Entry<Integer, List<SampleTable<Double>.Sample>> entry : count.table.getMapEntries()) {
-            int index = entry.getKey().intValue();
-            Object[] key = count.table.getKey(index); // the values of the parent nodes, same as for CPT
-            List<SampleTable<Double>.Sample> samples = entry.getValue();
+        double middleMean = 0; 			// the mean of all values
+        double middleVar = 0;			// the variance of all values
+        double middleTot = 0;			// the sum of counts for all parent configs
+        
+        // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
+        for (int index = 0; index < maxrows; index ++) {
+
+            List<SampleTable<Distrib>.Sample> samplesDistrib = countDistrib.get(index);
+            List<SampleTable<Double>.Sample> samplesDouble = countDouble.get(index);
             double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ... 
             double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
-            double[] y = new double[samples.size()];	// the observations, i.e. observed values or scores
-            double[] p = new double[y.length]; 		// how often do we see this score GIVEN the parents (an absolute count)
-            int j = 0;
-            for (SampleTable<Double>.Sample sample : samples) {	// look at each value entry
-                y[j] = sample.instance.doubleValue();				// actual value (or score)
-                p[j] = sample.prob;			// p(class=key) i.e. the height of the density for this parent config  
-                sum += y[j] * p[j];					// update the numerator of the mean calc
-                tot += p[j];						// update the denominator of the mean calc
-                j++;
+            double[] y;                 // the values generated from the observed distributions
+            if (samplesDistrib != null && samplesDouble != null) 
+                y = new double[samplesDistrib.size() * nSample + samplesDouble.size()];	
+            else if (samplesDistrib != null) 
+                y = new double[samplesDistrib.size() * nSample];	
+            else if (samplesDouble != null) 
+                y = new double[samplesDouble.size()];	
+            else
+                return;                 // no samples of any kind
+            double[] p = new double[y.length]; 	// how often do we see this score GIVEN the parents (an absolute count)
+            int j = 0;                  // sample count
+            // go through observed distributions... if any
+            if (samplesDistrib != null) {
+                for (SampleTable<Distrib>.Sample sample : samplesDistrib) {// look at each distribution
+                    for (int s = 0; s < nSample; s ++) {
+                        y[j] = (Double)sample.instance.sample();        // actual value (or score)
+                        p[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config  
+                        sum += y[j] * p[j];				// update the numerator of the mean calc
+                        tot += p[j];					// update the denominator of the mean calc
+                        j++;
+                    }
+                }
             }
+            // go through actual values...
+            if (samplesDouble != null) {
+                for (SampleTable<Double>.Sample sample : samplesDouble) {// look at each entry
+                    y[j] = (Double)sample.instance.doubleValue();        // actual value (or score)
+                    p[j] = sample.prob;                   // p(class=key) i.e. the height of the density for this parent config  
+                    sum += y[j] * p[j];				// update the numerator of the mean calc
+                    tot += p[j];					// update the denominator of the mean calc
+                    j++;
+                }
+            }
+            // calculate mean
             means[index] = sum / tot;
+            // now for calculating the variance
             double diff = 0;
             for (int jj = 0; jj < y.length; jj++) {
                 diff += (means[index] - y[jj]) * (means[index] - y[jj]) * p[jj];
@@ -456,7 +510,7 @@ public class GDT implements BNode, Serializable {
                 maxVar = vars[index];
             }
             // note the same key/index for both the CPT and the Sample table
-            this.put(key, new GaussianDistrib(means[index], vars[index]));
+            this.put(index, new GaussianDistrib(means[index], vars[index]));
             middleTot += tot;
             middleMean += sum;
         }
@@ -468,11 +522,14 @@ public class GDT implements BNode, Serializable {
                 // (1) simply use the max of the existing variances
                 for (Map.Entry<Integer, GaussianDistrib> entry : table.getMapEntries()) {
                     int index = entry.getKey().intValue();
-                    Object[] key = count.table.getKey(index); // the values of the parent nodes
+                    Object[] key = countDouble.table.getKey(index); // the values of the parent nodes
                     this.put(key, new GaussianDistrib(means[index], maxVar));
                 }
+            } else if (USE_POOLED_VARIANCE) { 
+                // (2) use the pooled existing variances (http://en.wikipedia.org/wiki/Pooled_variance)
+                throw new RuntimeException("This variant of tied variance is not yet implemented");
             } else {
-                // (2) compute the variance of all the values (Hastie and Tibshirani did this--but I have not had great success with this /MB)
+                // (3) compute the variance of all the values (Hastie and Tibshirani did this--but I have not had great success with this /MB)
                 throw new RuntimeException("This variant of tied variance is not yet implemented");
                 // ...
             }

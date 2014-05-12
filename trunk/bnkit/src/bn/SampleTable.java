@@ -63,6 +63,10 @@ public class SampleTable<T> implements Serializable {
 
     public List<Sample> get(Object[] key) {
         int index = table.getIndex(key);
+        return get(index);
+    }
+
+    public List<Sample> get(int index) {
         List<Sample> samples = table.getValue(index);
         return samples;
     }

@@ -58,8 +58,22 @@ public class CountTable implements Serializable {
         }
     }
 
+    public double get(int key_index) {
+        Double cnt = table.getValue(key_index);
+        if (cnt == null) {
+            return 0;
+        } else {
+            return cnt.doubleValue();
+        }
+    }
+
     public void put(Object[] key, double count) {
         table.setValue(key, count);
+        this.totalNeedsUpdate = true;
+    }
+
+    public void put(int key_index, double count) {
+        table.setValue(key_index, count);
         this.totalNeedsUpdate = true;
     }
 
