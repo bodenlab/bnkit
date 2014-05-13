@@ -14,7 +14,6 @@ import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Variable;
 import bn.alg.AICon.ApproxInferRuntimeException;
-import bn.alg.VarElim.VEQuery;
 
 import java.util.ArrayList;
 import java.util.Collection;

@@ -11,6 +11,7 @@ import bn.BNode;
 import bn.Distrib;
 import bn.EnumTable;
 import bn.EnumVariable;
+import bn.Factor;
 import bn.FactorTable;
 import bn.GaussianDistrib;
 import bn.JPT;
@@ -90,7 +91,7 @@ public class AIFactors implements Inference{
 	 */
 	@SuppressWarnings("rawtypes")
 	@Override
-	public AResult infer(Query query) {
+	public QueryResult infer(Query query) {
 		JPT answer = null;
 		AQuery q = (AQuery) query;
 		//Take a copy of the current state of network
@@ -152,19 +153,19 @@ public class AIFactors implements Inference{
 		}
 		
 		//Create factor tables for each query		
-		List<FactorTable> factors = new ArrayList<FactorTable>(qTables.size());
+		List<Factor> factors = new ArrayList<Factor>(qTables.size());
 		for (QueryTable qTab : qTables) {
 			BNode cQuery = qTab.getQuery();
-			FactorTable ft = cQuery.makeFactor(cbn);
+			Factor ft = cQuery.makeFactor(cbn);
 			factors.add(ft);
 		}
 
-		FactorTable result = null;
+		Factor result = null;
 
 		//Get the product of factor tables to record influence of other nodes
 		result = factors.get(0);
 		for (int i = 1; i < factors.size(); i++) {
-			result = FactorTable.product(result, factors.get(i));
+			result = Factor.product(result, factors.get(i));
 		}
 
 		//Find parents that need to be summed out during marginalization
@@ -181,7 +182,7 @@ public class AIFactors implements Inference{
 		
 		//FIXME RESET TABLES?
 		
-		return extractResult(result, q.X);
+		return new CGTable(result);
 
 		//Convergence of algorithm is incomplete
 		//	    	logLikelihood += 1;
