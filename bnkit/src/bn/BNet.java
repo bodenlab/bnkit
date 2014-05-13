@@ -490,14 +490,12 @@ public class BNet implements Serializable {
     	//Store the instance incase the map is empty and you have to reset the node
     	Object qInstance = query.getInstance();
     	query.resetInstance();
-    	System.out.println("NEW QUERY");
     	//Store all factor tables for query to iterate over to find product
     	Set<Factor> fTables = new HashSet<>();
     	//Check if root and GDT - special case
     	Boolean leafQuery = false;
     	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNodes){
-    		System.out.println(node.toString());
     		if (node.getName() != query.getName()){
     			Factor fact = node.makeFactor(cbn);
     			
