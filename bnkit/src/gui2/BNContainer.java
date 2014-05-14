@@ -63,6 +63,8 @@ public class BNContainer {
     
     public void removeNode(BNode node) {
         // remove actual node (and variable)
+        if (node == null) return;
+        System.out.println("removing " +node.getName());
         nodes.remove(node.getName());
         Variable parentvar = node.getVariable();
         // also update children to not point to parent

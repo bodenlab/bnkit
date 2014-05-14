@@ -6,6 +6,8 @@
 
 package gui2;
 
+import java.awt.Color;
+
 /**
  *
  * @author Jun
@@ -23,6 +25,7 @@ public class nodePropertiesPane extends javax.swing.JPanel{
     public nodePropertiesPane(){
         super();
         init();
+        this.setForeground(Color.red); //testing
         
     }
     

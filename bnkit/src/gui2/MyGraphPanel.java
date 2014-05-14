@@ -180,7 +180,7 @@ public class MyGraphPanel extends JPanel implements Serializable {
 
             if (model.isVertex(cell)) {
                 String nodename = graph.getLabel(cell);
-                graph.removeCells(new Object[]{cell});
+//                graph.removeCells(new Object[]{cell});
                 BNode node = bnc.getNode(nodename);
                 bnc.removeNode(node);
                 removeVertex(cell);
@@ -189,10 +189,11 @@ public class MyGraphPanel extends JPanel implements Serializable {
                 Object parent = model.getTerminal(cell, true);
                 BNode childnode = bnc.getNode(graph.getLabel(child));
                 Variable parentvar = bnc.getVariable(graph.getLabel(parent));
-                graph.removeCells(new Object[]{cell});
+//                graph.removeCells(new Object[]{cell});
                 bnc.removeParent(childnode, parentvar);
             }
         }
+        graph.removeCells(selectedCell.toArray(new Object[selectedCell.size()]));
     }
 
     public void executeLayout(int layout_index) {
@@ -222,8 +223,8 @@ public class MyGraphPanel extends JPanel implements Serializable {
         this.graph = new mxGraph();
         Object parent = this.graph.getDefaultParent();
         // To have scroll bars by default, set min graph size smaller than frame container
-        this.graph.setMinimumGraphSize(new mxRectangle(0, 0, 485, 565));
-        this.graph.setMaximumGraphBounds(new mxRectangle(0, 0, 1000, 800));
+        this.graph.setMinimumGraphSize(new mxRectangle(0, 0, 400, 500));
+        this.graph.setMaximumGraphBounds(new mxRectangle(0, 0, 2000, 1600));
         this.graph.setAllowDanglingEdges(false);
         this.graph.setAllowLoops(false);
         this.graph.setCellsEditable(false);
@@ -248,11 +249,7 @@ public class MyGraphPanel extends JPanel implements Serializable {
 
         // enable rubberband selection
         mxRubberband rubberband = new mxRubberband(graphComponent);
-        // Selection Listener
-//        graphComponent.getGraphControl().addGraphSelectionListener(new MyListener()
-//        {
-//            
-//        })
+
         graphComponent.setPanning(true);
 
         // handler for edge creation
@@ -368,16 +365,12 @@ public class MyGraphPanel extends JPanel implements Serializable {
                 System.out.println("evt.toString() = " + evt.toString());
                 System.out.println("Selection in graph component");
                 if (sender instanceof mxGraphSelectionModel) {
+                    selectedCell.clear();
                     for (Object cell : ((mxGraphSelectionModel) sender).getCells()) {
                         System.out.println("cell=" + graph.getLabel(cell));
                         //TODO: SELECT MULTI CELLS
                         selectedCell.add(cell);
-
                     }
-                }
-
-                for (Object o : selectedCell) {
-                    System.out.println("Obj: " + o);
                 }
             }
         });
