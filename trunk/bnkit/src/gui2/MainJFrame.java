@@ -77,14 +77,7 @@ public class MainJFrame extends javax.swing.JFrame {
         deleteSelectedBtn = new javax.swing.JButton();
         deleteAllBtn = new javax.swing.JButton();
         applyLayoutBtn = new javax.swing.JButton();
-        propertiesPanel = new javax.swing.JPanel();
-        nameLbl = new javax.swing.JLabel();
-        nodeNameField = new javax.swing.JTextField();
-        paramsLabel = new javax.swing.JLabel();
-        nodeParametersField = new javax.swing.JTextField();
-        nodeDescriptionLabel = new javax.swing.JLabel();
-        jButton1 = new javax.swing.JButton();
-        jButton2 = new javax.swing.JButton();
+        testButton = new javax.swing.JButton();
         jMenuBarMain = new javax.swing.JMenuBar();
         jMenuFile = new javax.swing.JMenu();
         jMenuItemOpen = new javax.swing.JMenuItem();
@@ -116,7 +109,7 @@ public class MainJFrame extends javax.swing.JFrame {
         drawPanel.setLayout(drawPanelLayout);
         drawPanelLayout.setHorizontalGroup(
             drawPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 364, Short.MAX_VALUE)
+            .addGap(0, 410, Short.MAX_VALUE)
         );
         drawPanelLayout.setVerticalGroup(
             drawPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -150,100 +143,27 @@ public class MainJFrame extends javax.swing.JFrame {
         });
         actionsPanel.add(applyLayoutBtn);
 
-        propertiesPanel.setBackground(new java.awt.Color(204, 204, 204));
-        propertiesPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Node Properties"));
-
-        nameLbl.setText("Name");
-
-        nodeNameField.addActionListener(new java.awt.event.ActionListener() {
+        testButton.setText("testing");
+        testButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                nodeNameFieldActionPerformed(evt);
+                testButtonActionPerformed(evt);
             }
         });
-
-        paramsLabel.setText("Parameters");
-
-        nodeParametersField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                nodeParametersFieldActionPerformed(evt);
-            }
-        });
-
-        nodeDescriptionLabel.setVerticalAlignment(javax.swing.SwingConstants.TOP);
-        nodeDescriptionLabel.setBorder(javax.swing.BorderFactory.createEtchedBorder());
-
-        jButton1.setText("Apply");
-        jButton1.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jButton1ActionPerformed(evt);
-            }
-        });
-
-        jButton2.setText("Cancel");
-        jButton2.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jButton2ActionPerformed(evt);
-            }
-        });
-
-        javax.swing.GroupLayout propertiesPanelLayout = new javax.swing.GroupLayout(propertiesPanel);
-        propertiesPanel.setLayout(propertiesPanelLayout);
-        propertiesPanelLayout.setHorizontalGroup(
-            propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(propertiesPanelLayout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(nodeDescriptionLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(nodeNameField)
-                    .addComponent(nodeParametersField)
-                    .addGroup(propertiesPanelLayout.createSequentialGroup()
-                        .addGroup(propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(nameLbl)
-                            .addComponent(paramsLabel))
-                        .addGap(0, 0, Short.MAX_VALUE)))
-                .addContainerGap())
-            .addGroup(propertiesPanelLayout.createSequentialGroup()
-                .addGap(36, 36, 36)
-                .addComponent(jButton1)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jButton2)
-                .addGap(34, 34, 34))
-        );
-        propertiesPanelLayout.setVerticalGroup(
-            propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(propertiesPanelLayout.createSequentialGroup()
-                .addGap(6, 6, 6)
-                .addComponent(nameLbl)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(nodeNameField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(paramsLabel)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(nodeParametersField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(nodeDescriptionLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 61, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 18, Short.MAX_VALUE)
-                .addGroup(propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jButton1)
-                    .addComponent(jButton2)))
-        );
+        actionsPanel.add(testButton);
 
         javax.swing.GroupLayout panelContainerPanelLayout = new javax.swing.GroupLayout(panelContainerPanel);
         panelContainerPanel.setLayout(panelContainerPanelLayout);
         panelContainerPanelLayout.setHorizontalGroup(
             panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(panelContainerPanelLayout.createSequentialGroup()
-                .addGroup(panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                    .addComponent(propertiesPanel, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 246, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 246, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
         );
         panelContainerPanelLayout.setVerticalGroup(
             panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(panelContainerPanelLayout.createSequentialGroup()
-                .addComponent(propertiesPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(actionsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(247, 247, 247)
+                .addComponent(actionsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 290, Short.MAX_VALUE))
         );
 
         jMenuFile.setText("File");
@@ -276,7 +196,10 @@ public class MainJFrame extends javax.swing.JFrame {
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addComponent(addNodePanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(panelContainerPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-            .addComponent(drawPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(drawPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
         );
 
         pack();
@@ -326,24 +249,24 @@ public class MainJFrame extends javax.swing.JFrame {
             dummybtn.addActionListener(new ActionListener(){
                 @Override
                 public void actionPerformed(ActionEvent e){
-                    propertiesPanel.setVisible(true);
+//                    propertiesPanel.setVisible(true);
                     actionsPanel.setVisible(true);
                     JButton thisbtn = (JButton) e.getSource();
                     String type = thisbtn.getText();
                     String paramDesc = "";
-                    nodeParametersField.setText("");
-                    nodeNameField.setText("");
+//                    nodeParametersField.setText("");
+//                    nodeNameField.setText("");
                     if (Predef.parameterName(type) != null){
-                        nodeParametersField.setEnabled(true);
+//                        nodeParametersField.setEnabled(true);
                         paramDesc = "<br>" + Predef.parameterName(type);
                     } else {
-                        nodeParametersField.setEnabled(false);
+//                        nodeParametersField.setEnabled(false);
                         paramDesc = "<br>No additional parameters.";
                     }
                     
-                    nodeDescriptionLabel.setText("<html>" + "Node type " +
-                           type +
-                           paramDesc);
+//                    nodeDescriptionLabel.setText("<html>" + "Node type " +
+//                           type +
+//                           paramDesc);
                     
                     createNode(type + " node", type, "1");
                 }
@@ -419,7 +342,6 @@ public class MainJFrame extends javax.swing.JFrame {
 //        graphPanel.executeLayout(getCurrentLayout());
         graphPanel.executeLayout(1);
     }
-
     
     
     private void createNode(String name, String type, String params) {
@@ -468,22 +390,6 @@ public class MainJFrame extends javax.swing.JFrame {
     }
     
     
-    private void nodeNameFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nodeNameFieldActionPerformed
-        
-    }//GEN-LAST:event_nodeNameFieldActionPerformed
-
-    private void nodeParametersFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nodeParametersFieldActionPerformed
-        
-    }//GEN-LAST:event_nodeParametersFieldActionPerformed
-
-    private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
-//       propertiesPanel.setVisible(false);
-//       nodeNameField.setText("");
-//       nodeParametersField.setText("");
-//       nodeDescriptionLabel.setText("");
-//       actionsPanel.setVisible(false);
-    }//GEN-LAST:event_jButton2ActionPerformed
-
     private void drawPanelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_drawPanelMouseClicked
 
         
@@ -491,6 +397,7 @@ public class MainJFrame extends javax.swing.JFrame {
 
     private void deleteSelectedBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteSelectedBtnActionPerformed
         graphPanel.deleteSelected();
+        //TODO remove stuff in model as well
         
     }//GEN-LAST:event_deleteSelectedBtnActionPerformed
 
@@ -506,15 +413,22 @@ public class MainJFrame extends javax.swing.JFrame {
         
     }//GEN-LAST:event_applyLayoutBtnActionPerformed
 
-    private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-       
-        if (graphPanel.getSelectedCellType().equals("cell")) {
-           // change the vertex name...
-           String temp = nodeNameField.getText();
-           Object vert = graphPanel.getVertex(temp);
+    private void testButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_testButtonActionPerformed
+        // TODO add your handling code here:
+        System.out.println(getContentPane());
+        java.awt.Container panel = getContentPane();
+        
+        nodePropertiesPane  npp;
+        npp = new nodePropertiesPane();
+        panel.add(npp);
+        npp.setVisible(true);
+        panel.setForeground(Color.red);
+//        panel.remove(propertiesPanel);
+//        remove(propertiesPanel);
+        panel.revalidate();
+        panel.repaint();
+    }//GEN-LAST:event_testButtonActionPerformed
     
-    }//GEN-LAST:event_jButton1ActionPerformed
-    }
     /**
      * @param args the command line arguments
      */
@@ -558,20 +472,13 @@ public class MainJFrame extends javax.swing.JFrame {
     private javax.swing.JButton deleteAllBtn;
     private javax.swing.JButton deleteSelectedBtn;
     private javax.swing.JPanel drawPanel;
-    private javax.swing.JButton jButton1;
-    private javax.swing.JButton jButton2;
     private javax.swing.JMenuBar jMenuBarMain;
     private javax.swing.JMenu jMenuEdit;
     private javax.swing.JMenu jMenuFile;
     private javax.swing.JMenuItem jMenuItemOpen;
     private javax.swing.JMenuItem jMenuItemSave;
-    private javax.swing.JLabel nameLbl;
-    private javax.swing.JLabel nodeDescriptionLabel;
-    private javax.swing.JTextField nodeNameField;
-    private javax.swing.JTextField nodeParametersField;
     private javax.swing.JPanel panelContainerPanel;
-    private javax.swing.JLabel paramsLabel;
-    private javax.swing.JPanel propertiesPanel;
+    private javax.swing.JButton testButton;
     // End of variables declaration//GEN-END:variables
 
 public static boolean deleteMode = false;
