@@ -398,6 +398,7 @@ public class MainJFrame extends javax.swing.JFrame {
                 for (EnumVariable parent : node.getParents()) {
                     String parent_name = parent.getName();
                     Object parent_vertex = myGraphPanel.getVertex(parent_name);
+                    System.out.println("Inserting edge between" + parent_name + " and " + child_name); 
                     graph.getModel().beginUpdate();
                     try {
                         Object newedge = graph.insertEdge(graph.getDefaultParent(), null, "", parent_vertex, child_vertex);
