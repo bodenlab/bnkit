@@ -20,11 +20,14 @@ package bn.alg;
 import bn.BNet;
 import bn.BNode;
 import bn.Distrib;
+import bn.EnumTable;
 import bn.EnumVariable;
+import bn.JDF;
 import bn.JPT;
 import bn.Variable;
 import bn.alg.CGVarElim.CGVarElimRuntimeException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -68,12 +71,19 @@ public class EM extends LearningAlg {
      * EM maximum number of rounds (iterations). Training stops after the
      * specified number of rounds independently of convergence.
      */
-    public static int EM_MAX_ROUNDS = 10000;
-
+    public static int EM_MAX_ROUNDS = 1000;
+    
     /**
      * EM status print-outs
      */
     public static boolean EM_PRINT_STATUS = true;
+
+    /**
+     * EM option: currently two different approaches to determine expectations.
+     * 1. one node at a time = one query per node
+     * 2. all nodes at a time = one big query
+     */
+    public static int EM_OPTION = 2;
 
     /**
      * Train the BN using EM.
@@ -98,25 +108,27 @@ public class EM extends LearningAlg {
         for (int i = 0; i < vars.length; i++) {
             updateVars.add(vars[i]);
         }
-        Set<BNode> update = new HashSet<>(); 			// the set of nodes that may need to be updated:
-        for (BNode node : bn.getNodes()) {      			// check all nodes
-            Variable var = node.getVariable();				// this is the variable of the node
-            if (updateVars.contains(var)) {					// is it in the data set?
-                update.add(node);							// if yes, add it and move to next node
+        Map<BNode, Object[]> update = new HashMap<>(); 			// the set of nodes that may need to be updated:
+        for (BNode node : bn.getNodes()) {      		// check all nodes
+            Variable var = node.getVariable();			// this is the variable of the node
+            if (updateVars.contains(var)) {			// is it in the data set?
+                update.put(node, null);				// if yes, add it and move to next node
                 continue;
             }
             List<EnumVariable> parents = node.getParents();	// if no, determine which are the parents of the node
             if (parents != null) {
                 for (EnumVariable parent : parents) {		// go through the parents
                     if (updateVars.contains(parent)) {		// check if parent is in data set
-                        update.add(node);					// if yes, add the node to the set of nodes to update
+                        update.put(node, null);			// if yes, add the node to the set of nodes to update
                         break;
                     }
                 }
             }
         } // finished constructing the node update set
 
-        for (BNode node : update) {
+        Map<BNode, Object[]> node_keys = new HashMap<>();       // hold the evidence for each of the nodes for efficient access
+
+        for (BNode node : update.keySet()) {
             if (node.isTrainable()) {
                 node.randomize(System.currentTimeMillis());
             }
@@ -130,6 +142,7 @@ public class EM extends LearningAlg {
         int round = 0;
         boolean latentVariablesExist = false;
 
+        
         // start training (keep going until convergence or stop criterion is met)
         while (conv_rate > EM_CONVERGENCE_CRITERION && round < EM_MAX_ROUNDS) {
             round++;
@@ -138,7 +151,7 @@ public class EM extends LearningAlg {
 
             // for each sample with observations...
             for (int i = 0; i < values.length; i++) {
-                // set variables according to observations
+                // set variables and keys according to observations
                 for (int j = 0; j < vars.length; j++) {
                     BNode instantiate_me = bn.getNode(vars[j]);
                     if (instantiate_me == null) {
@@ -168,95 +181,212 @@ public class EM extends LearningAlg {
                  * 
                  * Which of the ways is better depends on the number of variables in Y' and the number of nodes N.
                  */
-                // Principal way 1: go through each of the BN nodes...
                 inf.instantiate(bn);
-                for (BNode node : update) {
+                Variable.Assignment[] evidence = Variable.Assignment.array(vars, values[i]); // the evidence here
+                
+                switch (EM_OPTION) {
+                    case 1: 
 
-                    if (node.isTrainable()) {
-                        List<Variable> query_vars = new ArrayList<>();
-                        Object[] parent_key = null;
-                        int[] parent_map = null;
-                        if (!node.isRoot()) {
-                            List<EnumVariable> parents = node.getParents();
-                            parent_key = new Object[parents.size()];
-                            parent_map = new int[parents.size()];
-                            int index_in_query = 0;
-                            for (int p = 0; p < parents.size(); p++) {
-                                Variable vpar = parents.get(p);
-                                BNode npar = bn.getNode(vpar);
-                                parent_key[p] = npar.getInstance();
-                                if (parent_key[p] == null) {
-                                    query_vars.add(vpar);
-                                    parent_map[p] = index_in_query++;
-                                } else {
-                                    parent_map[p] = -1;
+                        // Principal way 1: go through each of the BN nodes... pose of query for, and update each...
+                        
+                        for (BNode node : update.keySet()) {
+
+                            if (node.isTrainable()) {
+                                List<Variable> query_vars = new ArrayList<>();
+                                Object[] parent_key = null;
+                                int[] parent_map = null;
+                                if (!node.isRoot()) {
+                                    Object[] evid_key = EnumTable.getKey(node.getParents(), evidence);
+                                    // FIXME: More cleanup to do below ...
+                                    List<EnumVariable> parents = node.getParents();
+                                    parent_key = new Object[parents.size()];
+                                    parent_map = new int[parents.size()];
+                                    int index_in_query = 0;
+                                    for (int p = 0; p < parents.size(); p++) {
+                                        Variable vpar = parents.get(p);
+                                        BNode npar = bn.getNode(vpar);
+                                        parent_key[p] = npar.getInstance();
+                                        if (parent_key[p] == null) {
+                                            query_vars.add(vpar);
+                                            parent_map[p] = index_in_query++;
+                                        } else {
+                                            parent_map[p] = -1;
+                                        }
+                                    }
+                                }
+                                Variable var = node.getVariable();
+                                Object ovalue = node.getInstance(); // check the value, if instantiated
+                                if (ovalue == null) {
+                                    query_vars.add(var);
+                                }
+                                if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
+                                    try {
+                                        latentVariablesExist = true;
+                                        Variable[] query_arr = new Variable[query_vars.size()];
+                                        query_vars.toArray(query_arr);
+                                        Query q = inf.makeQuery(query_arr);
+                                        CGTable qr = (CGTable) inf.infer(q);
+                                        JPT jpt = qr.getJPT();
+                                        if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
+                                            log_prob += Math.log(((CGVarElim)inf).likelihood());
+                                        for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
+                                            int key_index = entry.getKey();
+                                            Object[] jpt_key = jpt.table.getKey(key_index);
+                                            double prob = entry.getValue();
+                                            // jpt_key will contain values for latent variables
+                                            // other variables are already instantiated
+                                            if (node.getInstance() == null) {
+                                                try {
+                                                    ((EnumVariable)var).getName();
+                                                    ovalue = jpt_key[jpt_key.length - 1];
+                                                } catch (ClassCastException e) {
+                                                    // If the variable is not specified and inferred, CGTable gives a distribution.
+                                                    // GDT implements counting and maximisation of distributions (in addition to actual doubles)
+                                                    Distrib d = qr.getDistrib(key_index, var);
+                                                    //ovalue = d.sample();
+                                                    ovalue = d;
+                                                }
+                                            }
+                                            if (node.isRoot()) { // if prior
+                                                node.countInstance(null, ovalue, prob);
+                                            } else { // if node has parents
+                                                for (int p = 0; p < parent_key.length; p++) {
+                                                    if (parent_map[p] >= 0) {
+                                                        parent_key[p] = jpt_key[parent_map[p]];
+                                                    }
+                                                }
+                                                try {
+                                                    node.countInstance(parent_key, ovalue, prob);
+                                                } catch (java.lang.RuntimeException e) {
+                                                    throw new EMRuntimeException("Problem with sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
+                                                }
+                                            }
+                                        } 
+                                    } catch (CGVarElimRuntimeException e) {
+                                        throw new EMRuntimeException("Failed query for sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
+                                    }
+                                } else { // all variables are instantiated, no need to do inference
+                                    node.countInstance(parent_key, ovalue);
                                 }
                             }
                         }
-                        Variable var = node.getVariable();
-                        Object ovalue = node.getInstance(); // check the value, if instantiated
-                        if (ovalue == null) {
-                            query_vars.add(var);
+                        break; // end EM_OPTION == 1
+                        
+                    case 2:
+                        // Principal way 2: collect query variables from all (trainable) nodes... pose one query and update all (trainable) nodes
+                        Set<Variable> query_vars = new HashSet<>(); // all query variables are stored here
+
+                        for (BNode node : update.keySet()) {
+                            // check if the node should be updated, and if so collect query variables from it
+                            if (node.isTrainable()) {
+                                // if the node has parents, we need to check out the variables of its parents too
+                                if (!node.isRoot()) {
+                                    Object[] evid_key = EnumTable.getKey(node.getParents(), evidence);
+                                    update.put(node, evid_key); // associate each node with a (potentially partial) key for evidence, expected values later...
+                                    // add to the variables that must be queried during inference
+                                    for (int key_index = 0; key_index < evid_key.length; key_index ++) {
+                                        if (evid_key[key_index] == null)
+                                            query_vars.add(node.getParents().get(key_index));
+                                    }
+                                }
+                                Object ovalue = node.getInstance(); // check the value, if instantiated
+                                if (ovalue == null) 
+                                    query_vars.add(node.getVariable());
+                            }
                         }
+                        
                         if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
+                            // so we need to perform inference, which can go bad (hence potential for exception)
                             try {
                                 latentVariablesExist = true;
+                                // perform inference, ALL query variables in one go
                                 Variable[] query_arr = new Variable[query_vars.size()];
                                 query_vars.toArray(query_arr);
                                 Query q = inf.makeQuery(query_arr);
-                                CGTable qr = (CGTable) inf.infer(q);
-                                JPT jpt = qr.getJPT();
+                                CGTable qr = (CGTable) inf.infer(q); 
                                 if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
                                     log_prob += Math.log(((CGVarElim)inf).likelihood());
-                                for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
-                                    int key_index = entry.getKey();
-                                    Object[] jpt_key = jpt.table.getKey(key_index);
-                                    double prob = entry.getValue();
-                                    // jpt_key will contain values for latent variables
-                                    // other variables are already instantiated
-                                    if (node.getInstance() == null) {
-                                        try {
-                                            ((EnumVariable)var).getName();
-                                            ovalue = jpt_key[jpt_key.length - 1];
-                                        } catch (ClassCastException e) {
-                                            // If the variable is not specified and inferred, CGTable gives a distribution.
-                                            // GDT implements counting and maximisation of distributions (in addition to actual doubles)
-                                            Distrib d = qr.getDistrib(key_index, var);
-                                            //ovalue = d.sample();
-                                            ovalue = d;
-                                        }
-                                    }
-                                    if (node.isRoot()) { // if prior
-                                        node.countInstance(null, ovalue, prob);
-                                    } else { // if node has parents
-                                        for (int p = 0; p < parent_key.length; p++) {
-                                            if (parent_map[p] >= 0) {
-                                                parent_key[p] = jpt_key[parent_map[p]];
+
+                                int[] indices = qr.getIndices(); // FIXME: For efficiency, at least initially, consider only looking at indices of events that are more probable...
+                                // for each permutation of the enumerable query variables
+                                for (int qr_index : indices) {
+                                    Object[] qr_key = qr.getKey(qr_index);
+                                    double p = qr.getFactor(qr_index);
+                                    JDF jdf = null;
+                                    if (qr.hasNonEnumVariables())
+                                        jdf = qr.getJDF(qr_index);
+                                    Variable.Assignment[] assignment = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
+                                    for (BNode node : update.keySet()) {
+                                        // check if the node should be updated, and if so put together expectations for maximisation...
+                                        if (node.isTrainable()) {
+                                            // if the node has parents, we need to check out the variables of its parents too
+                                            if (!node.isRoot()) {
+                                                Object[] evid_key = update.get(node);
+                                                Object[] inf_key = EnumTable.getKey(node.getParents(), assignment);
+                                                EnumTable.overlay(evid_key, inf_key);
+                                                Object value = node.getInstance();
+                                                if (value != null)
+                                                    node.countInstance(evid_key, value, p);
+                                                else { // we don't know the value so use expected value
+                                                    Variable var = node.getVariable();
+                                                    try {
+                                                        EnumVariable evar = (EnumVariable) var;
+                                                        for (Variable.Assignment assigned : assignment) {
+                                                            if (assigned.var.equals(evar)) {
+                                                                node.countInstance(evid_key, assigned.val, p);
+                                                                break;
+                                                            }
+                                                        }
+                                                    } catch (ClassCastException e) {
+                                                        // we think it is a continuous variable, so we should have a distrib for it
+                                                        Distrib d = jdf.getDistrib(var);
+                                                        node.countInstance(evid_key, d, p);
+                                                    }
+                                                }
+                                            } else { // node IS root
+                                                Object value = node.getInstance();
+                                                if (value != null)
+                                                    node.countInstance(null, value, p);
+                                                else { // we don't know the value so use expected value
+                                                    Variable var = node.getVariable();
+                                                    try {
+                                                        EnumVariable evar = (EnumVariable) var;
+                                                        for (Variable.Assignment assigned : assignment) {
+                                                            if (assigned.var.equals(evar)) {
+                                                                node.countInstance(null, assigned.val, p);
+                                                                break;
+                                                            }
+                                                        }
+                                                    } catch (ClassCastException e) {
+                                                        // we think it is a continuous variable, but it is a root node!
+                                                        throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + var.getName() + " is a non-enumerable root node");
+                                                    }
+                                                }
+                                                
                                             }
                                         }
-                                        try {
-                                            node.countInstance(parent_key, ovalue, prob);
-                                        } catch (java.lang.RuntimeException e) {
-                                            throw new EMRuntimeException("Problem with sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
-                                        }
                                     }
-                                } 
+                                }
                             } catch (CGVarElimRuntimeException e) {
-                                // This happens when a variable cannot be queried, e.g. a continuous variable.
-                                // Since we do not currently properly check the scope of instantiated variables
-                                // to remove such variables for appropriate reasons, the problem is ignored. 
-                                throw new EMRuntimeException("Cannot query for sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
+                                throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + e.getMessage());
                             }
-                        } else { // all variables are instantiated, no need to do inference
-                            node.countInstance(parent_key, ovalue, 1.0);
+                        } else { // nothing needs to be inferred
+                            for (BNode node : update.keySet()) {
+                                // check if the node should be updated, and if so put together expectations for maximisation...
+                                if (node.isTrainable()) {
+                                    // if the node has parents, we need to check out the variables of its parents too
+                                    if (!node.isRoot()) {
+                                        Object[] evid_key = update.get(node);
+                                        node.countInstance(evid_key, node.getInstance());
+                                    }
+                                }
+                            }
                         }
-                    }
-                }
-                // Principal way 2: not yet implemented but see old bioalg:ml.bayes which does it this way.
-
+                        break; // end EM_OPTION == 2
+                }                        
             }
             // finally complete the M-step by transferring counts to probabilities
-            for (BNode node : update) {
+            for (BNode node : update.keySet()) {
                 if (node.isTrainable()) {
                     node.maximizeInstance();
                 }
@@ -265,7 +395,6 @@ public class EM extends LearningAlg {
             if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1) {
                 conv_rate = Math.abs(log_prob - prev_prob); // use abs because the joint prob may exceed 1 (it is not normalized)
                 System.err.println("Completed " + round + " round(s), L=" + log_prob);
-                //BNBuf.save(bn, "antonTest1.new");
             }
         }
 

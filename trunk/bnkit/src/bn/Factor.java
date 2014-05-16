@@ -980,13 +980,14 @@ public class Factor {
         et.atomicDensity = this.atomicDensity;
         et.atomicFactor = this.atomicFactor;
         for (Map.Entry<Integer, Double> entry : this.getMapEntries()) {
-            Object[] fkey = this.getKey(entry.getKey().intValue());
+            int fkey_index = entry.getKey().intValue();
+            Object[] fkey = this.getKey(fkey_index);
             Object[] qkey = new Object[fkey.length];
             for (int j = 0; j < fkey.length; j ++)
                 qkey[map2q[j]] = fkey[j];
-            et.setFactor(qkey, entry.getValue());
+            int qkey_index = et.setFactor(qkey, entry.getValue());
             if (hasNonEnumVariables()) 
-                et.setJDF(qkey, this.getJDF(qkey));
+                et.setJDF(qkey_index, this.getJDF(fkey_index));
         }
         return et;
     }
