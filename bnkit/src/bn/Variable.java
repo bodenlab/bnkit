@@ -193,6 +193,18 @@ public class Variable<E extends Domain> {
             this.var = var; 
             this.val = val;
         }
+        public static Assignment[] array(Variable[] vars, Object[] vals) {
+            Assignment[] ret = new Assignment[vars.length];
+            for (int i = 0; i < vars.length && i < vals.length; i ++)
+                ret[i] = new Assignment(vars[i], vals[i]);
+            return ret;
+        }
+        public static <T extends Variable> Assignment[] array(List<T> vars, Object[] vals) {
+            Assignment[] ret = new Assignment[vars.size()];
+            for (int i = 0; i < ret.length && i < vals.length; i ++)
+                ret[i] = new Assignment(vars.get(i), vals[i]);
+            return ret;
+        }
     }
 
     /**

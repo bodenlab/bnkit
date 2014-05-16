@@ -363,18 +363,7 @@ public class EnumTable<E> {
      * @return 
      */
     public Object[] getKey(Variable.Assignment[] evid) {
-        Object[] key = new Object[nParents]; // key is initialised to nulls by default
-        for (Variable.Assignment e : evid) {
-            try {
-                EnumVariable evar = (EnumVariable) e.var;
-                int var_index = parents.indexOf(evar);
-                if (var_index >= 0)
-                    key[var_index] = e.val;
-            } catch (ClassCastException exception) {
-                ; // ignore non-enumerable variables
-            }
-        }
-        return key;
+        return EnumTable.getKey(this.parents, evid);
     }
 
 
@@ -400,6 +389,54 @@ public class EnumTable<E> {
         }
     }
 
+    /**
+     * Get a key from a partial assignment of variables defined for the table.
+     * @param vars variables in order
+     * @param evid the evidence
+     * @return the key that encodes the values for the provided variables
+     */
+    public static <T extends Variable> Object[] getKey(List<T> vars, Variable.Assignment[] evid) {
+        Object[] key = new Object[vars.size()]; // key is initialised to nulls by default
+        if (key.length <= evid.length) { // for efficiency, we check what to iterate over
+            for (Variable.Assignment e : evid) {
+                try {
+                    EnumVariable evar = (EnumVariable) e.var;
+                    int var_index = vars.indexOf(evar);
+                    if (var_index >= 0)
+                        key[var_index] = e.val;
+                } catch (ClassCastException exception) {
+                    ; // ignore non-enumerable variables
+                }
+            }
+        } else { // evidence is longer than key, so let's iterate over key
+            for (int i = 0; i < key.length; i ++) {
+                Variable var = vars.get(i);
+                for (int j = 0; j < evid.length; j ++) {
+                    if (evid[j].var.equals(var)) {
+                        key[i] = evid[j].val;
+                        break;
+                    }
+                }
+            }
+        }
+        return key;
+    }
+    
+    /**
+     * Copy over all non-null values from source to target key.
+     * 
+     * @param target 
+     * @param source
+     * @return target
+     **/
+    public static Object[] overlay(Object[] target, Object[] source) {
+        if (target.length != source.length)
+            throw new EnumTableRuntimeException("Invalid operation since keys are of difference lengths (" + target.length + " vs " + source.length + ")");
+        for (int i = 0; i < target.length; i ++)
+            if (source[i] != null)
+                target[i] = source[i];
+        return target;
+    }
 }
 
 class EnumTableRuntimeException extends RuntimeException {
