@@ -83,7 +83,7 @@ public class EM extends LearningAlg {
      * 1. one node at a time = one query per node
      * 2. all nodes at a time = one big query
      */
-    public static int EM_OPTION = 2;
+    public static int EM_OPTION = 1;
 
     /**
      * Train the BN using EM.
@@ -192,33 +192,24 @@ public class EM extends LearningAlg {
                         for (BNode node : update.keySet()) {
 
                             if (node.isTrainable()) {
+                                
+                                // identify what variables that we need to infer, to generate expectations
                                 List<Variable> query_vars = new ArrayList<>();
-                                Object[] parent_key = null;
-                                int[] parent_map = null;
+                                Object[] evid_key = null; // only applicable if the node has parents
                                 if (!node.isRoot()) {
-                                    Object[] evid_key = EnumTable.getKey(node.getParents(), evidence);
-                                    // FIXME: More cleanup to do below ...
-                                    List<EnumVariable> parents = node.getParents();
-                                    parent_key = new Object[parents.size()];
-                                    parent_map = new int[parents.size()];
-                                    int index_in_query = 0;
-                                    for (int p = 0; p < parents.size(); p++) {
-                                        Variable vpar = parents.get(p);
-                                        BNode npar = bn.getNode(vpar);
-                                        parent_key[p] = npar.getInstance();
-                                        if (parent_key[p] == null) {
-                                            query_vars.add(vpar);
-                                            parent_map[p] = index_in_query++;
-                                        } else {
-                                            parent_map[p] = -1;
-                                        }
+                                    evid_key = EnumTable.getKey(node.getParents(), evidence);
+                                    // add to the variables that must be queried during inference
+                                    for (int key_index = 0; key_index < evid_key.length; key_index ++) {
+                                        if (evid_key[key_index] == null)
+                                            query_vars.add(node.getParents().get(key_index));
                                     }
                                 }
                                 Variable var = node.getVariable();
                                 Object ovalue = node.getInstance(); // check the value, if instantiated
-                                if (ovalue == null) {
+                                if (ovalue == null)
                                     query_vars.add(var);
-                                }
+                                
+                                // check if inference is required
                                 if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
                                     try {
                                         latentVariablesExist = true;
@@ -226,39 +217,56 @@ public class EM extends LearningAlg {
                                         query_vars.toArray(query_arr);
                                         Query q = inf.makeQuery(query_arr);
                                         CGTable qr = (CGTable) inf.infer(q);
-                                        JPT jpt = qr.getJPT();
-                                        if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
-                                            log_prob += Math.log(((CGVarElim)inf).likelihood());
-                                        for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
-                                            int key_index = entry.getKey();
-                                            Object[] jpt_key = jpt.table.getKey(key_index);
-                                            double prob = entry.getValue();
-                                            // jpt_key will contain values for latent variables
-                                            // other variables are already instantiated
-                                            if (node.getInstance() == null) {
-                                                try {
-                                                    ((EnumVariable)var).getName();
-                                                    ovalue = jpt_key[jpt_key.length - 1];
-                                                } catch (ClassCastException e) {
-                                                    // If the variable is not specified and inferred, CGTable gives a distribution.
-                                                    // GDT implements counting and maximisation of distributions (in addition to actual doubles)
-                                                    Distrib d = qr.getDistrib(key_index, var);
-                                                    //ovalue = d.sample();
-                                                    ovalue = d;
-                                                }
-                                            }
-                                            if (node.isRoot()) { // if prior
-                                                node.countInstance(null, ovalue, prob);
-                                            } else { // if node has parents
-                                                for (int p = 0; p < parent_key.length; p++) {
-                                                    if (parent_map[p] >= 0) {
-                                                        parent_key[p] = jpt_key[parent_map[p]];
+                                        int[] indices = qr.getIndices(); 
+                                        // for each permutation of the enumerable query variables
+                                        for (int qr_index : indices) {
+                                            Object[] qr_key = qr.getKey(qr_index);
+                                            double p = qr.getFactor(qr_index);
+                                            JDF jdf = null;
+                                            if (qr.hasNonEnumVariables())
+                                                jdf = qr.getJDF(qr_index);
+
+                                            if (!node.isRoot()) { // if node has parents
+                                                // we need to construct a key for the update of the node
+                                                // first, put in the result from the inference, but in the order of the node's parents
+                                                Variable.Assignment[] expected = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
+                                                Object[] inf_key = EnumTable.getKey(node.getParents(), expected);
+                                                // second, overlay the evidence
+                                                EnumTable.overlay(evid_key, inf_key);
+                                                if (ovalue != null)
+                                                    node.countInstance(evid_key, ovalue, p);
+                                                else { // we don't know the value so use expected value
+                                                    try {
+                                                        EnumVariable evar = (EnumVariable) var;
+                                                        for (Variable.Assignment assigned : expected) {
+                                                            if (assigned.var.equals(evar)) {
+                                                                node.countInstance(evid_key, assigned.val, p);
+                                                                break;
+                                                            }
+                                                        }
+                                                    } catch (ClassCastException e) {
+                                                        // we think it is a continuous variable, so we should have a distrib for it
+                                                        Distrib d = jdf.getDistrib(var);
+                                                        node.countInstance(evid_key, d, p);
                                                     }
                                                 }
-                                                try {
-                                                    node.countInstance(parent_key, ovalue, prob);
-                                                } catch (java.lang.RuntimeException e) {
-                                                    throw new EMRuntimeException("Problem with sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
+                                            } else { // node IS root
+                                                if (ovalue != null)
+                                                    node.countInstance(null, ovalue, p);
+                                                else { // we don't know the value so use expected value
+                                                    try {
+                                                        EnumVariable evar = (EnumVariable) var;
+                                                        Variable.Assignment[] expected = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
+                                                        for (Variable.Assignment assigned : expected) {
+                                                            if (assigned.var.equals(evar)) {
+                                                                node.countInstance(null, assigned.val, p);
+                                                                break;
+                                                            }
+                                                        }
+                                                    } catch (ClassCastException e) {
+                                                        // we think it is a continuous variable, but it is a root node!
+                                                        throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + var.getName() + " is a non-enumerable root node");
+                                                    }
                                                 }
                                             }
                                         } 
@@ -266,10 +274,13 @@ public class EM extends LearningAlg {
                                         throw new EMRuntimeException("Failed query for sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
                                     }
                                 } else { // all variables are instantiated, no need to do inference
-                                    node.countInstance(parent_key, ovalue);
+                                    node.countInstance(evid_key, ovalue);
                                 }
                             }
                         }
+                        if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
+                            log_prob += Math.log(((CGVarElim)inf).likelihood());
+
                         break; // end EM_OPTION == 1
                         
                     case 2:
@@ -304,8 +315,6 @@ public class EM extends LearningAlg {
                                 query_vars.toArray(query_arr);
                                 Query q = inf.makeQuery(query_arr);
                                 CGTable qr = (CGTable) inf.infer(q); 
-                                if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
-                                    log_prob += Math.log(((CGVarElim)inf).likelihood());
 
                                 int[] indices = qr.getIndices(); // FIXME: For efficiency, at least initially, consider only looking at indices of events that are more probable...
                                 // for each permutation of the enumerable query variables
@@ -362,7 +371,6 @@ public class EM extends LearningAlg {
                                                         throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + var.getName() + " is a non-enumerable root node");
                                                     }
                                                 }
-                                                
                                             }
                                         }
                                     }
@@ -382,6 +390,9 @@ public class EM extends LearningAlg {
                                 }
                             }
                         }
+                        if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
+                            log_prob += Math.log(((CGVarElim)inf).likelihood());
+
                         break; // end EM_OPTION == 2
                 }                        
             }
