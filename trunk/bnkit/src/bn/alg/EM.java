@@ -23,10 +23,10 @@ import bn.Distrib;
 import bn.EnumTable;
 import bn.EnumVariable;
 import bn.JDF;
-import bn.JPT;
 import bn.Variable;
 import bn.alg.CGVarElim.CGVarElimRuntimeException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -105,9 +105,7 @@ public class EM extends LearningAlg {
         // below we create the list of nodes that will be updated during training
         // note that only named nodes (variables) will be included, and their parents or children (the latter as latent variables)
         Set<Variable> updateVars = new HashSet<>();
-        for (int i = 0; i < vars.length; i++) {
-            updateVars.add(vars[i]);
-        }
+        updateVars.addAll(Arrays.asList(vars));
         Map<BNode, Object[]> update = new HashMap<>(); 			// the set of nodes that may need to be updated:
         for (BNode node : bn.getNodes()) {      		// check all nodes
             Variable var = node.getVariable();			// this is the variable of the node
