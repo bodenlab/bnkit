@@ -18,10 +18,11 @@
 
 package bn;
 
-import bn.alg.Query;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -47,26 +48,26 @@ public class BNet implements Serializable {
     /**
      * All nodes of the BN
      */
-    private final Map<String, BNode> nodes = new HashMap<String, BNode>();
-    private final Map<Variable, BNode> nodesByVar = new HashMap<Variable, BNode>();
+    private final Map<String, BNode> nodes = new HashMap<>();
+    private final Map<Variable, BNode> nodesByVar = new HashMap<>();
 
     /**
      * Linking children-to-parents, happens when BN is compiled (@see
      * BNet.compile())
      */
-    private Map<BNode, Set<BNode>> ch2par = new HashMap<BNode, Set<BNode>>();
+    private Map<BNode, Set<BNode>> ch2par = new HashMap<>();
 
     /**
      * Linking parent-to-children, happens when BN is compiled (@see
      * BNet.compile())
      */
-    private Map<BNode, Set<BNode>> par2ch = new HashMap<BNode, Set<BNode>>();
+    private Map<BNode, Set<BNode>> par2ch = new HashMap<>();
 
     /**
      * Listing variables in a top-down ordered fashion, for quick query
      * processing.
      */
-    private List<BNode> ordered = new ArrayList<BNode>();
+    private List<BNode> ordered = new ArrayList<>();
 
     /**
      * Construct a BN.
@@ -110,7 +111,7 @@ public class BNet implements Serializable {
     public void compile() {
         if (!compiled) {
             for (BNode node : nodes.values()) {
-                Set<BNode> parents = new HashSet<BNode>();
+                Set<BNode> parents = new HashSet<>();
                 List<EnumVariable> parvars = node.getParents();
                 if (parvars != null) {
                     for (EnumVariable parent : parvars) {
@@ -122,7 +123,7 @@ public class BNet implements Serializable {
                         parents.add(pnode);
                         Set<BNode> children = par2ch.get(pnode);
                         if (children == null) {
-                            children = new HashSet<BNode>();
+                            children = new HashSet<>();
                             par2ch.put(pnode, children);
                         }
                         children.add(node);
@@ -133,7 +134,7 @@ public class BNet implements Serializable {
             compiled = true; // note: must be declared compiled before full compilation ("ordered" below uses descendant links)
 
             for (BNode root : getRoots()) {
-                List<BNode> ordered_from_root = new ArrayList<BNode>();
+                List<BNode> ordered_from_root = new ArrayList<>();
                 if (ordered.contains(root)) {
                     continue;
                 }
@@ -158,7 +159,7 @@ public class BNet implements Serializable {
      * @return the set of all root nodes
      */
     public Set<BNode> getRoots() {
-        Set<BNode> roots = new HashSet<BNode>();
+        Set<BNode> roots = new HashSet<>();
         for (BNode node : nodes.values()) {
             if (node.isRoot()) {
                 roots.add(node);
@@ -303,7 +304,7 @@ public class BNet implements Serializable {
         }
         Set<BNode> children = par2ch.get(node);
         if (children == null) {
-            return null;
+            return Collections.EMPTY_LIST;
         }
         List<BNode> nonredundant = new ArrayList<>();
         nonredundant.addAll(children);
@@ -406,7 +407,7 @@ public class BNet implements Serializable {
      * @param query the variables that are in the query
      * @return a new BN with the relevant CPTs only
      */
-    public BNet getRelevant(Variable[] query) {
+    public BNet getRelevant(Variable... query) {
         BNet nbn = new BNet();
         Set<String> qset = new HashSet<>();
         for (Variable query1 : query) {
@@ -496,9 +497,8 @@ public class BNet implements Serializable {
     	Boolean leafQuery = false;
     	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNodes){
-    		if (node.getName() != query.getName()){
+    		if (!node.getName().equals(query.getName())){
     			Factor fact = node.makeFactor(cbn);
-    			
     			//instantiated priors cannot be used to factorise
     			if (fact != null ){
     				fTables.add(fact);
@@ -548,7 +548,7 @@ public class BNet implements Serializable {
 //		Distrib dist = new EnumDistrib((Enumerable)query.getVariable().getDomain(), data);
 //    	Object end = dist.sample(); 
 
-    	Map<Object, Double> nFt = new HashMap<Object, Double>();
+    	Map<Object, Double> nFt = new HashMap<>();
     	for (Map.Entry<Integer, Double> entry : ft.getMapEntries()) {
     		nFt.put((Object)entry.getKey(), entry.getValue());
     	}
@@ -582,10 +582,8 @@ public class BNet implements Serializable {
      * @return set with String
      */
     private Set<String> makeSet(String[] array) {
-        Set<String> s = new HashSet<String>();
-        for (String q : array) {
-            s.add(q);
-        }
+        Set<String> s = new HashSet<>();
+        s.addAll(Arrays.asList(array));
         return s;
     }
 

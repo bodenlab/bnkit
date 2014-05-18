@@ -42,6 +42,10 @@ public class GDT implements BNode, Serializable {
     private SampleTable<Double> countDouble = null; // the table that will contain all samples of the type "Double" during learning
     private SampleTable<Distrib> countDistrib = null; // the table that will contain all samples of the type "Distrib" during learning
 
+    final private double[] means;       // save the means 
+    final private double[] vars; 	// save the variances
+    final private double[] n;           // save the numbers of samples
+
     /**
      * Create a Gaussian density table for a variable. The variable is
      * conditioned on a set of Enumerable variables.
@@ -53,9 +57,13 @@ public class GDT implements BNode, Serializable {
         this.var = var;
         if (parents != null) {
             if (parents.size() > 0) {
-                this.table = new EnumTable<GaussianDistrib>(parents);
+                this.table = new EnumTable<>(parents);
             }
         }
+        int maxrows = this.table.getSize();
+        means = new double[maxrows];
+        vars = new double[maxrows];
+        n = new double[maxrows];
     }
 
     /**
@@ -76,6 +84,10 @@ public class GDT implements BNode, Serializable {
      */
     public GDT(Variable<Continuous> var) {
         this.var = var;
+        int maxrows = 0;
+        means = new double[maxrows];
+        vars = new double[maxrows];
+        n = new double[maxrows];
     }
 
     /**
@@ -272,7 +284,7 @@ public class GDT implements BNode, Serializable {
         List<EnumVariable> parents = table.getParents();
         StringBuilder sbuf = new StringBuilder();
         for (int i = 0; i < parents.size(); i++) {
-            sbuf.append(parents.get(i).getName() + (i < parents.size() - 1 ? "," : ""));
+            sbuf.append(parents.get(i).getName()).append(i < parents.size() - 1 ? "," : "");
         }
         return "GDT(" + getName() + "|" + sbuf.toString() + ")" + (getInstance() == null ? "" : "=" + getInstance());
     }
@@ -369,6 +381,7 @@ public class GDT implements BNode, Serializable {
 
     /**
      * Put random entries in the GDT if not already set.
+     * @param seed
      */
     @Override
     public void randomize(long seed) {
@@ -447,11 +460,8 @@ public class GDT implements BNode, Serializable {
     @Override
     public void maximizeInstance() {
         int maxrows = table.getSize();
-        int nSample = 20;                       // how many samples that should be generated for observed distributions
+        int nSample = 5;                        // how many samples that should be generated for observed distributions
         double maxVar = 0;                      // the largest variance of any class  
-        double[] means = new double[maxrows];   // save the means 
-        double[] vars = new double[maxrows]; 	// save the variances
-        double[] n = new double[maxrows]; 	// save the numbers of samples
         double middleMean = 0; 			// the mean of all values
         double middleVar = 0;			// the variance of all values
         double middleTot = 0;			// the sum of counts for all parent configs
@@ -489,10 +499,10 @@ public class GDT implements BNode, Serializable {
             // go through actual values...
             if (samplesDouble != null) {
                 for (SampleTable<Double>.Sample sample : samplesDouble) {// look at each entry
-                    y[j] = (Double)sample.instance.doubleValue();        // actual value (or score)
-                    p[j] = sample.prob;                   // p(class=key) i.e. the height of the density for this parent config  
-                    sum += y[j] * p[j];				// update the numerator of the mean calc
-                    tot += p[j];					// update the denominator of the mean calc
+                    y[j] = sample.instance;        // actual value (or score)
+                    p[j] = sample.prob;            // p(class=key) i.e. the height of the density for this parent config  
+                    sum += y[j] * p[j];            // update the numerator of the mean calc
+                    tot += p[j];                   // update the denominator of the mean calc
                     j++;
                 }
             }
@@ -579,25 +589,25 @@ public class GDT implements BNode, Serializable {
 
     @Override
     public String getStateAsText() {
-        StringBuffer sbuf = new StringBuffer("\n");
+        StringBuilder sbuf = new StringBuilder("\n");
         if (isRoot()) {
             GaussianDistrib d = prior;
             if (d != null) {
-                sbuf.append("" + d.getMean() + ", " + d.getVariance() + ";\n");
+                sbuf.append("").append(d.getMean()).append(", ").append(d.getVariance()).append(";\n");
             }
         } else {
             for (int i = 0; i < table.getSize(); i++) {
                 GaussianDistrib d = table.map.get(new Integer(i));
                 if (d != null) {
-                    sbuf.append(i + ": ");	// use index as key because values above can be of different non-printable types
-                    sbuf.append("" + d.getMean() + ", " + d.getVariance() + "; (");
+                    sbuf.append(i).append(": ");	// use index as key because values above can be of different non-printable types
+                    sbuf.append("").append(d.getMean()).append(", ").append(d.getVariance()).append("; (");
                     // If we want to *see* the key, may not work well for some non-printable types
                     Object[] key = table.getKey(i);
                     for (int j = 0; j < key.length; j++) {
                         if (j < key.length - 1) {
-                            sbuf.append(key[j] + ", ");
+                            sbuf.append(key[j]).append(", ");
                         } else {
-                            sbuf.append(key[j] + ")\n");
+                            sbuf.append(key[j]).append(")\n");
                         }
                     }
                 }

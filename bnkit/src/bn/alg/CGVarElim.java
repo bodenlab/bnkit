@@ -77,7 +77,9 @@ public class CGVarElim implements Inference {
         List<Variable> E = new ArrayList<>(); // Assignment
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
         Q.addAll(Arrays.asList(qvars));
-        for (BNode node : bn.getOrdered()) {
+        //BNet qbn = bn.getRelevant(qvars);
+        BNet qbn = bn;
+        for (BNode node : qbn.getOrdered()) {
             Variable var = node.getVariable();
             if (node.getInstance() != null) {
                 E.add(var);
@@ -85,7 +87,7 @@ public class CGVarElim implements Inference {
                 X.add(var);
             }
         }
-        return new CGQuery(Q, E, X);
+        return new CGQuery(Q, E, X, qbn);
     }
 
     /**
@@ -113,11 +115,11 @@ public class CGVarElim implements Inference {
             } catch (ClassCastException e) {
                 ;
             }
-        }
+        }        
         int nBuckets = buckets.size();
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
-        for (BNode node : bn.getNodes()) {
-            Factor ft = node.makeFactor(bn);
+        for (BNode node : q.qbn.getNodes()) {
+            Factor ft = node.makeFactor(q.qbn);
             boolean added = false;
             if (ft.isAtomic()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
                 buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
@@ -144,9 +146,13 @@ public class CGVarElim implements Inference {
             if (b.factors.isEmpty()) { // no factors, put sum-out variables in other bucket(s)
                 for (Variable sumout : b.vars) { // check each sum-out variable
                     for (int jj = i + 1; jj < nBuckets; jj++) { // search suitable bucket for sum-out
-                        Bucket b2 = buckets.get(jj);
-                        if (b2.hasFactorWith(sumout) || jj == nBuckets - 1) { // we've found a bucket with a factor with sum-out variable
-                            b2.vars.add(sumout);
+                        try {
+                            Bucket b2 = buckets.get(jj);
+                            if (b2.hasFactorWith(sumout) || jj == nBuckets - 1) { // we've found a bucket with a factor with sum-out variable
+                                b2.vars.add(sumout);
+                            }
+                        } catch (IndexOutOfBoundsException e) {
+                            throw new CGVarElimRuntimeException("Bucket elimination failed during purging and merging: Variable is " + sumout.getName());
                         }
                     }
                 }
@@ -354,10 +360,12 @@ public class CGVarElim implements Inference {
         final List<Variable> Q;
         final List<Variable> E;
         final List<Variable> X;
-        CGQuery(List<Variable> Q, List<Variable> E, List<Variable> X) {
+        final BNet qbn;
+        CGQuery(List<Variable> Q, List<Variable> E, List<Variable> X, BNet qbn) {
             this.Q = Q;
             this.E = E;
             this.X = X;
+            this.qbn = qbn;
         }
     }
 
