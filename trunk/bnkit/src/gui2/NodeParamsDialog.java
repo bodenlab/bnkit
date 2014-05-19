@@ -29,6 +29,10 @@ public class NodeParamsDialog extends javax.swing.JDialog {
     }
 
     public void setModel(BNode node) {
+        if (node == null) {
+             System.out.println("node null, do nothing");
+             return;
+         }
          myTableModel = new MyTableModel(node);
          myParamsTable.setModel(myTableModel);
     }

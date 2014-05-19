@@ -3,38 +3,35 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package gui2;
 
 import bn.BNode;
 import bn.EnumVariable;
 import bn.Predef;
 import bn.Variable;
-import com.mxgraph.model.mxIGraphModel;
-import com.mxgraph.swing.mxGraphComponent;
-import com.mxgraph.util.mxConstants;
 import com.mxgraph.view.mxGraph;
 import java.awt.Color;
-import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.Random;
-import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
-import javax.swing.ButtonGroup;
+import javax.swing.BoxLayout;
 import javax.swing.GroupLayout;
-import javax.swing.GroupLayout.ParallelGroup;
-import javax.swing.GroupLayout.SequentialGroup;
 import javax.swing.JButton;
-import javax.swing.JDialog;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
+import javax.swing.JComponent;
+import javax.swing.JFileChooser;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
-import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.TransferHandler;
 import javax.swing.border.Border;
+import javax.swing.filechooser.FileFilter;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 /**
  *
@@ -44,7 +41,7 @@ public class MainJFrame extends javax.swing.JFrame {
 
     BNContainer bnc;
     gui2.MyGraphPanel graphPanel;
-    
+
     /**
      * Creates new form MainJFrame
      */
@@ -54,11 +51,14 @@ public class MainJFrame extends javax.swing.JFrame {
 //        actionsPanel.setVisible(false);
         bnc = new BNContainer();
         graphPanel = new gui2.MyGraphPanel();
+        graphPanel.setAutoscrolls(true);
         graphPanel.setBNContainer(bnc);
+
         initNodeButtons();
+//        initNodeLbls();
+        
         initDrawPanel();
     }
-   
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -92,7 +92,7 @@ public class MainJFrame extends javax.swing.JFrame {
         addNodePanel.setLayout(addNodePanelLayout);
         addNodePanelLayout.setHorizontalGroup(
             addNodePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 163, Short.MAX_VALUE)
+            .addGap(0, 139, Short.MAX_VALUE)
         );
         addNodePanelLayout.setVerticalGroup(
             addNodePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -155,23 +155,33 @@ public class MainJFrame extends javax.swing.JFrame {
         panelContainerPanel.setLayout(panelContainerPanelLayout);
         panelContainerPanelLayout.setHorizontalGroup(
             panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(panelContainerPanelLayout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, panelContainerPanelLayout.createSequentialGroup()
                 .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 246, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
         );
         panelContainerPanelLayout.setVerticalGroup(
             panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(panelContainerPanelLayout.createSequentialGroup()
-                .addGap(247, 247, 247)
-                .addComponent(actionsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, 290, Short.MAX_VALUE))
+                .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 111, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
         );
 
         jMenuFile.setText("File");
 
         jMenuItemOpen.setText("Open file...");
+        jMenuItemOpen.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItemOpenActionPerformed(evt);
+            }
+        });
         jMenuFile.add(jMenuItemOpen);
 
         jMenuItemSave.setText("Save");
+        jMenuItemSave.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItemSaveActionPerformed(evt);
+            }
+        });
         jMenuFile.add(jMenuItemSave);
 
         jMenuBarMain.add(jMenuFile);
@@ -204,118 +214,141 @@ public class MainJFrame extends javax.swing.JFrame {
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
-    
-    private void initDrawPanel()
-    {
+
+    // TODO: factor this out properly later
+    public JPanel getPanelContainer() {
+        return panelContainerPanel;
+    }
+
+    private void initDrawPanel() {
         // adds the graph panel to drawPanel.
         GroupLayout layout = new GroupLayout(drawPanel);
         drawPanel.setLayout(layout);
         layout.setHorizontalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(graphPanel)
+                layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(graphPanel)
         );
         layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(graphPanel)
+                layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(graphPanel)
         );
     }
-    
-    private void initNodeButtons(){
-        
+
+    private void initNodeButtons() {
+
         // Name and label border
         Border addNodeBorder = BorderFactory.createTitledBorder("Add Node");
         addNodePanel.setBorder(addNodeBorder);
-        
-        // Set up group layout for the 'add nodes' panel
-        GroupLayout layout = new GroupLayout(addNodePanel);
-        addNodePanel.setLayout(layout);
-        layout.setAutoCreateContainerGaps(true);
-        layout.setAutoCreateGaps(true);
-        
+
+        // Set up layout for the 'add nodes' panel
+        addNodePanel.setLayout(new BoxLayout(addNodePanel, BoxLayout.Y_AXIS));
+
         // Set up a dummy JRadioButton for dynamically adding 
         // buttons in for loop.
         ArrayList<JButton> BtnArr = new ArrayList<>();
         JButton dummybtn;
-        
+
         // Construct radio buttons for each predefined type
         // and add to button group.
-        for(String s: Predef.getVariableTypes()){
+        for (String s : Predef.getVariableTypes()) {
             dummybtn = new JButton(s);
             // TODO: Custom appearance for buttons
-            
+
             BtnArr.add(dummybtn);
-            
+
             // Listener should add node, select it, and refresh parameterPanel
-            dummybtn.addActionListener(new ActionListener(){
+            dummybtn.addActionListener(new ActionListener() {
                 @Override
-                public void actionPerformed(ActionEvent e){
+                public void actionPerformed(ActionEvent e) {
 //                    propertiesPanel.setVisible(true);
                     actionsPanel.setVisible(true);
                     JButton thisbtn = (JButton) e.getSource();
                     String type = thisbtn.getText();
                     String paramDesc = "";
-//                    nodeParametersField.setText("");
-//                    nodeNameField.setText("");
-                    if (Predef.parameterName(type) != null){
-//                        nodeParametersField.setEnabled(true);
-                        paramDesc = "<br>" + Predef.parameterName(type);
-                    } else {
-//                        nodeParametersField.setEnabled(false);
-                        paramDesc = "<br>No additional parameters.";
-                    }
-                    
-//                    nodeDescriptionLabel.setText("<html>" + "Node type " +
-//                           type +
-//                           paramDesc);
-                    
-                    createNode(type + " node", type, "1");
+
+                    // don't update this here...
+//                    if (Predef.parameterName(type) != null) {
+//                        paramDesc = "<br>" + Predef.parameterName(type);
+//                    } else {
+////                        nodeParametersField.setEnabled(false);
+//                        paramDesc = "<br>No additional parameters.";
+//                    }
+                    // Need to fix these dummy inputs so things don't break
+                    createNode(null, type, null);
                 }
             });
         }
-        
-        // Add elements to groupings and add to layout.
-        ParallelGroup hRadioButtons = layout.createParallelGroup();
-        for (JButton b: BtnArr){
-            hRadioButtons.addComponent(b);
+
+        // Add buttons.
+        for (JButton b : BtnArr) {
+            addNodePanel.add(b);
         }
-        
-        layout.setHorizontalGroup(
-                layout.createSequentialGroup()
-                .addGroup(hRadioButtons)
-        );
-        
-        SequentialGroup vRadioButtons = layout.createSequentialGroup();
-        for (JButton b: BtnArr){
-            vRadioButtons.addComponent(b);
-        }
-        
-        layout.setVerticalGroup(
-                vRadioButtons
-                .addGroup(layout.createParallelGroup())
-        );
-        
+
         addNodePanel.setVisible(true);
     }
-        
+
+    private void initNodeLbls() {
+        ;
+        // Name and label border
+        Border addNodeBorder = BorderFactory.createTitledBorder("Add Node");
+        addNodePanel.setBorder(addNodeBorder);
+
+        // Set up layout for the 'add nodes' panel
+        addNodePanel.setLayout(new BoxLayout(addNodePanel, BoxLayout.Y_AXIS));
+
+        // Set up a dummy JLabel for dynamically adding 
+        // buttons in for loop.
+        ArrayList<NodeLabel> LblArr = new ArrayList<>();
+        NodeLabel dummylbl;
+
+        // Construct radio buttons for each predefined type
+        // and add to button group.
+        for (String s : Predef.getVariableTypes()) {
+            dummylbl = new NodeLabel(graphPanel, s);
+
+            // change appearnace
+            Border border = BorderFactory.createLineBorder(Color.BLUE, 2);
+            dummylbl.setBorder(border);
+
+            LblArr.add(dummylbl);
+
+        }
+
+        // Add buttons.
+        for (NodeLabel b : LblArr) {
+            addNodePanel.add(b);
+        }
+
+        addNodePanel.setVisible(true);
+    }
+
+    public class DragMouseAdapter extends MouseAdapter {
+
+        public void mousePressed(MouseEvent e) {
+            System.out.println("Label pressed");
+            JComponent c = (JComponent) e.getSource();
+            TransferHandler handler = c.getTransferHandler();
+            System.out.println("handler is: " + handler);
+            handler.exportAsDrag(c, e, TransferHandler.COPY);
+        }
+    }
+
     private void renderNetwork(BNContainer bnc) {
         final mxGraph graph = graphPanel.getGraph();
         graph.removeCells(graphPanel.getAllCells());
+
         for (BNode node : bnc.getBNet().getNodes()) {
             Variable var = node.getVariable();
             if (var != null) {
                 String type = var.getPredef();
                 String name = var.getName();
                 String params = var.getParams();
-                String color = (Predef.isEnumerable(type)?"yellow":"orange"); // yellow for enumerable nodes, orange for continuous
-                String label = name;
                 graph.getModel().beginUpdate();
-                
-                Random rand = new Random();
+
                 try {
-                    
-                    Object newvertex = graph.insertVertex(graph.getDefaultParent(), null, label, 
-                            rand.nextInt(50), rand.nextInt(50), rand.nextInt(80), rand.nextInt(30), 
-                            "ROUNDED;strokeColor=black;fillColor="+color);
+                    String color = (Predef.isEnumerable(type) ? "yellow" : "orange");
+                    Object newvertex = graph.insertVertex(graph.getDefaultParent(), 
+                            null, name, 50, 50, 80, 30, "ROUNDED;strokeColor=black;fillColor=" + color);
                     graphPanel.addVertex(name, newvertex);
                 } finally {
                     graph.getModel().endUpdate();
@@ -324,111 +357,147 @@ public class MainJFrame extends javax.swing.JFrame {
         } // variables done... now connect them
         for (BNode node : bnc.getBNet().getNodes()) {
             String child_name = node.getVariable().getName();
+            System.out.println("About to draw edges in renderNetwork");
             Object child_vertex = graphPanel.getVertex(child_name);
             if (node.getParents() != null) {
                 for (EnumVariable parent : node.getParents()) {
                     String parent_name = parent.getName();
                     Object parent_vertex = graphPanel.getVertex(parent_name);
                     graph.getModel().beginUpdate();
+                    System.out.println("Inserting edge between" + parent_name + " and " + child_name);
                     try {
+
                         Object newedge = graph.insertEdge(graph.getDefaultParent(), null, "", parent_vertex, child_vertex);
-                        
+
                     } finally {
                         graph.getModel().endUpdate();
                     }
                 }
+            } else {
+                System.out.println("No parents :(");
             }
-        }        
+        }
 //        graphPanel.executeLayout(getCurrentLayout());
         graphPanel.executeLayout(1);
     }
-    
-    
+
     private void createNode(String name, String type, String params) {
         final mxGraph graph = graphPanel.getGraph();
-        Object parent = graph.getDefaultParent();
-        params = "";
+
+        // Set defaults for initialising node...
+        if (name == null) {
+            name = type + " node";
+        }
+        // only String and Number are parametrised atm
+        if (params == null) {
+            params = type.equalsIgnoreCase("String") ? "a;b"
+                    : type.equalsIgnoreCase("Number") ? "5" : // this bugs out when real int provided
+                    null;
+        }
         try {
-                String color = (Predef.isEnumerable(type)?"yellow":"orange"); // yellow for enumerable nodes, orange for continuous
+            String color = (Predef.isEnumerable(type) ? "yellow" : "orange"); // yellow for enumerable nodes, orange for continuous
 //                String cellStyle = (Predef.parameterName(type).equals("String") ? "STRING_STYLE" : "BOOL_STYLE");
-                String label = name;
-                graph.getModel().beginUpdate();
-                try {
-                    graphPanel.defStyleSheets(graph); // custom vertex and edge styles
-                    Object newvertex = graph.insertVertex(parent, null, label, 50, 50, 100, 50, "ROUNDED;strokeColor=black;fillColor="+color);
-//                    Object newvertex = graph.insertVertex(parent, null, label, 50, 50, 100, 50, cellStyle);
-                    graphPanel.addVertex(name, newvertex);
-//                    Object newedge = graph.insertEdge(parent, null, parent, parent, parent, params)
-                    graphPanel.setSelected(newvertex);
-//                    bnc.addNode(Predef.getBNode(var, new ArrayList<Variable>(), Predef.getBNodeType(type)));
-                } finally {
-                    graph.getModel().endUpdate();
-                }
+            String label = name;
+            graph.getModel().beginUpdate();
+            Variable var = Predef.getVariable(name, type, params);
+
+            try {
+                graphPanel.defStyleSheets(graph); // custom vertex and edge styles
+                Object newvertex = graph.insertVertex(graph.getDefaultParent(), null, label, 50, 50, 100, 50, "ROUNDED;strokeColor=black;fillColor=" + color);
+                graphPanel.addVertex(name, newvertex);
+                graphPanel.addCellSelection(newvertex);
+                System.out.println("bnode is: " + Predef.getBNode(var, new ArrayList<Variable>(), Predef.getBNodeType(type)));
+                BNode newBNode = Predef.getBNode(var, new ArrayList<Variable>(), Predef.getBNodeType(type));
+                bnc.addNode(newBNode);
+                Variable nodevar = bnc.getVariable(graph.getLabel(newBNode));
+                nodevar.setName(name);
+                nodevar.setParams(params);
+                nodevar.setPredef(type);
+            } finally {
+                graph.getModel().endUpdate();
+            }
 //            }
         } catch (RuntimeException e) {
 //            error_msg = e.getLocalizedMessage();
         }
     }
-    public static boolean isDeleteMode() {
-        return deleteMode;
-    }
-    
-    /**
-     * Gets the selected RadioButton from a ButtonGroup.
-     * Can use button.getText() to find text of selected button etc.
-     * @param group
-     * @return AbstractButton
-     */
-    public AbstractButton getSelectedRadioButton(ButtonGroup group){
-         for (Enumeration<AbstractButton> buttons = group.getElements(); buttons.hasMoreElements();) {
-            AbstractButton button = buttons.nextElement();
-            if (button.isSelected()) {
-                return button;
-            }
-        }
-        return null;
-    }
-    
-    
+
+
     private void drawPanelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_drawPanelMouseClicked
 
-        
+
     }//GEN-LAST:event_drawPanelMouseClicked
 
     private void deleteSelectedBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteSelectedBtnActionPerformed
         graphPanel.deleteSelected();
-        //TODO remove stuff in model as well
-        
+
+
     }//GEN-LAST:event_deleteSelectedBtnActionPerformed
 
     private void deleteAllBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteAllBtnActionPerformed
         mxGraph graph = graphPanel.getGraph();
+        for (Object cell : graph.getChildVertices(graph.getDefaultParent())) {
+            graphPanel.addCellSelection(cell);
+        }
+        graphPanel.deleteSelected();
         graph.removeCells(graph.getChildVertices(graph.getDefaultParent()));
-        
-        //TODO remove stuff in model as well
+
     }//GEN-LAST:event_deleteAllBtnActionPerformed
 
     private void applyLayoutBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyLayoutBtnActionPerformed
         graphPanel.setLayout("");
-        
+
     }//GEN-LAST:event_applyLayoutBtnActionPerformed
 
     private void testButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_testButtonActionPerformed
         // TODO add your handling code here:
-        System.out.println(getContentPane());
-        java.awt.Container panel = getContentPane();
-        
-        nodePropertiesPane  npp;
-        npp = new nodePropertiesPane();
-        panel.add(npp);
-        npp.setVisible(true);
-        panel.setForeground(Color.red);
-//        panel.remove(propertiesPanel);
-//        remove(propertiesPanel);
-        panel.revalidate();
-        panel.repaint();
+
+        JButton thisbtn = (JButton) evt.getSource();
+        System.out.println(SwingUtilities.getUnwrappedParent(thisbtn));
+
+        java.awt.Container panel = SwingUtilities.getUnwrappedParent(thisbtn);
+        JPanel frame = (JPanel) SwingUtilities.getUnwrappedParent(panel);
+        System.out.println(frame.getLayout());
+        nodePropertiesPane npp = new nodePropertiesPane();
+        frame.add(npp);
+        frame.setLayout(new GridLayout(2, 0));
+
+        frame.validate();
+
     }//GEN-LAST:event_testButtonActionPerformed
-    
+
+    private void jMenuItemSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemSaveActionPerformed
+        graphPanel.saveNetwork();
+
+    }//GEN-LAST:event_jMenuItemSaveActionPerformed
+
+    private void jMenuItemOpenActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemOpenActionPerformed
+        JFileChooser c = new JFileChooser();
+
+        // For now only allow .xml files
+      FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
+      c.setFileFilter(filter);
+        int rVal = c.showOpenDialog(c);
+        if (rVal == JFileChooser.APPROVE_OPTION) {
+            File file = c.getSelectedFile();
+            if (file != null) {
+                try {
+                    bnc.load(file.getCanonicalPath());
+                    renderNetwork(bnc);
+                    graphPanel.setLayout("");
+                } catch (IOException ex) {
+
+                }
+            }
+            // open
+        }
+        if (rVal == JFileChooser.CANCEL_OPTION) {
+            // do nothing for now
+        }
+        // Later replace this with
+        // graphPanel.loadNetwork();
+    }//GEN-LAST:event_jMenuItemOpenActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -480,7 +549,5 @@ public class MainJFrame extends javax.swing.JFrame {
     private javax.swing.JPanel panelContainerPanel;
     private javax.swing.JButton testButton;
     // End of variables declaration//GEN-END:variables
-
-public static boolean deleteMode = false;
 
 }
