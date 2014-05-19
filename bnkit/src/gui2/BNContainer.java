@@ -52,6 +52,7 @@ public class BNContainer {
     }
     
     public void addNode(BNode node) {
+        System.out.println("adding node:" + node + " to bnc");
         if (!vars.containsKey(node.getVariable().getName()))
             addVariable(node.getVariable());
         nodes.put(node.getName(), node);
@@ -91,7 +92,7 @@ public class BNContainer {
     }
     
     public void removeParent(BNode child, Variable parent) {
-        System.out.println("child is: " + child + "parent is: " + parent);
+        System.out.println("child is: " + child + " parent is: " + parent);
         List<EnumVariable> parents = child.getParents();
         List<BNode> additions = new ArrayList<BNode>();
         List<BNode> deletions = new ArrayList<BNode>();
