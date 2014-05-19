@@ -265,6 +265,8 @@ public class CGVarElim implements Inference {
             }
         }
         int nBuckets = buckets.size();
+        if (nBuckets == 0) // if no variables are unknown, then we need to 
+            buckets.add(new Bucket((EnumVariable)null));
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
         for (BNode node : bn.getNodes()) {
             Factor ft = node.makeFactor(bn);
