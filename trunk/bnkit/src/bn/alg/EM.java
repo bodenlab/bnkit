@@ -83,7 +83,7 @@ public class EM extends LearningAlg {
      * 1. one node at a time = one query per node
      * 2. all nodes at a time = one big query
      */
-    public static int EM_OPTION = 1;
+    public static int EM_OPTION = 2;
 
     /**
      * Train the BN using EM.
