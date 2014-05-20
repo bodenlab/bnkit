@@ -60,11 +60,11 @@ public class CGVarElim implements Inference {
     /**
      * Construct the data structure for the specified variables in preparation
      * of inference. There are three types of variables (given the BN): 
- 1. Assignment variables E--which have been assigned values via the BN 
- 2. Query variables Q--for which probabilities are sought P(Q|E) 
- 3. Other variables X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
- Note that inference should return a JPT with variables in the *same* order 
- as that specified by Q.
+     *  1. Assignment variables E--which have been assigned values via the BN 
+     *  2. Query variables Q--for which probabilities are sought P(Q|E) 
+     *  3. Other variables X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
+     *  Note that inference should return a JPT with variables in the *same* order 
+     *  as that specified by Q.
      * @param qvars variables to include in query
      */
     @SuppressWarnings("rawtypes")
@@ -77,8 +77,8 @@ public class CGVarElim implements Inference {
         List<Variable> E = new ArrayList<>(); // Assignment
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
         Q.addAll(Arrays.asList(qvars));
-        //BNet qbn = bn.getRelevant(qvars);
-        BNet qbn = bn;
+        BNet qbn = bn.getRelevant(qvars);
+        //BNet qbn = bn;
         for (BNode node : qbn.getOrdered()) {
             Variable var = node.getVariable();
             if (node.getInstance() != null) {
