@@ -485,7 +485,7 @@ public class GDT implements BNode, Serializable {
     @Override
     public void maximizeInstance() {
         int maxrows = table.getSize();
-        int nSample = 5;                        // how many samples that should be generated for observed distributions
+        int nSample = 20;                        // how many samples that should be generated for observed distributions
         double maxVar = 0;                      // the largest variance of any class  
         double middleMean = 0; 			// the mean of all values
         double middleVar = 0;			// the variance of all values
