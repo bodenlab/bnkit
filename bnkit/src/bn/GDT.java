@@ -35,13 +35,27 @@ import java.util.Random;
 public class GDT implements BNode, Serializable {
 
     private static final long serialVersionUID = 1L;
-    private boolean tieVariances = true;
+
+    public final int VARIANCE_UNTIED = 0;
+    public final int VARIANCE_TIED_MAX = 1;
+    public final int VARIANCE_TIED_POOLED = 2;
+    
+    private int tieVariances = VARIANCE_TIED_POOLED;
+    
+
     final private Variable<Continuous> var;
     private GaussianDistrib prior = null;
     private EnumTable<GaussianDistrib> table = null;
+
+    // Parameters used for training. Some of which are allocated prior to training, and then re-used to save time.
+    
     private SampleTable<Double> countDouble = null; // the table that will contain all samples of the type "Double" during learning
     private SampleTable<Distrib> countDistrib = null; // the table that will contain all samples of the type "Distrib" during learning
 
+    private double[] observed = new double[0];// observations are stored here AFTER sample collecting, some caching is possible (values and numbers there-of)
+    private double[] prob = new double[0];    // probability of making observation
+    private int[] row = new int[0];           // identifies to which "row" the observation belongs
+    
     final private double[] means;       // save the means 
     final private double[] vars; 	// save the variances
     final private double[] n;           // save the numbers of samples
@@ -433,22 +447,33 @@ public class GDT implements BNode, Serializable {
      }
      */
     /**
-     * Couple each entry in this GDT so that the variances are equal (Hastie &
-     * Tibshirani).
+     * Couple/uncouple variances.
+     *     public final int VARIANCE_UNTIED = 0;
+     *     public final int VARIANCE_TIED_MAX = 1;
+     *     public final int VARIANCE_TIED_POOLED = 2;
+     * (see Hastie & Tibshirani).
      *
-     * @param status tie variances if true, individual variances if false
-     * (default)
+     * @param status variance update policy
      */
-    public void setTieVariances(boolean status) {
+    public void setTieVariances(int status) {
         tieVariances = status;
     }
 
-    /**
-     * Use the maximum of any variance as the global variance (set to false if
-     * the variance of all values should be used instead)
-     */
-    public static boolean USE_MAX_VARIANCE = false;
-    public static boolean USE_POOLED_VARIANCE = true;
+    public int getNumberObservedDistrib() {
+        int number = 0;
+        for (List<SampleTable<Distrib>.Sample> samplesDistrib : countDistrib.table.getValues()) {
+            number += samplesDistrib.size();
+        }
+        return number;
+    }
+    
+    public int getNumberObservedSample() {
+        int number = 0;
+        for (List<SampleTable<Double>.Sample> samplesDouble : countDouble.table.getValues()) {
+            number += samplesDouble.size();
+        }
+        return number;
+    }
     
     /**
      * Find the best parameter setting for the observed data.
@@ -465,45 +490,49 @@ public class GDT implements BNode, Serializable {
         double middleMean = 0; 			// the mean of all values
         double middleVar = 0;			// the variance of all values
         double middleTot = 0;			// the sum of counts for all parent configs
+
+        int nObservedDouble = getNumberObservedSample();
+        int nObservedDistrib = getNumberObservedDistrib();
+        int nTotal = nObservedDouble + nObservedDistrib * nSample;
         
+        if (observed.length != nTotal) {
+            observed = new double[nTotal];
+            prob = new double[nTotal];
+            row = new int[nTotal]; // the row in the table to which the observation belong
+        }
         // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
+        int j = 0;                  // sample count
         for (int index = 0; index < maxrows; index ++) {
 
             List<SampleTable<Distrib>.Sample> samplesDistrib = countDistrib.get(index);
             List<SampleTable<Double>.Sample> samplesDouble = countDouble.get(index);
             double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ... 
             double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
-            double[] y;                 // the values generated from the observed distributions
-            if (samplesDistrib != null && samplesDouble != null) 
-                y = new double[samplesDistrib.size() * nSample + samplesDouble.size()];	
-            else if (samplesDistrib != null) 
-                y = new double[samplesDistrib.size() * nSample];	
-            else if (samplesDouble != null) 
-                y = new double[samplesDouble.size()];	
-            else
+            int jStart = j;             // start index for samples in the row
+            if (samplesDistrib == null && samplesDouble == null) 
                 continue;                 // no samples of any kind
-            double[] p = new double[y.length]; 	// how often do we see this score GIVEN the parents (an absolute count)
-            int j = 0;                  // sample count
             // go through observed distributions... if any
             if (samplesDistrib != null) {
                 for (SampleTable<Distrib>.Sample sample : samplesDistrib) {// look at each distribution
                     for (int s = 0; s < nSample; s ++) {
-                        y[j] = (Double)sample.instance.sample();        // actual value (or score)
-                        p[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config  
-                        sum += y[j] * p[j];				// update the numerator of the mean calc
-                        tot += p[j];					// update the denominator of the mean calc
-                        j++;
+                        observed[j] = (Double)sample.instance.sample();        // actual value (or score)
+                        prob[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config  
+                        sum += observed[j] * prob[j];				// update the numerator of the mean calc
+                        tot += prob[j];					// update the denominator of the mean calc
+                        row[j] = index;
+                        j++; 
                     }
                 }
             }
             // go through actual values...
             if (samplesDouble != null) {
                 for (SampleTable<Double>.Sample sample : samplesDouble) {// look at each entry
-                    y[j] = sample.instance;        // actual value (or score)
-                    p[j] = sample.prob;            // p(class=key) i.e. the height of the density for this parent config  
-                    sum += y[j] * p[j];            // update the numerator of the mean calc
-                    tot += p[j];                   // update the denominator of the mean calc
-                    j++;
+                    observed[j] = sample.instance;        // actual value (or score)
+                    prob[j] = sample.prob;            // p(class=key) i.e. the height of the density for this parent config  
+                    sum += observed[j] * prob[j];            // update the numerator of the mean calc
+                    tot += prob[j];                   // update the denominator of the mean calc
+                    row[j] = index;
+                    j++; 
                 }
             }
             n[index] = tot; // save the number of possibly fractional samples on which the estimates were based
@@ -511,8 +540,8 @@ public class GDT implements BNode, Serializable {
             means[index] = sum / tot;
             // now for calculating the variance
             double diff = 0;
-            for (int jj = 0; jj < y.length; jj++) {
-                diff += (means[index] - y[jj]) * (means[index] - y[jj]) * p[jj];
+            for (int jj = 0; jj < j - jStart; jj++) {
+                diff += (means[index] - observed[jStart + jj]) * (means[index] - observed[jStart + jj]) * prob[jStart + jj];
             }
             vars[index] = diff / tot;
             if (vars[index] < 0.01) {
@@ -526,22 +555,23 @@ public class GDT implements BNode, Serializable {
             middleMean += sum;
         }
         middleMean /= middleTot;
+        countDistrib = null;    // reset counts
+        countDouble = null;     // reset counts
 
-
-        if (!tieVariances) { // if we use the individual variances
+        if (tieVariances == VARIANCE_UNTIED) { // if we use the individual variances
             for (int i = 0; i < maxrows; i ++) {
                 if (n[i] > 0)
                     this.put(i, new GaussianDistrib(means[i], vars[i]));
             }
         } else { // re-compute variances if they need to be tied
             // there are different ways of dealing with this
-            if (USE_MAX_VARIANCE) {
+            if (tieVariances == VARIANCE_TIED_MAX) {
                 // (1) simply use the max of the existing variances
                 for (int i = 0; i < maxrows; i ++) {
                     if (n[i] > 0)
                         this.put(i, new GaussianDistrib(means[i], maxVar));
                 }
-            } else if (USE_POOLED_VARIANCE) { 
+            } else if (tieVariances == VARIANCE_TIED_POOLED) { 
                 // (2) use the pooled existing variances (http://en.wikipedia.org/wiki/Pooled_variance)
                 double num = 0.0;
                 double denom = 0.0;
