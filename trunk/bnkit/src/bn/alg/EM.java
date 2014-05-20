@@ -62,28 +62,31 @@ public class EM extends LearningAlg {
 
     /**
      * EM convergence is true (and training stops) when the improvement is
-     * smaller than this value. Note that smaller value leads to longer
-     * convergence times but closer to optimal solutions.
+     * smaller than this value (expressed in percent; based on the average
+     * log-likelihood over the last 5 x 10 rounds; only sampled every 10 rounds). 
+     * Note that smaller value leads to longer convergence times but closer 
+     * to optimal solutions.
      */
-    public static double EM_CONVERGENCE_CRITERION = 0.00001;
+    public double EM_CONVERGENCE_CRITERION = 0.005; // e.g: at LL=-904, improvement needs to be above 0.045 for training to continue
 
     /**
      * EM maximum number of rounds (iterations). Training stops after the
      * specified number of rounds independently of convergence.
      */
-    public static int EM_MAX_ROUNDS = 1000;
+    public int EM_MAX_ROUNDS = 1000;
     
     /**
      * EM status print-outs
      */
-    public static boolean EM_PRINT_STATUS = true;
+    public boolean EM_PRINT_STATUS = true;
 
     /**
      * EM option: currently two different approaches to determine expectations.
+     * In either case, nodes are then updated one at a time.
      * 1. one node at a time = one query per node
      * 2. all nodes at a time = one big query
      */
-    public static int EM_OPTION = 2;
+    public int EM_OPTION = 2;
 
     /**
      * Train the BN using EM.
@@ -124,29 +127,25 @@ public class EM extends LearningAlg {
             }
         } // finished constructing the node update set
 
-        Map<BNode, Object[]> node_keys = new HashMap<>();       // hold the evidence for each of the nodes for efficient access
-
         for (BNode node : update.keySet()) {
             if (node.isTrainable()) {
                 node.randomize(System.currentTimeMillis());
             }
         }
 
-        // randomize nodes that will be updated as part of learning ???
         // initialize learning parameters
-        double log_prob = -999998;
-        double prev_prob = -999999;
-        double conv_rate = 0.02;
+        double[] last_LL = new double[] {-999999, -999999, -999999, -999999, -999999};
+        
         int round = 0;
         boolean latentVariablesExist = false;
-
+        
+        boolean EM_TERMINATE = false;
         
         // start training (keep going until convergence or stop criterion is met)
-        while (conv_rate > EM_CONVERGENCE_CRITERION && round < EM_MAX_ROUNDS) {
+        while (round < EM_MAX_ROUNDS && !EM_TERMINATE) {
             round++;
-            prev_prob = log_prob;
-            log_prob = 0;
-
+            
+            double log_likelihood = 0;
             // for each sample with observations...
             for (int i = 0; i < values.length; i++) {
                 // set variables and keys according to observations
@@ -276,8 +275,6 @@ public class EM extends LearningAlg {
                                 }
                             }
                         }
-                        if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
-                            log_prob += Math.log(((CGVarElim)inf).likelihood());
 
                         break; // end EM_OPTION == 1
                         
@@ -388,12 +385,12 @@ public class EM extends LearningAlg {
                                 }
                             }
                         }
-                        if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1)
-                            log_prob += Math.log(((CGVarElim)inf).likelihood());
-
                         break; // end EM_OPTION == 2
                 }                        
+                if ((round % 10 == 0) || round == 1) 
+                    log_likelihood += Math.log(((CGVarElim)inf).likelihood());
             }
+            
             // finally complete the M-step by transferring counts to probabilities
             for (BNode node : update.keySet()) {
                 if (node.isTrainable()) {
@@ -401,9 +398,20 @@ public class EM extends LearningAlg {
                 }
             }
 
-            if ((EM_PRINT_STATUS && round % 10 == 0) || round == 1) {
-                conv_rate = Math.abs(log_prob - prev_prob); // use abs because the joint prob may exceed 1 (it is not normalized)
-                System.err.println("Completed " + round + " round(s), L=" + log_prob);
+            if ((round % 10 == 0) || round == 1) {
+                // summarise progress
+                // copy previous LL (log-likelihood of data)
+                double mean_LL = last_LL[0] / last_LL.length;
+                for (int i = 0; i < last_LL.length - 1; i ++) {
+                    last_LL[i] = last_LL[i + 1];
+                    mean_LL += (last_LL[i] / last_LL.length);
+                }
+                last_LL[last_LL.length - 1] = log_likelihood;
+                if ((-mean_LL - -log_likelihood) < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
+                    EM_TERMINATE = true;
+
+                if (EM_PRINT_STATUS)
+                    System.err.println("Completed " + round + " round(s), L=" + log_likelihood);
             }
         }
 
@@ -412,7 +420,7 @@ public class EM extends LearningAlg {
             node.resetInstance();
         }
         if (EM_PRINT_STATUS) {
-            System.err.println("Completed " + round + " rounds, L=" + log_prob + ". Done.");
+            System.err.println("Done.");
         }
     }
 
