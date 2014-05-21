@@ -25,7 +25,7 @@ import com.mxgraph.util.mxResources;
 import com.mxgraph.view.mxGraph;
 import com.mxgraph.view.mxGraphSelectionModel;
 import com.mxgraph.view.mxStylesheet;
-import static gui2.StyleExample.NEW_CUSTOM_EDGE;
+import static testing.StyleExample.NEW_CUSTOM_EDGE;
 import java.awt.BorderLayout;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
@@ -54,7 +54,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
  *
  * @author mikael
  */
-public class MyGraphPanel extends JPanel implements Serializable {
+public class MyGraphPanel extends JPanel implements Serializable, Observer {
 
     private mxGraph graph;
     final mxGraphComponent graphComponent;
@@ -62,7 +62,7 @@ public class MyGraphPanel extends JPanel implements Serializable {
     private BNContainer bnc;
     public final Object lastPressedVertex = null;
     public List<Object> selectedCell = new ArrayList<Object>();
-    private final nodePropertiesPane nodeProps = new nodePropertiesPane();
+//    private final NodePropertiesDialog nodeProps = new NodePropertiesDialog();
 
     public mxGraphComponent getGraphComponent() {
         return graphComponent;
@@ -237,12 +237,12 @@ public class MyGraphPanel extends JPanel implements Serializable {
         }
     }
 
-    public void saveNetwork(){
+    public void saveNetwork() {
         JFileChooser c = new JFileChooser();
 
         // For now only allow .xml files
-      FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
-      c.setFileFilter(filter);
+        FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
+        c.setFileFilter(filter);
         int rVal = c.showSaveDialog(c);
         if (rVal == JFileChooser.APPROVE_OPTION) {
             File file = c.getSelectedFile();
@@ -260,13 +260,13 @@ public class MyGraphPanel extends JPanel implements Serializable {
             // do nothing for now
         }
     }
-    
-    public void loadNetwork(){
-         JFileChooser c = new JFileChooser();
+
+    public void loadNetwork() {
+        JFileChooser c = new JFileChooser();
 
         // For now only allow .xml files
-      FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
-      c.setFileFilter(filter);
+        FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
+        c.setFileFilter(filter);
         int rVal = c.showOpenDialog(c);
         if (rVal == JFileChooser.APPROVE_OPTION) {
             File file = c.getSelectedFile();
@@ -285,7 +285,7 @@ public class MyGraphPanel extends JPanel implements Serializable {
             // do nothing for now
         }
     }
-    
+
     public MyGraphPanel() {
         super();
         this.graph = new mxGraph();
@@ -307,8 +307,7 @@ public class MyGraphPanel extends JPanel implements Serializable {
 //        panel.add(nodeProps);
 //        panel.validate();
 //        this.getParent().getComponents();
-        nodeProps.setVisible(false);
-
+//        nodeProps.setVisible(false);
         //this.graph.getView().setTranslate(new mxPoint(500,400)); // middle?
         Map<String, Object> stil = new HashMap<String, Object>();
         stil.put(mxConstants.STYLE_ROUNDED, false);
@@ -343,7 +342,9 @@ public class MyGraphPanel extends JPanel implements Serializable {
 
                 // update parent-child relationships
                 BNode childnode = bnc.getNode(graph.getLabel(childNode));
+//                NodeModel nm = (NodeModel) childnode;
                 Variable parentvar = bnc.getVariable(graph.getLabel(parentNode));
+                System.out.println("parentvar is: " + parentvar.getName());
                 bnc.addParent(childnode, parentvar);
 
             }
@@ -392,6 +393,10 @@ public class MyGraphPanel extends JPanel implements Serializable {
                     TransferHandler.getCopyAction();
                 } else if ((key == KeyEvent.VK_V) && ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0)) {
                     System.out.println("ctrl+v");
+                } else if ((key == KeyEvent.VK_EQUALS) && ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0)) {
+                    graphComponent.zoomIn();
+                } else if ((key == KeyEvent.VK_MINUS) && ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0)) {
+                    graphComponent.zoomOut();
                 }
             }
 
@@ -404,9 +409,8 @@ public class MyGraphPanel extends JPanel implements Serializable {
                 // TODO: Need to make changes in MainJFrame
                 // show side pane, etc.
 
-                nodePropertiesPane nn = new nodePropertiesPane();
+//                NodePropertiesDialog nn = new NodePropertiesDialog();
 //                mxStylesheet sty = graph.getStylesheet().getDefaultVertexStyle();
-
                 Object cell = graphComponent.getCellAt(e.getX(), e.getY());
                 // Clear previous selections
                 if (selectedCell != null) {
@@ -418,29 +422,38 @@ public class MyGraphPanel extends JPanel implements Serializable {
                 }
 
                 if (cell != null) {
-                    // Single-clicked single cell
-                    graphComponent.getGraphControl().requestFocus();
-                    mxIGraphModel model = graph.getModel();
-                    // select whatever is pointed at
-                    if (model.isVertex(cell)) {
-                        System.out.println("Selected node is:" + bnc.getNode(graph.getLabel(cell)));
+                    
+                    // If right-click, open properties dialog
+                    if (SwingUtilities.isRightMouseButton(e)) {
+                        BNode node = bnc.getNode(graph.getLabel(cell));
+                        NodePropertiesDialog npp = new NodePropertiesDialog(null, true, node);
+                        npp.setVisible(true);
+                    } else {
+                        // Single-clicked single cell
+                        graphComponent.getGraphControl().requestFocus();
+                        mxIGraphModel model = graph.getModel();
+                        // select whatever is pointed at
+                        if (model.isVertex(cell)) {
+                            System.out.println("Cell is: " + cell
+                                    + ", Selected node is:" + bnc.getNode(graph.getLabel(cell)));
 
-                        // now add this to MainJFrame's propertiesPanel
+                            // now add this to MainJFrame's propertiesPanel
 //                        nodeProps.setBNode(bnc.getNode(graph.getLabel(cell)));
-                        nodeProps.updateDisplay();
+//                        nodeProps.updateDisplay();
+                            if (e.getClickCount() == 2) {
+                                System.out.println("Double-clicked-to-select Vertex=" + graph.getLabel(cell));
+                                System.out.print(bnc.getBNet());
+                                BNode node = bnc.getNode(graph.getLabel(cell));
+                                NodeParamsDialog dialog = new NodeParamsDialog(null, true);
 
-                        if (e.getClickCount() == 2) {
-                            System.out.println("Double-clicked-to-select Vertex=" + graph.getLabel(cell));
-                            System.out.print(bnc.getBNet());
-                            BNode node = bnc.getNode(graph.getLabel(cell));
-                            NodeParamsDialog dialog = new NodeParamsDialog(null, true);
+                                //TODO: find a way to correctly setmodel
+                                dialog.setModel(node);
+                                dialog.setVisible(true);
+                            }
 
-                            //TODO: find a way to correctly setmodel
-                            dialog.setModel(node);
-                            dialog.setVisible(true);
+                        } else if (graph.getModel().isEdge(cell)) {
+                            System.out.println("Clicked-to-select Edge=" + graph.getLabel(cell));
                         }
-                    } else if (graph.getModel().isEdge(cell)) {
-                        System.out.println("Clicked-to-select Edge=" + graph.getLabel(cell));
                     }
                 } else {
                     selectedCell.clear();
@@ -477,6 +490,16 @@ public class MyGraphPanel extends JPanel implements Serializable {
 
         });
 
+    }
+
+    @Override
+    public void update() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public void setSubject(Observable sub) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
 }
