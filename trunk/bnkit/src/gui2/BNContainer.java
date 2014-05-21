@@ -52,7 +52,8 @@ public class BNContainer {
     }
     
     public void addNode(BNode node) {
-        System.out.println("adding node:" + node + " to bnc");
+        System.out.println("in BNContainer.java, adding node:" +
+                node.getName() + "::" + node + " to bnc");
         if (!vars.containsKey(node.getVariable().getName()))
             addVariable(node.getVariable());
         nodes.put(node.getName(), node);

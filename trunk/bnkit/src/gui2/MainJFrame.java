@@ -11,7 +11,6 @@ import bn.Predef;
 import bn.Variable;
 import com.mxgraph.view.mxGraph;
 import java.awt.Color;
-import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -19,15 +18,15 @@ import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Random;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.GroupLayout;
 import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JDialog;
 import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import javax.swing.TransferHandler;
 import javax.swing.border.Border;
 import javax.swing.filechooser.FileFilter;
@@ -37,7 +36,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
  *
  * @author Jun Ling
  */
-public class MainJFrame extends javax.swing.JFrame {
+public class MainJFrame extends javax.swing.JFrame implements Observer {
 
     BNContainer bnc;
     gui2.MyGraphPanel graphPanel;
@@ -47,8 +46,6 @@ public class MainJFrame extends javax.swing.JFrame {
      */
     public MainJFrame() {
         initComponents();
-//        propertiesPanel.setVisible(false);
-//        actionsPanel.setVisible(false);
         bnc = new BNContainer();
         graphPanel = new gui2.MyGraphPanel();
         graphPanel.setAutoscrolls(true);
@@ -69,7 +66,6 @@ public class MainJFrame extends javax.swing.JFrame {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        buttonGroupNodes = new javax.swing.ButtonGroup();
         addNodePanel = new javax.swing.JPanel();
         drawPanel = new javax.swing.JPanel();
         panelContainerPanel = new javax.swing.JPanel();
@@ -77,12 +73,12 @@ public class MainJFrame extends javax.swing.JFrame {
         deleteSelectedBtn = new javax.swing.JButton();
         deleteAllBtn = new javax.swing.JButton();
         applyLayoutBtn = new javax.swing.JButton();
-        testButton = new javax.swing.JButton();
         jMenuBarMain = new javax.swing.JMenuBar();
         jMenuFile = new javax.swing.JMenu();
         jMenuItemOpen = new javax.swing.JMenuItem();
         jMenuItemSave = new javax.swing.JMenuItem();
         jMenuEdit = new javax.swing.JMenu();
+        jMenuHelp = new javax.swing.JMenu();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -143,14 +139,6 @@ public class MainJFrame extends javax.swing.JFrame {
         });
         actionsPanel.add(applyLayoutBtn);
 
-        testButton.setText("testing");
-        testButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                testButtonActionPerformed(evt);
-            }
-        });
-        actionsPanel.add(testButton);
-
         javax.swing.GroupLayout panelContainerPanelLayout = new javax.swing.GroupLayout(panelContainerPanel);
         panelContainerPanel.setLayout(panelContainerPanelLayout);
         panelContainerPanelLayout.setHorizontalGroup(
@@ -188,6 +176,14 @@ public class MainJFrame extends javax.swing.JFrame {
 
         jMenuEdit.setText("Edit");
         jMenuBarMain.add(jMenuEdit);
+
+        jMenuHelp.setText("Help");
+        jMenuHelp.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuHelpActionPerformed(evt);
+            }
+        });
+        jMenuBarMain.add(jMenuHelp);
 
         setJMenuBar(jMenuBarMain);
 
@@ -288,7 +284,6 @@ public class MainJFrame extends javax.swing.JFrame {
     }
 
     private void initNodeLbls() {
-        ;
         // Name and label border
         Border addNodeBorder = BorderFactory.createTitledBorder("Add Node");
         addNodePanel.setBorder(addNodeBorder);
@@ -320,6 +315,16 @@ public class MainJFrame extends javax.swing.JFrame {
         }
 
         addNodePanel.setVisible(true);
+    }
+
+    @Override
+    public void update() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public void setSubject(Observable sub) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     public class DragMouseAdapter extends MouseAdapter {
@@ -388,7 +393,7 @@ public class MainJFrame extends javax.swing.JFrame {
         if (name == null) {
             name = type + " node";
         }
-        // only String and Number are parametrised atm
+        // Set default parameters.
         if (params == null) {
             params = type.equalsIgnoreCase("String") ? "a;b"
                     : type.equalsIgnoreCase("Number") ? "5" : // this bugs out when real int provided
@@ -400,19 +405,28 @@ public class MainJFrame extends javax.swing.JFrame {
             String label = name;
             graph.getModel().beginUpdate();
             Variable var = Predef.getVariable(name, type, params);
-
+            
             try {
+                // Create visual node and update model
                 graphPanel.defStyleSheets(graph); // custom vertex and edge styles
                 Object newvertex = graph.insertVertex(graph.getDefaultParent(), null, label, 50, 50, 100, 50, "ROUNDED;strokeColor=black;fillColor=" + color);
                 graphPanel.addVertex(name, newvertex);
                 graphPanel.addCellSelection(newvertex);
                 System.out.println("bnode is: " + Predef.getBNode(var, new ArrayList<Variable>(), Predef.getBNodeType(type)));
                 BNode newBNode = Predef.getBNode(var, new ArrayList<Variable>(), Predef.getBNodeType(type));
+//                NodeModel nm = (NodeModel) Predef.getBNode(var, new ArrayList<Variable>(), Predef.getBNodeType(type));
+                
+                System.out.println("newBNode: " + newBNode.getName() + ", " + newBNode.getType());
+//                System.out.println("NodeModel: " + nm.getName() + ", " + nm.getType());
+                
                 bnc.addNode(newBNode);
-                Variable nodevar = bnc.getVariable(graph.getLabel(newBNode));
-                nodevar.setName(name);
-                nodevar.setParams(params);
-                nodevar.setPredef(type);
+//                nm.setName(name);
+//                nm.setParams(params);
+         
+//                Variable nodevar = bnc.getVariable(graph.getLabel(nm));
+//                nodevar.setName(name);
+//                nodevar.setParams(params);
+//                nodevar.setPredef(type);
             } finally {
                 graph.getModel().endUpdate();
             }
@@ -449,23 +463,6 @@ public class MainJFrame extends javax.swing.JFrame {
 
     }//GEN-LAST:event_applyLayoutBtnActionPerformed
 
-    private void testButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_testButtonActionPerformed
-        // TODO add your handling code here:
-
-        JButton thisbtn = (JButton) evt.getSource();
-        System.out.println(SwingUtilities.getUnwrappedParent(thisbtn));
-
-        java.awt.Container panel = SwingUtilities.getUnwrappedParent(thisbtn);
-        JPanel frame = (JPanel) SwingUtilities.getUnwrappedParent(panel);
-        System.out.println(frame.getLayout());
-        nodePropertiesPane npp = new nodePropertiesPane();
-        frame.add(npp);
-        frame.setLayout(new GridLayout(2, 0));
-
-        frame.validate();
-
-    }//GEN-LAST:event_testButtonActionPerformed
-
     private void jMenuItemSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemSaveActionPerformed
         graphPanel.saveNetwork();
 
@@ -474,7 +471,7 @@ public class MainJFrame extends javax.swing.JFrame {
     private void jMenuItemOpenActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemOpenActionPerformed
         JFileChooser c = new JFileChooser();
 
-        // For now only allow .xml files
+      // For now only allow .xml files
       FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
       c.setFileFilter(filter);
         int rVal = c.showOpenDialog(c);
@@ -497,6 +494,16 @@ public class MainJFrame extends javax.swing.JFrame {
         // Later replace this with
         // graphPanel.loadNetwork();
     }//GEN-LAST:event_jMenuItemOpenActionPerformed
+
+    private void jMenuHelpActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuHelpActionPerformed
+        String message = "<html>" +
+                "Basic Controls<br>" +
+                "<Mouse scroll> Zoom screen" ;
+        System.err.println("content pane " + getContentPane());
+        JOptionPane.showMessageDialog(getContentPane(), message);
+        
+        
+    }//GEN-LAST:event_jMenuHelpActionPerformed
 
     /**
      * @param args the command line arguments
@@ -537,17 +544,16 @@ public class MainJFrame extends javax.swing.JFrame {
     private javax.swing.JPanel actionsPanel;
     private javax.swing.JPanel addNodePanel;
     private javax.swing.JButton applyLayoutBtn;
-    private javax.swing.ButtonGroup buttonGroupNodes;
     private javax.swing.JButton deleteAllBtn;
     private javax.swing.JButton deleteSelectedBtn;
     private javax.swing.JPanel drawPanel;
     private javax.swing.JMenuBar jMenuBarMain;
     private javax.swing.JMenu jMenuEdit;
     private javax.swing.JMenu jMenuFile;
+    private javax.swing.JMenu jMenuHelp;
     private javax.swing.JMenuItem jMenuItemOpen;
     private javax.swing.JMenuItem jMenuItemSave;
     private javax.swing.JPanel panelContainerPanel;
-    private javax.swing.JButton testButton;
     // End of variables declaration//GEN-END:variables
 
 }
