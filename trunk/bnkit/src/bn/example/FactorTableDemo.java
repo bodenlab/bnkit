@@ -156,10 +156,9 @@ public class FactorTableDemo {
 
         CGVarElim ve = new CGVarElim();
         ve.instantiate(bn);
-        Query q = ve.makeQuery(new Variable[] {B});
+        Query q = ve.makeQuery(B);
         CGTable qr = (CGTable) ve.infer(q);
         qr.display();
-        
 
     }
 }
