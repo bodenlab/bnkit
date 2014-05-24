@@ -109,9 +109,6 @@
       </Layout>
     </Container>
     <Container class="javax.swing.JPanel" name="drawPanel">
-      <Events>
-        <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="drawPanelMouseClicked"/>
-      </Events>
 
       <Layout>
         <DimensionLayout dim="0">
@@ -165,25 +162,21 @@
               <Properties>
                 <Property name="text" type="java.lang.String" value="Delete selected"/>
               </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="deleteSelectedBtnActionPerformed"/>
-              </Events>
             </Component>
             <Component class="javax.swing.JButton" name="deleteAllBtn">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Delete all"/>
               </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="deleteAllBtnActionPerformed"/>
-              </Events>
             </Component>
             <Component class="javax.swing.JButton" name="applyLayoutBtn">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Apply layout"/>
               </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="applyLayoutBtnActionPerformed"/>
-              </Events>
+            </Component>
+            <Component class="javax.swing.JButton" name="jButtonRefresh">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Refresh"/>
+              </Properties>
             </Component>
           </SubComponents>
         </Container>
