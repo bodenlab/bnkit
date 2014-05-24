@@ -3,7 +3,6 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package gui2;
 
 import bn.BNode;
@@ -20,51 +19,65 @@ import javax.swing.table.AbstractTableModel;
 public class NodeParamsDialog extends javax.swing.JDialog {
 
     MyTableModel myTableModel;
+
     /**
      * Creates new form NodeParamsDialog
      */
     public NodeParamsDialog(java.awt.Frame parent, boolean modal) {
         super(parent, modal);
         initComponents();
+
     }
 
-    public void setModel(BNode node) {
+    public void setModel(NodeModel node) {
         if (node == null) {
-             System.out.println("node null, do nothing");
-             return;
-         }
-         myTableModel = new MyTableModel(node);
-         myParamsTable.setModel(myTableModel);
+            System.out.println("node null, do nothing");
+            return;
+        }
+        myTableModel = new MyTableModel(node);
+        myParamsTable.setModel(myTableModel);
     }
-    
+
     class MyTableModel extends AbstractTableModel {
-        private final BNode node;
+
+        private final NodeModel node;
         private EnumTable table;
-        
-        public MyTableModel(BNode node) {
+
+        public MyTableModel(NodeModel node) {
             this.node = node;
             this.table = node.getTable();
+            System.out.println("@@Printing node");
+            node.print();
+            if (table == null) {
+                System.out.println("node table is null");
+            } else {
+                System.out.println("In MyTableModel, print table");
+                table.display();
+            }
         }
-        
+
         public int getColumnCount() {
-            if (table != null)
+            if (table != null) {
                 return node.getParents().size() + 1;
-            else
+            } else {
                 return 1;
+            }
         }
 
         public int getRowCount() {
-            if (table != null)
+            if (table != null) {
                 return table.getSize();
-            else
+            } else {
                 return 1;
+            }
         }
 
         public String getColumnName(int col) {
             if (table != null) {
                 List<EnumVariable> parents = node.getParents();
-                if (col < parents.size())
+                if (col < parents.size()) {
                     return parents.get(col).getName();
+                }
             }
             return node.getVariable().getName();
         }
@@ -77,8 +90,9 @@ public class NodeParamsDialog extends javax.swing.JDialog {
                 } else {
                     return table.getValue(row);
                 }
-            } else 
+            } else {
                 return node.getDistrib();
+            }
         }
 
         public Class getColumnClass(int c) {
@@ -91,9 +105,10 @@ public class NodeParamsDialog extends javax.swing.JDialog {
          */
         public boolean isCellEditable(int row, int col) {
             if (table != null) {
-                if (col < node.getParents().size()) 
+                if (col < node.getParents().size()) {
                     return false;
-            } 
+                }
+            }
             return true;
         }
 
@@ -122,27 +137,27 @@ public class NodeParamsDialog extends javax.swing.JDialog {
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
 
         myParamsTable.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-                {null, null, null, null},
-                {null, null, null, null},
-                {null, null, null, null},
-                {null, null, null, null}
-            },
-            new String [] {
-                "Title 1", "Title 2", "Title 3", "Title 4"
-            }
+                new Object[][]{
+                    {null, null, null, null},
+                    {null, null, null, null},
+                    {null, null, null, null},
+                    {null, null, null, null}
+                },
+                new String[]{
+                    "Title 1", "Title 2", "Title 3", "Title 4"
+                }
         ));
         myScrollPane.setViewportView(myParamsTable);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(myScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 400, Short.MAX_VALUE)
+                layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(myScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 400, Short.MAX_VALUE)
         );
         layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(myScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 300, Short.MAX_VALUE)
+                layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(myScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 300, Short.MAX_VALUE)
         );
 
         pack();

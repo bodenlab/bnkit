@@ -9,6 +9,7 @@ import bn.BNode;
 import bn.EnumVariable;
 import bn.Predef;
 import bn.Variable;
+import com.mxgraph.model.mxCell;
 import com.mxgraph.view.mxGraph;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
@@ -18,6 +19,7 @@ import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Random;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.GroupLayout;
@@ -25,6 +27,7 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.TransferHandler;
@@ -39,7 +42,8 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 public class MainJFrame extends javax.swing.JFrame implements Observer {
 
     BNContainer bnc;
-    gui2.MyGraphPanel graphPanel;
+    gui2.GraphPanel graphPanel;
+    ArrayList<JButton> BtnArr = new ArrayList<>();
 
     /**
      * Creates new form MainJFrame
@@ -47,14 +51,13 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
     public MainJFrame() {
         initComponents();
         bnc = new BNContainer();
-        graphPanel = new gui2.MyGraphPanel();
-        graphPanel.setAutoscrolls(true);
-        graphPanel.setBNContainer(bnc);
+        
 
+        // Toggle these two to switch between
+        // drag-drop or button press for adding nodes
         initNodeButtons();
 //        initNodeLbls();
-        
-        initDrawPanel();
+    
     }
 
     /**
@@ -73,6 +76,7 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         deleteSelectedBtn = new javax.swing.JButton();
         deleteAllBtn = new javax.swing.JButton();
         applyLayoutBtn = new javax.swing.JButton();
+        jButtonRefresh = new javax.swing.JButton();
         jMenuBarMain = new javax.swing.JMenuBar();
         jMenuFile = new javax.swing.JMenu();
         jMenuItemOpen = new javax.swing.JMenuItem();
@@ -95,12 +99,6 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
             .addGap(0, 537, Short.MAX_VALUE)
         );
 
-        drawPanel.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                drawPanelMouseClicked(evt);
-            }
-        });
-
         javax.swing.GroupLayout drawPanelLayout = new javax.swing.GroupLayout(drawPanel);
         drawPanel.setLayout(drawPanelLayout);
         drawPanelLayout.setHorizontalGroup(
@@ -116,28 +114,16 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         actionsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Node Actions"));
 
         deleteSelectedBtn.setText("Delete selected");
-        deleteSelectedBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                deleteSelectedBtnActionPerformed(evt);
-            }
-        });
         actionsPanel.add(deleteSelectedBtn);
 
         deleteAllBtn.setText("Delete all");
-        deleteAllBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                deleteAllBtnActionPerformed(evt);
-            }
-        });
         actionsPanel.add(deleteAllBtn);
 
         applyLayoutBtn.setText("Apply layout");
-        applyLayoutBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                applyLayoutBtnActionPerformed(evt);
-            }
-        });
         actionsPanel.add(applyLayoutBtn);
+
+        jButtonRefresh.setText("Refresh");
+        actionsPanel.add(jButtonRefresh);
 
         javax.swing.GroupLayout panelContainerPanelLayout = new javax.swing.GroupLayout(panelContainerPanel);
         panelContainerPanel.setLayout(panelContainerPanelLayout);
@@ -215,8 +201,29 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
     public JPanel getPanelContainer() {
         return panelContainerPanel;
     }
-
-    private void initDrawPanel() {
+    
+    public void setGraphPanel(GraphPanel panel){
+        this.graphPanel = panel;
+    }
+    
+    public JPanel getActionsPanel() {
+        return actionsPanel;
+    }
+    
+    public JButton getDeleteButton() {
+        return deleteSelectedBtn;
+    }
+    
+    public JButton getDeleteAllButton() {
+        return deleteAllBtn;
+    }
+    
+    public JButton getRefreshButton() {
+        return jButtonRefresh;
+    }
+    
+    
+    public void initDrawPanel() {
         // adds the graph panel to drawPanel.
         GroupLayout layout = new GroupLayout(drawPanel);
         drawPanel.setLayout(layout);
@@ -230,8 +237,19 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         );
     }
 
+    public ArrayList<JButton> getNodeButtons(){
+        return BtnArr;
+    }
+    
+    public JMenuItem getMenuSave(){
+        return jMenuItemSave;
+    }
+    
+    public JMenuItem getMenuOpen(){
+        return jMenuItemOpen;
+    }
+    
     private void initNodeButtons() {
-
         // Name and label border
         Border addNodeBorder = BorderFactory.createTitledBorder("Add Node");
         addNodePanel.setBorder(addNodeBorder);
@@ -239,47 +257,18 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         // Set up layout for the 'add nodes' panel
         addNodePanel.setLayout(new BoxLayout(addNodePanel, BoxLayout.Y_AXIS));
 
-        // Set up a dummy JRadioButton for dynamically adding 
-        // buttons in for loop.
-        ArrayList<JButton> BtnArr = new ArrayList<>();
+        // Set up a dummy JButton for dynamically adding 
+        // buttons in loop.
         JButton dummybtn;
 
-        // Construct radio buttons for each predefined type
-        // and add to button group.
         for (String s : Predef.getVariableTypes()) {
             dummybtn = new JButton(s);
-            // TODO: Custom appearance for buttons
-
             BtnArr.add(dummybtn);
-
-            // Listener should add node, select it, and refresh parameterPanel
-            dummybtn.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-//                    propertiesPanel.setVisible(true);
-                    actionsPanel.setVisible(true);
-                    JButton thisbtn = (JButton) e.getSource();
-                    String type = thisbtn.getText();
-                    String paramDesc = "";
-
-                    // don't update this here...
-//                    if (Predef.parameterName(type) != null) {
-//                        paramDesc = "<br>" + Predef.parameterName(type);
-//                    } else {
-////                        nodeParametersField.setEnabled(false);
-//                        paramDesc = "<br>No additional parameters.";
-//                    }
-                    // Need to fix these dummy inputs so things don't break
-                    createNode(null, type, null);
-                }
-            });
         }
-
         // Add buttons.
         for (JButton b : BtnArr) {
             addNodePanel.add(b);
         }
-
         addNodePanel.setVisible(true);
     }
 
@@ -306,9 +295,7 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
             dummylbl.setBorder(border);
 
             LblArr.add(dummylbl);
-
         }
-
         // Add buttons.
         for (NodeLabel b : LblArr) {
             addNodePanel.add(b);
@@ -319,180 +306,30 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
 
     @Override
     public void update() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        // Update the View. Called by the Model
+//        renderNetwork(bnc);
+        // Instead...
+        // What is the link between the view and the model?
+        
+         final mxGraph graph = graphPanel.getGraph();
+         for (Object cell: graphPanel.getAllVertices()){
+//             ((mxCell) cell).setValue("rofl");
+         }
+        
     }
 
     @Override
     public void setSubject(Observable sub) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
-
-    public class DragMouseAdapter extends MouseAdapter {
-
-        public void mousePressed(MouseEvent e) {
-            System.out.println("Label pressed");
-            JComponent c = (JComponent) e.getSource();
-            TransferHandler handler = c.getTransferHandler();
-            System.out.println("handler is: " + handler);
-            handler.exportAsDrag(c, e, TransferHandler.COPY);
-        }
-    }
-
-    private void renderNetwork(BNContainer bnc) {
-        final mxGraph graph = graphPanel.getGraph();
-        graph.removeCells(graphPanel.getAllCells());
-
-        for (BNode node : bnc.getBNet().getNodes()) {
-            Variable var = node.getVariable();
-            if (var != null) {
-                String type = var.getPredef();
-                String name = var.getName();
-                String params = var.getParams();
-                graph.getModel().beginUpdate();
-
-                try {
-                    String color = (Predef.isEnumerable(type) ? "yellow" : "orange");
-                    Object newvertex = graph.insertVertex(graph.getDefaultParent(), 
-                            null, name, 50, 50, 80, 30, "ROUNDED;strokeColor=black;fillColor=" + color);
-                    graphPanel.addVertex(name, newvertex);
-                } finally {
-                    graph.getModel().endUpdate();
-                }
-            }
-        } // variables done... now connect them
-        for (BNode node : bnc.getBNet().getNodes()) {
-            String child_name = node.getVariable().getName();
-            System.out.println("About to draw edges in renderNetwork");
-            Object child_vertex = graphPanel.getVertex(child_name);
-            if (node.getParents() != null) {
-                for (EnumVariable parent : node.getParents()) {
-                    String parent_name = parent.getName();
-                    Object parent_vertex = graphPanel.getVertex(parent_name);
-                    graph.getModel().beginUpdate();
-                    System.out.println("Inserting edge between" + parent_name + " and " + child_name);
-                    try {
-
-                        Object newedge = graph.insertEdge(graph.getDefaultParent(), null, "", parent_vertex, child_vertex);
-
-                    } finally {
-                        graph.getModel().endUpdate();
-                    }
-                }
-            } else {
-                System.out.println("No parents :(");
-            }
-        }
-//        graphPanel.executeLayout(getCurrentLayout());
-        graphPanel.executeLayout(1);
-    }
-
-    private void createNode(String name, String type, String params) {
-        final mxGraph graph = graphPanel.getGraph();
-
-        // Set defaults for initialising node...
-        if (name == null) {
-            name = type + " node";
-        }
-        // Set default parameters.
-        if (params == null) {
-            params = type.equalsIgnoreCase("String") ? "a;b"
-                    : type.equalsIgnoreCase("Number") ? "5" : // this bugs out when real int provided
-                    null;
-        }
-        try {
-            String color = (Predef.isEnumerable(type) ? "yellow" : "orange"); // yellow for enumerable nodes, orange for continuous
-//                String cellStyle = (Predef.parameterName(type).equals("String") ? "STRING_STYLE" : "BOOL_STYLE");
-            String label = name;
-            graph.getModel().beginUpdate();
-            Variable var = Predef.getVariable(name, type, params);
-            
-            try {
-                // Create visual node and update model
-                graphPanel.defStyleSheets(graph); // custom vertex and edge styles
-                Object newvertex = graph.insertVertex(graph.getDefaultParent(), null, label, 50, 50, 100, 50, "ROUNDED;strokeColor=black;fillColor=" + color);
-                graphPanel.addVertex(name, newvertex);
-                graphPanel.addCellSelection(newvertex);
-                System.out.println("bnode is: " + Predef.getBNode(var, new ArrayList<Variable>(), Predef.getBNodeType(type)));
-                BNode newBNode = Predef.getBNode(var, new ArrayList<Variable>(), Predef.getBNodeType(type));
-//                NodeModel nm = (NodeModel) Predef.getBNode(var, new ArrayList<Variable>(), Predef.getBNodeType(type));
-                
-                System.out.println("newBNode: " + newBNode.getName() + ", " + newBNode.getType());
-//                System.out.println("NodeModel: " + nm.getName() + ", " + nm.getType());
-                
-                bnc.addNode(newBNode);
-//                nm.setName(name);
-//                nm.setParams(params);
-         
-//                Variable nodevar = bnc.getVariable(graph.getLabel(nm));
-//                nodevar.setName(name);
-//                nodevar.setParams(params);
-//                nodevar.setPredef(type);
-            } finally {
-                graph.getModel().endUpdate();
-            }
-//            }
-        } catch (RuntimeException e) {
-//            error_msg = e.getLocalizedMessage();
-        }
-    }
-
-
-    private void drawPanelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_drawPanelMouseClicked
-
-
-    }//GEN-LAST:event_drawPanelMouseClicked
-
-    private void deleteSelectedBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteSelectedBtnActionPerformed
-        graphPanel.deleteSelected();
-
-
-    }//GEN-LAST:event_deleteSelectedBtnActionPerformed
-
-    private void deleteAllBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteAllBtnActionPerformed
-        mxGraph graph = graphPanel.getGraph();
-        for (Object cell : graph.getChildVertices(graph.getDefaultParent())) {
-            graphPanel.addCellSelection(cell);
-        }
-        graphPanel.deleteSelected();
-        graph.removeCells(graph.getChildVertices(graph.getDefaultParent()));
-
-    }//GEN-LAST:event_deleteAllBtnActionPerformed
-
-    private void applyLayoutBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyLayoutBtnActionPerformed
-        graphPanel.setLayout("");
-
-    }//GEN-LAST:event_applyLayoutBtnActionPerformed
-
+    
     private void jMenuItemSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemSaveActionPerformed
         graphPanel.saveNetwork();
 
     }//GEN-LAST:event_jMenuItemSaveActionPerformed
 
     private void jMenuItemOpenActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemOpenActionPerformed
-        JFileChooser c = new JFileChooser();
-
-      // For now only allow .xml files
-      FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
-      c.setFileFilter(filter);
-        int rVal = c.showOpenDialog(c);
-        if (rVal == JFileChooser.APPROVE_OPTION) {
-            File file = c.getSelectedFile();
-            if (file != null) {
-                try {
-                    bnc.load(file.getCanonicalPath());
-                    renderNetwork(bnc);
-                    graphPanel.setLayout("");
-                } catch (IOException ex) {
-
-                }
-            }
-            // open
-        }
-        if (rVal == JFileChooser.CANCEL_OPTION) {
-            // do nothing for now
-        }
-        // Later replace this with
-        // graphPanel.loadNetwork();
+      
     }//GEN-LAST:event_jMenuItemOpenActionPerformed
 
     private void jMenuHelpActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuHelpActionPerformed
@@ -505,41 +342,6 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         
     }//GEN-LAST:event_jMenuHelpActionPerformed
 
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(MainJFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(MainJFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(MainJFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(MainJFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        }
-        //</editor-fold>
-
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new MainJFrame().setVisible(true);
-            }
-        });
-    }
-
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel actionsPanel;
     private javax.swing.JPanel addNodePanel;
@@ -547,6 +349,7 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
     private javax.swing.JButton deleteAllBtn;
     private javax.swing.JButton deleteSelectedBtn;
     private javax.swing.JPanel drawPanel;
+    private javax.swing.JButton jButtonRefresh;
     private javax.swing.JMenuBar jMenuBarMain;
     private javax.swing.JMenu jMenuEdit;
     private javax.swing.JMenu jMenuFile;
