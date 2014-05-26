@@ -15,6 +15,7 @@ import javax.swing.table.AbstractTableModel;
 /**
  *
  * @author mikael
+ * modified by jun
  */
 public class NodeParamsDialog extends javax.swing.JDialog {
 
@@ -43,8 +44,8 @@ public class NodeParamsDialog extends javax.swing.JDialog {
         private final NodeModel node;
         private EnumTable table;
 
-        public MyTableModel(NodeModel node) {
-            this.node = node;
+        public MyTableModel(NodeModel nd) {
+            this.node = nd;
             this.table = node.getTable();
             System.out.println("@@Printing node");
             node.print();
@@ -96,7 +97,8 @@ public class NodeParamsDialog extends javax.swing.JDialog {
         }
 
         public Class getColumnClass(int c) {
-            return getValueAt(0, c).getClass();
+            Object value = this.getValueAt(0, c);
+            return (value == null ? Object.class : value.getClass());
         }
 
         /*
@@ -117,7 +119,12 @@ public class NodeParamsDialog extends javax.swing.JDialog {
          * data can change.
          */
         public void setValueAt(Object value, int row, int col) {
-            table.setValue(col, value);
+            if (table == null) {
+                return;
+            }
+            System.out.println("value is " + value);
+            table.display();
+            table.setValue(myParamsTable.getSelectedRow(), value);
             fireTableCellUpdated(row, col);
         }
     }

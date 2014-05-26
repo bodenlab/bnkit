@@ -23,6 +23,7 @@ import java.util.Set;
  * Container of things related to the BN that is under construction. 
  * The BNet object is constructed only when needed and is not maintained in this class.
  * @author mikael
+ * modified by jun
  */
 public class BNContainer {
     private Map<String, Variable> vars = new HashMap<String, Variable>(); // all variables that are considered and can be used to create nodes

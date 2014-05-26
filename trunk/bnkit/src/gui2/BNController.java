@@ -5,15 +5,8 @@
  */
 package gui2;
 
-import bn.BNode;
-import bn.Predef;
-import bn.Variable;
-import com.mxgraph.model.mxIGraphModel;
-import com.mxgraph.view.mxGraph;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.ArrayList;
-import java.util.Random;
 import javax.swing.JButton;
 
 /**
@@ -21,11 +14,11 @@ import javax.swing.JButton;
  * @author Jun All the controller logic lives here. Receives calls from View
  * classes MainJFrame and GraphPanel.
  */
-public class BNController {
+public class BNController implements Observer {
 
-    private MainJFrame mainFrame;
-    private BNModel model;
-    private GraphPanel graphPanel;
+    private final MainJFrame mainFrame;
+    private final BNModel model;
+    private final GraphPanel graphPanel;
 
     public BNController(MainJFrame mf, GraphPanel gp, BNModel mod) {
         this.mainFrame = mf;
@@ -37,17 +30,26 @@ public class BNController {
      * Initialises handler events for View class MainJFrame.
      */
     public void InitButtonHandlers() {
-        for (JButton button : mainFrame.getNodeButtons()) {
-            button.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    JButton thisbtn = (JButton) e.getSource();
-                    String type = thisbtn.getText();
-                    graphPanel.createNode(null, type, null);
-                }
-            });
+        mainFrame.initNodeControls();
+        // THis msut be called after InitNodeButtons has been calle din MainJFrame
+        
+        // Only used if MainJFrame using Button node implementation
+        if (mainFrame.usingButtons) {
+            // Configure action handlers for add node buttons
+            for (JButton button : mainFrame.getNodeButtons()) {
+                button.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        JButton thisbtn = (JButton) e.getSource();
+                        String type = thisbtn.getText();
+                        graphPanel.createNode(null, type, null);
+                    }
+                });
+            }
+        } else {
+            // Configure action handlers for drag-drop labels
+            
         }
-
         mainFrame.getDeleteButton().addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -78,10 +80,29 @@ public class BNController {
         });
 
         mainFrame.getMenuSave().addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 graphPanel.saveNetwork();
             }
         });
+
+        mainFrame.getLayoutButton().addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                graphPanel.setLayout("");
+            }
+        });
+    }
+
+    @Override
+    public void update() {
+        // When update occurs, update View
+        // and update the tables in BNode list.
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public void setSubject(Observable sub) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
 }
