@@ -5,35 +5,20 @@
  */
 package gui2;
 
-import bn.BNode;
-import bn.EnumVariable;
 import bn.Predef;
-import bn.Variable;
-import com.mxgraph.model.mxCell;
 import com.mxgraph.view.mxGraph;
 import java.awt.Color;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Random;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.GroupLayout;
 import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JDialog;
-import javax.swing.JFileChooser;
+import javax.swing.JFrame;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.TransferHandler;
+import javax.swing.JToolBar;
 import javax.swing.border.Border;
-import javax.swing.filechooser.FileFilter;
-import javax.swing.filechooser.FileNameExtensionFilter;
 
 /**
  *
@@ -44,22 +29,18 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
     BNContainer bnc;
     gui2.GraphPanel graphPanel;
     ArrayList<JButton> BtnArr = new ArrayList<>();
+    public boolean usingButtons;
 
     /**
      * Creates new form MainJFrame
      */
-    public MainJFrame() {
+    public MainJFrame(boolean usebuttons) {
+        usingButtons = usebuttons;
         initComponents();
         bnc = new BNContainer();
-        
-
-        // Toggle these two to switch between
-        // drag-drop or button press for adding nodes
-        initNodeButtons();
-//        initNodeLbls();
-    
+        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
-
+    
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -137,25 +118,15 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
             panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(panelContainerPanelLayout.createSequentialGroup()
                 .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 111, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, Short.MAX_VALUE))
+                .addGap(0, 426, Short.MAX_VALUE))
         );
 
         jMenuFile.setText("File");
 
         jMenuItemOpen.setText("Open file...");
-        jMenuItemOpen.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jMenuItemOpenActionPerformed(evt);
-            }
-        });
         jMenuFile.add(jMenuItemOpen);
 
         jMenuItemSave.setText("Save");
-        jMenuItemSave.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jMenuItemSaveActionPerformed(evt);
-            }
-        });
         jMenuFile.add(jMenuItemSave);
 
         jMenuBarMain.add(jMenuFile);
@@ -197,32 +168,34 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    // TODO: factor this out properly later
     public JPanel getPanelContainer() {
         return panelContainerPanel;
     }
-    
-    public void setGraphPanel(GraphPanel panel){
+
+    public void setGraphPanel(GraphPanel panel) {
         this.graphPanel = panel;
     }
-    
+
     public JPanel getActionsPanel() {
         return actionsPanel;
     }
-    
+
+    public JButton getLayoutButton() {
+        return applyLayoutBtn;
+    }
+
     public JButton getDeleteButton() {
         return deleteSelectedBtn;
     }
-    
+
     public JButton getDeleteAllButton() {
         return deleteAllBtn;
     }
-    
+
     public JButton getRefreshButton() {
         return jButtonRefresh;
     }
-    
-    
+
     public void initDrawPanel() {
         // adds the graph panel to drawPanel.
         GroupLayout layout = new GroupLayout(drawPanel);
@@ -236,19 +209,27 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
                 .addComponent(graphPanel)
         );
     }
+    
+    public void initNodeControls() {
+        if (usingButtons) {
+            initNodeButtons();
+        } else {
+            initNodeLbls();
+        }
+    }
 
-    public ArrayList<JButton> getNodeButtons(){
+    public ArrayList<JButton> getNodeButtons() {
         return BtnArr;
     }
-    
-    public JMenuItem getMenuSave(){
+
+    public JMenuItem getMenuSave() {
         return jMenuItemSave;
     }
-    
-    public JMenuItem getMenuOpen(){
+
+    public JMenuItem getMenuOpen() {
         return jMenuItemOpen;
     }
-    
+
     private void initNodeButtons() {
         // Name and label border
         Border addNodeBorder = BorderFactory.createTitledBorder("Add Node");
@@ -310,36 +291,26 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
 //        renderNetwork(bnc);
         // Instead...
         // What is the link between the view and the model?
-        
-         final mxGraph graph = graphPanel.getGraph();
-         for (Object cell: graphPanel.getAllVertices()){
+
+        final mxGraph graph = graphPanel.getGraph();
+        for (Object cell : graphPanel.getAllVertices()) {
 //             ((mxCell) cell).setValue("rofl");
-         }
-        
+        }
     }
 
     @Override
     public void setSubject(Observable sub) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
-    
-    private void jMenuItemSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemSaveActionPerformed
-        graphPanel.saveNetwork();
-
-    }//GEN-LAST:event_jMenuItemSaveActionPerformed
-
-    private void jMenuItemOpenActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemOpenActionPerformed
-      
-    }//GEN-LAST:event_jMenuItemOpenActionPerformed
 
     private void jMenuHelpActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuHelpActionPerformed
-        String message = "<html>" +
-                "Basic Controls<br>" +
-                "<Mouse scroll> Zoom screen" ;
+        String message = "<html>"
+                + "Basic Controls<br>"
+                + "<Mouse scroll> Zoom screen";
         System.err.println("content pane " + getContentPane());
         JOptionPane.showMessageDialog(getContentPane(), message);
-        
-        
+
+
     }//GEN-LAST:event_jMenuHelpActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables

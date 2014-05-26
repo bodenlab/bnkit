@@ -38,10 +38,11 @@ public class ProjectMain {
 
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
+            @Override
             public void run() {
                 
                 // Initialise the views.
-                MainJFrame mainFrame = new MainJFrame();
+                MainJFrame mainFrame = new MainJFrame(true);
                 mainFrame.setVisible(true);
                 
                 // Initialise the model.
@@ -55,6 +56,8 @@ public class ProjectMain {
                 
                 mainFrame.setGraphPanel(graphPanel);
                 mainFrame.initDrawPanel();
+                
+                
                 
             }
         });
