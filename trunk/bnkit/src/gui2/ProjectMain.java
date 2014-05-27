@@ -42,7 +42,7 @@ public class ProjectMain {
             public void run() {
                 
                 // Initialise the views.
-                MainJFrame mainFrame = new MainJFrame(true);
+                MainJFrame mainFrame = new MainJFrame(false);
                 mainFrame.setVisible(true);
                 
                 // Initialise the model.

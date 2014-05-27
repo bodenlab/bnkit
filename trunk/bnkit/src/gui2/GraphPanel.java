@@ -54,7 +54,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 
 /**
  *
- * @author mikael
+ * @author jun
  */
 public class GraphPanel extends JPanel implements Serializable, Observer {
 
@@ -209,16 +209,21 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
             Variable var = Predef.getVariable(name, predef, params);
 
             try {
-                // Create visual node and update model
+                // Create visible node
                 Random rand = new Random();
                 this.defStyleSheets(graph); // custom vertex and edge styles
                 Object newvertex = graph.insertVertex(graph.getDefaultParent(), null, name, 10 + rand.nextInt(50),
                         10 + rand.nextInt(50), 100, 50, "ROUNDED;strokeColor=black;fillColor=" + color);
+                
+                // TODO: find a new home for this
                 this.addVertex(name, newvertex);
+                
+                // 'Select' the new node.
                 selectedCells.clear();
                 this.addCellSelection(newvertex);
                 System.out.println("bnode is: " + Predef.getBNode(var, new ArrayList<Variable>(), type));
                 System.out.println("type is: " + type);
+                
                 // Add Node to BNodeMap.
 
 //                nm.register(mainFrame);
@@ -237,12 +242,14 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
 //        selectedCells.clear();
 //        this.addCellSelection(newvertex);
 
-            // Changes in GraphPanel View
+        String name = predef + " node-" + nodeCounts.get(predef);
+        
+        // Changes in GraphPanel View
         mxRectangle bounds = new mxRectangle(0, 0, 100, 50);
         mxGeometry geometry = new mxGeometry(0, 0, 100, 50);
         geometry.setRelative(false);
         String color = (Predef.isEnumerable(predef) ? "yellow" : "orange");
-        mxCell vertex = new mxCell(predef, geometry, "ROUNDED;strokeColor=black;fillColor=" + color);
+        mxCell vertex = new mxCell(name, geometry, "ROUNDED;strokeColor=black;fillColor=" + color);
 //                vertex.setId(null);
         vertex.setVertex(true);
         vertex.setConnectable(true);
@@ -255,6 +262,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     }
 
     public void addNodetoBNC(String name, String predef, String params) {
+        System.out.println("node added to bnc!!");
         if (name == null) {
             name = predef + " node-" + nodeCounts.get(predef);
         }
@@ -280,7 +288,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
                 nm.getVariable().setName("Number node");
             }
 
-//            model.getBNC().addNode(newBNode);
+            model.getBNC().addNode(newBNode);
             model.getBNC().addNode(nm);
         } else {
             System.out.println("GPT case");
