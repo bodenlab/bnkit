@@ -5,12 +5,10 @@
  */
 package gui2;
 
-import bn.BNode;
 import bn.EnumDistrib;
 import bn.EnumTable;
 import bn.EnumVariable;
 import bn.Enumerable;
-import bn.Variable;
 import java.util.List;
 import javax.swing.table.AbstractTableModel;
 
