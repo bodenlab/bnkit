@@ -17,7 +17,6 @@ import javax.swing.JFrame;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JToolBar;
 import javax.swing.border.Border;
 
 /**
@@ -39,6 +38,7 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         initComponents();
         bnc = new BNContainer();
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        this.setTitle("bnKit");
     }
     
     /**
@@ -168,6 +168,7 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
+    // TODO: factor this out properly later
     public JPanel getPanelContainer() {
         return panelContainerPanel;
     }
@@ -254,6 +255,11 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
     }
 
     private void initNodeLbls() {
+        if (graphPanel == null){
+            System.err.println("GraphPanel not initialised.");
+            return;
+        }
+        
         // Name and label border
         Border addNodeBorder = BorderFactory.createTitledBorder("Add Node");
         addNodePanel.setBorder(addNodeBorder);

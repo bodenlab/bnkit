@@ -6,8 +6,10 @@
 package gui2;
 
 import bn.BNode;
+import bn.EnumDistrib;
 import bn.EnumTable;
 import bn.EnumVariable;
+import bn.Enumerable;
 import bn.Variable;
 import java.util.List;
 import javax.swing.table.AbstractTableModel;
@@ -27,7 +29,6 @@ public class NodeParamsDialog extends javax.swing.JDialog {
     public NodeParamsDialog(java.awt.Frame parent, boolean modal) {
         super(parent, modal);
         initComponents();
-
     }
 
     public void setModel(NodeModel node) {
@@ -37,6 +38,8 @@ public class NodeParamsDialog extends javax.swing.JDialog {
         }
         myTableModel = new MyTableModel(node);
         myParamsTable.setModel(myTableModel);
+        this.setTitle(node.getBNode().getVariable().getPredef() + "(" + node.getType() + ") " +
+                "node " + "\"" + node.getName() + "\""); // add information about Q/E/I state
     }
 
     class MyTableModel extends AbstractTableModel {
@@ -106,6 +109,7 @@ public class NodeParamsDialog extends javax.swing.JDialog {
          * editable.
          */
         public boolean isCellEditable(int row, int col) {
+            //TODO: update editable conditions.
             if (table != null) {
                 if (col < node.getParents().size()) {
                     return false;
@@ -122,13 +126,39 @@ public class NodeParamsDialog extends javax.swing.JDialog {
             if (table == null) {
                 return;
             }
-            System.out.println("value is " + value);
+            if (node.getBNode().getType().equalsIgnoreCase("CPT")){
+                // Generate an EnumVariable.
+                Enumerable domain = (Enumerable) node.getBNode().getVariable().getDomain();
+                table.setValue(myParamsTable.getSelectedRow(), 
+                        getEnumVar(value, domain));
+                
+            }
             table.display();
-            table.setValue(myParamsTable.getSelectedRow(), value);
+            
+            // need enumdistrib
             fireTableCellUpdated(row, col);
         }
     }
 
+    private EnumDistrib getEnumVar(Object input, Enumerable domain){
+        // EnumVariable v1 = Predef.Boolean();
+        // cpt1.put(new Object[]{true, false}, new EnumDistrib(v1.getDomain(), new double[]{1, 0}));
+        String[] strArr = ((String) input).split(",");
+        double[] dblArr = new double[strArr.length];
+        for (int i = 0; i < strArr.length; i++) {
+            dblArr[i] = Double.parseDouble(strArr[i]);
+        }
+        return new EnumDistrib(domain, dblArr);
+    }
+    
+    private double[] parseInput(Object input){
+        String[] strArr = ((String) input).split(",");
+        double[] dblArr = new double[strArr.length];
+        for (int i = 0; i < strArr.length; i++) {
+            dblArr[i] = Double.parseDouble(strArr[i]);
+        }
+        return dblArr;
+    }
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always

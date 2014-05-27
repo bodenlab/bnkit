@@ -43,6 +43,7 @@ public class BNController implements Observer {
                         JButton thisbtn = (JButton) e.getSource();
                         String type = thisbtn.getText();
                         graphPanel.createNode(null, type, null);
+                        graphPanel.addNodetoBNC(null, type, null);
                     }
                 });
             }

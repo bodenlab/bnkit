@@ -57,6 +57,19 @@ public class BNModel implements Observable{
         BNodeMap.put(key, entry);
     }
     
+    /**
+     * Retrieve a BNode, given a key (corresponds to mxCell).
+     * @param key
+     * @return 
+     */
+    public BNode get(Object key){
+        return BNodeMap.get(key);
+    }
+    
+    public void remove(Object key) {
+        BNodeMap.remove(key);
+    }
+    
     public List<Object> getSelectedCells() {
         return selectedCells;
     }

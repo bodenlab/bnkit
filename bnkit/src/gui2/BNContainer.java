@@ -91,6 +91,10 @@ public class BNContainer {
         return nodems.get(name);
     }
     
+    public Map<String, NodeModel> getNodeModelArr(){
+        return nodems;
+    }
+    
     public void removeNode(BNode node) {
         // remove actual node (and variable)
         if (node == null) return;

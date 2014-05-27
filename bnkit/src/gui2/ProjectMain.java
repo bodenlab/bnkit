@@ -56,6 +56,7 @@ public class ProjectMain {
                 
                 mainFrame.setGraphPanel(graphPanel);
                 mainFrame.initDrawPanel();
+                mainFrame.initNodeControls();
                 
                 
                 
