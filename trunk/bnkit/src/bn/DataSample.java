@@ -25,12 +25,12 @@ import bn.alg.ApproxInferCont;
  */
 public class DataSample {
 
-	protected final Map<Variable, List<Object>> map;
+	public Map<Variable, List<Object>> map;
 	protected final int nParents;
 	protected final List<Variable> parents;
 	private List<EnumVariable> discrete; //ALL DISCRETE PARENTS
-	private CountTable counts = null;
-	private Map<Variable, Map<Integer, List<Object>>> nonEnumTables = null;
+	public CountTable counts = null;
+	public Map<Variable, Map<Integer, List<Object>>> nonEnumTables = null;
 	private boolean allContinuous = false;
 	private int[] step; //FOR DISCRETE PARENTS ONLY
 	
@@ -69,14 +69,14 @@ public class DataSample {
      * Use this to process the data and create appropriate structures
      */
     public void createData() {
-    	if (discrete.size() == nParents) {
+    	if (discrete.size() == nParents) { //Only discrete nodes in query
 	    	List<Variable> pars = this.getParents();
 	    	EnumVariable[] enums = new EnumVariable[discrete.size()];
 	    	for (int i = 0; i < nParents; i++) {
 	    		Variable p = pars.get(i);
 	    		enums[i] = (EnumVariable)pars.get(i);
 	    	}
-	    	CountTable counts = new CountTable(enums);
+	    	CountTable counts = new CountTable(enums); //Count table for discrete nodes
 	    	for(int i = 0; i < ApproxInferCont.iterations ; i++) {
 				List<Object> curKey = new ArrayList<Object>(pars.size());
 				for (Variable p : pars) {
@@ -84,8 +84,8 @@ public class DataSample {
 				}
 				counts.count(curKey.toArray());
 			}
-	    	this.counts = counts;
-    	} else if (discrete.size() < nParents && discrete.size() != 0) {
+	    	this.counts = counts; //Store the counts for this query
+    	} else if (discrete.size() < nParents && discrete.size() != 0) { //Hybrid query - discrete and real
     		List<Variable> pars = this.getParents();
 	    	List<Variable> nonEnums = new ArrayList<Variable>(nParents-discrete.size());
 	    	for (Variable par: pars) {
@@ -93,10 +93,13 @@ public class DataSample {
 	    			nonEnums.add(par);
 	    		}
 	    	}
-	    	CountTable counts = new CountTable(discrete);
+	    	CountTable counts = new CountTable(discrete); //Count table for discrete nodes in query 
 	    	Map<Variable, Map<Integer, List<Object>>> store = new HashMap<>();
 	    	for (Variable v : nonEnums) {
-	    		Map<Integer, List<Object>> samples = new HashMap<>();
+	    		Map<Integer, List<Object>> samples = new HashMap<>(); // Structure to store key/index with list of samples
+	    		//With 1 discrete node in query possible keys are t/f
+	    		//all continuous values for 'states' where the discrete node is true are recorded
+	    		//leaving raw data allows flexibility in which distribution you apply e.g. Gaussian, kernel density etc.
 		    	for(int i = 0; i < ApproxInferCont.iterations ; i++) {
 					List<Object> curKey = new ArrayList<Object>(pars.size());
 					for (EnumVariable p : discrete) {
@@ -114,8 +117,8 @@ public class DataSample {
 	    	}
 	    	this.nonEnumTables = store;
 	    	this.counts = counts;
-    	} else {
-    		allContinuous = true;
+    	} else { //Continuous variables only in query
+    		allContinuous = true; //Original storage data structure contains adequate info
     	}
     }
     
@@ -147,6 +150,7 @@ public class DataSample {
      * 
      * @return table containing normalized counts
      */
+    //FIXME - more sophisticated normalization technique?
     public EnumTable<Double> getNormalizedCounts() {
     	if (counts != null) {
     		EnumTable<Double> normalized = new EnumTable(counts.table.getParents());
@@ -195,6 +199,11 @@ public class DataSample {
     	return null;
     }
     
+    
+    /**
+     * Use this method for processing samples from a hybrid query
+     * @return map of variable and associated enum table representing the distribution
+     */
     public Map<Variable, EnumTable<Distrib>> getMixedGDistrib() {
     	if (!allContinuous){
     		Map<Variable, EnumTable<Distrib>> result = new HashMap<>();

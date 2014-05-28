@@ -46,13 +46,13 @@ import java.util.Set;
  * @author Alex
  *
  */
-public class ApproxInferCont {
+public class ApproxInferCont implements Inference{
 
 
 	public BNet bn;
 	private double logLikelihood = 1;
 	private Random randomGenerator = new Random();
-	public static int iterations = 50;
+	public static int iterations = 500;
 	private Variable Counts = Predef.Boolean("Counts");
 
 	/** 
@@ -114,7 +114,7 @@ public class ApproxInferCont {
 		//First set all non-evidenced nodes including query
 		instantiateNet(q.Z, cbn);
 		
-		DataSample data = new DataSample(q.X);
+		DataSample data = new DataSample(q.X); //Storage class - maintains instance of each query node for each 'state' the chain passes through
 
 		//Iterations of sampling
 		int N = iterations;
@@ -141,13 +141,6 @@ public class ApproxInferCont {
 			}
 		}
 		
-		data.createData();
-	//	EnumTable<Double> disc = data.getNormalizedCounts();
-	//	disc.display();
-		Map<Variable, EnumTable<Distrib>> cont1 = data.getMixedGDistrib();
-//		cont1.display();
-//		Map<Variable, Distrib> allCont = data.getGaussianDistrib();
-		
 		//Reset all unevidenced nodes in network
 		for (BNode node : cbn.getNodes()) {
 			if (q.Z.contains(node.getVariable())){
@@ -156,26 +149,34 @@ public class ApproxInferCont {
 		}
 		
 		data.createData(); //Take raw counts and sort into appropriate data structures
+//		logLikelihood = logLikelihood*0.8;//Random value for training purposes when needed
+		
 		//Process the results stored in data
+		//FIXME adapt this to CGTable output?
 		if (data.allContinuous()) { //Query contains only continuous nodes
 			Map<Variable, Distrib> allCont = data.getGaussianDistrib();
+			data.map = null;
 			return new AResult(allCont);
 		} else if (data.getNonEnumTable() == null) { //Query contains only discrete nodes
 			EnumTable<Double> disc = data.getNormalizedCounts();
 			JPT result = new JPT(disc);
+			data.map = null;
+			data.counts = null;
 			return new AResult(result);
 		} else { //Mixed/hybrid query
 			EnumTable<Double> disc = data.getNormalizedCounts();
 			Map<Variable, EnumTable<Distrib>> cont = data.getMixedGDistrib();
 			JPT result = new JPT(disc);
+			data.map = null;
+			data.counts = null;
+			data.nonEnumTables = null;
 			return new AResult(result, cont);
 		}
 
 //		//FIXME RESET TABLES?
 //		FactorTable result = null;
 
-		//Convergence of algorithm is incomplete
-		//	    	logLikelihood += 1;
+		//TODO - Convergence of algorithm
 
 
 	}
@@ -312,6 +313,9 @@ public class ApproxInferCont {
 		iterations = iter;
 	}
 	
+	public double getLogLikelihood() {
+		return logLikelihood;
+	}
 
 	public class ApproxInferRuntimeException extends RuntimeException {
 		private static final long serialVersionUID = 1L;
