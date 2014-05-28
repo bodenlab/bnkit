@@ -120,7 +120,7 @@ public class GDTExample2 {
         //m.setInstance(true);
         c.setInstance(false);
         //n.setInstance(100.0);
-        s.setInstance(6.5);
+        //s.setInstance(6.5);
         //r.setInstance(0.55);
         
         // Variable elimination works by factorising CPTs, and then by performing products and variable sum-outs in
@@ -128,17 +128,23 @@ public class GDTExample2 {
         
         CGVarElim ve = new CGVarElim();
         ve.instantiate(bn);
-        Query q = ve.makeQuery(new Variable[] {M,E,N,R});
+        Query q = ve.makeQuery(new Variable[] {M,E,N,R,S});
+        //Query q = ve.makeQuery(new Variable[] {S});
         CGTable qr = (CGTable) ve.infer(q);
         qr.display();
+        qr.displaySampled();
         Distrib d = qr.query(R);
         System.out.println(d);
         d = qr.query(N, new Assignment[] {
-            //Variable.assign(E, false), 
             Variable.assign(R, 0.01),
             Variable.assign(M, true),
             });
         System.out.println(d);
+        d = qr.query(S, new Assignment[] {
+            Variable.assign(M, true),
+            });
+        System.out.println(d);
+        
     }
 
 }
