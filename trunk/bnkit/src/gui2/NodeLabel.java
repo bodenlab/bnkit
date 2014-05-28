@@ -87,23 +87,6 @@ DragSourceListener, DragGestureListener{
         source.startDrag(dge, DragSource.DefaultCopyDrop, transferable, this);
     }
 
-    protected Transferable createTransferable(JComponent comp) {
-                NodeLabel parentComponent = (NodeLabel) comp;
-                String type = parentComponent.getText();
-                mxRectangle bounds = new mxRectangle(0, 0, 100, 50);
-                mxGeometry geometry = new mxGeometry(0, 0, 100, 50);
-                geometry.setRelative(false);
-                mxCell vertex = new mxCell(type, new mxGeometry(0, 0, 100, 50), null);
-//                vertex.setId(null);
-                vertex.setVertex(true);
-                vertex.setConnectable(true);
-
-                // TODO is it neccessary to set the parent here??
-//                Object parent = graphPanel.getGraphComponent().getGraph().getDefaultParent();
-//                vertex.setParent((mxICell) parent);
-                return new mxGraphTransferable(new Object[]{vertex}, bounds);
-            
-        }
     @Override
     public void dropActionChanged(DragSourceDragEvent dsde) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.

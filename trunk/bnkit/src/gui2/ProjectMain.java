@@ -52,12 +52,12 @@ public class ProjectMain {
                 GraphPanel graphPanel = new GraphPanel(model);
                 graphPanel.getGraphComponent().requestFocus();
                 BNController Controller = new BNController(mainFrame, graphPanel, model);
-                Controller.InitButtonHandlers();
+                
                 
                 mainFrame.setGraphPanel(graphPanel);
                 mainFrame.initDrawPanel();
                 mainFrame.initNodeControls();
-                
+                Controller.InitButtonHandlers();
                 
                 
             }

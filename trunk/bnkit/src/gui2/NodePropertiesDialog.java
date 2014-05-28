@@ -35,9 +35,11 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
     private javax.swing.JLabel lbl2;
     private javax.swing.JButton applyBtn;
     private javax.swing.JButton cancelBtn;
+    private javax.swing.JCheckBox evidenceCheck; // signifies whether node is Evidence.
+    private javax.swing.JPanel radioPanel;
     private GraphPanel graphPanel;
     private NodeModel nodeModel;
-    
+
     private BNContainer bnc;
     private Object selectedRadioButton;
 
@@ -46,11 +48,10 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         graphPanel = gp;
         bnc = graphPanel.getBNContainer();
         this.setTitle("Node Properties");
-        
+
         // Set default button
 //        JRootPane rootpane = SwingUtilities.getRootPane(applyBtn);
 //        rootPane.setDefaultButton(applyBtn);
-        
         nodeModel = nm;
         init();
         System.out.println("NodePropertiesDialog Constructor");
@@ -97,25 +98,69 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         applyBtn = new javax.swing.JButton("Apply");
         cancelBtn = new javax.swing.JButton("Cancel");
 
-        // Loop through model.getModelNames() to generate JRadioButtons...
+        radioPanel = new javax.swing.JPanel();
+        radioPanel.setVisible(true);
+        evidenceCheck = new javax.swing.JCheckBox("Is Evidence node");
+        evidenceCheck.setSelected(true);
+
+        evidenceCheck.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                boolean state = ((javax.swing.JCheckBox) e.getSource()).isSelected();
+                radioPanel.setVisible(state);
+                if (state) {
+                    // Check if there is already a set parameter checkbox
+                } else {
+                    // Clear the 'evidenced' parameter checkbox
+                }
+
+            }
+
+        });
+
+        // Generate radioButtons for the parameters.
         JRadioButton dummybtn;
         ArrayList<JRadioButton> buttonArr = new ArrayList<>();
         ButtonGroup bgroup = new ButtonGroup();
-        
-        for (String s: nodeModel.getModelNames()){
+
+        // TODO: handling here is hardcoded for now, need a more elegant way of
+        // checking predef types
+        // Loop through parameters if String...
+        // If Number, enumerate 1 - Max num
+        ArrayList<String> paramsList = new ArrayList<>();
+        String params = nodeModel.getVariable().getParams();
+        if (nodeModel.getVariable().getPredef().equalsIgnoreCase("String")) {
+            paramsList.addAll(Arrays.asList(params.split(";")));
+        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Boolean")){
+            paramsList.addAll(Arrays.asList("True", "False"));
+        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Number")){
+            for (int i = 1; i < Integer.parseInt(params); i++){
+                paramsList.add(String.valueOf(i));
+            }
+        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Amino acid")){
+            paramsList.addAll(Arrays.asList("A", "T", "C", "G")); // revise this later
+        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Nucleic acid")){
+            paramsList.add("In development");
+        } else {
+            paramsList.add("In development");
+        }
+//        for (String s : nodeModel.getModelNames()) {
+        for (String s : paramsList){
             dummybtn = new JRadioButton(s);
-            dummybtn.addActionListener(new ActionListener(){
-                public void actionPerformed(ActionEvent e){
+            dummybtn.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
                     AbstractButton thisbtn = (AbstractButton) e.getSource();
                     selectedRadioButton = thisbtn;
-                    System.out.println("selected radiobutton: " + 
-                            ((JRadioButton)selectedRadioButton).getText());
+                    System.out.println("selected radiobutton: "
+                            + ((JRadioButton) selectedRadioButton).getText());
                 }
             });
             buttonArr.add(dummybtn);
             bgroup.add(dummybtn);
+            radioPanel.add(dummybtn);
         }
-        
+
         applyBtn.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 applyBtnPressed(evt);
@@ -131,17 +176,14 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         this.setBackground(new java.awt.Color(204, 204, 204));
 //        this.setBorder(javax.swing.BorderFactory.createTitledBorder("Node Properties"));
 
-        
-        
         javax.swing.GroupLayout propertiesPanelLayout = new javax.swing.GroupLayout(getContentPane());
-        
+
 //        ParallelGroup hgroup =  propertiesPanelLayout.createParallelGroup();
 //        SequentialGroup vgroup = propertiesPanelLayout.createSequentialGroup();
 //        for (JRadioButton b: buttonArr){
 //            hgroup.addComponent(b);
 //            vgroup.addComponent(b);
 //        }
-        
         this.setLayout(propertiesPanelLayout);
         propertiesPanelLayout.setHorizontalGroup(
                 propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -157,7 +199,9 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                                                 .addComponent(lbl2))
                                         .addGap(0, 0, Short.MAX_VALUE)))
                         .addContainerGap())
-//                .addGroup(hgroup)
+                //                .addGroup(hgroup)
+                .addComponent(evidenceCheck)
+                .addComponent(radioPanel)
                 .addGroup(propertiesPanelLayout.createSequentialGroup()
                         .addGap(36, 36, 36)
                         .addComponent(applyBtn)
@@ -179,7 +223,9 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                         .addGap(18, 18, 18)
                         .addComponent(nodeDescriptionLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 61, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 7, Short.MAX_VALUE)
-//                        .addGroup(vgroup)
+                        //                        .addGroup(vgroup)
+                        .addComponent(evidenceCheck)
+                        .addComponent(radioPanel)
                         .addGroup(propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                                 .addComponent(applyBtn)
                                 .addComponent(cancelBtn)))
@@ -189,23 +235,23 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
     }
 
     private void applyBtnPressed(java.awt.event.MouseEvent evt) {
+
+        //TRY: somehow make use of graphPanel.allVertices?
         // If old name is not the same as the new name, need to remove
         // the old <key,value> pair from the map and re-enter it.
         String oldNodeName = nodeModel.getVariable().getName();
         String newNodeName = nodeNameField.getText();
         if (!oldNodeName.equals(newNodeName)) {
-            
+
             bnc.removeNode(nodeModel);
             nodeModel.getVariable().setName(newNodeName);
             bnc.addNode(nodeModel);
-            
+
             // Bayesian Network requires at least one parent-child relationship
             // check in BNet constructor failing
-            BNet bn = bnc.getBNetnm(); 
-            
-            
+            BNet bn = bnc.getBNetnm();
+
             // The node will have no children, because the 'child' will point to old name.
-            
             // Make children point to new parent name
             System.out.println("==bn is: " + Arrays.toString(bn.getNodes().toArray()));
             if (bn.getChildren(nodeModel) != null) { // always null.... nodemodel has changed.
@@ -216,8 +262,7 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
             } else {
                 System.out.println(nodeModel.getName() + " has no children");
             }
-            
-            
+
             // Alternate brute-force method for getting children to point to new parent name
 //            for (NodeModel nm: bnc.getNodeModelArr().values()){
 //                System.out.println("!!nm is:" + nm.getName());
@@ -230,24 +275,28 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
 //                    }
 //                }
 //            }
-            
-            
             //TODO: use a placeholder node for search?
 //            NodeModel tempnode = new NodeModel(nodeModel);
-            
             // Since get by ID is not exposed in Java implementation of JGraphX,
             // have to bruteforce search for matching cell...
             // TODO: replace this with listener, and have View handle the name update
-            for (Object cell: graphPanel.getAllVertices()){
-                if (((mxCell) cell).getValue().equals(oldNodeName)){
+            for (Object cell : graphPanel.getAllVertices()) {
+                if (((mxCell) cell).getValue().equals(oldNodeName)) {
                     graphPanel.getGraph().getModel().setValue(
-                        cell, newNodeName);
+                            cell, newNodeName);
                 }
             }
         }
         // Update variables
         nodeModel.getVariable().setParams(nodeParametersField.getText());
 //        nodeModel.setModel(((JRadioButton) selectedRadioButton).getText());
+
+        // when is the node query?
+        if (evidenceCheck.isSelected()) {
+            nodeModel.setInferenceModel("Evidence");
+        } else {
+            nodeModel.setInferenceModel("Ignore");
+        }
         dispose();
     }
 

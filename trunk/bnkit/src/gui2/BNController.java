@@ -30,8 +30,6 @@ public class BNController implements Observer {
      * Initialises handler events for View class MainJFrame.
      */
     public void InitButtonHandlers() {
-        mainFrame.initNodeControls();
-        // THis msut be called after InitNodeButtons has been calle din MainJFrame
         
         // Only used if MainJFrame using Button node implementation
         if (mainFrame.usingButtons) {
@@ -40,6 +38,7 @@ public class BNController implements Observer {
                 button.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
+                        System.out.println("btn presed");
                         JButton thisbtn = (JButton) e.getSource();
                         String type = thisbtn.getText();
                         graphPanel.createNode(null, type, null);
@@ -70,6 +69,9 @@ public class BNController implements Observer {
             public void actionPerformed(ActionEvent e) {
                 graphPanel.renderNetwork(model.getBNC());
                 graphPanel.setLayout("");
+                for (NodeModel node: model.getBNC().getNodeModelArr().values()){
+                    System.out.println(" >Node is: " + node.getName());
+                }
             }
         });
 

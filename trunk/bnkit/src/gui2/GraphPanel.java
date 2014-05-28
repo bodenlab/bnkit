@@ -5,10 +5,12 @@
  */
 package gui2;
 
+import bn.BNet;
 import bn.BNode;
 import bn.EnumVariable;
 import bn.Predef;
 import bn.Variable;
+import bn.alg.CGVarElim;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.layout.mxGraphLayout;
 import com.mxgraph.layout.mxParallelEdgeLayout;
@@ -288,7 +290,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
                 nm.getVariable().setName("Number node");
             }
 
-            model.getBNC().addNode(newBNode);
+//            model.getBNC().addNode(newBNode);
             model.getBNC().addNode(nm);
         } else {
             System.out.println("GPT case");
@@ -622,7 +624,36 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         });
 
     }
+    /**
+     * Perform Inference.
+     * Selected node is set as Query node, and NodeModels which are so specified
+     * set as Evidence. Presently only variable elimination is implemented so this
+     * is used by default for inference.
+     */
+    public void doInference(){
+        // Check Query node is not Evidenced.
+        NodeModel queryNode = null;
+        BNet bn = new BNet();
+        for (NodeModel nm: bnc.getNodeModelArr().values()){
+            if (nm.getInferenceModel().equalsIgnoreCase("Evidence")){
+                bn.add(nm); // expects cpt or GDT
 
+                // Retrive the parameter which is set and set that instance.
+                // i.e. for boolean nodes, use True.
+                
+//                nm.setInstance(true);
+            }
+        }
+        CGVarElim ve = new CGVarElim();
+//        Query q = ve.makeQuery(queryNode);
+//        JPT jpt = ve.infer(q).getJPT();
+//        jpt.display;
+        
+    }
+    
+    // TODO: eventually, inference algorithm should be selectable.
+    public void doInference(String inferAlg){}
+    
     /**
      * Re-renders the network. This involves removing all vertices in View and
      * generating them again from underlying Model.

@@ -85,42 +85,46 @@ public class NodeModel implements Observable, BNode {
         this.observers = new ArrayList<>();
     }
 
-    public NodeModel(EnumVariable var) {
-        this("CPT");
-        this.bnode = new CPT(var);
+    public NodeModel(Variable var) {
+        try {
+            var = (EnumVariable) var;
+            this.bnode = new CPT((EnumVariable) var);
+            // change the 'String' constructor to a method.
+        } catch(ClassCastException e) {
+            var = (Variable<Continuous>) var;
+            this.bnode = new GDT(var);
+        }
+//        this("CPT");
+        this.observers = new ArrayList<>();
     }
-
-    public NodeModel(EnumVariable var, List<EnumVariable> parents) {
-        this("CPT");
-        this.bnode = new CPT(var, parents);
-    }
-
-    public NodeModel(EnumVariable var, EnumVariable... parents) {
-        this("CPT");
-        this.bnode = new CPT(var, parents);
-    }
-
-    public NodeModel(Variable<Continuous> var) {
-        this("GDT");
-        this.bnode = new GDT(var);
-    }
+    
 
     public NodeModel(Variable var, List<EnumVariable> parents) {
         try {
             var = (EnumVariable) var;
-            this.bnode = new CPT((EnumVariable) var, bnode.getParents());
+            this.bnode = new CPT((EnumVariable) var, parents);
             // change the 'String' constructor to a method.
         } catch(ClassCastException e) {
             var = (Variable<Continuous>) var;
-            this.bnode = new GDT(var, bnode.getParents());
+            this.bnode = new GDT(var, parents);
         }
+//        this("CPT");
+        this.observers = new ArrayList<>();
+    }
+    
+    public NodeModel(Variable var, EnumVariable... parents) {
+        try {
+            var = (EnumVariable) var;
+            this.bnode = new CPT((EnumVariable) var, parents);
+            // change the 'String' constructor to a method.
+        } catch(ClassCastException e) {
+            var = (Variable<Continuous>) var;
+            this.bnode = new GDT(var, parents);
+        }
+//        this("CPT");
         this.observers = new ArrayList<>();
     }
 
-    public NodeModel(Variable<Continuous> var, EnumVariable... parents) {
-        this("GDT");
-        this.bnode = new GDT(var, parents);
-    }
 
     public String getCellName(){
         return cellName;
@@ -130,12 +134,16 @@ public class NodeModel implements Observable, BNode {
         cellName = name;
     }
     
-    public void setModel(String state){
+    /**
+     * Set inference model of the node: 'Query', 'Evidence', 'Ignore'
+     * @param state 
+     */
+    public void setInferenceModel(String state){
         // TODO: throw exception if string doesn't match?
         this.state = inferenceModel.valueOf(state.toUpperCase());
     }
     
-    public String getModel(){
+    public String getInferenceModel(){
         return state.name();
     }
     
@@ -266,7 +274,7 @@ public class NodeModel implements Observable, BNode {
         notifyObservers();
         return bnode.setState(dump);
     }
-
+    
     @Override
     public boolean isRoot() {
         return bnode.isRoot();
