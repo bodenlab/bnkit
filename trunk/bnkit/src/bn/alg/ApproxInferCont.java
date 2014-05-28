@@ -127,15 +127,16 @@ public class ApproxInferCont implements Inference{
 				//Top down? Should it be randomised?
 				//Z is an ordered list
 
-				//Get the children of node and node for factors
+				//Get the markov blanket for the node
 				List<BNode> mbVar = cbn.getMB(var);
 				//Sample from the mb distribution
-				Object result = bn.getMBProb(mbVar, bn.getNode(var), bn);
+				Object result = bn.getMBProb(mbVar, bn.getNode(var), bn); //FIXME - this is the most time consuming element of ApproxInfer
 				if (result != null) {
 					cbn.getNode(var).setInstance(result);
 				}
 			}
 			
+			//Record instances of query node for current state of network
 			for (Variable cQuery : q.X){
 				data.addValue(cQuery,  cbn.getNode(cQuery).getInstance());
 			}
@@ -173,7 +174,7 @@ public class ApproxInferCont implements Inference{
 			return new AResult(result, cont);
 		}
 
-//		//FIXME RESET TABLES?
+//		//FIXME RESET Data structures?  
 //		FactorTable result = null;
 
 		//TODO - Convergence of algorithm

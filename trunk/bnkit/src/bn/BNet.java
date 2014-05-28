@@ -493,12 +493,10 @@ public class BNet implements Serializable {
     	query.resetInstance();
     	//Store all factor tables for query to iterate over to find product
     	Set<Factor> fTables = new HashSet<>();
-    	//Check if root and GDT - special case
-    	Boolean leafQuery = false;
     	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNodes){
     		if (!node.getName().equals(query.getName())){
-    			Factor fact = node.makeFactor(cbn);
+    			Factor fact = node.makeFactor(cbn); //FIXME - step which takes most CPU time, gets called a lot
     			//instantiated priors cannot be used to factorise
     			if (fact != null ){
     				fTables.add(fact);
@@ -512,32 +510,17 @@ public class BNet implements Serializable {
     	for (Factor factor : fTables) {
     		ft = Factor.product(ft, factor); 
     	} 	
-    	 
-    	//Distribution never altered by factor when cg is leaf node
-    	if (ft.hasNonEnumVariables()) { 
-    		Distrib d = ft.getDistrib(0, query.getVariable());
-    		Object result = d.sample();
-//    		System.out.println(result);
-    		return result;
-    	}
     	
-    	//FIXME
-    	//Where a network is properly parameterised, an atomic ft represents 
-    	//a non-initialised real node as query - USING THIS ALGORITHM
-    	//CAN IT REPRESENT ANYTHING ELSE??? 
-    	//Is this accurate for training or only for querying the final network?
+    	//The sampling algorithm currently only looks at single queries.
+    	//Either the result will be atomic or it will be a discrete node
     	if (ft.isAtomic()) {
-//    		System.out.println("Atomic Map getMBProbReal");
-    		Distrib d = ft.getDistrib(0, query.getVariable());
+    		Distrib d = ft.getDistrib(query.getVariable());
     		Object result = d.sample();
-//    		System.out.println(result);
     		return result;
     	}
     	
-    	//How to get distribution from factor table?
+    	//FIXME How to get distribution for discrete query from factor table?
     	//Two choices for method currently
-    	
-    	Collection<Double> values = ft.getFactors();  
     	
 //    	Double[] d = (Double[]) values.toArray(new Double[values.size()]);
 //    	double[] data = new double[d.length];
