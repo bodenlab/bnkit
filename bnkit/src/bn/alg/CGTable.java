@@ -565,7 +565,13 @@ public class CGTable implements QueryResult {
         for (Variable v : getNonEnumVariables()) {
             sbuf.append(v.toString()).append(";");
         }
-        return sbuf.toString() + ")";
+        if (this.isAtomic()) {
+            sbuf.append(") = ").append(this.atomicFactor.toString());
+            if (this.atomicDensity != null)
+                sbuf.append("|").append(this.atomicDensity.toString());
+        } else
+            sbuf.append(")");
+        return sbuf.toString();
     }
     
     private String constantLength(String s, int len) {
@@ -575,6 +581,19 @@ public class CGTable implements QueryResult {
     }
     
     public void display() {
+        if (this.isAtomic()) { // does not have enumerable variables
+            System.out.println(this.atomicFactor.toString());
+            List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
+            for (Variable nonenum : nonenums) 
+                System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));
+            System.out.println();
+            for (Variable nonenum : nonenums) {
+                Distrib d = this.getDistrib(nonenum);
+                System.out.print(String.format(" %s ", d.toString()));
+            }
+            return;
+        } 
+        // has enumerable variables
         System.out.print("Idx ");
         for (int j = 0; j < factorTable.getParents().size(); j++)
             System.out.print(String.format("[%10s]", constantLength(factorTable.getParents().get(j).toString(), 10)));
@@ -601,6 +620,24 @@ public class CGTable implements QueryResult {
     }
 
     public void displaySampled() {
+        if (this.isAtomic()) { // does not have enumerable variables
+            System.out.println(this.atomicFactor.toString());
+            List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
+            for (Variable nonenum : nonenums) 
+                System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));
+            System.out.println();
+            JDF jdf = this.getJDF();
+            for (Variable nonenum : nonenums) {
+                double sum = 0;
+                for (int j = 0; j < 1000; j ++) {
+                    Double sample = (Double)jdf.sample(nonenum);
+                    sum += sample;
+                }
+                System.out.print(String.format(" %10.3f ", sum/1000.0));
+            }
+            return;
+        } 
+        // has enumerable variables
         System.out.print("Idx ");
         for (int j = 0; j < factorTable.getParents().size(); j++)
             System.out.print(String.format("[%10s]", constantLength(factorTable.getParents().get(j).toString(), 10)));
@@ -620,7 +657,7 @@ public class CGTable implements QueryResult {
                     Double sample = (Double)jdf.sample(nonenum);
                     sum += sample;
                 }
-                System.out.print(String.format(" %5.3f ", sum/1000.0));
+                System.out.print(String.format(" %10.3f ", sum/1000.0));
             }
             Object val = this.getFactor(i);
             if (val != null) 
