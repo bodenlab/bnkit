@@ -61,20 +61,28 @@ public class NodeModel implements Observable, BNode {
         this.observers = new ArrayList<>();
     }
 
-    /**
-     * Copy constructor for NodeModel
-     * @param oldNode 
-     */
-    public NodeModel (NodeModel oldNode){
-        this(oldNode.getVariable(), oldNode.getParents());
-    }
+//    /**
+//     * Copy constructor for NodeModel
+//     * @param oldNode 
+//     */
+//    public NodeModel (NodeModel oldNode){
+//        this(oldNode.getVariable(), oldNode.getParents());
+//    }
     
     public BNode getBNode() {
         return bnode;
     }
 
     public NodeModel(BNode bnode) {
-        this(bnode.getVariable(), bnode.getParents());
+        try {
+            EnumVariable evar = (EnumVariable) bnode.getVariable();
+            this.bnode = new CPT(evar, bnode.getParents());
+            // change the 'String' constructor to a method.
+        } catch(ClassCastException e) {
+            Variable var = (Variable<Continuous>) bnode.getVariable();
+            this.bnode = new GDT(var, bnode.getParents());
+        }
+        this.observers = new ArrayList<>();
     }
 
     public NodeModel(EnumVariable var) {
@@ -97,9 +105,16 @@ public class NodeModel implements Observable, BNode {
         this.bnode = new GDT(var);
     }
 
-    public NodeModel(Variable<Continuous> var, List<EnumVariable> parents) {
-        this("GDT");
-        this.bnode = new GDT(var, parents);
+    public NodeModel(Variable var, List<EnumVariable> parents) {
+        try {
+            var = (EnumVariable) var;
+            this.bnode = new CPT((EnumVariable) var, bnode.getParents());
+            // change the 'String' constructor to a method.
+        } catch(ClassCastException e) {
+            var = (Variable<Continuous>) var;
+            this.bnode = new GDT(var, bnode.getParents());
+        }
+        this.observers = new ArrayList<>();
     }
 
     public NodeModel(Variable<Continuous> var, EnumVariable... parents) {

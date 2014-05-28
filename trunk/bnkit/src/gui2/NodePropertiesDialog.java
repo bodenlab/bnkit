@@ -195,41 +195,45 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         String newNodeName = nodeNameField.getText();
         if (!oldNodeName.equals(newNodeName)) {
             
+            bnc.removeNode(nodeModel);
+            nodeModel.getVariable().setName(newNodeName);
+            bnc.addNode(nodeModel);
+            
             // Bayesian Network requires at least one parent-child relationship
             // check in BNet constructor failing
-//            BNet bn = bnc.getBNetnm(); 
+            BNet bn = bnc.getBNetnm(); 
             
             
             // The node will have no children, because the 'child' will point to old name.
             
             // Make children point to new parent name
-//            System.out.println("==bn is: " + Arrays.toString(bn.getNodes().toArray()));
-//            if (bn.getChildren(nodeModel) != null) { // always null.... nodemodel has changed.
-//                for (String nodename : bn.getChildren(nodeModel)) {
-//                    System.out.println("!!Child is: " + nodename);
-//                    bnc.getNodeModel(nodename).setName(newNodeName);
-//                }
-//            } else {
-//                System.out.println(nodeModel.getName() + " has no children");
-//            }
-            
-            
-            // Alternate brute-force method for getting chjildren to point to new parent name
-            for (NodeModel nm: bnc.getNodeModelArr().values()){
-                System.out.println("!!nm is:" + nm.getName());
-                if (nm.getParents() != null && !nm.getParents().isEmpty()){ // null object pattern...
-                    for (Variable v: nm.getParents()){
-                        System.out.println("parent node is: " + v.getName());
-                        if (v.getName().equals(oldNodeName)){
-                            v.setName(newNodeName);
-                        }
-                    }
+            System.out.println("==bn is: " + Arrays.toString(bn.getNodes().toArray()));
+            if (bn.getChildren(nodeModel) != null) { // always null.... nodemodel has changed.
+                for (String nodename : bn.getChildren(nodeModel)) {
+                    System.out.println("!!Child is: " + nodename);
+                    bnc.getNodeModel(nodename).setName(newNodeName);
                 }
+            } else {
+                System.out.println(nodeModel.getName() + " has no children");
             }
             
             
+            // Alternate brute-force method for getting children to point to new parent name
+//            for (NodeModel nm: bnc.getNodeModelArr().values()){
+//                System.out.println("!!nm is:" + nm.getName());
+//                if (nm.getParents() != null && !nm.getParents().isEmpty()){ // null object pattern...
+//                    for (Variable v: nm.getParents()){
+//                        System.out.println("parent node is: " + v.getName());
+//                        if (v.getName().equals(oldNodeName)){
+//                            v.setName(newNodeName);
+//                        }
+//                    }
+//                }
+//            }
+            
+            
             //TODO: use a placeholder node for search?
-            NodeModel tempnode = new NodeModel(nodeModel);
+//            NodeModel tempnode = new NodeModel(nodeModel);
             
             // Since get by ID is not exposed in Java implementation of JGraphX,
             // have to bruteforce search for matching cell...
@@ -240,14 +244,6 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                         cell, newNodeName);
                 }
             }
-            
-            bnc.removeNode(nodeModel);
-            nodeModel.getVariable().setName(newNodeName);
-            bnc.addNode(nodeModel);
-            
-            
-            
-            
         }
         // Update variables
         nodeModel.getVariable().setParams(nodeParametersField.getText());
