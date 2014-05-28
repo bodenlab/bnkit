@@ -191,7 +191,6 @@ public class DataSample {
                 double variance = diff/data.size();
                 GaussianDistrib d = new GaussianDistrib(mean, variance);
                 output.put(entry.getKey(), d);
-                System.out.println();
     		}
     		return output;
     	}
