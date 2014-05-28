@@ -555,6 +555,10 @@ public class CGTable implements QueryResult {
         }
     }
     
+    /**
+     * The usual string representation of a CGTable instance.
+     * @return a string representation of CGTable
+     */
     @Override
     public String toString() {
         StringBuilder sbuf = new StringBuilder("C(");
@@ -580,6 +584,11 @@ public class CGTable implements QueryResult {
         else return String.format("%-10s", s);
     }
     
+    /**
+     * Pretty-print of a CGTable instance. 
+     * Prints enumerable variable assignments as table, associated with a probability, then 
+     * non-enumerable variable assignments in their original form, conditioned on enumerables.
+     */
     public void display() {
         if (this.isAtomic()) { // does not have enumerable variables
             System.out.println(this.atomicFactor.toString());
@@ -600,7 +609,7 @@ public class CGTable implements QueryResult {
         List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
         for (Variable nonenum : nonenums) 
             System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));
-        System.out.println(" F");
+        System.out.println(" P");
         for (int i = 0; i < factorTable.getSize(); i++) {
             System.out.print(String.format("%3d ", i));
             Object[] key = factorTable.getKey(i);
@@ -619,6 +628,11 @@ public class CGTable implements QueryResult {
         }
     }
 
+    /**
+     * Pretty-print of a CGTable instance. 
+     * Prints enumerable variable assignments as table, associated with a probability, then 
+     * non-enumerable variable assignments as means of samples, conditioned on enumerables.
+     */
     public void displaySampled() {
         if (this.isAtomic()) { // does not have enumerable variables
             System.out.println(this.atomicFactor.toString());
@@ -644,7 +658,7 @@ public class CGTable implements QueryResult {
         List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
         for (Variable nonenum : nonenums) 
             System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));
-        System.out.println(" F");
+        System.out.println(" P");
         for (int i = 0; i < factorTable.getSize(); i++) {
             System.out.print(String.format("%3d ", i));
             Object[] key = factorTable.getKey(i);
@@ -667,16 +681,25 @@ public class CGTable implements QueryResult {
         }
     }
 
+    /**
+     * Retrieve JPT from results.
+     * 
+     * @return JPT of result (result for enumerables only)
+     * @deprecated This method is implemented but only because QueryResult requires it. Do not use.
+     */
+    @Deprecated
     @Override
     public JPT getJPT() {
         return new JPT(factorTable);
     }
 
+    @Deprecated
     @Override
     public Map<Variable, EnumTable<Distrib>> getNonEnum() {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
+    @Deprecated
     @Override
     public Map<Variable, Distrib> getNonEnumDistrib() {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
