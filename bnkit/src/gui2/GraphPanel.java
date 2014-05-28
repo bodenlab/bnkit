@@ -637,6 +637,8 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
             // Just iterate through elements in nodems??
 
             NodeModel nm = new NodeModel(node);
+            // check if parents is null beforehand
+//            NodeModel nm = new NodeModel( node.getVariable(), node.getParents());
 
             Variable var = nm.getVariable();
             if (var != null) {
