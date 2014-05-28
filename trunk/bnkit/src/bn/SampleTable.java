@@ -104,58 +104,6 @@ public class SampleTable<T> implements Serializable {
     public void count(Object[] key, T value) {
         count(key, value, 1.0);
     }
-
-    /**
-     * Create distribution of samples collected in table
-     * @param qTab query table containing sample table and query node
-     */
-    public void maximizeInstance(QueryTable qTab) {
-        int maxrows = qTab.getQuery().getTable().getSize();
-        double maxVar = 0;  				// the largest variance of any class  
-        double[] means = new double[maxrows]; // save the means 
-        double[] vars = new double[maxrows]; 	// save the variances
-        double middleMean = 0; 				// the mean of all values
-        double middleVar = 0;					// the variance of all values
-        double middleTot = 0;					// the sum of count for all parent configs
-
-        // go through each possible setting of the parent nodes
-        for (Entry<Integer, List<Sample>> entry : table.getMapEntries()) {
-            int index = entry.getKey().intValue();
-            Object[] key = table.getKey(index); // the values of the parent nodes, same as for CPT
-            List<Sample> samples = entry.getValue();
-            double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ... 
-            double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
-            double[] y = new double[samples.size()];	// the observations, i.e. observed values or scores
-            double[] p = new double[y.length]; 		// how often do we see this score GIVEN the parents (an absolute count)
-            int j = 0;
-            for (Sample sample : samples) {	// look at each value entry
-                y[j] = (Double)sample.instance;				// actual value (or score)
-                p[j] = sample.prob;			// p(class=key) i.e. the height of the density for this parent config  
-                sum += y[j] * p[j];					// update the numerator of the mean calc
-                tot += p[j];						// update the denominator of the mean calc
-                j++;
-            }
-            means[index] = sum / tot;
-            double diff = 0;
-            for (int jj = 0; jj < y.length; jj++) {
-                diff += (means[index] - y[jj]) * (means[index] - y[jj]) * p[jj];
-            }
-            vars[index] = diff / tot;
-            if (vars[index] < 0.01) {
-                vars[index] = 0.01;
-            }
-            if (vars[index] > maxVar) {
-                maxVar = vars[index];
-            }
-            // note the same key/index for both the CPT and the Sample table
-//            this.put(key, new GaussianDistrib(means[index], vars[index]));
-            middleTot += tot;
-            middleMean += sum;
-            GaussianDistrib d = new GaussianDistrib(means[index], vars[index]);
-//            qTab.getNonEnumTable().setValue(key,  d);
-            qTab.getQuery().getTable().setValue(key, d);
-        }
-    }
     
     public void display() {
         table.display();

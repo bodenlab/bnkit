@@ -2,36 +2,18 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
-import bn.CPT;
-import bn.CountTable;
 import bn.DataSample;
 import bn.Distrib;
-import bn.EnumDistrib;
 import bn.EnumTable;
-import bn.EnumVariable;
-import bn.Enumerable;
-import bn.FactorTable;
 import bn.GaussianDistrib;
 import bn.JPT;
-import bn.MixtureDistrib;
 import bn.Predef;
-import bn.QueryTable;
-import bn.SampleTable;
-import bn.SampleTable.Sample;
 import bn.Variable;
 
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
-import java.util.Set;
 
 /** 
  * Approximate inference in Bayesian network by Gibbs algorithm (MCMC).
