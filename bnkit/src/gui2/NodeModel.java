@@ -12,6 +12,7 @@ import bn.Continuous;
 import bn.Distrib;
 import bn.EnumTable;
 import bn.EnumVariable;
+import bn.Factor;
 import bn.FactorTable;
 import bn.GDT;
 import bn.Variable;
@@ -25,6 +26,16 @@ import java.util.List;
  */
 //http://stackoverflow.com/questions/1658702/how-do-i-make-a-class-extend-observable-when-it-has-extended-another-class-too
 public class NodeModel implements Observable, BNode {
+
+    @Override
+    public Factor makeFactor(BNet bn) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public void countInstance(Object[] key, Object value) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
 
     private enum DistributionType {
         GDT, CPT
@@ -263,10 +274,10 @@ public class NodeModel implements Observable, BNode {
         return bnode.getInstance();
     }
 
-    @Override
-    public FactorTable makeFactor(BNet bn) {
-        return bnode.makeFactor(bn);
-    }
+//    @Override
+//    public FactorTable makeFactor(BNet bn) {
+//        return bnode.makeFactor(bn);
+//    }
 
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
