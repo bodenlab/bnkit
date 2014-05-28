@@ -2,7 +2,7 @@
  * 
  */
 package bn.example;
-import bn.alg.EMA;
+import bn.alg.ApproxInferCont;
 import bn.alg.LearningAlg;
 import bn.alg.EM;
 
@@ -32,9 +32,10 @@ public class LoadNTrain {
 		Object[][] data = DataBuf.load(data_file, nodes);
 
 		LearningAlg em = new EM(bn);
-//		LearningAlg em = new EMA(bn);
 		em.train(data, nodes);
-		BNBuf.save(bn, bn_file + "1.new");
+		BNBuf.save(bn, bn_file + "2.new");
+		
+//		TestNetwork tn = new TestNetwork(bn, data, "Variance");
 	}
 
 }
