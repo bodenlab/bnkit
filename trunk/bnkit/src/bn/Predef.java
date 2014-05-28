@@ -17,6 +17,7 @@
  */
 package bn;
 
+import gui2.NodeModel;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -108,6 +109,31 @@ public class Predef {
                     elist.add((EnumVariable) v);
                 }
                 return new GDT((Variable<Continuous>) var, elist);
+            }
+            return null;
+        } catch (ClassCastException e) {
+            return null;
+        }
+    }
+    
+    @SuppressWarnings("rawtypes")
+    public static NodeModel getNodeModel(Variable var, List<Variable> parents, String type) {
+        if (parents == null) {
+            parents = new ArrayList<>();
+        }
+        try {
+            if (type.equalsIgnoreCase("CPT")) {
+                List<EnumVariable> elist = new ArrayList<>();
+                for (Variable v : parents) {
+                    elist.add((EnumVariable) v);
+                }
+                return new NodeModel((EnumVariable) var, elist);
+            } else if (type.equalsIgnoreCase("GDT")) {
+                List<EnumVariable> elist = new ArrayList<>();
+                for (Variable v : parents) {
+                    elist.add((EnumVariable) v);
+                }
+                return new NodeModel((Variable<Continuous>) var, elist);
             }
             return null;
         } catch (ClassCastException e) {
