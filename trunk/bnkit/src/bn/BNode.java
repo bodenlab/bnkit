@@ -134,7 +134,15 @@ public interface BNode {
     public Object getInstance();
 
     /**
-     * Make BNode into a FactorTable
+     * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
+     * Requires all parent nodes to be instantiated.
+     * @param bn the Bayesian network with instantiations
+     * @return the distribution of the variable for this node
+     */
+    public Distrib evalInstance(BNet bn);
+    
+    /**
+     * Make BNode into a Factor
      */
     public Factor makeFactor(BNet bn);
 

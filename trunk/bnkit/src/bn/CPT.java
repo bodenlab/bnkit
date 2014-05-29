@@ -206,7 +206,24 @@ public class CPT implements BNode, Serializable {
     }
 
     /**
-     * Make a FactorTable out of this CPT. If a variable is instantiated it will
+     * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
+     * Requires all parent nodes to be instantiated.
+     * @param bn the Bayesian network with instantiations
+     * @return the distribution of the variable for this node
+     */
+    public Distrib evalInstance(BNet bn) {
+        if (nParents == 0)
+            return this.getDistrib();
+        Object[] key = bn.getEvidenceKey(this);
+        try {
+            return this.table.getValue(key);
+        } catch (EnumTableRuntimeException e) {
+            throw new RuntimeException("Evaluation of CPT " + this.toString() + " failed since condition was not fully specified: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Make a Factor out of this CPT. If a variable is instantiated it will
      * be factored out.
      *
      * @param bn the BNet instance that can be used to check the status of nodes

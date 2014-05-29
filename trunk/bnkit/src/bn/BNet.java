@@ -392,14 +392,15 @@ public class BNet implements Serializable {
         List<EnumVariable> parents = node.getParents();
         Object[] bkey = new Object[parents.size()];
         for (int i = 0; i < bkey.length; i++) {
-            BNode parent = this.getNode(parents.get(i).toString());
+            BNode parent = this.getNode(parents.get(i)); // changed this from a string-search (based on .toString)
             bkey[i] = parent.getInstance();
         }
         return bkey;
     }
 
+    
     /**
-     * Determine which subset of CPTs that are relevant to a specific query and
+     * Determine which subset of nodes that are relevant to a specific query and
      * evidence combination. "Every variable that is not an ancestor of a query
      * variable or evidence variable is irrelevant to the query" (Russell and
      * Norvig, 2002, p. 509).
