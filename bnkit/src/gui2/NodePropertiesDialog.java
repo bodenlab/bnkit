@@ -139,6 +139,8 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
             }
 
             // Generate JRadioButtons for parameters.
+            // TODO: Bug where clicking elsewhere causes selectedRadioButton to
+            // be set to null.
             for (String s : paramsList) {
                 dummybtn = new JRadioButton(s);
                 dummybtn.addActionListener(new ActionListener() {
