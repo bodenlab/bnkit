@@ -286,7 +286,8 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
             // number node predef and name
             if (predef.equalsIgnoreCase("Number")) {
                 nm.getVariable().setPredef("Number");
-                nm.getVariable().setName("Number node-" + nodeCounts.get("Number"));
+                nm.getVariable().setName("Number node-" + (nodeCounts.get("Number") -1));
+                System.out.println("name is:" + "Number node-" + nodeCounts.get("Number"));
             }
 
 //            model.getBNC().addNode(newBNode);
