@@ -5,6 +5,8 @@
  */
 package gui2;
 
+import com.mxgraph.model.mxCell;
+import com.mxgraph.view.mxGraph;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import javax.swing.JButton;
@@ -30,7 +32,7 @@ public class BNController implements Observer {
      * Initialises handler events for View class MainJFrame.
      */
     public void InitButtonHandlers() {
-        
+
         // Only used if MainJFrame using Button node implementation
         if (mainFrame.usingButtons) {
             // Configure action handlers for add node buttons
@@ -48,7 +50,7 @@ public class BNController implements Observer {
             }
         } else {
             // Configure action handlers for drag-drop labels
-            
+
         }
         mainFrame.getDeleteButton().addActionListener(new ActionListener() {
             @Override
@@ -69,7 +71,7 @@ public class BNController implements Observer {
             public void actionPerformed(ActionEvent e) {
                 graphPanel.renderNetwork(model.getBNC());
                 graphPanel.setLayout("");
-                for (NodeModel node: model.getBNC().getNodeModelArr().values()){
+                for (NodeModel node : model.getBNC().getNodeModelArr().values()) {
                     System.out.println(" >Node is: " + node.getName());
                 }
             }
@@ -90,8 +92,41 @@ public class BNController implements Observer {
         });
 
         mainFrame.getLayoutButton().addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 graphPanel.setLayout("");
+            }
+        });
+
+        mainFrame.getSetQueryButton().addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                java.util.List<Object> cells = graphPanel.getSelectedCells();
+                if (cells.size() == 1) {
+                    mainFrame.setQueryLbl("<html>Query Node: " + ((mxCell) cells.get(0)).getValue());
+                    
+                    BNContainer bnc = graphPanel.getBNContainer();
+                    NodeModel node = bnc.getNodeModel((String)((mxCell) cells.get(0)).getValue());
+                    
+                    if (node == null) {
+                        System.err.println("Oops, done soemthing wrong");
+                    } else {
+                        node.setInstance(null);
+                        node.setInferenceModel("QUERY");
+                        graphPanel.setQueryNode(node);
+                    }
+                    
+                } else {
+                    mainFrame.setQueryLbl("<html>Query Node: error, select one query cell.");
+                }
+            }
+
+        });
+
+        mainFrame.getSetInferButton().addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                graphPanel.doInference();
             }
         });
     }

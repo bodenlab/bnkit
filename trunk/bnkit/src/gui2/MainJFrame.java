@@ -28,7 +28,6 @@ public class MainJFrame extends javax.swing.JFrame{
     BNContainer bnc;
     gui2.GraphPanel graphPanel;
     ArrayList<JButton> BtnArr = new ArrayList<>();
-    JPanel queryResultPanel;
     public boolean usingButtons;
 
     /**
@@ -60,6 +59,11 @@ public class MainJFrame extends javax.swing.JFrame{
         deleteAllBtn = new javax.swing.JButton();
         applyLayoutBtn = new javax.swing.JButton();
         jButtonRefresh = new javax.swing.JButton();
+        jPanel1 = new javax.swing.JPanel();
+        queryNodeLbl = new javax.swing.JLabel();
+        setQueryBtn = new javax.swing.JButton();
+        inferenceBtn = new javax.swing.JButton();
+        inferResultLbl = new javax.swing.JLabel();
         jMenuBarMain = new javax.swing.JMenuBar();
         jMenuFile = new javax.swing.JMenu();
         jMenuItemOpen = new javax.swing.JMenuItem();
@@ -108,19 +112,61 @@ public class MainJFrame extends javax.swing.JFrame{
         jButtonRefresh.setText("Refresh");
         actionsPanel.add(jButtonRefresh);
 
+        jPanel1.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+
+        queryNodeLbl.setText("Query Node: null");
+
+        setQueryBtn.setText("Set Query");
+
+        inferenceBtn.setText("Infer");
+
+        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
+        jPanel1.setLayout(jPanel1Layout);
+        jPanel1Layout.setHorizontalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(inferResultLbl, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addComponent(setQueryBtn)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(inferenceBtn))
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addComponent(queryNodeLbl, javax.swing.GroupLayout.PREFERRED_SIZE, 213, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(0, 0, Short.MAX_VALUE)))
+                .addContainerGap())
+        );
+        jPanel1Layout.setVerticalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(queryNodeLbl)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(inferResultLbl, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(setQueryBtn)
+                    .addComponent(inferenceBtn))
+                .addContainerGap())
+        );
+
         javax.swing.GroupLayout panelContainerPanelLayout = new javax.swing.GroupLayout(panelContainerPanel);
         panelContainerPanel.setLayout(panelContainerPanelLayout);
         panelContainerPanelLayout.setHorizontalGroup(
             panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, panelContainerPanelLayout.createSequentialGroup()
-                .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 246, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addGroup(panelContainerPanelLayout.createSequentialGroup()
+                .addGroup(panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                    .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 246, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(0, 0, Short.MAX_VALUE))
         );
         panelContainerPanelLayout.setVerticalGroup(
             panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(panelContainerPanelLayout.createSequentialGroup()
                 .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 111, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 426, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         jMenuFile.setText("File");
@@ -199,6 +245,14 @@ public class MainJFrame extends javax.swing.JFrame{
         return jButtonRefresh;
     }
 
+    public JButton getSetQueryButton() {
+        return setQueryBtn;
+    }
+    
+    public JButton getSetInferButton() {
+        return inferenceBtn;
+    }
+    
     public void initDrawPanel() {
         // adds the graph panel to drawPanel.
         GroupLayout layout = new GroupLayout(drawPanel);
@@ -222,9 +276,7 @@ public class MainJFrame extends javax.swing.JFrame{
         
         // Also initialise the queryResultPanel
         panelContainerPanel.setLayout(new java.awt.BorderLayout());
-        queryResultPanel = new JPanel();
-        panelContainerPanel.add(queryResultPanel);
-//        queryResultPanel.setBackground(Color.red);
+
         
         // needs a button at the bottom left.
     }
@@ -301,6 +353,14 @@ public class MainJFrame extends javax.swing.JFrame{
         addNodePanel.setVisible(true);
     }
 
+    public void setQueryLbl(String txt){
+        queryNodeLbl.setText(txt);
+    }
+    
+    public void setInferResultLbl (String txt){
+        inferResultLbl.setText(txt);
+    }
+    
 //    @Override
 //    public void update() {
 //        // Update the View. Called by the Model
@@ -336,6 +396,8 @@ public class MainJFrame extends javax.swing.JFrame{
     private javax.swing.JButton deleteAllBtn;
     private javax.swing.JButton deleteSelectedBtn;
     private javax.swing.JPanel drawPanel;
+    private javax.swing.JLabel inferResultLbl;
+    private javax.swing.JButton inferenceBtn;
     private javax.swing.JButton jButtonRefresh;
     private javax.swing.JMenuBar jMenuBarMain;
     private javax.swing.JMenu jMenuEdit;
@@ -343,7 +405,10 @@ public class MainJFrame extends javax.swing.JFrame{
     private javax.swing.JMenu jMenuHelp;
     private javax.swing.JMenuItem jMenuItemOpen;
     private javax.swing.JMenuItem jMenuItemSave;
+    private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel panelContainerPanel;
+    private javax.swing.JLabel queryNodeLbl;
+    private javax.swing.JButton setQueryBtn;
     // End of variables declaration//GEN-END:variables
 
 }

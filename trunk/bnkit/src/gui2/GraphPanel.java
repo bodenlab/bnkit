@@ -8,9 +8,12 @@ package gui2;
 import bn.BNet;
 import bn.BNode;
 import bn.EnumVariable;
+import bn.JPT;
 import bn.Predef;
 import bn.Variable;
+import bn.alg.CGTable;
 import bn.alg.CGVarElim;
+import bn.alg.Query;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.layout.mxGraphLayout;
 import com.mxgraph.layout.mxParallelEdgeLayout;
@@ -46,13 +49,9 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JFileChooser;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
-import javax.swing.TransferHandler;
-import javax.swing.filechooser.FileFilter;
-import javax.swing.filechooser.FileNameExtensionFilter;
 
 /**
  *
@@ -69,6 +68,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     private List<NodeModel> nodeModels = new ArrayList<>();
     private BNModel model;
     private Map<String, Integer> nodeCounts = new HashMap<>();
+    private NodeModel queryNode; // For now, there is only one query node
 
     public mxGraphComponent getGraphComponent() {
         return graphComponent;
@@ -86,6 +86,14 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         return bnc;
     }
 
+    public NodeModel getQueryNode(){
+        return queryNode;
+    }
+    
+    public void setQueryNode(NodeModel node){
+        queryNode = node;
+    }
+    
     public void defStyleSheets(mxGraph graph) {
         String STRING_STYLE = "STRING_STYLE";
         String BOOL_STYLE = "BOOL_STYLE";
@@ -136,6 +144,10 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         }
     }
 
+    public List<Object> getSelectedCells(){
+        return selectedCells;
+    }
+    
     public void addCellSelection(Object o) {
         selectedCells.add(o);
     }
@@ -634,22 +646,17 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
      */
     public void doInference(){
         // Check Query node is not Evidenced.
-        NodeModel queryNode = null;
         BNet bn = new BNet();
         for (NodeModel nm: bnc.getNodeModelArr().values()){
             if (nm.getInferenceModel().equalsIgnoreCase("Evidence")){
-                bn.add(nm); // expects cpt or GDT
-
-                // Retrive the parameter which is set and set that instance.
-                // i.e. for boolean nodes, use True.
-                
-//                nm.setInstance(true);
+                bn.add(nm.getBNode()); // expects cpt or GDT
             }
         }
         CGVarElim ve = new CGVarElim();
-//        Query q = ve.makeQuery(queryNode);
-//        JPT jpt = ve.infer(q).getJPT();
-//        jpt.display;
+        ve.instantiate(bn);
+        Query q = ve.makeQuery(queryNode.getVariable());
+        CGTable res = (CGTable)ve.infer(q);
+        res.display();
         
     }
     
