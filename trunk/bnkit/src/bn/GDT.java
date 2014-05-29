@@ -69,12 +69,13 @@ public class GDT implements BNode, Serializable {
      */
     public GDT(Variable<Continuous> var, List<EnumVariable> parents) {
         this.var = var;
+        int maxrows = 0;
         if (parents != null) {
             if (parents.size() > 0) {
                 this.table = new EnumTable<>(parents);
+                maxrows = this.table.getSize();
             }
         }
-        int maxrows = this.table.getSize();
         means = new double[maxrows];
         vars = new double[maxrows];
         n = new double[maxrows];
@@ -103,6 +104,23 @@ public class GDT implements BNode, Serializable {
         vars = new double[maxrows];
         n = new double[maxrows];
     }
+    
+    /**
+     * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
+     * Requires all parent nodes to be instantiated.
+     * @param key the parent values
+     * @return the distribution of the variable for this node
+     */
+    public Distrib getDistrib(Object[] key) {
+        if (this.table == null || key == null)
+            return this.getDistrib();
+        try {
+            return this.table.getValue(key);
+        } catch (EnumTableRuntimeException e) {
+            throw new RuntimeException("Evaluation of GDT " + this.toString() + " failed since condition was not fully specified: " + e.getMessage());
+        }
+    }
+    
 
     /**
      * Make a FactorTable out of this GDT. If a variable is instantiated it will
