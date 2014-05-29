@@ -25,7 +25,7 @@ import java.util.List;
  * in EnumVariable var's members are observed.
  */
 //http://stackoverflow.com/questions/1658702/how-do-i-make-a-class-extend-observable-when-it-has-extended-another-class-too
-public class NodeModel implements Observable, BNode {
+public class NodeModel implements BNode {
 
     @Override
     public Factor makeFactor(BNet bn) {
@@ -162,57 +162,57 @@ public class NodeModel implements Observable, BNode {
         return names;
     }
     
-    @Override
-    public void register(Observer obj) {
-        if (obj == null) {
-            throw new NullPointerException("Null Observer");
-        }
-        synchronized (MUTEX) {
-            if (!observers.contains(obj)) {
-                observers.add(obj);
-            }
-        }
-    }
-
-    @Override
-    public void unregister(Observer obj) {
-        synchronized (MUTEX) {
-            observers.remove(obj);
-        }
-    }
-
-    @Override
-    public void notifyObservers() {
-        List<Observer> observersLocal = null;
-        // This needs to be thread-safe!
-        synchronized (MUTEX) {
-            if (!changed) {
-                return;
-            }
-            observersLocal = new ArrayList<>(this.observers);
-            this.changed = false;
-        }
-        for (Observer obj : observersLocal) {
-            obj.update();
-        }
-    }
+//    @Override
+//    public void register(Observer obj) {
+//        if (obj == null) {
+//            throw new NullPointerException("Null Observer");
+//        }
+//        synchronized (MUTEX) {
+//            if (!observers.contains(obj)) {
+//                observers.add(obj);
+//            }
+//        }
+//    }
+//
+//    @Override
+//    public void unregister(Observer obj) {
+//        synchronized (MUTEX) {
+//            observers.remove(obj);
+//        }
+//    }
+//
+//    @Override
+//    public void notifyObservers() {
+//        List<Observer> observersLocal = null;
+//        // This needs to be thread-safe!
+//        synchronized (MUTEX) {
+//            if (!changed) {
+//                return;
+//            }
+//            observersLocal = new ArrayList<>(this.observers);
+//            this.changed = false;
+//        }
+//        for (Observer obj : observersLocal) {
+//            obj.update();
+//        }
+//    }
 
     public void setName(String name) {
         this.bnode.getVariable().setName(name);
         changed = true;
-        notifyObservers();
+//        notifyObservers();
     }
 
     public void setParams(String name) {
         this.bnode.getVariable();
         changed = true;
-        notifyObservers();
+//        notifyObservers();
     }
 
-    @Override
-    public Object getUpdate(Observer obj) {
-        return this.getVariable();
-    }
+//    @Override
+//    public Object getUpdate(Observer obj) {
+//        return this.getVariable();
+//    }
 
     @Override
     public String getName() {
@@ -239,7 +239,7 @@ public class NodeModel implements Observable, BNode {
         // need to do this more intelligently...
         // should watch for a change in stored BNode
         changed = true;
-        notifyObservers();
+//        notifyObservers();
         return bnode.getVariable();
     }
 
@@ -251,7 +251,7 @@ public class NodeModel implements Observable, BNode {
     @Override
     public EnumTable getTable() {
         changed = true;
-        notifyObservers();
+//        notifyObservers();
         return bnode.getTable();
     }
 
@@ -278,7 +278,7 @@ public class NodeModel implements Observable, BNode {
     @Override
     public boolean setState(String dump) {
         changed = true;
-        notifyObservers();
+//        notifyObservers();
         boolean success = bnode.setState(dump);
         if (success){
             System.out.println("set state success");
@@ -296,7 +296,7 @@ public class NodeModel implements Observable, BNode {
     @Override
     public void setInstance(Object value) {
         changed = true;
-        notifyObservers();
+//        notifyObservers();
         bnode.setInstance(value);
     }
 

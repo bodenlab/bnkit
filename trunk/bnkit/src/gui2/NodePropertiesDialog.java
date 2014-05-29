@@ -31,12 +31,13 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
     private javax.swing.JButton cancelBtn;
     private javax.swing.JCheckBox evidenceCheck; // signifies whether node is Evidence.
     private javax.swing.JPanel radioPanel;
+    private javax.swing.JTextField optField;
     private ButtonGroup checkButtonGroup;
     private GraphPanel graphPanel;
     private NodeModel nodeModel;
 
     private BNContainer bnc;
-    private Object selectedRadioButton;
+    private JRadioButton selectedRadioButton;
 
     public NodePropertiesDialog(java.awt.Frame parent, boolean modal, NodeModel nm, GraphPanel gp) {
         super(parent, modal);
@@ -95,78 +96,76 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
 
         radioPanel = new javax.swing.JPanel();
         radioPanel.setVisible(true);
-        
+
         // Generate radioButtons for the parameters.
         JRadioButton dummybtn;
         ArrayList<JRadioButton> buttonArr = new ArrayList<>();
         checkButtonGroup = new ButtonGroup();
+        javax.swing.JLabel evidenceLbl = new javax.swing.JLabel("Evidenced value");
         
-        evidenceCheck = new javax.swing.JCheckBox("Is Evidence node");
-        evidenceCheck.setSelected(true);
-
-        evidenceCheck.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                boolean state = ((javax.swing.JCheckBox) e.getSource()).isSelected();
-                radioPanel.setVisible(state);
-                if (state) {
-                    // Check if there is already a set parameter checkbox
-                    // How to do this??
-                    
-                } else {
-                    checkButtonGroup.clearSelection();
-                }
-
-            }
-
-        });
-
         
-
         // TODO: handling here is hardcoded for now, need a more elegant way of
         // checking predef types
         // Loop through parameters if String...
         // If Number, enumerate 1 - Max num
         ArrayList<String> paramsList = new ArrayList<>();
-        
+
         if (nodeModel == null) {
             System.out.println("NodePropertiesFialog constructed with null NodeModel");
         }
         String params = nodeModel.getVariable().getParams();
-        if (nodeModel.getVariable().getPredef().equalsIgnoreCase("String")) {
-            paramsList.addAll(Arrays.asList(params.split(";")));
-        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Boolean")){
-            paramsList.addAll(Arrays.asList("True", "False"));
-        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Number")){
-            for (int i = 1; i < Integer.parseInt(params); i++){
-                paramsList.add(String.valueOf(i));
-            }
-        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Amino acid")){
-            paramsList.addAll(Arrays.asList("A", "T", "C", "G")); // revise this later
-        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Nucleic acid")){
-            paramsList.add("In development");
-        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Real")){
-            // Real nodes are handled differently, should take a specific input value.
-            paramsList.add("In development"); 
-            
-        } else {
-            paramsList.add("In development");
-        }
-//        for (String s : nodeModel.getModelNames()) {
-        for (String s : paramsList){
-            dummybtn = new JRadioButton(s);
-            dummybtn.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent e) {
-                    AbstractButton thisbtn = (AbstractButton) e.getSource();
-                    selectedRadioButton = thisbtn;
-                    System.out.println("selected radiobutton: "
-                            + ((JRadioButton) selectedRadioButton).getText());
+
+//        if (nodeModel.)
+        if (Predef.getBNodeType(nodeModel.getVariable().getPredef()).equalsIgnoreCase("CPT")) {
+            paramsList.add("None"); // will need to put check in palce to prevent user from entering a parameter named
+            // "None".
+            if (nodeModel.getVariable().getPredef().equalsIgnoreCase("String")) {
+                paramsList.addAll(Arrays.asList(params.split(";")));
+            } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Boolean")) {
+                paramsList.addAll(Arrays.asList("True", "False"));
+            } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Number")) {
+                for (int i = 1; i < Integer.parseInt(params); i++) {
+                    paramsList.add(String.valueOf(i));
                 }
-            });
-            buttonArr.add(dummybtn);
-            checkButtonGroup.add(dummybtn);
-            radioPanel.add(dummybtn);
+            } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Amino acid")) {
+
+                System.out.println("AA params: " + Predef.AminoAcid().getDomain().toString());
+//                paramsList.addAll(Arrays.asList("A", "T", "C", "G")); // revise this later
+                paramsList.add("In development");
+            } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Nucleic acid")) {
+                paramsList.add("In development");
+            } else {
+                paramsList.add("In development");
+            }
+
+            // Generate JRadioButtons for parameters.
+            for (String s : paramsList) {
+                dummybtn = new JRadioButton(s);
+                dummybtn.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent e) {
+                        AbstractButton thisbtn = (AbstractButton) e.getSource();
+                        selectedRadioButton = (JRadioButton) thisbtn;
+                        System.out.println("selected radiobutton: "
+                                + ((JRadioButton) selectedRadioButton).getText());
+                    }
+                });
+                buttonArr.add(dummybtn);
+                checkButtonGroup.add(dummybtn);
+                radioPanel.add(dummybtn);
+            }
+        } else { //GDT
+            optField = new javax.swing.JTextField();
+            optField.setColumns(10);
+            radioPanel.add(optField);
+            if (nodeModel.getInstance() != null) {
+                optField.setText(String.valueOf(nodeModel.getInstance()));
+            }
+        }
+        
+         // Select checkboxes if node is evidenced.
+        if (nodeModel.getInstance() != null &&
+                Predef.getBNodeType(nodeModel.getVariable().getPredef()).equalsIgnoreCase("CPT")){
+            setParameterBoxes();
         }
 
         applyBtn.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -208,7 +207,8 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                                         .addGap(0, 0, Short.MAX_VALUE)))
                         .addContainerGap())
                 //                .addGroup(hgroup)
-                .addComponent(evidenceCheck)
+                //                .addComponent(evidenceCheck)
+                .addComponent(evidenceLbl)
                 .addComponent(radioPanel)
                 .addGroup(propertiesPanelLayout.createSequentialGroup()
                         .addGap(36, 36, 36)
@@ -232,7 +232,8 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                         .addComponent(nodeDescriptionLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 61, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 7, Short.MAX_VALUE)
                         //                        .addGroup(vgroup)
-                        .addComponent(evidenceCheck)
+                        //                        .addComponent(evidenceCheck)
+                        .addComponent(evidenceLbl)
                         .addComponent(radioPanel)
                         .addGroup(propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                                 .addComponent(applyBtn)
@@ -299,33 +300,92 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         nodeModel.getVariable().setParams(nodeParametersField.getText());
 //        nodeModel.setModel(((JRadioButton) selectedRadioButton).getText());
 
-        // when is the node 'QUERY'?
-        if (evidenceCheck.isSelected()) {
-            nodeModel.setInferenceModel("Evidence");
-            // TODO: decide how to instance the node!
-//            nodeModel.setInstance(selectedRadioButton);
-            
+//        if (evidenceCheck.isSelected()) {
+//            nodeModel.setInferenceModel("Evidence");
+//            // TODO: decide how to instance the node!
+////            nodeModel.setInstance(selectedRadioButton);
+//
+//        } else {
+//            nodeModel.setInferenceModel("Ignore");
+//        }
+        if (Predef.getBNodeType(nodeModel.getVariable().getPredef()).equalsIgnoreCase("CPT")) {
+            if (checkParameterBox().equals("null")) {
+                nodeModel.setInferenceModel("IGNORE");
+                nodeModel.setInstance(null);
+            } else {
+                nodeModel.setInferenceModel("Evidence");
+                nodeModel.setInstance(checkParameterBox());
+            }
         } else {
-            nodeModel.setInferenceModel("Ignore");
+            if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Real")) {
+                if (optField.getText().isEmpty()) {
+                    nodeModel.setInferenceModel("IGNORE");
+                    nodeModel.setInstance(null);
+                }
+                nodeModel.setInferenceModel("Evidence");
+                try {
+                    nodeModel.setInstance(Double.parseDouble(optField.getText()));
+                } catch (NumberFormatException e){
+                    
+                }
+            }
         }
         dispose();
     }
 
-    private Object checkParameterBox(){
-        String checkTxt = checkButtonGroup.getSelection().getActionCommand();
-        if (nodeModel.getVariable().getPredef().equalsIgnoreCase("String")){
-            return checkTxt;
-        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Boolean")){
-            if (checkTxt.equalsIgnoreCase("true")){
-                return true;
+    private void setParameterBoxes(){
+        String instanceString = "";
+        instanceString = nodeModel.getInstance().toString();
+        java.util.Enumeration<AbstractButton> radioButtons = checkButtonGroup.getElements();
+        // TODO: wrap casts in try catches
+        if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Boolean")) {
+            if ((Boolean) nodeModel.getInstance()){
+                instanceString = "True";
             } else {
-                return false;
+                instanceString = "False";
             }
-        }   
+        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Number")) {
+            instanceString = String.valueOf((Integer) nodeModel.getInstance());
+        } else {
+            instanceString = (String) nodeModel.getInstance();
+        }
+        while (radioButtons.hasMoreElements()){
+            AbstractButton b = radioButtons.nextElement();
+            if (((JRadioButton) b).getText().equalsIgnoreCase(instanceString)){ // CHECK THIS.
+                checkButtonGroup.setSelected(b.getModel(), true);
+            }
+        }
         
-        return null;
     }
     
+    private Object checkParameterBox() {
+
+        if (Predef.getBNodeType(nodeModel.getVariable().getPredef()).equalsIgnoreCase("CPT")) {
+            String checkTxt = selectedRadioButton.getText();
+            if (nodeModel.getVariable().getPredef().equalsIgnoreCase("String")) {
+                return checkTxt;
+            } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Boolean")) {
+                if (checkTxt.equalsIgnoreCase("true")) {
+                    return true;
+                } else if (checkTxt.equalsIgnoreCase("false")) {
+                    return false;
+                } else {
+                    return "null";
+                }
+            } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Number")) {
+                // check for null first...
+                try {
+                    return Integer.parseInt(checkTxt);
+                } catch (NumberFormatException e) {
+                    return "null";
+                }
+            }
+        } else {
+            System.err.println("Calling checkParameterBox() for a continuous variable.");
+        }
+        return null;
+    }
+
     private void cancelBtnPressed(java.awt.event.MouseEvent evt) {
         dispose();
     }

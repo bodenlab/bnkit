@@ -277,7 +277,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         String type = Predef.getBNodeType(predef);
         nodeCounts.put(predef, nodeCounts.get(predef) + 1);
         Variable var = Predef.getVariable(name, predef, params);
-        if (Predef.getBNodeType(predef).equalsIgnoreCase("CPT")) {
+        if (type.equalsIgnoreCase("CPT")) {
             NodeModel nm = Predef.getNodeModel(var, new ArrayList<Variable>(), type);
 
             //TODO: investigate this...
@@ -293,6 +293,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
 //            model.getBNC().addNode(nm);
             bnc.addNode(nm);
             System.out.println(">>node" +  nm.getName()+" added to bnc!!");
+            System.out.println("@ bnc:" + bnc.getNodeModelArr());
         } else {
             System.out.println("GPT case");
 //            BNode newBNode = Predef.getBNode(var, new ArrayList<Variable>(), type);
@@ -333,9 +334,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         }
         for (Object cell : selectedCells) {
             if (mxModel.isVertex(cell)) {
-                bnc.removeNode(bnc.getNodeModel(graph.getLabel(cell)));
                 String nodename = graph.getLabel(cell);
-                System.out.println("bnc " + bnc.getNodeModelArr().values());
                 BNode node = bnc.getNodeModel(nodename);
                 nodeCounts.put(node.getVariable().getPredef(), nodeCounts.get(node.getVariable().getPredef()) - 1);
                 bnc.removeNode(node);
