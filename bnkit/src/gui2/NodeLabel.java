@@ -7,9 +7,6 @@
 package gui2;
 
 import com.mxgraph.model.mxCell;
-import com.mxgraph.model.mxGeometry;
-import com.mxgraph.swing.util.mxGraphTransferable;
-import com.mxgraph.util.mxRectangle;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.dnd.DnDConstants;

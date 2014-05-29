@@ -23,7 +23,7 @@ import javax.swing.border.Border;
  *
  * @author Jun Ling
  */
-public class MainJFrame extends javax.swing.JFrame implements Observer {
+public class MainJFrame extends javax.swing.JFrame{
 
     BNContainer bnc;
     gui2.GraphPanel graphPanel;
@@ -225,6 +225,8 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         queryResultPanel = new JPanel();
         panelContainerPanel.add(queryResultPanel);
 //        queryResultPanel.setBackground(Color.red);
+        
+        // needs a button at the bottom left.
     }
 
     public ArrayList<JButton> getNodeButtons() {
@@ -299,24 +301,24 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         addNodePanel.setVisible(true);
     }
 
-    @Override
-    public void update() {
-        // Update the View. Called by the Model
-//        renderNetwork(bnc);
-        // Instead...
-        // What is the link between the view and the model?
-
-        final mxGraph graph = graphPanel.getGraph();
-        for (Object cell : graphPanel.getAllVertices()) {
-//             ((mxCell) cell).setValue("rofl");
-        }
-    }
-
-    @Override
-    public void setSubject(Observable sub) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
+//    @Override
+//    public void update() {
+//        // Update the View. Called by the Model
+////        renderNetwork(bnc);
+//        // Instead...
+//        // What is the link between the view and the model?
+//
+//        final mxGraph graph = graphPanel.getGraph();
+//        for (Object cell : graphPanel.getAllVertices()) {
+////             ((mxCell) cell).setValue("rofl");
+//        }
+//    }
+//
+//    @Override
+//    public void setSubject(Observable sub) {
+//        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+//    }
+//
     private void jMenuHelpActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuHelpActionPerformed
         String message = "<html>"
                 + "Basic Controls<br>"
