@@ -279,7 +279,6 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         nodeCounts.put(predef, nodeCounts.get(predef) + 1);
         Variable var = Predef.getVariable(name, predef, params);
         if (Predef.getBNodeType(predef).equalsIgnoreCase("CPT")) {
-            BNode newBNode = Predef.getBNode(var, new ArrayList<Variable>(), type);
             NodeModel nm = Predef.getNodeModel(var, new ArrayList<Variable>(), type);
 
             //TODO: investigate this...
@@ -287,15 +286,16 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
             // number node predef and name
             if (predef.equalsIgnoreCase("Number")) {
                 nm.getVariable().setPredef("Number");
-                nm.getVariable().setName("Number node");
+                nm.getVariable().setName("Number node-" + nodeCounts.get("Number"));
             }
 
 //            model.getBNC().addNode(newBNode);
             model.getBNC().addNode(nm);
         } else {
             System.out.println("GPT case");
-            BNode newBNode = Predef.getBNode(var, new ArrayList<Variable>(), type);
+//            BNode newBNode = Predef.getBNode(var, new ArrayList<Variable>(), type);
             NodeModel nm = Predef.getNodeModel(var, new ArrayList<Variable>(), type);
+            model.getBNC().addNode(nm);
         }
 
     }
@@ -345,7 +345,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
             addCellSelection(cell);
             removeVertex(cell);
         }
-        deleteSelected();
+//        deleteSelected();
         graph.removeCells(graph.getChildVertices(graph.getDefaultParent()));
         bnc.clear();
     }
@@ -548,17 +548,17 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
                 }
                 selectedCells.add(cell);
 
+                // TODO: set this node to QUERY!
+                
                 if (cell != null) {
 
                     // If right-click, open properties dialog
                     if (SwingUtilities.isRightMouseButton(e)) {
-                        BNode node = bnc.getNode(graph.getLabel(cell));
+//                        BNode node = bnc.getNode(graph.getLabel(cell));
 
+                        // Why is this failing?
+                        System.out.println("cell is: " + graph.getLabel(cell));
                         NodeModel nm = bnc.getNodeModel(graph.getLabel(cell));
-
-                        if (nm == null) {
-                            System.out.println("getLabel is: " + graph.getLabel(cell));
-                        }
 
                         // register listener here.
                         NodePropertiesDialog npp = new NodePropertiesDialog(null, true, nm, getGraphPanel());

@@ -100,6 +100,12 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
 
         radioPanel = new javax.swing.JPanel();
         radioPanel.setVisible(true);
+        
+        // Generate radioButtons for the parameters.
+        JRadioButton dummybtn;
+        ArrayList<JRadioButton> buttonArr = new ArrayList<>();
+        final ButtonGroup bgroup = new ButtonGroup();
+        
         evidenceCheck = new javax.swing.JCheckBox("Is Evidence node");
         evidenceCheck.setSelected(true);
 
@@ -111,24 +117,27 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                 radioPanel.setVisible(state);
                 if (state) {
                     // Check if there is already a set parameter checkbox
+                    // How to do this??
+                    
                 } else {
-                    // Clear the 'evidenced' parameter checkbox
+                    bgroup.clearSelection();
                 }
 
             }
 
         });
 
-        // Generate radioButtons for the parameters.
-        JRadioButton dummybtn;
-        ArrayList<JRadioButton> buttonArr = new ArrayList<>();
-        ButtonGroup bgroup = new ButtonGroup();
+        
 
         // TODO: handling here is hardcoded for now, need a more elegant way of
         // checking predef types
         // Loop through parameters if String...
         // If Number, enumerate 1 - Max num
         ArrayList<String> paramsList = new ArrayList<>();
+        
+        if (nodeModel == null) {
+            System.out.println("NodePropertiesFialog constructed with null NodeModel");
+        }
         String params = nodeModel.getVariable().getParams();
         if (nodeModel.getVariable().getPredef().equalsIgnoreCase("String")) {
             paramsList.addAll(Arrays.asList(params.split(";")));
@@ -142,6 +151,10 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
             paramsList.addAll(Arrays.asList("A", "T", "C", "G")); // revise this later
         } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Nucleic acid")){
             paramsList.add("In development");
+        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Real")){
+            // Real nodes are handled differently, should take a specific input value.
+            paramsList.add("In development"); 
+            
         } else {
             paramsList.add("In development");
         }
@@ -294,6 +307,8 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         // when is the node query?
         if (evidenceCheck.isSelected()) {
             nodeModel.setInferenceModel("Evidence");
+            // TODO: decide how to instance the node!
+//            nodeModel.setInstance(selectedRadioButton);
         } else {
             nodeModel.setInferenceModel("Ignore");
         }

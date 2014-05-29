@@ -239,6 +239,6 @@ public class BNContainer {
     }
     
     public void save(String filename) {
-        BNBuf.save(getBNet(), filename);
+        BNBuf.save(getBNetnm(), filename);
     }
 }

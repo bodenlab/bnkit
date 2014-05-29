@@ -28,6 +28,7 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
     BNContainer bnc;
     gui2.GraphPanel graphPanel;
     ArrayList<JButton> BtnArr = new ArrayList<>();
+    JPanel queryResultPanel;
     public boolean usingButtons;
 
     /**
@@ -217,6 +218,12 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
         } else {
             initNodeLbls();
         }
+        
+        // Also initialise the queryResultPanel
+        panelContainerPanel.setLayout(new java.awt.BorderLayout());
+        queryResultPanel = new JPanel();
+        panelContainerPanel.add(queryResultPanel);
+//        queryResultPanel.setBackground(Color.red);
     }
 
     public ArrayList<JButton> getNodeButtons() {
