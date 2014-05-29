@@ -76,6 +76,14 @@ public interface BNode {
      */
     public EnumTable getTable();
 
+    /**
+     * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
+     * Requires all parent nodes to be instantiated.
+     * @param key the parents' values
+     * @return the distribution of the variable for this node
+     */
+    public Distrib getDistrib(Object[] key);
+    
     public Distrib getDistrib();
 
     /**
@@ -133,14 +141,6 @@ public interface BNode {
      */
     public Object getInstance();
 
-    /**
-     * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
-     * Requires all parent nodes to be instantiated.
-     * @param bn the Bayesian network with instantiations
-     * @return the distribution of the variable for this node
-     */
-    public Distrib evalInstance(BNet bn);
-    
     /**
      * Make BNode into a Factor
      */

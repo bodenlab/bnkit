@@ -208,13 +208,12 @@ public class CPT implements BNode, Serializable {
     /**
      * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
      * Requires all parent nodes to be instantiated.
-     * @param bn the Bayesian network with instantiations
+     * @param key the parent values
      * @return the distribution of the variable for this node
      */
-    public Distrib evalInstance(BNet bn) {
-        if (nParents == 0)
+    public Distrib getDistrib(Object[] key) {
+        if (this.table == null || key == null)
             return this.getDistrib();
-        Object[] key = bn.getEvidenceKey(this);
         try {
             return this.table.getValue(key);
         } catch (EnumTableRuntimeException e) {
