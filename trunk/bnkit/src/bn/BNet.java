@@ -389,6 +389,8 @@ public class BNet implements Serializable {
      * nodes in the BN
      */
     public Object[] getEvidenceKey(BNode node) {
+        if (node.isRoot())
+            return null;
         List<EnumVariable> parents = node.getParents();
         Object[] bkey = new Object[parents.size()];
         for (int i = 0; i < bkey.length; i++) {
@@ -398,7 +400,22 @@ public class BNet implements Serializable {
         return bkey;
     }
 
-    
+    /**
+     * Use currently set instances to sample values for unset nodes.
+     * The whole BN will be instantiated after this process.
+     * Nodes are processed in a top-down manner; all parents before a child.
+     * Sampling is done by using current parameters.
+     */
+    public void sampleInstance() {
+        for (BNode node : this.getOrdered()) { // traverse nodes in top-down order
+            if (node.getInstance() == null) { // not currently set, so we'll do that
+                Object[] key = getEvidenceKey(node);
+                Distrib d = node.getDistrib(key);
+                Object sample = d.sample();
+                node.setInstance(sample);
+            } // else, ignore
+        }
+    }
     /**
      * Determine which subset of nodes that are relevant to a specific query and
      * evidence combination. "Every variable that is not an ancestor of a query
