@@ -77,6 +77,10 @@ public class CountTable implements Serializable {
         this.totalNeedsUpdate = true;
     }
 
+    public int[] getIndices(Object[] key) {
+        return table.getIndices(key);
+    }
+    
     synchronized public void count(Object[] key, double count) {
         int index = table.getIndex(key);
         Double cnt = table.getValue(index);
