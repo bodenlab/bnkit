@@ -9,11 +9,11 @@ import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Predef;
 import bn.Variable;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /** 
  * Approximate inference in Bayesian network by Gibbs algorithm (MCMC).
@@ -110,9 +110,9 @@ public class ApproxInferCont implements Inference{
 				//Z is an ordered list
 
 				//Get the markov blanket for the node
-				List<BNode> mbVar = cbn.getMB(var);
+				Set<BNode> mbVar = cbn.getMB(bn.getNode(var));
 				//Sample from the mb distribution
-				Object result = bn.getMBProb(mbVar, bn.getNode(var), bn); //FIXME - this is the most time consuming element of ApproxInfer
+				Object result = bn.getMBProb(mbVar, bn.getNode(var)); //FIXME - this is the most time consuming element of ApproxInfer
 				if (result != null) {
 					cbn.getNode(var).setInstance(result);
 				}
