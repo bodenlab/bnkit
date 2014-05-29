@@ -29,11 +29,17 @@ public class NodeModel implements Observable, BNode {
 
     @Override
     public Factor makeFactor(BNet bn) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return bnode.makeFactor(bn);
+//        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
     public void countInstance(Object[] key, Object value) {
+        bnode.countInstance(key, value);
+    }
+
+    @Override
+    public Distrib getDistrib(Object[] key) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
@@ -73,15 +79,16 @@ public class NodeModel implements Observable, BNode {
         return bnode;
     }
 
-    public NodeModel(BNode bnode) {
-        try {
-            EnumVariable evar = (EnumVariable) bnode.getVariable();
-            this.bnode = new CPT(evar, bnode.getParents());
-            // change the 'String' constructor to a method.
-        } catch(ClassCastException e) {
-            Variable var = (Variable<Continuous>) bnode.getVariable();
-            this.bnode = new GDT(var, bnode.getParents());
-        }
+    public NodeModel(BNode bnod) {
+//        try {
+//            EnumVariable evar = (EnumVariable) bnode.getVariable();
+//            this.bnode = new CPT(evar, bnode.getParents());
+//            // change the 'String' constructor to a method.
+//        } catch(ClassCastException e) {
+//            Variable var = (Variable<Continuous>) bnode.getVariable();
+//            this.bnode = new GDT(var, bnode.getParents());
+//        }
+        this.bnode = bnod;
         this.observers = new ArrayList<>();
     }
 
@@ -272,7 +279,13 @@ public class NodeModel implements Observable, BNode {
     public boolean setState(String dump) {
         changed = true;
         notifyObservers();
-        return bnode.setState(dump);
+        boolean success = bnode.setState(dump);
+        if (success){
+            System.out.println("set state success");
+        } else {
+            System.out.println("set state failure");
+        }
+        return success;
     }
     
     @Override

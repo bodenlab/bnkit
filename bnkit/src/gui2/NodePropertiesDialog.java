@@ -7,7 +7,6 @@ package gui2;
 
 import bn.BNet;
 import bn.Predef;
-import bn.Variable;
 import com.mxgraph.model.mxCell;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -15,12 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import javax.swing.AbstractButton;
 import javax.swing.ButtonGroup;
-import javax.swing.GroupLayout.ParallelGroup;
-import javax.swing.GroupLayout.SequentialGroup;
-import javax.swing.JPanel;
 import javax.swing.JRadioButton;
-import javax.swing.JRootPane;
-import javax.swing.SwingUtilities;
 
 /**
  *
@@ -37,6 +31,7 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
     private javax.swing.JButton cancelBtn;
     private javax.swing.JCheckBox evidenceCheck; // signifies whether node is Evidence.
     private javax.swing.JPanel radioPanel;
+    private ButtonGroup checkButtonGroup;
     private GraphPanel graphPanel;
     private NodeModel nodeModel;
 
@@ -104,7 +99,7 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         // Generate radioButtons for the parameters.
         JRadioButton dummybtn;
         ArrayList<JRadioButton> buttonArr = new ArrayList<>();
-        final ButtonGroup bgroup = new ButtonGroup();
+        checkButtonGroup = new ButtonGroup();
         
         evidenceCheck = new javax.swing.JCheckBox("Is Evidence node");
         evidenceCheck.setSelected(true);
@@ -120,7 +115,7 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                     // How to do this??
                     
                 } else {
-                    bgroup.clearSelection();
+                    checkButtonGroup.clearSelection();
                 }
 
             }
@@ -170,7 +165,7 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                 }
             });
             buttonArr.add(dummybtn);
-            bgroup.add(dummybtn);
+            checkButtonGroup.add(dummybtn);
             radioPanel.add(dummybtn);
         }
 
@@ -304,17 +299,33 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         nodeModel.getVariable().setParams(nodeParametersField.getText());
 //        nodeModel.setModel(((JRadioButton) selectedRadioButton).getText());
 
-        // when is the node query?
+        // when is the node 'QUERY'?
         if (evidenceCheck.isSelected()) {
             nodeModel.setInferenceModel("Evidence");
             // TODO: decide how to instance the node!
 //            nodeModel.setInstance(selectedRadioButton);
+            
         } else {
             nodeModel.setInferenceModel("Ignore");
         }
         dispose();
     }
 
+    private Object checkParameterBox(){
+        String checkTxt = checkButtonGroup.getSelection().getActionCommand();
+        if (nodeModel.getVariable().getPredef().equalsIgnoreCase("String")){
+            return checkTxt;
+        } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Boolean")){
+            if (checkTxt.equalsIgnoreCase("true")){
+                return true;
+            } else {
+                return false;
+            }
+        }   
+        
+        return null;
+    }
+    
     private void cancelBtnPressed(java.awt.event.MouseEvent evt) {
         dispose();
     }

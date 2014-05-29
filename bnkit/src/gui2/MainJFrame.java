@@ -33,6 +33,7 @@ public class MainJFrame extends javax.swing.JFrame implements Observer {
 
     /**
      * Creates new form MainJFrame
+     * @param usebuttons
      */
     public MainJFrame(boolean usebuttons) {
         usingButtons = usebuttons;

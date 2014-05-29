@@ -239,7 +239,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     }
 
     public Transferable createTransferableNode(String predef) {
-        // Changes in GraphPanel model
+        // Changes in GraphPanel mxModel
 //        this.addVertex(name, newvertex);
 //        selectedCells.clear();
 //        this.addCellSelection(newvertex);
@@ -264,7 +264,6 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     }
 
     public void addNodetoBNC(String name, String predef, String params) {
-        System.out.println("node added to bnc!!");
         if (name == null) {
             name = predef + " node-" + nodeCounts.get(predef);
         }
@@ -290,13 +289,17 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
                 System.out.println("name is:" + "Number node-" + nodeCounts.get("Number"));
             }
 
-//            model.getBNC().addNode(newBNode);
-            model.getBNC().addNode(nm);
+//            mxModel.getBNC().addNode(newBNode);
+//            model.getBNC().addNode(nm);
+            bnc.addNode(nm);
+            System.out.println(">>node" +  nm.getName()+" added to bnc!!");
         } else {
             System.out.println("GPT case");
 //            BNode newBNode = Predef.getBNode(var, new ArrayList<Variable>(), type);
             NodeModel nm = Predef.getNodeModel(var, new ArrayList<Variable>(), type);
-            model.getBNC().addNode(nm);
+//            model.getBNC().addNode(nm);
+            bnc.addNode(nm);
+            System.out.println("node added to bnc!!");
         }
 
     }
@@ -310,16 +313,16 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
             return;
         }
         System.out.println("Delete selection ");
-        mxIGraphModel model = graph.getModel();
+        mxIGraphModel mxModel = graph.getModel();
         for (Object cell : selectedCells) {
 
             // Edges must be deleted first, otherwise removeParent fails.
             if (graph.getModel().isEdge(cell)) {
-                Object child = model.getTerminal(cell, false);
-                Object parent = model.getTerminal(cell, true);
+                Object child = mxModel.getTerminal(cell, false);
+                Object parent = mxModel.getTerminal(cell, true);
                 System.out.println("deleting edge between " + ((mxCell) parent).getValue()
                         + " and " + ((mxCell) child).getValue());
-                BNode childnode = bnc.getNode(graph.getLabel(child));
+                BNode childnode = bnc.getNodeModel(graph.getLabel(child));
 
                 Variable parentvar = bnc.getVariable(graph.getLabel(parent));
 //                graph.removeCells(new Object[]{cell});
@@ -329,10 +332,11 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
 
         }
         for (Object cell : selectedCells) {
-            if (model.isVertex(cell)) {
+            if (mxModel.isVertex(cell)) {
                 bnc.removeNode(bnc.getNodeModel(graph.getLabel(cell)));
                 String nodename = graph.getLabel(cell);
-                BNode node = bnc.getNode(nodename);
+                System.out.println("bnc " + bnc.getNodeModelArr().values());
+                BNode node = bnc.getNodeModel(nodename);
                 nodeCounts.put(node.getVariable().getPredef(), nodeCounts.get(node.getVariable().getPredef()) - 1);
                 bnc.removeNode(node);
                 removeVertex(cell);
@@ -376,9 +380,8 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     public void saveNetwork() {
         JFileChooser c = new JFileChooser();
 
-        // For now only allow .xml files
-        FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
-        c.setFileFilter(filter);
+//        FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
+//        c.setFileFilter(filter);
         int rVal = c.showSaveDialog(c);
         if (rVal == JFileChooser.APPROVE_OPTION) {
             File file = c.getSelectedFile();
@@ -400,9 +403,8 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     public void loadNetwork() {
         JFileChooser c = new JFileChooser();
 
-        // For now only allow .xml files
-        FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
-        c.setFileFilter(filter);
+//        FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
+//        c.setFileFilter(filter);
         int rVal = c.showOpenDialog(c);
         if (rVal == JFileChooser.APPROVE_OPTION) {
             File file = c.getSelectedFile();
@@ -578,7 +580,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
 //                        nodeProps.updateDisplay();
                             if (e.getClickCount() == 2) {
                                 System.out.println("Double-clicked-to-select Vertex=" + graph.getLabel(cell));
-                                BNode node = bnc.getNode(graph.getLabel(cell));
+                                BNode node = bnc.getNodeModel(graph.getLabel(cell));
                                 NodeParamsDialog dialog = new NodeParamsDialog(null, true);
                                 NodeModel nm = bnc.getNodeModel(graph.getLabel(cell));
 
@@ -719,7 +721,7 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     }
 
     @Override
-    // Method called by Observable model NodeModel.
+    // Method called by Observable mxModel NodeModel.
     public void update() {
 
     }

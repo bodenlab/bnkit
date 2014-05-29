@@ -88,6 +88,7 @@ public class BNContainer {
     }
     
     public NodeModel getNodeModel (String name) {
+        System.out.println("nodems" + nodems.keySet());
         return nodems.get(name);
     }
     
@@ -221,15 +222,18 @@ public class BNContainer {
         }
     }
     
-        // Uses NodeModel implementation now
+    // Uses NodeModel implementation now
     public void loadnm(String filename, boolean replace) {
         if (replace)
             nodems = new HashMap<String, NodeModel>();
         BNet bnet = BNBuf.load(filename);
         for (BNode node : bnet.getNodes()) {
+            System.out.println(""); // print out the variables.s.s.dflsf
             NodeModel nm = new NodeModel(node);
-            vars.put(node.getVariable().getName(), node.getVariable());
-            nodems.put(node.getName(), nm);
+            vars.put(nm.getVariable().getName(), nm.getVariable());
+            nodems.put(nm.getName(), nm);
+            System.out.println("!!!NODEMODEL " + nm.getStateAsText());
+            System.out.println("NODE !! " + node.getStateAsText());
         }
     }
     
