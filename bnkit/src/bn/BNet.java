@@ -464,32 +464,26 @@ public class BNet implements Serializable {
      * Only need the factor tables of node and children
      * 
      * 
-     * @param query variable to query
+     * @param qnode query node
      * @return a list of relevant factor tables
      */
     
     //Should this method return a list of nodes in the mb instead?
     //Use of factor tables to get product could be influenced by cutting off parts of network?
-    public List<BNode> getMB(Variable query) {
-    	List<BNode> mbNodes = new ArrayList<>();
-//    	BNet mbn = new BNet();
-    	String qName = query.getName();
-    	BNode qNode = getNode(query);
-    	//get children of query node
-    	Set<String> children = new HashSet<>();
-    	//add children of query node unless it's a leaf node
-    	if (getChildren(qNode) != null ) {
-    		children.addAll(getChildren(qNode));
-    	} else {
-    		children.add(qNode.getName());
-    	}
-    	for (BNode node : nodes.values()) {
-    		//markov blanket calculation requires factor tables of query node and children only
-    		if (children.contains(node.getName()) || node.getVariable().equals(query)){
-    			mbNodes.add(node);
-    		}
-    	}
-//    	mbn.compile();
+    public Set<BNode> getMB(BNode qnode) {
+        if (!compiled) 
+            this.compile(); // relies on parent to children to parent linking
+        Set<BNode> mbNodes = new HashSet<>();
+        mbNodes.add(qnode); // add query node
+    	// add children of query node unless it's a leaf node
+        Set<BNode> children = par2ch.get(qnode);
+        if (children != null)
+            mbNodes.addAll(children);
+        for (BNode cnode : children) {
+            Set<BNode> pnodes = ch2par.get(cnode);
+            if (pnodes != null)
+                mbNodes.addAll(pnodes);
+        }
     	return mbNodes;
     }
     
@@ -501,40 +495,38 @@ public class BNet implements Serializable {
      * 
      * @param mbNodes
      * @param query 
-     * @param cbn the current bayesian network
      * @return sample from distribution
      */
-    public Object getMBProb(List<BNode> mbNodes, BNode query, BNet cbn) {  	
-    	
-    	//Store the instance incase the map is empty and you have to reset the node
+    public Object getMBProb(Set<BNode> mbNodes, BNode query) {  	
+    	// Store the instance incase the map is empty and you have to reset the node
     	Object qInstance = query.getInstance();
     	query.resetInstance();
-    	//Store all factor tables for query to iterate over to find product
+    	// Store all factor tables for query to iterate over to find product
     	Set<Factor> fTables = new HashSet<>();
     	//Query node not included in set, used for initial factor table in product
     	for (BNode node : mbNodes){
-    		if (!node.getName().equals(query.getName())){
-    			Factor fact = node.makeFactor(cbn); //FIXME - step which takes most CPU time, gets called a lot
-    			//instantiated priors cannot be used to factorise
-    			if (fact != null ){
-    				fTables.add(fact);
-    			}
-    		}
+            if (!node.getName().equals(query.getName())){
+                Factor fact = node.makeFactor(this); //FIXME - step which takes most CPU time, gets called a lot
+                //instantiated priors cannot be used to factorise
+                if (fact != null ){
+                    fTables.add(fact);
+                }
+            }
     	}
     	
     	//Get the factor table for the query and make it the product start point
-    	Factor ft = query.makeFactor(cbn);
+    	Factor ft = query.makeFactor(this);
     	//For each factor table, add it to the product
     	for (Factor factor : fTables) {
-    		ft = Factor.product(ft, factor); 
+            ft = Factor.product(ft, factor); 
     	} 	
     	
     	//The sampling algorithm currently only looks at single queries.
     	//Either the result will be atomic or it will be a discrete node
     	if (ft.isAtomic()) {
-    		Distrib d = ft.getDistrib(query.getVariable());
-    		Object result = d.sample();
-    		return result;
+            Distrib d = ft.getDistrib(query.getVariable());
+            Object result = d.sample();
+            return result;
     	}
     	
     	//FIXME How to get distribution for discrete query from factor table?
@@ -551,7 +543,7 @@ public class BNet implements Serializable {
 
     	Map<Object, Double> nFt = new HashMap<>();
     	for (Map.Entry<Integer, Double> entry : ft.getMapEntries()) {
-    		nFt.put((Object)entry.getKey(), entry.getValue());
+            nFt.put((Object)entry.getKey(), entry.getValue());
     	}
     	Distrib dist = new EnumDistrib(nFt, (Enumerable)query.getVariable().getDomain());
         Object end = dist.sample();
