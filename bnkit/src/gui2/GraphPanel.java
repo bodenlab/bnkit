@@ -14,6 +14,7 @@ import bn.Variable;
 import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
+import bn.file.BNBuf;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.layout.mxGraphLayout;
 import com.mxgraph.layout.mxParallelEdgeLayout;
@@ -645,19 +646,27 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
      * is used by default for inference.
      */
     public void doInference(){
-        // Check Query node is not Evidenced.
-        BNet bn = new BNet();
-        for (NodeModel nm: bnc.getNodeModelArr().values()){
-            if (nm.getInferenceModel().equalsIgnoreCase("Evidence")){
-                bn.add(nm.getBNode()); // expects cpt or GDT
-            }
+        
+        if (queryNode == null) {
+            System.err.println("queryNode is null. Returning...");
+            return;
         }
+        // Check Query node is not Evidenced.
+//        BNet bn = new BNet();
+//        for (NodeModel nm: bnc.getNodeModelArr().values()){
+//            if (nm.getInferenceModel().equalsIgnoreCase("Evidence")){
+//                bn.add(nm.getBNode()); // expects cpt or GDT
+//            }
+//        }
+        BNet bn = bnc.getBNetnm();
+        //aa
         CGVarElim ve = new CGVarElim();
         ve.instantiate(bn);
         Query q = ve.makeQuery(queryNode.getVariable());
         CGTable res = (CGTable)ve.infer(q);
         res.display();
         
+        //set mainFrame's panel??
     }
     
     // TODO: eventually, inference algorithm should be selectable.
@@ -735,6 +744,48 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     @Override
     public void setSubject(Observable sub) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+    
+    public void testInfer(){
+//        String bn_file = "cgSimple3.new";
+//        BNet bn = BNBuf.load(bn_file);
+        BNet bn = bnc.getBNetnm();
+//        BNet bn = new BNet();
+        
+        for (BNode node : bn.getNodes()) {
+            if (node.getName().equals("DNase(Open)")) {
+                node.setInstance(10.54);
+            }
+//			if(node.getName().equals("DNase(UWash)")){
+//				node.setInstance(10.53);
+//			}
+//			if(node.getName().equals("Chromatin")){
+//				node.setInstance(true);
+//			}
+            if (node.getName().equals("RepeatSeq")) {
+                node.setInstance("two");
+            }
+//			if(node.getName().equals("Proxy")){
+//				node.setInstance(true);
+//			}
+            if (node.getName().equals("Variance")) {
+                node.setInstance(false);
+            }
+            if (node.getName().equals("Unstable")) {
+                node.setInstance(false);
+            }
+
+        }
+
+        System.out.println("Variable Elimination------------");
+        CGVarElim ve = new CGVarElim();
+        ve.instantiate(bn);
+
+        Query q = ve.makeQuery(bn.getNode("DNase(UWash)").getVariable());
+
+        CGTable res = (CGTable) ve.infer(q);
+//        res.display();
+        res.displaySampled();
     }
 
 }

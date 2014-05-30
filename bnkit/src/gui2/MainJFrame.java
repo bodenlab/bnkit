@@ -253,6 +253,10 @@ public class MainJFrame extends javax.swing.JFrame{
         return inferenceBtn;
     }
     
+    public javax.swing.JLabel getResultLabel(){
+        return inferResultLbl;
+    }
+    
     public void initDrawPanel() {
         // adds the graph panel to drawPanel.
         GroupLayout layout = new GroupLayout(drawPanel);
