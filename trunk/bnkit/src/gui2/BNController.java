@@ -5,6 +5,9 @@
  */
 package gui2;
 
+import bn.BNet;
+import bn.alg.CGTable;
+import bn.alg.Query;
 import com.mxgraph.model.mxCell;
 import com.mxgraph.view.mxGraph;
 import java.awt.event.ActionEvent;
@@ -126,7 +129,9 @@ public class BNController implements Observer {
         mainFrame.getSetInferButton().addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                graphPanel.doInference();
+//                graphPanel.doInference();
+                doInference();
+//                graphPanel.testInfer();
             }
         });
     }
@@ -143,4 +148,21 @@ public class BNController implements Observer {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
+    public void doInference(){
+        if (graphPanel.getQueryNode() == null) {
+            System.err.println("queryNode is null. Returning...");
+            return;
+        }
+        
+        BNet bn = graphPanel.getBNContainer().getBNetnm();
+        //aa
+        bn.alg.CGVarElim ve = new bn.alg.CGVarElim();
+        ve.instantiate(bn);
+        Query q = ve.makeQuery(graphPanel.getQueryNode().getVariable());
+        CGTable res = (CGTable)ve.infer(q);
+        res.display();
+        
+        //set mainFrame's panel??
+        mainFrame.getResultLabel().setText(null);
+    }
 }
