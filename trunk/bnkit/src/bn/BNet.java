@@ -471,24 +471,75 @@ public class BNet implements Serializable {
     //Should this method return a list of nodes in the mb instead?
     //Use of factor tables to get product could be influenced by cutting off parts of network?
     public Set<BNode> getMB(BNode qnode) {
-        if (!compiled) 
-            this.compile(); // relies on parent to children to parent linking
+        if (!compiled) // relies on parent to children to parent linking, so BN must be compiled
+            this.compile(); 
         Set<BNode> mbNodes = new HashSet<>();
-        mbNodes.add(qnode); // add query node
     	// add children of query node unless it's a leaf node
         Set<BNode> children = par2ch.get(qnode);
-        if (children != null)
+        if (children != null) {
             mbNodes.addAll(children);
-        for (BNode cnode : children) {
-            Set<BNode> pnodes = ch2par.get(cnode);
-            if (pnodes != null)
-                mbNodes.addAll(pnodes);
+            // if there are children, then add parents of children
+            for (BNode cnode : children) {
+                Set<BNode> pnodes = ch2par.get(cnode);
+                if (pnodes != null)
+                    mbNodes.addAll(pnodes);
+            }
+            // remove query node that accidentally got added above
+            mbNodes.remove(qnode); 
         }
-    	return mbNodes;
+        // finally add parents of query node
+        Set<BNode> pnodes = ch2par.get(qnode); 
+        if (pnodes != null)
+            mbNodes.addAll(pnodes);
+        return mbNodes;
     }
     
-    
-
+    /**
+     * Given the Markov Blanket network of a query, 
+     * return a sample from the distribution of P(X|mb(X))
+     * Assumes that other nodes in the Markov blanket have been instantiated.
+     * 
+     * @param query 
+     * @return sample from distribution
+     */
+    public Object getMBProb(BNode query) {  	
+        if (!compiled) // relies on parent to children to parent linking, so BN must be compiled
+            this.compile(); 
+    	// Store the instance incase the map is empty and you have to reset the node
+        Object qInstance = query.getInstance();
+    	query.resetInstance();
+        Object query_sample;
+        try {
+            // Enumerable query
+            EnumVariable evar = (EnumVariable) query.getVariable();
+            Enumerable edom = evar.getDomain();
+            double[] dist = new double[edom.size()];
+            // FIXME: Some unnecessary re-calculation below
+            for (int i = 0; i < edom.values.length; i ++) {
+                Object[] key = this.getEvidenceKey(query);
+                dist[i] = query.get(key, edom.values[i]);
+                query.setInstance(edom.values[i]);
+        	// Query node not included in set, used for initial factor table in product
+                Set<BNode> children = par2ch.get(query);
+                if (children != null) {
+                    for (BNode node : children) {
+                        key = this.getEvidenceKey(node);
+                        Double f = node.get(key, node.getInstance());
+                        dist[i] *= f;
+                    }
+                }
+            }
+            EnumDistrib edist = new EnumDistrib(edom, dist);
+            query_sample = edist.sample();
+        } catch (ClassCastException e) {
+            // Non-enumerable query, which means that there are no children of it
+            Object[] key = this.getEvidenceKey(query);
+            Distrib gdist = query.getDistrib(key);
+            query_sample = gdist.sample();
+        }
+        query.setInstance(qInstance);
+        return query_sample;
+    }
     /**
      * Given the Markov Blanket network of a query, 
      * return a sample from the distribution of P(X|mb(X))
@@ -498,6 +549,46 @@ public class BNet implements Serializable {
      * @return sample from distribution
      */
     public Object getMBProb(Set<BNode> mbNodes, BNode query) {  	
+    	// Store the instance incase the map is empty and you have to reset the node
+    	Object qInstance = query.getInstance();
+    	query.resetInstance();
+        try {
+            // Enumerable query
+            EnumVariable evar = (EnumVariable) query.getVariable();
+            Enumerable edom = evar.getDomain();
+            double[] dist = new double[edom.size()];
+            // FIXME: Some unnecessary re-calculation below
+            for (int i = 0; i < edom.values.length; i ++) {
+                Object[] key = this.getEvidenceKey(query);
+                dist[i] = query.get(key, edom.values[i]);
+                query.setInstance(edom.values[i]);
+        	// Query node not included in set, used for initial factor table in product
+        	for (BNode node : mbNodes) {
+                    key = this.getEvidenceKey(node);
+                    Double f = node.get(key, node.getInstance());
+                    dist[i] *= f;
+                }
+            }
+            EnumDistrib edist = new EnumDistrib(edom, dist);
+            Object end = edist.sample();
+            return end;   		    	
+        } catch (ClassCastException e) {
+            // Non-enumerable query, which means that there are no children of it
+            Object[] key = this.getEvidenceKey(query);
+            Distrib d = query.getDistrib(key);
+            Object result = d.sample();
+            return result;
+        }
+    }
+//    /**
+//     * Given the Markov Blanket network of a query, 
+//     * return a sample from the distribution of P(X|mb(X))
+//     * 
+//     * @param mbNodes
+//     * @param query 
+//     * @return sample from distribution
+//     */
+    public Object getMBProbOld(Set<BNode> mbNodes, BNode query) {  	
     	// Store the instance incase the map is empty and you have to reset the node
     	Object qInstance = query.getInstance();
     	query.resetInstance();

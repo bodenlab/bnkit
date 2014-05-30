@@ -11,7 +11,9 @@ import bn.GaussianDistrib;
 import bn.JPT;
 import bn.Predef;
 import bn.Variable;
+import bn.alg.ApproxInference;
 import bn.alg.CGVarElim;
+import bn.alg.Query;
 import bn.alg.QueryResult;
 import bn.file.BNBuf;
 
@@ -62,9 +64,11 @@ public class GDTExample {
 		sun.setInstance("Partly sunny");
 		sprinkler.setInstance(false);
 		
-		CGVarElim ve = new CGVarElim();
-		ve.instantiate(bn);
-                QueryResult qr = ve.infer(new EnumVariable[] {WETGRASS});
+//		CGVarElim inf = new CGVarElim();
+                ApproxInference inf = new ApproxInference();
+		inf.instantiate(bn);
+                Query q = inf.makeQuery(WETGRASS);
+                QueryResult qr = inf.infer(q);
 		JPT jpt=qr.getJPT();
 		jpt.display();
 		

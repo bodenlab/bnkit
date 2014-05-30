@@ -2,36 +2,17 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
-import bn.CPT;
-import bn.CountTable;
-import bn.DataSample;
 import bn.Distrib;
-import bn.EnumDistrib;
 import bn.EnumTable;
-import bn.EnumVariable;
-import bn.Enumerable;
-import bn.FactorTable;
-import bn.GaussianDistrib;
 import bn.JPT;
-import bn.MixtureDistrib;
-import bn.Predef;
-import bn.SampleTable;
-import bn.SampleTable.Sample;
+import bn.SampleTrace;
 import bn.Variable;
 
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
-import java.util.Set;
 
 /**
  * Approximate inference in Bayesian network by Gibbs algorithm (MCMC). In
@@ -74,16 +55,17 @@ public class ApproxInference implements Inference {
      */
     @Override
     public Query makeQuery(Variable... qvars) {
-        List<Variable> X = new ArrayList<>(); // Query variables
-        List<Variable> E = new ArrayList<>(); // Evidence variables
+        List<BNode> X = new ArrayList<>(); // Query variables
+        List<BNode> E = new ArrayList<>(); // Evidence variables
         List<BNode> Z = new ArrayList<>(); // 
         BNet qbn = bn.getRelevant(qvars); // create new BN with variables that are relevant to query, 
         try {
-            X.addAll(Arrays.asList(qvars));
+            for (Variable x : qvars) 
+                X.add(qbn.getNode(x));
             for (BNode node : qbn.getOrdered()) { // topological order: top-down
                 Variable var = node.getVariable();
                 if (node.getInstance() != null) {
-                    E.add(var);
+                    E.add(qbn.getNode(var));
                     //need to keep track of ALL non-evidence variables
                     //this includes the query variable
                 } else {
@@ -93,24 +75,25 @@ public class ApproxInference implements Inference {
         } catch (RuntimeException e) {
             throw new RuntimeException("makeQuery, ApproxInfer didn't work");
         }
-
         return new AQuery(X, E, Z, qbn);
     }
 
     /**
      * Perform Approximate inference using Gibbs sampling algorithm
+     * @param query
      */
     @SuppressWarnings("rawtypes")
+    @Override
     public AResult infer(Query query) {
-        JPT answer = null;
         AQuery q = (AQuery) query;
         // BN that will be queried
         BNet cbn = q.qbn;
         // First set all non-evidenced nodes including query
         cbn.sampleInstance();
         
-        DataSample data = new DataSample(q.X); //Storage class - maintains instance of each query node for each 'state' the chain passes through
+        SampleTrace data = new SampleTrace(q.X); //Storage class - maintains instance of each query node for each 'state' the chain passes through
 
+        Map<BNode, Object> nextInstance = new HashMap<>();
         //Iterations of sampling
         int N = iterations;
 
@@ -120,17 +103,23 @@ public class ApproxInference implements Inference {
             for (BNode node : q.Z) {
                 // These variables are in "topological order" (a node is never seen until all its parents have been seen)
                 // Get the Markov blanket for the node
-                Set<BNode> mbVar = cbn.getMB(node);
+                //Set<BNode> mbVar = cbn.getMB(node); // don't need it with the getMBProb below
                 // Sample from the mb distribution
-                Object result = bn.getMBProb(mbVar, node); //FIXME - this is the most time consuming element of ApproxInfer
+                //Object result = bn.getMBProb(mbVar, node); //FIXME - this is the most time consuming element of ApproxInfer
+                Object result = bn.getMBProb(node);
                 if (result != null) {
-                    cbn.getNode(node.getVariable()).setInstance(result);
+                    nextInstance.put(node, result);
+                    //node.setInstance(result);// wait until after the full round
                 }
             }
 
+            // instantiate the nodes according to the MB-based sampling
+            for (Map.Entry<BNode, Object> inst : nextInstance.entrySet()) 
+                inst.getKey().setInstance(inst.getValue());
+            
             //Record instances of query node for current state of network
-            for (Variable cQuery : q.X) {
-                data.addValue(cQuery, cbn.getNode(cQuery).getInstance());
+            for (BNode cQuery : q.X) {
+                data.addValue(cQuery, cQuery.getInstance());
             }
         }
 
@@ -163,51 +152,8 @@ public class ApproxInference implements Inference {
             return new AResult(result, cont);
         }
 
-//		//FIXME RESET Data structures?  
-//		FactorTable result = null;
-            //TODO - Convergence of algorithm
     }
 
-//    public BNet instantiateNet(List<Variable> uninstantiated, BNet cbn) {
-//    	//Occurs only once during inference
-//        //Should be done randomly**
-//        for (Variable var : uninstantiated) {
-//            String pre = var.getPredef();
-//            //getParams() did not return suitable results for boolean nodes
-//            //Set manually
-//            if (pre.equals("Boolean")) {
-//                Object[] params = {true, false};
-//                //Generate a pseudo random number to select parameter
-//                int index = randomGenerator.nextInt(params.length);
-//                //Randomly set the instance for the node
-//                cbn.getNode(var).setInstance(params[index]);
-//            } else if (pre.equals("Real")) {
-//                // Ultimately want to sample from one of the possible distributions
-//                // FIXME - better way to do this sampling? Something without odd casts
-//                Object[] nodeDistribs = cbn.getNode(var).getTable().getValues().toArray();
-//                int index = randomGenerator.nextInt(nodeDistribs.length);
-//                //Get individual mu and sigma from random distribution
-//                String[] values = nodeDistribs[index].toString().split(";");
-//                //Create distribution to sample from
-//                Distrib d = new GaussianDistrib(Double.parseDouble(values[0]), Double.parseDouble(values[1]));
-//                //If this distribution is randomly generated it will not be a very accurate value here
-//                cbn.getNode(var).setInstance(d.sample());
-//            } else {
-//                String parm = var.getParams();
-//                String[] params;
-//                if (parm != null) {
-//                    params = parm.split(";");
-//                    //Generate a pseudo random number to select parameter
-//                    int index = randomGenerator.nextInt(params.length);
-//                    //Randomly set the instance for the node
-//                    cbn.getNode(var).setInstance(params[index]);
-//                } else {
-//                    throw new ApproxInferRuntimeException("Node must contain parameters");
-//                }
-//            }
-//        }
-//        return cbn;
-//    }
 
     /**
      * Get the number of iterations sampling will complete
@@ -242,12 +188,12 @@ public class ApproxInference implements Inference {
 
     public class AQuery implements Query {
 
-        final List<Variable> X;
-        final List<Variable> E;
+        final List<BNode> X;
+        final List<BNode> E;
         final List<BNode> Z;
         final BNet qbn;
 
-        AQuery(List<Variable> X, List<Variable> E, List<BNode> Z, BNet qbn) {
+        AQuery(List<BNode> X, List<BNode> E, List<BNode> Z, BNet qbn) {
             this.X = X;
             this.E = E;
             this.Z = Z;
