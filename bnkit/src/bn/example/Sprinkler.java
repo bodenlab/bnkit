@@ -24,7 +24,9 @@ import bn.EnumVariable;
 import bn.Enumerable;
 import bn.JPT;
 import bn.Predef;
+import bn.alg.ApproxInference;
 import bn.alg.CGVarElim;
+import bn.alg.Query;
 import bn.alg.QueryResult;
 import bn.file.BNBuf;
 
@@ -67,9 +69,11 @@ public class Sprinkler {
 
 		sprinkler.setInstance(true);
 		
-		CGVarElim ve = new CGVarElim();
-		ve.instantiate(bn);
-                QueryResult qr = ve.infer(new EnumVariable[] {RAIN});
+//		CGVarElim inf = new CGVarElim();
+                ApproxInference inf = new ApproxInference();
+		inf.instantiate(bn);
+                Query q = inf.makeQuery(RAIN);
+                QueryResult qr = inf.infer(q);
 		JPT jpt=qr.getJPT();
 		jpt.display();
 		
