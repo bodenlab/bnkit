@@ -15,30 +15,15 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package bn;
 
+import java.util.List;
+
 /**
- * Probability distribution defined. 
- * A variable in a BNode will be assigned an instance of a distribution in every row.
+ * This interface must be implemented by a node in a Bayesian network.
  * @author mikael
- *
  */
-public interface Distrib {
+public interface EBNode extends BNode {
 
-    /**
-     * Retrieve the probability of the value
-     *
-     * @param value
-     * @return the probability
-     */
-    public double get(Object value);
-
-    /**
-     * Sample from the distribution
-     *
-     * @return a sample value, drawn from the distribution in proportion to its
-     * probability
-     */
-    public Object sample();
-    
 }

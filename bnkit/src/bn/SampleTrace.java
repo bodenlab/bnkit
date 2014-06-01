@@ -1,7 +1,9 @@
 package bn;
 
+import bn.Variable.Assignment;
 import bn.alg.ApproxInference;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,264 +23,151 @@ import java.util.Map.Entry;
  */
 public class SampleTrace {
 
-    public Map<Variable, List<Object>> map;
-    protected final int nParents;
-    protected final List<Variable> parents;
-    private final List<EnumVariable> discrete; //ALL DISCRETE PARENTS
-    public CountTable counts = null;
+    private int[] enumRecord; // all observations of enumerable variables in query, encoded as key-indices
+    private CountTable enumCounts; // the counts of enumerable variables in query
+    private Map<BNode, SampleTable> nonEnumSamples;
+    protected final int nQuery;
+    protected final int nSamples;
+    protected final List<Variable> qvars;       // All query variables
+    private final List<EnumVariable> enumVars = new ArrayList<>();  // All enumerable query variables
+    private final List<BNode> enumNodes = new ArrayList<>();  // All enumerable query nodes
+    private final List<BNode> nonEnumNodes = new ArrayList<>();  // All non-enumerable query nodes
+    private final List<Variable> nonEnumVars = new ArrayList<>();  // All non-enumerable query variables
     public Map<Variable, Map<Integer, List<Object>>> nonEnumTables = null;
-    private boolean allContinuous = false;
-    private int[] step; //FOR DISCRETE PARENTS ONLY
-
-    public SampleTrace(List<BNode> query) {
-        this.discrete = new ArrayList<>();              // the enumerable query variables
-        this.parents = new ArrayList<>(query.size());   // all query variables
-        this.nParents = query.size();                   // the number of query variables
-        this.map = new HashMap<>();                     // map of query samples for all iterations
+    private boolean allNonEnumerable = false;
+    private boolean allEnumerable = false;
+    private int round = 0;
+    private final Object[] key;
+    
+    /**
+     * Create a container for recording samples of mixed types (enumerable and non-enumerable).
+     * @param query the nodes which are recorded
+     */
+    public SampleTrace(List<BNode> query, int nSamples) {
+        this.qvars = new ArrayList<>(query.size());     // all query variables
+        this.nQuery = query.size();                     // the number of query variables
+        this.nonEnumSamples = new HashMap<>();
+        this.enumRecord = new int[nSamples];
+        this.nSamples = nSamples;
         for (BNode node : query) {
             Variable var = node.getVariable();
-            this.parents.add(var);
+            this.qvars.add(var);
             try {
                 EnumVariable e = (EnumVariable) var;
-                discrete.add(e);
+                enumVars.add(e);
+                enumNodes.add(node);
             } catch (ClassCastException e) {
-                ;
+                nonEnumVars.add(var);
+                nonEnumNodes.add(node);
             }
-            List<Object> nList = new ArrayList<>(ApproxInference.iterations);
-            map.put(var, nList);
         }
-        this.step = new int[this.discrete.size()];
-        int prod = 1;
-        for (int i = 0; i < discrete.size(); i++) {
-            int parent = discrete.size() - i - 1;
-            this.step[parent] = prod;
-            prod *= this.discrete.get(parent).size();
-        }
-    }
-
-    public List<Variable> getParents() {
-        return parents;
-    }
-
-    /**
-     * Add the current instance of the variable to the appropriate list
-     *
-     * @param node - current node
-     * @param instance - variable's instance
-     */
-    public void addValue(BNode node, Object instance) {
-        Variable key = node.getVariable();
-        map.get(key).add(instance);
-    }
-
-    /**
-     * To be called after all counting is completed Use this to process the data
-     * and create appropriate structures
-     */
-    public void createData() {
-        if (discrete.size() == nParents) { //Only discrete nodes in query
-            List<Variable> pars = this.getParents();
-            EnumVariable[] enums = new EnumVariable[discrete.size()];
-            for (int i = 0; i < nParents; i++) {
-                Variable p = pars.get(i);
-                enums[i] = (EnumVariable) pars.get(i);
-            }
-            CountTable counts = new CountTable(enums); //Count table for discrete nodes
-            for (int i = 0; i < ApproxInference.iterations; i++) {
-                List<Object> curKey = new ArrayList<Object>(pars.size());
-                for (Variable p : pars) {
-                    curKey.add(this.getData(p).get(i));
-                }
-                counts.count(curKey.toArray());
-            }
-            this.counts = counts; //Store the counts for this query
-        } else if (discrete.size() < nParents && discrete.size() != 0) { //Hybrid query - discrete and real
-            List<Variable> pars = this.getParents();
-            List<Variable> nonEnums = new ArrayList<Variable>(nParents - discrete.size());
-            for (Variable par : pars) {
-                if (!discrete.contains(par)) {
-                    nonEnums.add(par);
-                }
-            }
-            CountTable counts = new CountTable(discrete); //Count table for discrete nodes in query 
-            Map<Variable, Map<Integer, List<Object>>> store = new HashMap<>();
-            for (Variable v : nonEnums) {
-                Map<Integer, List<Object>> samples = new HashMap<>(); // Structure to store key/index with list of samples
-                //With 1 discrete node in query possible keys are t/f
-                //all continuous values for 'states' where the discrete node is true are recorded
-                //leaving raw data allows flexibility in which distribution you apply e.g. Gaussian, kernel density etc.
-                for (int i = 0; i < ApproxInference.iterations; i++) {
-                    List<Object> curKey = new ArrayList<Object>(pars.size());
-                    for (EnumVariable p : discrete) {
-                        curKey.add(this.getData(p).get(i));
-                    }
-                    counts.count(curKey.toArray());
-                    if (samples.containsKey(getIndex(curKey.toArray()))) {
-                        samples.get(getIndex(curKey.toArray())).add(this.getData(v).get(i));
-                    } else {
-                        samples.put(getIndex(curKey.toArray()), new ArrayList<Object>());
-                        samples.get(getIndex(curKey.toArray())).add(this.getData(v).get(i));
-                    }
-                }
-                store.put(v, samples);
-            }
-            this.nonEnumTables = store;
-            this.counts = counts;
-        } else { //Continuous variables only in query
-            allContinuous = true; //Original storage data structure contains adequate info
-        }
-    }
-
-    /**
-     * Retrieve the index for the specified key
-     *
-     * @param key the values by which the index is identified (order the same as
-     * when constructing the factor table)
-     * @return the index for the instantiated key
-     */
-    public int getIndex(Object[] key) {
-        int sum = 0;
-        if (key.length != discrete.size()) {
-            throw new EnumTableRuntimeException("Invalid key: length is " + key.length + " not " + nParents);
-        }
-        for (int i = 0; i < discrete.size(); i++) {
-            if (key[i] == null) {
-                throw new EnumTableRuntimeException("Null in key");
-            }
-            sum += (discrete.get(i).getIndex(key[i]) * step[i]);
-        }
-        return sum;
-    }
-
-    /**
-     * Normalize the counts generated by the enum/discrete variables in the
-     * query Method can be used both with a mixed query and a query with only
-     * discrete nodes If query is mixed - getMixedDistrib() will also have to be
-     * used
-     *
-     * @return table containing normalized counts
-     */
-    //FIXME - more sophisticated normalization technique?
-    public EnumTable<Double> getNormalizedCounts() {
-        if (counts != null) {
-            EnumTable<Double> normalized = new EnumTable(counts.table.getParents());
-            for (Entry<Integer, Double> entry : counts.table.getMapEntries()) {
-                double nobserv = entry.getValue().doubleValue();
-                Object[] cntkey = counts.table.getKey(entry.getKey().intValue());
-                double norm = nobserv / ApproxInference.iterations;
-                normalized.setValue(cntkey, norm);
-            }
-            return normalized;
+        
+        if (enumNodes.isEmpty()) {
+            allNonEnumerable = true;
+            key = null;
         } else {
-            System.out.println("No count table exists to normalize");
-            return null;
+            key = new Object[enumNodes.size()];
+            this.enumCounts = new CountTable(enumVars);
+        }
+        if (nonEnumNodes.isEmpty()) {
+            allEnumerable = true;
+        } else {
+            for (BNode node : nonEnumNodes) 
+                this.nonEnumSamples.put(node, new SampleTable(enumVars));                     // map of query samples for all non-enumerable variables CONDITIONED on enumerables
         }
     }
 
     /**
-     * Use this method when all query nodes are continuous Calculates a gaussian
-     * distribution for the set of samples generated
-     *
-     * @return map of variable and associated distribution
+     * Add the current instances of the query variables to the appropriate list.
+     * All nodes are assumed to be instantiated.
      */
-    public Map<Variable, Distrib> getGaussianDistrib() {
-        if (allContinuous) {
-            Map<Variable, Distrib> output = new HashMap<Variable, Distrib>();
-            for (Entry<Variable, List<Object>> entry : map.entrySet()) {
-                List<Object> data = entry.getValue();
-
-                double sum = 0; //sum of all counts
-                for (Object d : data) {
-                    sum += (Double) d;
-                }
-                double mean = sum / data.size();
-                double diff = 0;
-                for (int jj = 0; jj < data.size(); jj++) {
-                    //FIXME - weighted based on prob from JPT?
-                    diff += ((mean - (Double) data.get(jj)) * (mean - (Double) data.get(jj)));
-                }
-                double variance = diff / data.size();
-                GaussianDistrib d = new GaussianDistrib(mean, variance);
-                output.put(entry.getKey(), d);
+    public void count() {
+        int ecnt = 0;
+        int key_index = 0;
+        if (!allNonEnumerable) {
+            for (BNode node : enumNodes)
+                key[ecnt ++] = node.getInstance();
+            enumCounts.getIndex(key);
+            enumRecord[round] = key_index;
+            enumCounts.count(key_index);
+        }
+        if (!allEnumerable) {
+            for (Map.Entry<BNode, SampleTable> entry : nonEnumSamples.entrySet()) {
+                BNode node = entry.getKey();
+                SampleTable samples = entry.getValue();
+                samples.count(node.getInstance());
             }
-            return output;
         }
-        System.out.println("Cannot use this function when discrete variables exist in query");
-        return null;
+        round ++;
     }
 
     /**
-     * Use this method for processing samples from a hybrid query
-     *
-     * @return map of variable and associated enum table representing the
-     * distribution
+     * Construct a factor from a CountTable for any number of enumerable variables, 
+     * and a SampleTable for any number of non-enumerable variables CONDITIONED on the 
+     * former enumerable variables.
+     * @param counts
+     * @param nonEnumSamples 
      */
-    public Map<Variable, EnumTable<Distrib>> getMixedGDistrib() {
-        if (!allContinuous) {
-            Map<Variable, EnumTable<Distrib>> result = new HashMap<>();
-            for (Entry<Variable, Map<Integer, List<Object>>> var : nonEnumTables.entrySet()) {
-                EnumTable<Distrib> output = new EnumTable(this.discrete);
-                for (Entry<Integer, List<Object>> entry : var.getValue().entrySet()) {
-                    List<Object> data = entry.getValue();
-                    double sum = 0; //sum of all counts
-                    for (Object d : data) {
-                        sum += (Double) d;
-                    }
-                    double mean = sum / data.size();
-                    double diff = 0;
-                    for (int jj = 0; jj < data.size(); jj++) {
-                        //FIXME - weighted based on prob from JPT?
-                        diff += ((mean - (Double) data.get(jj)) * (mean - (Double) data.get(jj)));
-                    }
-                    double variance = diff / data.size();
-                    if (variance < 0.01) {
-                        variance = 0.01;
-                    }
-                    GaussianDistrib d = new GaussianDistrib(mean, variance);
-                    output.setValue(entry.getKey(), d);
-                }
-                result.put(var.getKey(), output);
+    private Factor makeFactor(CountTable counts, Map<BNode, SampleTable> nonEnumSamples) {
+        Factor f = new Factor(qvars);
+        for (Entry<Integer, Double> entry : counts.table.getMapEntries()) {
+            int index = entry.getKey();
+            double value = entry.getValue();
+            f.setFactor(index, value);
+            JDF jdf = new JDF(nonEnumVars);
+            for (Entry<BNode, SampleTable> sample : nonEnumSamples.entrySet()) {
+                BNode node = sample.getKey();
+                Variable var = node.getVariable();
+                SampleTable table = sample.getValue();
+                Distrib d = node.makeDistrib(table.getAll());
+                jdf.setDistrib(d, var);
             }
-            return result;
+            f.setJDF(jdf);
         }
-        System.out.println("Cannot use this function when discrete variables exist in query");
-        return null;
+        return f;
     }
-
+    
     /**
-     * Get the canonical names of the parent variables (names + "." + index)
-     *
-     * @return names of variables (in order)
+     * Construct a factor from a map of SampleTables (one for each non-enumerable variable) 
+     * @param nonEnumSamples 
      */
-    public String[] getLabels() {
-        String[] labels = new String[nParents];
-        for (int i = 0; i < labels.length; i++) {
-            labels[i] = this.parents.get(i).toString();
+    private Factor makeFactor(Map<BNode, SampleTable> nonEnumSamples) {
+        Factor f = new Factor(qvars);
+        f.setFactor(1.0);
+        JDF jdf = new JDF(nonEnumVars);
+        for (Entry<BNode, SampleTable> entry : nonEnumSamples.entrySet()) {
+            BNode node = entry.getKey();
+            Variable var = node.getVariable();
+            SampleTable table = entry.getValue();
+            Distrib d = node.makeDistrib(table.getAll());
+            jdf.setDistrib(d, var);
         }
-        return labels;
+        f.setJDF(jdf);
+        return f;
     }
-
+    
     /**
-     * get the list of data/samples associated with a query variable
-     *
-     * @param key query variable of interest
-     * @return list of data/samples
+     * Construct a factor with enumerable variables from a count table.
+     * @param counts 
      */
-    public List<Object> getData(Variable key) {
-        List<Object> samples = map.get(key);
-        return samples;
+    private Factor makeFactor(CountTable counts) {
+        Factor f = new Factor(qvars);
+        for (Entry<Integer, Double> entry : counts.table.getMapEntries()) {
+            int index = entry.getKey();
+            double value = entry.getValue();
+            f.setFactor(index, value);
+        }
+        return f;
     }
-
-    public boolean allContinuous() {
-        return allContinuous;
+    
+    public Factor getFactor() {
+        Factor f;
+        if (allNonEnumerable) 
+            f = makeFactor(this.nonEnumSamples);
+        else if (allEnumerable)
+            f = makeFactor(this.enumCounts);
+        else
+            f = makeFactor(this.enumCounts, this.nonEnumSamples);
+        return f;
     }
-
-    public List<EnumVariable> getDiscreteNodes() {
-        return discrete;
-    }
-
-    public Map<Variable, Map<Integer, List<Object>>> getNonEnumTable() {
-        return nonEnumTables;
-    }
-
 }

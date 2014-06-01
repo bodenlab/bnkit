@@ -18,6 +18,7 @@
 
 package bn;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -141,6 +142,13 @@ public interface BNode {
      */
     public Object getInstance();
 
+    /**
+     * Make a native Distrib instance out of a collection of samples.
+     * @param samples
+     * @return an instance of Distrib that can be used to populate this node.
+     */
+    public Distrib makeDistrib(Collection<Sample> samples);
+    
     /**
      * Make BNode into a Factor
      */

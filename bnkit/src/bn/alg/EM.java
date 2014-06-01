@@ -176,7 +176,8 @@ public class EM extends LearningAlg {
                  * 	  For each node, marginalise over {Y'} - {X'} for P(Y'|E) where {Y'} - {X'} is the set of query variables not in the node.
                  * 	     Assign a probability to each value permutation.
                  * 
-                 * Which of the ways is better depends on the number of variables in Y' and the number of nodes N.
+                 * Which of the ways is better depends on the number of variables in Y' and the number of nodes N. 
+                 * Should benchmark this so way is chose automatically depending on the query complexity.
                  */
                 inf.instantiate(bn);
                 Variable.Assignment[] evidence = Variable.Assignment.array(vars, values[i]); // the evidence here
