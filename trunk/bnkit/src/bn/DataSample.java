@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import bn.SampleTable.Sample;
+import bn.Sample;
 import bn.alg.ApproxInferCont;
 
 /**

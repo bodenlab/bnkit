@@ -19,6 +19,7 @@ package bn;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -37,24 +38,26 @@ public class CountTable implements Serializable {
     public final EnumTable<Double> table; // table of counts
 
     public CountTable(EnumVariable[] variables) {
-        List<EnumVariable> list = new ArrayList<EnumVariable>(variables.length);
-        for (EnumVariable var : variables) {
-            list.add(var);
-        }
-        table = new EnumTable<Double>(list);
+        List<EnumVariable> list = new ArrayList<>(variables.length);
+        list.addAll(Arrays.asList(variables));
+        table = new EnumTable<>(list);
     }
 
     public CountTable(Collection<EnumVariable> variables) {
-        table = new EnumTable<Double>(variables);
+        table = new EnumTable<>(variables);
     }
 
+    public List<EnumVariable> getParents() {
+        return table.getParents();
+    }
+    
     public double get(Object[] key) {
         int index = table.getIndex(key);
         Double cnt = table.getValue(index);
         if (cnt == null) {
             return 0;
         } else {
-            return cnt.doubleValue();
+            return cnt;
         }
     }
 
@@ -63,10 +66,14 @@ public class CountTable implements Serializable {
         if (cnt == null) {
             return 0;
         } else {
-            return cnt.doubleValue();
+            return cnt;
         }
     }
 
+    public boolean hasParents() {
+        return (table != null);
+    }
+    
     public void put(Object[] key, double count) {
         table.setValue(key, count);
         this.totalNeedsUpdate = true;
@@ -81,19 +88,32 @@ public class CountTable implements Serializable {
         return table.getIndices(key);
     }
     
+    public int getIndex(Object[] key) {
+        return table.getIndex(key);
+    }
+    
     synchronized public void count(Object[] key, double count) {
         int index = table.getIndex(key);
-        Double cnt = table.getValue(index);
-        if (cnt == null) {
-            table.setValue(key, count);
-        } else {
-            table.setValue(key, cnt.doubleValue() + count);
-        }
-        this.totalNeedsUpdate = true;
+        count(index, count);
     }
 
     public void count(Object[] key) {
         count(key, 1.0);
+        this.totalNeedsUpdate = true;
+    }
+    
+    synchronized public void count(int key_index, double count) {
+        Double cnt = table.getValue(key_index);
+        if (cnt == null) {
+            table.setValue(key_index, count);
+        } else {
+            table.setValue(key_index, cnt + count);
+        }
+        this.totalNeedsUpdate = true;
+    }
+
+    public void count(int key_index) {
+        count(key_index, 1.0);
         this.totalNeedsUpdate = true;
     }
     
@@ -104,7 +124,7 @@ public class CountTable implements Serializable {
     public double getTotal() {
         if (totalNeedsUpdate) {
             for (Double val : table.getValues()) {
-                totalCount += val.doubleValue();
+                totalCount += val;
             }
             this.totalNeedsUpdate = false;
         }
@@ -115,11 +135,12 @@ public class CountTable implements Serializable {
         table.display();
     }
 
+    @Override
     public String toString() {
         String[] parents = table.getLabels();
-        StringBuffer sbuf = new StringBuffer();
+        StringBuilder sbuf = new StringBuilder();
         for (int i = 0; i < parents.length; i++) {
-            sbuf.append(parents[i] + (i < parents.length - 1 ? "," : ""));
+            sbuf.append(parents[i]).append(i < parents.length - 1 ? "," : "");
         }
         return "CountTable(" + sbuf.toString() + ")";
     }

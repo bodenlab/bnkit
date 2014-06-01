@@ -19,6 +19,7 @@ package bn;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -111,6 +112,7 @@ public class GDT implements BNode, Serializable {
      * @param key the parent values
      * @return the distribution of the variable for this node
      */
+    @Override
     public Distrib getDistrib(Object[] key) {
         if (this.table == null || key == null)
             return this.getDistrib();
@@ -121,7 +123,26 @@ public class GDT implements BNode, Serializable {
         }
     }
     
+    /**
+     * Retrieve the distribution for this node with no parents.
+     * @return the distribution of the variable for this root node
+     */
+    @Override
+    public GaussianDistrib getDistrib() {
+        return prior;
+    }
 
+    /**
+     * Make a native Distrib instance out of a collection of samples.
+     * @param samples
+     * @return an instance of Distrib that can be used to populate this node.
+     */
+    public GaussianDistrib makeDistrib(Collection<Sample> samples) {
+        
+        
+        throw new RuntimeException("Not yet implemented");
+    }
+    
     /**
      * Make a FactorTable out of this GDT. If a variable is instantiated it will
      * be factored out.
@@ -247,15 +268,6 @@ public class GDT implements BNode, Serializable {
     }
 
     /**
-     * Get the prior probability of the variable (represented by this CDT)
-     *
-     * @return the density
-     */
-    public GaussianDistrib get() {
-        return prior;
-    }
-
-    /**
      * Get the conditional probability (density if continuous) of the variable
      * (represented by this CDT).
      *
@@ -267,11 +279,6 @@ public class GDT implements BNode, Serializable {
     @Override
     public EnumTable getTable() {
         return table;
-    }
-
-    @Override
-    public GaussianDistrib getDistrib() {
-        return prior;
     }
 
     /**
@@ -367,7 +374,7 @@ public class GDT implements BNode, Serializable {
     public Double getInstance() {
         return instance;
     }
-
+    
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
         if (this.isRoot()) {
@@ -479,7 +486,7 @@ public class GDT implements BNode, Serializable {
 
     public int getNumberObservedDistrib() {
         int number = 0;
-        for (List<SampleTable<Distrib>.Sample> samplesDistrib : countDistrib.table.getValues()) {
+        for (List<Sample<Distrib>> samplesDistrib : countDistrib.table.getValues()) {
             number += samplesDistrib.size();
         }
         return number;
@@ -487,7 +494,7 @@ public class GDT implements BNode, Serializable {
     
     public int getNumberObservedSample() {
         int number = 0;
-        for (List<SampleTable<Double>.Sample> samplesDouble : countDouble.table.getValues()) {
+        for (List<Sample<Double>> samplesDouble : countDouble.table.getValues()) {
             number += samplesDouble.size();
         }
         return number;
@@ -522,8 +529,8 @@ public class GDT implements BNode, Serializable {
         int j = 0;                  // sample count
         for (int index = 0; index < maxrows; index ++) {
 
-            List<SampleTable<Distrib>.Sample> samplesDistrib = countDistrib.get(index);
-            List<SampleTable<Double>.Sample> samplesDouble = countDouble.get(index);
+            List<Sample<Distrib>> samplesDistrib = countDistrib.get(index);
+            List<Sample<Double>> samplesDouble = countDouble.get(index);
             double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ... 
             double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
             int jStart = j;             // start index for samples in the row
@@ -531,7 +538,7 @@ public class GDT implements BNode, Serializable {
                 continue;                 // no samples of any kind
             // go through observed distributions... if any
             if (samplesDistrib != null) {
-                for (SampleTable<Distrib>.Sample sample : samplesDistrib) {// look at each distribution
+                for (Sample<Distrib> sample : samplesDistrib) {// look at each distribution
                     for (int s = 0; s < nSample; s ++) {
                         observed[j] = (Double)sample.instance.sample();        // actual value (or score)
                         prob[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config  
@@ -544,7 +551,7 @@ public class GDT implements BNode, Serializable {
             }
             // go through actual values...
             if (samplesDouble != null) {
-                for (SampleTable<Double>.Sample sample : samplesDouble) {// look at each entry
+                for (Sample<Double> sample : samplesDouble) {// look at each entry
                     observed[j] = sample.instance;        // actual value (or score)
                     prob[j] = sample.prob;            // p(class=key) i.e. the height of the density for this parent config  
                     sum += observed[j] * prob[j];            // update the numerator of the mean calc

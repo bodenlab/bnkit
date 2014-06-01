@@ -19,6 +19,7 @@ package bn;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -221,6 +222,12 @@ public class CPT implements BNode, Serializable {
         }
     }
     
+    @Override
+    public Distrib makeDistrib(Collection<Sample> samples) {
+        throw new UnsupportedOperationException("Not supported yet."); 
+    }
+
+
     /**
      * Make a Factor out of this CPT. If a variable is instantiated it will
      * be factored out.

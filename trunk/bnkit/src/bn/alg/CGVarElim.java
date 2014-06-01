@@ -19,21 +19,15 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
-import bn.Distrib;
-import bn.EnumDistrib;
-import bn.EnumTable;
 import bn.EnumVariable;
 import bn.Factor;
-import bn.JDF;
 import bn.JPT;
 import bn.Variable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Exact inference in Bayesian network by variable elimination, more

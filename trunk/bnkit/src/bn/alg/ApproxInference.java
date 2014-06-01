@@ -4,10 +4,10 @@ import bn.BNet;
 import bn.BNode;
 import bn.Distrib;
 import bn.EnumTable;
+import bn.Factor;
 import bn.JPT;
 import bn.SampleTrace;
 import bn.Variable;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -79,81 +79,48 @@ public class ApproxInference implements Inference {
     }
 
     /**
-     * Perform Approximate inference using Gibbs sampling algorithm
+     * Perform approximate inference using Gibbs sampling algorithm
      * @param query
      */
     @SuppressWarnings("rawtypes")
     @Override
-    public AResult infer(Query query) {
+    public CGTable infer(Query query) {
         AQuery q = (AQuery) query;
         // BN that will be queried
         BNet cbn = q.qbn;
         // First set all non-evidenced nodes including query
-        cbn.sampleInstance();
+        cbn.sampleInstance(); // will instantiate all nodes
+        SampleTrace data = new SampleTrace(q.X, iterations);    // Storage class - maintains instance of each query node for each 'state' the chain passes through
+        data.count();                            // Observe the current instantiation, starting 'state' of chain
         
-        SampleTrace data = new SampleTrace(q.X); //Storage class - maintains instance of each query node for each 'state' the chain passes through
-
         Map<BNode, Object> nextInstance = new HashMap<>();
-        //Iterations of sampling
+        // Iterations of sampling
         int N = iterations;
-
         //The main loop for the algorithm (see Russell and Norvig 2e p. 517)
-        for (int j = 0; j < N; j++) {
+        for (int j = 0; j < N - 1; j++) {
             //Iterate over all non-evidenced nodes, including query nodes
             for (BNode node : q.Z) {
                 // These variables are in "topological order" (a node is never seen until all its parents have been seen)
                 // Get the Markov blanket for the node
-                //Set<BNode> mbVar = cbn.getMB(node); // don't need it with the getMBProb below
-                // Sample from the mb distribution
-                //Object result = bn.getMBProb(mbVar, node); //FIXME - this is the most time consuming element of ApproxInfer
+                // Sample from the Markov blanket distribution of the node
                 Object result = bn.getMBProb(node);
                 if (result != null) {
-                    nextInstance.put(node, result);
-                    //node.setInstance(result);// wait until after the full round
+                    nextInstance.put(node, result); // save the sample for later
                 }
             }
-
             // instantiate the nodes according to the MB-based sampling
             for (Map.Entry<BNode, Object> inst : nextInstance.entrySet()) 
                 inst.getKey().setInstance(inst.getValue());
-            
             //Record instances of query node for current state of network
-            for (BNode cQuery : q.X) {
-                data.addValue(cQuery, cQuery.getInstance());
-            }
+            data.count();
         }
-
-        //Reset all unevidenced nodes in network
+        // Reset all unevidenced nodes in network
         for (BNode node : q.Z) 
             node.resetInstance();
-
-        data.createData(); //Take raw counts and sort into appropriate data structures
-//		logLikelihood = logLikelihood*0.8;//Random value for training purposes when needed
-
-            //Process the results stored in data
-        //FIXME adapt this to CGTable output?
-        if (data.allContinuous()) { //Query contains only continuous nodes
-            Map<Variable, Distrib> allCont = data.getGaussianDistrib();
-            data.map = null;
-            return new AResult(allCont);
-        } else if (data.getNonEnumTable() == null) { //Query contains only discrete nodes
-            EnumTable<Double> disc = data.getNormalizedCounts();
-            JPT result = new JPT(disc);
-            data.map = null;
-            data.counts = null;
-            return new AResult(result);
-        } else { //Mixed/hybrid query
-            EnumTable<Double> disc = data.getNormalizedCounts();
-            Map<Variable, EnumTable<Distrib>> cont = data.getMixedGDistrib();
-            JPT result = new JPT(disc);
-            data.map = null;
-            data.counts = null;
-            data.nonEnumTables = null;
-            return new AResult(result, cont);
-        }
-
+        // put everything in place
+        Factor f = data.getFactor();
+        return new CGTable(f);
     }
-
 
     /**
      * Get the number of iterations sampling will complete
@@ -174,6 +141,7 @@ public class ApproxInference implements Inference {
     }
 
     public double getLogLikelihood() {
+        // FIXME: Not implemented
         return logLikelihood;
     }
 
@@ -198,78 +166,6 @@ public class ApproxInference implements Inference {
             this.E = E;
             this.Z = Z;
             this.qbn = qbn;
-        }
-    }
-
-    public class AResult implements QueryResult {
-
-        final private JPT jpt;
-        final private Map<Variable, EnumTable<Distrib>> nonEnumTables;
-        final private Map<Variable, Distrib> nonEnumDistribs;
-
-        public AResult(JPT jpt) {
-            this.jpt = jpt;
-            this.nonEnumTables = null;
-            this.nonEnumDistribs = null;
-        }
-
-        public AResult(JPT jpt, Map<Variable, EnumTable<Distrib>> nonEnum) {
-            this.jpt = jpt;
-            this.nonEnumTables = nonEnum;
-            this.nonEnumDistribs = null;
-        }
-
-        public AResult(Map<Variable, Distrib> nonEnum) {
-            this.jpt = null;
-            this.nonEnumTables = null;
-            this.nonEnumDistribs = nonEnum;
-        }
-
-        @Override
-        public JPT getJPT() {
-            return this.jpt;
-        }
-
-        public Map<Variable, EnumTable<Distrib>> getNonEnum() {
-            return this.nonEnumTables;
-        }
-
-        public Map<Variable, Distrib> getNonEnumDistrib() {
-            return this.nonEnumDistribs;
-        }
-
-        /**
-         * Method to retrieve a single distribution with all other variables in
-         * original query unspecified.
-         *
-         * @param query the query variable
-         * @return
-         */
-        public Distrib getDistrib(Variable query) {
-            return getDistrib(query, null);
-        }
-
-        /**
-         * Method to retrieve a single distribution GIVEN some optional
-         * evidence.
-         *
-         * @param query the query variable
-         * @return
-         */
-        public Distrib getDistrib(Variable query, Evidence... evid) {
-
-            return null;
-        }
-
-        public class Evidence {
-
-            public Variable var;
-            Object val;
-
-            public Evidence(Variable var, Object val) {
-                this.var = var;
-                this.val = val;
-            }
         }
     }
 
