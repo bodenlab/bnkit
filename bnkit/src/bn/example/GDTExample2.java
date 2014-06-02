@@ -149,7 +149,7 @@ public class GDTExample2 {
         
         ApproxInference ve1 = new ApproxInference();
         ve1.instantiate(bn);
-        ve1.setIterations(10000);
+        ve1.setIterations(1000);
         Query q = ve1.makeQuery(new Variable[] {M,E,N,R,S});
         //Query q = ve1.makeQuery(new Variable[] {S});
         CGTable qr = (CGTable) ve1.infer(q);

@@ -540,6 +540,7 @@ public class BNet implements Serializable {
         query.setInstance(qInstance);
         return query_sample;
     }
+    
     /**
      * Given the Markov Blanket network of a query, 
      * return a sample from the distribution of P(X|mb(X))
@@ -580,14 +581,15 @@ public class BNet implements Serializable {
             return result;
         }
     }
-//    /**
-//     * Given the Markov Blanket network of a query, 
-//     * return a sample from the distribution of P(X|mb(X))
-//     * 
-//     * @param mbNodes
-//     * @param query 
-//     * @return sample from distribution
-//     */
+    
+    /**
+     * Given the Markov Blanket network of a query, 
+     * return a sample from the distribution of P(X|mb(X))
+     * 
+     * @param mbNodes
+     * @param query 
+     * @return sample from distribution
+     */
     public Object getMBProbOld(Set<BNode> mbNodes, BNode query) {  	
     	// Store the instance incase the map is empty and you have to reset the node
     	Object qInstance = query.getInstance();
