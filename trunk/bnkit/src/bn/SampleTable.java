@@ -40,8 +40,8 @@ public class SampleTable<T> implements Serializable {
 
     
     private static final long serialVersionUID = 1L;
-    public final EnumTable<List<Sample<T>>> table; // table of counts
-    public final List<Sample<T>> list; // counts if no enumerable variables as key
+    protected final EnumTable<List<Sample<T>>> table; // table of counts
+    protected final List<Sample<T>> list; // counts if no enumerable variables as key
     
     public SampleTable(EnumVariable[] variables) {
         if (variables == null) {
@@ -76,16 +76,29 @@ public class SampleTable<T> implements Serializable {
         list = new ArrayList<>(); 
     }
     
+    public SampleTable(Collection<EnumVariable> variables, int nSamples) {
+        if (variables == null) {
+            table = null;
+            list = new ArrayList<>(); 
+        } else if (variables.isEmpty()) {
+            table = null;
+            list = new ArrayList<>(); 
+        } else {
+            table = new EnumTable<>(variables);
+            list = null;
+        }
+    }
+    
     public List<Sample<T>> get(Object[] key) {
         if (table == null) 
-            return list;
+            throw new RuntimeException("Invalid call to SampleTable: has no key, but one given");
         int index = table.getIndex(key);
         return get(index);
     }
 
     public List<Sample<T>> get(int index) {
         if (table == null) 
-            return list;
+            throw new RuntimeException("Invalid call to SampleTable: has no key, but one given");
         List<Sample<T>> samples = table.getValue(index);
         return samples;
     }
@@ -98,16 +111,15 @@ public class SampleTable<T> implements Serializable {
     
     public List<Sample<T>> getAll(Object[] key) {
         if (table == null) 
-            return list;
+            throw new RuntimeException("Invalid call to SampleTable: has no key, but one given");
         int index = table.getIndex(key);
         return getAll(index);
     }
     
     public List<Sample<T>> getAll(int index) {
-        if (table == null)
-            return list;
-        else
-            return table.getValue(index);
+        if (table == null) 
+            throw new RuntimeException("Invalid call to SampleTable: has no key, but one given");
+        return table.getValue(index);
     }
     
     public List<Sample<T>> getAll() {
@@ -143,24 +155,40 @@ public class SampleTable<T> implements Serializable {
      * Make one valid observation of value, under a specified condition (key),
      * associated with a probability (or count).
      *
+     * @param key_index the condition encoded by a key index
+     * @param value the observed value
+     * @param count the weight of the observation (usually a probability)
+     */
+    synchronized public void count(int key_index, T value, double count) {
+        List<Sample<T>> samples = table.getValue(key_index);
+        if (samples == null) {
+            samples = new ArrayList<>();
+            samples.add(new Sample(value, count));
+            table.setValue(key_index, samples);
+        } else {
+            samples.add(new Sample(value, count));
+        }
+    }
+
+    /**
+     * Make one valid observation of value, under a specified condition (key),
+     * associated with a probability (or count).
+     *
      * @param key the condition
      * @param value the observed value
      * @param count the weight of the observation (usually a probability)
      */
     synchronized public void count(Object[] key, T value, double count) {
         int index = table.getIndex(key);
-        List<Sample<T>> samples = table.getValue(index);
-        if (samples == null) {
-            samples = new ArrayList<>();
-            samples.add(new Sample(value, count));
-            table.setValue(key, samples);
-        } else {
-            samples.add(new Sample(value, count));
-        }
+        count(index, value, count);
     }
 
     public void count(Object[] key, T value) {
         count(key, value, 1.0);
+    }
+    
+    public void count(int key_index, T value) {
+        count(key_index, value, 1.0);
     }
     
     /**

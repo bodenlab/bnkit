@@ -615,10 +615,13 @@ public class CGTable implements QueryResult {
             Object[] key = factorTable.getKey(i);
             for (Object key1 : key)
                 System.out.print(String.format(" %-10s ", constantLength(key1.toString(), 10)));
-            for (Variable nonenum : nonenums) {
-                Distrib d = this.getDistrib(i, nonenum);
-                System.out.print(String.format(" %s ", d.toString()));
-                //System.out.print(String.format(" %-10s ", constantLength(d.toString(), 10)));
+            JDF jdf = this.getJDF(i);
+            if (jdf != null) {
+                for (Variable nonenum : nonenums) {
+                    Distrib d = jdf.getDistrib(nonenum);
+                    System.out.print(String.format(" %s ", d));
+                    //System.out.print(String.format(" %-10s ", constantLength(d.toString(), 10)));
+                }
             }
             Object val = this.getFactor(i);
             if (val != null) 
@@ -641,13 +644,17 @@ public class CGTable implements QueryResult {
                 System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));
             System.out.println();
             JDF jdf = this.getJDF();
-            for (Variable nonenum : nonenums) {
-                double sum = 0;
-                for (int j = 0; j < 1000; j ++) {
-                    Double sample = (Double)jdf.sample(nonenum);
-                    sum += sample;
+            if (jdf != null) {
+                for (Variable nonenum : nonenums) {
+                    double sum = 0;
+                    if (jdf.getDistrib(nonenum) != null) {
+                        for (int j = 0; j < 1000; j ++) {
+                            Double sample = (Double)jdf.sample(nonenum);
+                            sum += sample;
+                        }
+                        System.out.print(String.format(" %10.3f ", sum/1000.0));
+                    }
                 }
-                System.out.print(String.format(" %10.3f ", sum/1000.0));
             }
             return;
         } 
@@ -665,13 +672,15 @@ public class CGTable implements QueryResult {
             for (Object key1 : key)
                 System.out.print(String.format(" %-10s ", constantLength(key1.toString(), 10)));
             JDF jdf = this.getJDF(i);
-            for (Variable nonenum : nonenums) {
-                double sum = 0;
-                for (int j = 0; j < 1000; j ++) {
-                    Double sample = (Double)jdf.sample(nonenum);
-                    sum += sample;
+            if (jdf != null) {
+                for (Variable nonenum : nonenums) {
+                    double sum = 0;
+                    for (int j = 0; j < 1000; j ++) {
+                        Double sample = (Double)jdf.sample(nonenum);
+                        sum += sample;
+                    }
+                    System.out.print(String.format(" %10.3f ", sum/1000.0));
                 }
-                System.out.print(String.format(" %10.3f ", sum/1000.0));
             }
             Object val = this.getFactor(i);
             if (val != null) 
@@ -748,8 +757,11 @@ public class CGTable implements QueryResult {
                 return d;
             } catch (ClassCastException e) { // so it must be non-enumerable
                 JDF jdf = getJDFSum(key, evid);
-                Distrib d = jdf.getDistrib(query);
-                return d;
+                if (jdf != null) {
+                    Distrib d = jdf.getDistrib(query);
+                    return d;
+                }
+                return null;
             }
         } else { // atomic, can only be non-enumerables
             JDF jdf = atomicDensity;

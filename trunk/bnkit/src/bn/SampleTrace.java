@@ -87,15 +87,17 @@ public class SampleTrace {
         if (!allNonEnumerable) {
             for (BNode node : enumNodes)
                 key[ecnt ++] = node.getInstance();
-            enumCounts.getIndex(key);
+            key_index = enumCounts.getIndex(key);
             enumRecord[round] = key_index;
             enumCounts.count(key_index);
         }
         if (!allEnumerable) {
-            for (Map.Entry<BNode, SampleTable> entry : nonEnumSamples.entrySet()) {
-                BNode node = entry.getKey();
-                SampleTable samples = entry.getValue();
-                samples.count(node.getInstance());
+            if (round > 0) {
+                for (Map.Entry<BNode, SampleTable> entry : nonEnumSamples.entrySet()) {
+                    BNode node = entry.getKey();
+                    SampleTable samples = entry.getValue();
+                    samples.count(enumRecord[round - 1], node.getInstance());
+                }
             }
         }
         round ++;
@@ -119,10 +121,10 @@ public class SampleTrace {
                 BNode node = sample.getKey();
                 Variable var = node.getVariable();
                 SampleTable table = sample.getValue();
-                Distrib d = node.makeDistrib(table.getAll());
+                Distrib d = node.makeDistrib(table.getAll(index));
                 jdf.setDistrib(d, var);
             }
-            f.setJDF(jdf);
+            f.setJDF(index, jdf);
         }
         return f;
     }

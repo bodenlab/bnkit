@@ -20,10 +20,7 @@ package bn;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 /**
@@ -138,9 +135,40 @@ public class GDT implements BNode, Serializable {
      * @return an instance of Distrib that can be used to populate this node.
      */
     public GaussianDistrib makeDistrib(Collection<Sample> samples) {
-        
-        
-        throw new RuntimeException("Not yet implemented");
+        double sum = 0;		// we keep track of the sum of observed values
+        double tot = 0;		// we keep track of the total of counts
+        double[] infobs = new double[samples.size()];
+        double[] infprb = new double[samples.size()];
+        // go through observed samples
+        int j = 0;
+        for (Sample sample : samples) {// look at each distribution
+            try {
+                Double y = (Double) sample.instance;
+                infobs[j] = y;        // actual value (or score)
+                infprb[j] = sample.prob;            // p(class=key) i.e. the height of the density for this parent config  
+                sum += infobs[j] * infprb[j];            // update the numerator of the mean calc
+                tot += infprb[j];                   // update the denominator of the mean calc
+            } catch (ClassCastException e1) {
+                try {
+                    Distrib d = (Distrib) sample.instance;
+                    infobs[j] = (double) d.sample();        // actual value (or score)
+                    infprb[j] = sample.prob;                   // p(class=key) i.e. the height of the density for this parent config  
+                    sum += infobs[j] * infprb[j];				// update the numerator of the mean calc
+                    tot += infprb[j];					// update the denominator of the mean calc
+                } catch (ClassCastException e2) {
+                    throw new RuntimeException("Evaluation of GDT distribution failed since sample was of unknown type: " + sample.instance);
+                }
+            }
+            j++; 
+        }                
+        // calculate mean
+        double mean = sum / tot;
+        // now for calculating the variance
+        double diff = 0;
+        for (int jj = 0; jj < j; jj++)
+            diff += (mean - infobs[jj]) * (mean - infobs[jj]) * infprb[jj];
+        double variance = Math.max(diff / tot, 0.01);
+        return new GaussianDistrib(mean, variance);
     }
     
     /**

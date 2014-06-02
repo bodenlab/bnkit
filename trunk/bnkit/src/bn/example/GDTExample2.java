@@ -29,6 +29,7 @@ import bn.JPT;
 import bn.Predef;
 import bn.Variable;
 import bn.Variable.Assignment;
+import bn.alg.ApproxInference;
 import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
@@ -126,11 +127,32 @@ public class GDTExample2 {
         // Variable elimination works by factorising CPTs, and then by performing products and variable sum-outs in
         // an order that heuristically is computationally efficient.
         
-        CGVarElim ve = new CGVarElim();
-        ve.instantiate(bn);
-        Query q = ve.makeQuery(new Variable[] {M,E,N,R,S});
-        //Query q = ve.makeQuery(new Variable[] {S});
-        CGTable qr = (CGTable) ve.infer(q);
+        CGVarElim ve0 = new CGVarElim();
+        ve0.instantiate(bn);
+        Query q0 = ve0.makeQuery(new Variable[] {M,E,N,R,S});
+        //Query q = ve1.makeQuery(new Variable[] {S});
+        CGTable qr0 = (CGTable) ve0.infer(q0);
+        qr0.display();
+        qr0.displaySampled();
+        Distrib d0 = qr0.query(R);
+        System.out.println(d0);
+        d0 = qr0.query(N, new Assignment[] {
+            Variable.assign(R, 0.01),
+            Variable.assign(M, true),
+            });
+        System.out.println(d0);
+        d0 = qr0.query(S, new Assignment[] {
+            Variable.assign(M, true),
+            });
+        System.out.println(d0);
+        
+        
+        ApproxInference ve1 = new ApproxInference();
+        ve1.instantiate(bn);
+        ve1.setIterations(10000);
+        Query q = ve1.makeQuery(new Variable[] {M,E,N,R,S});
+        //Query q = ve1.makeQuery(new Variable[] {S});
+        CGTable qr = (CGTable) ve1.infer(q);
         qr.display();
         qr.displaySampled();
         Distrib d = qr.query(R);
