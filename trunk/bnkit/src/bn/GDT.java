@@ -135,6 +135,8 @@ public class GDT implements BNode, Serializable {
      * @return an instance of Distrib that can be used to populate this node.
      */
     public GaussianDistrib makeDistrib(Collection<Sample> samples) {
+        if (samples == null)
+            return new GaussianDistrib(0,0.01);
         double sum = 0;		// we keep track of the sum of observed values
         double tot = 0;		// we keep track of the total of counts
         double[] infobs = new double[samples.size()];
@@ -162,7 +164,9 @@ public class GDT implements BNode, Serializable {
             j++; 
         }                
         // calculate mean
-        double mean = sum / tot;
+        double mean = 0;
+        if (tot > 0) 
+            mean = sum / tot;
         // now for calculating the variance
         double diff = 0;
         for (int jj = 0; jj < j; jj++)

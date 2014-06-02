@@ -19,7 +19,7 @@ import java.util.Map.Entry;
  * records the influence of non-evidenced variables.
  *
  * @author Alex
- *
+ * @author Mikael (secondary)
  */
 public class SampleTrace {
 
@@ -112,11 +112,11 @@ public class SampleTrace {
      */
     private Factor makeFactor(CountTable counts, Map<BNode, SampleTable> nonEnumSamples) {
         Factor f = new Factor(qvars);
-        for (Entry<Integer, Double> entry : counts.table.getMapEntries()) {
-            int index = entry.getKey();
-            double value = entry.getValue();
+        for (int index = 0; index < counts.table.getSize(); index ++) {
+            double value = counts.get(index);
             f.setFactor(index, value);
             JDF jdf = new JDF(nonEnumVars);
+            f.setJDF(index, jdf);
             for (Entry<BNode, SampleTable> sample : nonEnumSamples.entrySet()) {
                 BNode node = sample.getKey();
                 Variable var = node.getVariable();
@@ -124,7 +124,6 @@ public class SampleTrace {
                 Distrib d = node.makeDistrib(table.getAll(index));
                 jdf.setDistrib(d, var);
             }
-            f.setJDF(index, jdf);
         }
         return f;
     }
@@ -137,6 +136,7 @@ public class SampleTrace {
         Factor f = new Factor(qvars);
         f.setFactor(1.0);
         JDF jdf = new JDF(nonEnumVars);
+        f.setJDF(jdf);
         for (Entry<BNode, SampleTable> entry : nonEnumSamples.entrySet()) {
             BNode node = entry.getKey();
             Variable var = node.getVariable();
@@ -144,7 +144,6 @@ public class SampleTrace {
             Distrib d = node.makeDistrib(table.getAll());
             jdf.setDistrib(d, var);
         }
-        f.setJDF(jdf);
         return f;
     }
     
