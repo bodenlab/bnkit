@@ -245,8 +245,9 @@ public class Predef {
     public static EnumVariable Number(int max, String name) {
         Enumerable domain = new Enumerable(max);
         EnumVariable var = new EnumVariable(domain, name);
-        var.setName("Number");
+//        var.setName("Number");
         var.setParams("" + max);
+        var.setPredef("Number");
         return var;
     }
 
