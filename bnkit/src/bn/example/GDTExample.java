@@ -12,6 +12,7 @@ import bn.JPT;
 import bn.Predef;
 import bn.Variable;
 import bn.alg.ApproxInference;
+import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.alg.QueryResult;
@@ -64,13 +65,18 @@ public class GDTExample {
 		sun.setInstance("Partly sunny");
 		sprinkler.setInstance(false);
 		
-//		CGVarElim inf = new CGVarElim();
-                ApproxInference inf = new ApproxInference();
-		inf.instantiate(bn);
-                Query q = inf.makeQuery(WETGRASS);
-                QueryResult qr = inf.infer(q);
-		JPT jpt=qr.getJPT();
-		jpt.display();
+		CGVarElim inf1 = new CGVarElim();
+		inf1.instantiate(bn);
+                Query q1 = inf1.makeQuery(WETGRASS);
+                CGTable qr1 = (CGTable)inf1.infer(q1);
+		qr1.display();
+                
+                ApproxInference inf2 = new ApproxInference();
+                inf2.setIterations(10000);
+		inf2.instantiate(bn);
+                Query q2 = inf2.makeQuery(WETGRASS);
+                CGTable qr2 = (CGTable)inf2.infer(q2);
+		qr2.display();
 		
 		BNBuf.save(bn, "data/sprinkler1.xml");
 	}

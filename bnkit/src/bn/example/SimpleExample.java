@@ -11,6 +11,7 @@ import bn.Enumerable;
 import bn.JPT;
 import bn.Predef;
 import bn.alg.ApproxInference;
+import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.file.BNBuf;
@@ -78,12 +79,8 @@ public class SimpleExample {
             ai.instantiate(bn);
             ai.setIterations(1000);
             Query qq = ai.makeQuery(B);
-            JPT jpt1 = ai.infer(qq).getJPT();
-            jpt1.display();
-            j.setInstance(false);
-            jpt1 = ai.infer(qq).getJPT();
-            jpt1.display();
-
+            CGTable cgt = (CGTable)ai.infer(qq);
+            cgt.display();
 
             BNBuf.save(bn, "data/bn_simple.xml");
 		
