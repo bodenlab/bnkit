@@ -125,7 +125,7 @@ public class BNet implements Serializable {
                         if (children == null) {
                             children = new HashSet<>();
                             par2ch.put(pnode, children);
-                        }
+                        } 
                         children.add(node);
                     }
                 }
