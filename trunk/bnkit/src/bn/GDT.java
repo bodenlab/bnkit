@@ -518,6 +518,8 @@ public class GDT implements BNode, Serializable {
 
     public int getNumberObservedDistrib() {
         int number = 0;
+        if (countDistrib == null)
+            return 0;
         for (List<Sample<Distrib>> samplesDistrib : countDistrib.table.getValues()) {
             number += samplesDistrib.size();
         }
@@ -526,6 +528,8 @@ public class GDT implements BNode, Serializable {
     
     public int getNumberObservedSample() {
         int number = 0;
+        if (countDouble == null)
+            return 0;
         for (List<Sample<Double>> samplesDouble : countDouble.table.getValues()) {
             number += samplesDouble.size();
         }
@@ -561,8 +565,12 @@ public class GDT implements BNode, Serializable {
         int j = 0;                  // sample count
         for (int index = 0; index < maxrows; index ++) {
 
-            List<Sample<Distrib>> samplesDistrib = countDistrib.get(index);
-            List<Sample<Double>> samplesDouble = countDouble.get(index);
+            List<Sample<Distrib>> samplesDistrib = null;
+            if (countDistrib != null)
+                samplesDistrib = countDistrib.get(index);
+            List<Sample<Double>> samplesDouble = null;
+            if (countDouble != null)        
+                samplesDouble = countDouble.get(index);
             double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ... 
             double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
             int jStart = j;             // start index for samples in the row
