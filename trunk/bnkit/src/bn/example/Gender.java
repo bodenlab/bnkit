@@ -39,7 +39,7 @@ public class Gender {
         GDT w = new GDT(W,    G);
 
         // Parameterise the nodes using our "expertise"
-        g.put(new EnumDistrib(Enumerable.bool, 0.45, 0.55));
+        g.put(new EnumDistrib(new Enumerable(new String[] {"Male", "Female"}), 0.45, 0.55));
         h.put(new GaussianDistrib(180.0, 15.0), "Male");
         h.put(new GaussianDistrib(165.0, 15.0), "Female");
         w.put(new GaussianDistrib(80.0, 15.0), "Male");
@@ -48,7 +48,9 @@ public class Gender {
         BNet bn = new BNet();
         bn.add(g,h,w);
         h.setInstance(175.0);
-        CGVarElim inf = new CGVarElim();
+        //CGVarElim inf = new CGVarElim();
+        ApproxInference inf = new ApproxInference();
+        inf.setIterations(2000);
         inf.instantiate(bn);
         Query q = inf.makeQuery(G,W);
         CGTable r = (CGTable) inf.infer(q);
