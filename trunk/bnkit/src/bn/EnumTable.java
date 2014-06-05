@@ -36,26 +36,32 @@ public class EnumTable<E> {
     protected final Map<Integer, E> map;
     protected final int nParents;
     protected final List<EnumVariable> parents;
+    protected final EnumVariable[] pararr;
     protected final int[] period;
     protected final int[] step;
+    protected final int[] domsize; // size of domain
 
-    public EnumTable(EnumVariable[] useParents) {
+    public EnumTable(EnumVariable... useParents) {
         this(EnumVariable.toList(useParents));
     }
 
     public EnumTable(Collection<EnumVariable> useParents) {
         this.parents = new ArrayList<>(useParents.size());
+        this.pararr = new EnumVariable[useParents.size()];
         this.nParents = useParents.size();
         this.step = new int[this.nParents];
         this.period = new int[this.nParents];
+        this.domsize = new int[this.nParents];
         int prod = 1;
         for (EnumVariable var : useParents) {
             this.parents.add(var);
         }
         for (int i = 0; i < nParents; i++) {
             int parent = nParents - i - 1;
+            this.pararr[parent] = this.parents.get(parent);
+            this.domsize[parent] = pararr[parent].size();
             this.step[parent] = prod;
-            prod *= this.parents.get(parent).size();
+            prod *= this.domsize[parent];
             this.period[parent] = prod;
         }
         this.map = new HashMap<>();
@@ -83,7 +89,7 @@ public class EnumTable<E> {
     public String[] getLabels() {
         String[] labels = new String[nParents];
         for (int i = 0; i < labels.length; i++) {
-            labels[i] = this.parents.get(i).toString();
+            labels[i] = this.pararr[i].toString();
         }
         return labels;
     }
@@ -131,7 +137,7 @@ public class EnumTable<E> {
             if (key[i] == null) {
                 throw new EnumTableRuntimeException("Null in key");
             }
-            sum += (parents.get(i).getIndex(key[i]) * step[i]);
+            sum += (pararr[i].getIndex(key[i]) * step[i]);
         }
         return sum;
     }
@@ -151,7 +157,7 @@ public class EnumTable<E> {
         Object[] key = new Object[nParents];
         for (int i = 0; i < nParents; i++) {
             int keyindex = remain / step[i];
-            key[i] = parents.get(i).getDomain().get(keyindex);
+            key[i] = pararr[i].getDomain().get(keyindex);
             remain -= keyindex * step[i];
         }
         return key;
@@ -204,7 +210,7 @@ public class EnumTable<E> {
         int remain = index;
         for (int i = 0; i < nParents; i++) {
             if (key[i] != null) {
-                int keyindex = parents.get(i).getIndex(key[i]);
+                int keyindex = pararr[i].getIndex(key[i]);
                 if (keyindex != remain / step[i]) {
                     return false;
                 }
@@ -280,12 +286,13 @@ public class EnumTable<E> {
                 break;
             }
         }
-        if (allWildcards) {
-            int[] ret = new int[this.getSize()];
-            for (int i = 0; i < ret.length; i++) {
-                ret[i] = i;
-            }
-            return ret;
+        if (allWildcards) { // 
+//            int[] ret = new int[this.getSize()];
+//            for (int i = 0; i < ret.length; i++) {
+//                ret[i] = i;
+//            }
+//            return ret;
+            return getIndices();
         }
         List<Integer> indices = new ArrayList<Integer>();
         for (Map.Entry<Integer, E> entry : map.entrySet()) {
@@ -300,6 +307,55 @@ public class EnumTable<E> {
         return ret;
     }
 
+    /**
+     * Identify each "theoretical" index that is linked to the specified key (which may
+     * include "wildcards", indicated by null values).
+     * In contrast to only identifying populated entries like getIndices does, this function
+     * finds all indices that in theory match the key.
+     *
+     * @param key
+     * @return an array with all matching indices
+     */
+    public int[] getTheoreticalIndices(Object[] key) {
+        if (key.length != nParents)
+            throw new EnumTableRuntimeException("Invalid key for EnumTable: key should be " + nParents + " but is " + key.length + " values");
+        int[] idx; // size a function of domain sizes of null columns
+        int startentry = 0; // determined from non-null entries, where counting will start
+        int tot = 1;
+        for (int i = 0; i < key.length; i ++) {
+            if (key[i] == null) {
+                tot *= domsize[i];
+            } else {
+                int keyidx = pararr[i].getIndex(key[i]);
+                startentry += keyidx * step[i];
+            }
+        }
+        idx = new int[tot];
+        getTheoreticalIndicesRecursive(key, idx, 0, startentry, 0);
+        return idx;
+    }
+
+    private synchronized int getTheoreticalIndicesRecursive(Object[] key, int[] idx, int my_idx, int my_tab, int parent) {
+        if (key.length <= parent) 
+            return -1;
+        // parent is real
+        if (key[parent] == null) {
+            for (int i = 0; i < domsize[parent]; i ++) {
+                int start = getTheoreticalIndicesRecursive(key, idx, my_idx, my_tab, parent + 1);
+                if (start != -1) {
+                    my_idx = start;
+                    my_tab += step[parent];
+                } else { // start == null meaning that we're at leaf
+                    idx[my_idx ++] = my_tab;
+                    my_tab += step[parent];
+                }
+            }
+        } else {
+            return getTheoreticalIndicesRecursive(key, idx, my_idx, my_tab, parent + 1);
+        }
+        return my_idx;
+    }
+    
     /**
      * Get indices for all non-null entries.
      * @return the indices
@@ -436,6 +492,30 @@ public class EnumTable<E> {
             if (source[i] != null)
                 target[i] = source[i];
         return target;
+    }
+    
+    public static void main(String[] args) {
+        EnumTable<Character> t = new EnumTable<>(Predef.Boolean(),Predef.Nominal("S1","S2","S3"),Predef.Number(4));
+        t.display();
+        int[] idx = t.getTheoreticalIndices(new Object[] {true,null,2});
+        if (idx != null) {
+            for (int i = 0; i <idx.length; i++)
+                System.out.println(idx[i]);
+        }
+        t = new EnumTable<>(Predef.Boolean(),Predef.Nominal("S1","S2","S3"),Predef.Number(4));
+        t.display();
+        idx = t.getTheoreticalIndices(new Object[] {null,"S2",null});
+        if (idx != null) {
+            for (int i = 0; i <idx.length; i++)
+                System.out.println(idx[i]);
+        }
+        t = new EnumTable<>(Predef.Boolean(),Predef.Nominal("S1","S2","S3"),Predef.Boolean(),Predef.Number(4),Predef.Nominal("A","B"));
+        t.display();
+        idx = t.getTheoreticalIndices(new Object[] {false,null,null,3,"B"});
+        if (idx != null) {
+            for (int i = 0; i <idx.length; i++)
+                System.out.println(idx[i]);
+        }
     }
 }
 
