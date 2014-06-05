@@ -238,7 +238,7 @@ public class Predef {
         return var;
     }
 
-    public static EnumVariable Nominal(String[] values) {
+    public static EnumVariable Nominal(String... values) {
         return Predef.Nominal(values, "Nom");
     }
 
