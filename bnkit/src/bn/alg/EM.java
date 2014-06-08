@@ -78,7 +78,7 @@ public class EM extends LearningAlg {
     /**
      * EM status print-outs
      */
-    public boolean EM_PRINT_STATUS = true;
+    public boolean EM_PRINT_STATUS = false;
 
     /**
      * EM option: currently two different approaches to determine expectations.
@@ -86,7 +86,35 @@ public class EM extends LearningAlg {
      * 1. one node at a time = one query per node
      * 2. all nodes at a time = one big query
      */
-    public int EM_OPTION = 2;
+    public int EM_OPTION = 1;
+
+    public void setConvergeCrit(double value){
+        this.EM_CONVERGENCE_CRITERION = (value > 0.0) ? value : 0.005;
+    }
+
+    /**
+     * Set the print status for the training
+     * @param status
+     */
+    public void setPrintStatus(Boolean status){
+        this.EM_PRINT_STATUS = status;
+    }
+
+    /**
+     * Set EM training option
+     * @param option
+     */
+    public void setEMOption(int option){
+        this.EM_OPTION = (option == 1) ? 1 : 2;
+    }
+
+    /**
+     * Set the max number of rounds for training.
+     * @param rounds
+     */
+    public void setMaxRounds(int rounds){
+        this.EM_MAX_ROUNDS = (rounds >= 1) ? rounds : 1;
+    }
 
     /**
      * Train the BN using EM.
