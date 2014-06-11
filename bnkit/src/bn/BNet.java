@@ -64,10 +64,15 @@ public class BNet implements Serializable {
     private Map<BNode, Set<BNode>> par2ch = new HashMap<>();
 
     /**
-     * Listing variables in a top-down ordered fashion, for quick query
+     * Listing nodes in a top-down ordered fashion, for quick query
      * processing.
      */
     private List<BNode> ordered = new ArrayList<>();
+
+    /**
+     * Listing node variables in a top-down ordered fashion
+     */
+    private List<Variable> orderedVars = new ArrayList<>();
 
     /**
      * Construct a BN.
@@ -333,6 +338,14 @@ public class BNet implements Serializable {
         return ordered;
     }
 
+    public List<Variable> getOrderedVariables() {
+        List<BNode> nodes = this.getOrdered();
+        for (BNode node : nodes){
+            this.orderedVars.add(node.getVariable());
+        }
+        return this.orderedVars;
+    }
+
     /**
      * Get the names of all variables in the BN.
      *
@@ -379,6 +392,7 @@ public class BNet implements Serializable {
             return null;
         }
     }
+
 
     /**
      * Get the boolean key to retrieve entries in the conditional probability
