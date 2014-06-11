@@ -338,6 +338,11 @@ public class BNet implements Serializable {
         return ordered;
     }
 
+    /**
+     * Retrieve all node variables in order (from root/s to leaves; with parallel paths
+     * in arbitrary order).
+     * @return variables in a defined topological order
+     */
     public List<Variable> getOrderedVariables() {
         List<BNode> nodes = this.getOrdered();
         for (BNode node : nodes){
