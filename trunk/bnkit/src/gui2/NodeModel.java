@@ -20,10 +20,11 @@ import java.util.List;
 
 /**
  *
- * @author Jun NodeModel implements Observable in the Observer pattern. Changes
- * in EnumVariable var's members are observed.
+ * @author jun 
+ * Wrapper around the BNode class.
+ * NodeModel implements Observable in the Observer pattern. 
  */
-//http://stackoverflow.com/questions/1658702/how-do-i-make-a-class-extend-observable-when-it-has-extended-another-class-too
+
 public class NodeModel implements BNode, Observable{
 
     @Override
@@ -64,14 +65,6 @@ public class NodeModel implements BNode, Observable{
         }
         this.observers = new ArrayList<>();
     }
-
-//    /**
-//     * Copy constructor for NodeModel
-//     * @param oldNode 
-//     */
-//    public NodeModel (NodeModel oldNode){
-//        this(oldNode.getVariable(), oldNode.getParents());
-//    }
     
     public BNode getBNode() {
         return bnode;
@@ -135,7 +128,6 @@ public class NodeModel implements BNode, Observable{
      * @param state 
      */
     public void setInferenceModel(String state){
-        // TODO: throw exception if string doesn't match?
         this.state = inferenceModel.valueOf(state.toUpperCase());
     }
     

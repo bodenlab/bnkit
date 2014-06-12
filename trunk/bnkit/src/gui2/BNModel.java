@@ -16,8 +16,12 @@ import java.util.List;
  *
  * @author Jun Ling
  * The BNModel class contains state information about nodes present
- * in the graph. A Bayesian Network data structure is stored and periodically
- * updated 
+ * in the graph. 
+ * 
+ * Nodes in the network have a visual representation stored in the View 
+ * (GraphPanel.graph) and internal representation stored in BNModel's bnc.nodems.
+ * 
+ * References to the Model are held by Controllers and Views. 
  */
 public class BNModel implements Observable{
     private final BNContainer bnc;
