@@ -29,6 +29,10 @@ public class NodeParamsDialog extends javax.swing.JDialog {
         initComponents();
     }
 
+    /**
+     * Specify the model to be displayed by NodeParamsDialog's table.
+     * @param node 
+     */
     public void setModel(NodeModel node) {
         if (node == null) {
             System.out.println("node null, do nothing");
@@ -37,7 +41,7 @@ public class NodeParamsDialog extends javax.swing.JDialog {
         myTableModel = new MyTableModel(node);
         myParamsTable.setModel(myTableModel);
         this.setTitle(node.getBNode().getVariable().getPredef() + "(" + node.getType() + ") " +
-                "node " + "\"" + node.getName() + "\""); // add information about Q/E/I state
+                "node " + "\"" + node.getName() + "\"");
     }
 
     class MyTableModel extends AbstractTableModel {

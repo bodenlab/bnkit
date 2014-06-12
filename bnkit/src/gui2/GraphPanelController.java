@@ -31,11 +31,15 @@ import javax.swing.SwingUtilities;
 
 /**
  *
- * @author Study Room
+ * @author jun
+ * GraphPanelController implements handlers for GraphPanel,.
+ * 
+ * Mouse and keyboard input are captured to allow node selection
+ * and movement, edge insertion as well as keyboard and mouse events.
  */
 public class GraphPanelController {
     final private GraphPanel graphPanel;
-    private BNModel model;
+    final private BNModel model;
     
     public GraphPanelController(GraphPanel gp, BNModel mdl){
         this.graphPanel = gp;
@@ -56,6 +60,7 @@ public class GraphPanelController {
 
         // Listener for edge creation
         graphComponent.getConnectionHandler().addListener(mxEvent.CONNECT, new mxEventSource.mxIEventListener() {
+            @Override
             public void invoke(Object sender, mxEventObject evt) {
                 Object edge = evt.getProperty("cell");
                 Object parentNode = ((mxCell) edge).getTerminal(true);
@@ -89,6 +94,7 @@ public class GraphPanelController {
 
         // Mouse scroll handler for zooming
         graphComponent.getGraphControl().addMouseWheelListener(new MouseAdapter() {
+            @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
                 System.out.println("Mouse scrolled");
                 if (e.getWheelRotation() < 0) {
@@ -104,6 +110,7 @@ public class GraphPanelController {
 
         // Register listeners for key presses.
         graphComponent.getGraphControl().addKeyListener(new KeyAdapter() {
+            @Override
             public void keyPressed(KeyEvent e) {
                 int key = e.getKeyCode();
                 if (key == KeyEvent.VK_DELETE) {
@@ -120,10 +127,12 @@ public class GraphPanelController {
             }
         });
 
+        // Add a listener for mouse-clicks. 
         graphComponent.getGraphControl().addMouseListener(new MouseAdapter() {
+            @Override
             public void mouseClicked(MouseEvent e) {
                 Object cell = graphComponent.getCellAt(e.getX(), e.getY());
-                // Clear previous selections
+                // If a single node is clicked, clear previous selections and select node.
                 if (graphPanel.getSelectedCells() != null) {
                     graphPanel.getSelectedCells().clear();
                 }
@@ -132,9 +141,6 @@ public class GraphPanelController {
 
                     // If right-click, open properties dialog
                     if (SwingUtilities.isRightMouseButton(e)) {
-//                        BNode node = bnc.getNode(graph.getLabel(cell));
-
-                        // Why is this failing?
                         System.out.println("cell is: " + graph.getLabel(cell));
                         NodeModel nm = bnc.getNodeModel(graph.getLabel(cell));
 
@@ -167,8 +173,7 @@ public class GraphPanelController {
             }
         });
 
-        // Multiple selection
-        // This handles general click events (by mouse selection or Ctrl+A)
+        // Add listener for multiple cell selection.
         graph.getSelectionModel().addListener(mxEvent.CHANGE, new mxEventSource.mxIEventListener() {
             @Override
             public void invoke(Object sender, mxEventObject evt) {
@@ -182,20 +187,10 @@ public class GraphPanelController {
                 }
             }
         });
-
-        graphComponent.getGraphControl().addMouseListener(new MouseAdapter() {
-            public void mouseReleased(MouseEvent e) {
-                Object cell = graphComponent.getCellAt(e.getX(), e.getY());
-                if (cell != null) {
-                }
-            }
-
-        });
-
     }
     
     /**
-     * Creates a new Vertex 'node' in the View.
+     * Add node to GraphPanel View.
      *
      * @param name
      * @param predef
@@ -217,14 +212,13 @@ public class GraphPanelController {
         String type = Predef.getBNodeType(predef);
         try {
             String color = (Predef.isEnumerable(predef) ? "yellow" : "orange"); // yellow for enumerable nodes, orange for continuous
-//                String cellStyle = (Predef.parameterName(predef).equals("String") ? "STRING_STYLE" : "BOOL_STYLE");
             graph.getModel().beginUpdate();
             Variable var = Predef.getVariable(name, predef, params);
 
             try {
                 // Create visible node
                 Random rand = new Random();
-                graphPanel.defStyleSheets(graph); // custom vertex and edge styles
+//                graphPanel.defStyleSheets(graph); // custom vertex and edge styles, presently unused.
                 Object newvertex = graph.insertVertex(graph.getDefaultParent(), null, name, 10 + rand.nextInt(50),
                         10 + rand.nextInt(50), 100, 50, "ROUNDED;strokeColor=black;fillColor=" + color);
 
@@ -243,12 +237,11 @@ public class GraphPanelController {
             }
 //            }
         } catch (RuntimeException e) {
-//            error_msg = e.getLocalizedMessage();
         }
     }
 
     /**
-     * Adds node to model. 
+     * Adds node to Model. 
      *
      * @param name
      * @param predef
@@ -324,7 +317,6 @@ public class GraphPanelController {
             graphPanel.addCellSelection(cell);
             graphPanel.removeVertex(cell);
         }
-//        deleteSelected();
         graph.removeCells(graph.getChildVertices(graph.getDefaultParent()));
         model.getBNC().clear();
         graphPanel.clearNodeCounts();

@@ -21,9 +21,8 @@ import javax.swing.border.Border;
 /**
  *
  * @author Jun Ling
- * MainJFrame is the main view of the project.
- * It presents GUI elements which allow addition and modification of nodes.
- * This class passes 
+ * MainJFrame is the 'main' View.
+ * It presents GUI elements which allow user interaction with the system. 
  */
 public class MainJFrame extends javax.swing.JFrame{
 
@@ -257,6 +256,9 @@ public class MainJFrame extends javax.swing.JFrame{
         return inferResultLbl;
     }
     
+    /**
+     * Adds GraphPanel View to MainJFrame.
+     */
     public void initDrawPanel() {
         // adds the graph panel to drawPanel.
         GroupLayout layout = new GroupLayout(drawPanel);
@@ -271,18 +273,19 @@ public class MainJFrame extends javax.swing.JFrame{
         );
     }
     
+    /**
+     * Selects whether JButtons or drag-drop NodeLabels used to add
+     * nodes to network.
+     */
     public void initNodeControls() {
         if (usingButtons) {
             initNodeButtons();
         } else {
             initNodeLbls();
-        }
-        
+        }    
         // Also initialise the queryResultPanel
         panelContainerPanel.setLayout(new java.awt.BorderLayout());
 
-        
-        // needs a button at the bottom left.
     }
 
     public ArrayList<JButton> getNodeButtons() {
@@ -297,6 +300,10 @@ public class MainJFrame extends javax.swing.JFrame{
         return jMenuItemOpen;
     }
 
+    /**
+     * Initialise JButtons for adding nodes.
+     * This is called if MainJFrame is instantiated with argument 'true'.
+     */
     private void initNodeButtons() {
         // Name and label border
         Border addNodeBorder = BorderFactory.createTitledBorder("Add Node");
@@ -319,13 +326,15 @@ public class MainJFrame extends javax.swing.JFrame{
         }
         addNodePanel.setVisible(true);
     }
-
+    /**
+     * Initialise drag-drop labels for adding nodes.
+     * This is called if MainJFrame is instantiated with argument 'false'.
+     */
     private void initNodeLbls() {
         if (graphPanel == null){
             System.err.println("GraphPanel not initialised.");
             return;
         }
-        
         // Name and label border
         Border addNodeBorder = BorderFactory.createTitledBorder("Add Node");
         addNodePanel.setBorder(addNodeBorder);

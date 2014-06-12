@@ -28,8 +28,9 @@ import javax.swing.border.Border;
 
 /**
  *
- * @author Jun JLabel which can be dragged and dropped onto GraphPanel as a
- * node.
+ * @author jun 
+ * Extension of JLabel which can be dragged and dropped onto GraphPanel to
+ * add nodes to the network.
  */
 public class NodeLabel extends JLabel implements Transferable,
         DragSourceListener, DragGestureListener {

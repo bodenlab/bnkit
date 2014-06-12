@@ -6,6 +6,7 @@
 package gui2;
 
 import bn.BNet;
+import bn.Enumerable;
 import bn.Predef;
 import com.mxgraph.model.mxCell;
 import java.awt.event.ActionEvent;
@@ -18,7 +19,11 @@ import javax.swing.JRadioButton;
 
 /**
  *
- * @author Jun
+ * @author jun
+ * Dialog presented when node is right-clicked on.
+ * 
+ * Allows nodes to be parameterised and evidenced. Model
+ * and View are updated accordingly.
  */
 public class NodePropertiesDialog extends javax.swing.JDialog {
 
@@ -44,9 +49,6 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         bnc = graphPanel.getBNContainer();
         this.setTitle("Node Properties");
 
-        // Set default button
-//        JRootPane rootpane = SwingUtilities.getRootPane(applyBtn);
-//        rootPane.setDefaultButton(applyBtn);
         nodeModel = nm;
         init();
         System.out.println("NodePropertiesDialog Constructor");
@@ -63,6 +65,12 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         nodeDescriptionLabel.setText(getTypeDescription(nodeModel.getVariable().getPredef()));
     }
 
+    /**
+     * Returns a short description about the queried predef.
+     * This needs to be maintained manually.
+     * @param predef
+     * @return predef-description 
+     */
     private String getTypeDescription(String predef) {
         String header = "<html>" + predef + " (" + nodeModel.getType() + ")<br>";
         if (Predef.isParameterised(predef)) {
@@ -81,6 +89,9 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         return null;
     }
 
+    /**
+     * Initialises GUI elements.
+     */
     private void init() {
 
         // Set up the 'node actions' panel
@@ -109,9 +120,10 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         }
         String params = nodeModel.getVariable().getParams();
 
+        
+        // Populate the parameter checkboxes.
         if (Predef.isEnumerable(nodeModel.getVariable().getPredef())) {
-            paramsList.add("None"); // will need to put check in palce to prevent user from entering a parameter named
-            // "None".
+            paramsList.add("None");
             if (nodeModel.getVariable().getPredef().equalsIgnoreCase("String")) {
                 paramsList.addAll(Arrays.asList(params.split(";")));
             } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Boolean")) {
@@ -127,19 +139,15 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                     ));
                 }
             } else if (nodeModel.getVariable().getPredef().equalsIgnoreCase("Nucleic acid")) {
-                //TODO: check this.
-                // this fails, because there are two different instances of nucleic acid.
-                for (int i = 0; i < Predef.AminoAcid().size(); i++) {
-                    nodeModel.getVariable().getDomain();
-                    paramsList.add(String.valueOf(Predef.NucleicAcid().getDomain().get(i)));
+                for (int i = 0; i < Predef.NucleicAcid().size(); i++) {
+                    paramsList.add(String.valueOf(
+                            Predef.NucleicAcid().getDomain().get(i)));
                 }
             } else {
                 paramsList.add("In development");
             }
 
             // Generate JRadioButtons for parameters.
-            // TODO: Bug where clicking elsewhere causes selectedRadioButton to
-            // be set to null.
             for (String s : paramsList) {
                 dummybtn = new JRadioButton(s);
                 dummybtn.addActionListener(new ActionListener() {
@@ -182,16 +190,9 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         });
 
         this.setBackground(new java.awt.Color(204, 204, 204));
-//        this.setBorder(javax.swing.BorderFactory.createTitledBorder("Node Properties"));
 
         javax.swing.GroupLayout propertiesPanelLayout = new javax.swing.GroupLayout(getContentPane());
 
-//        ParallelGroup hgroup =  propertiesPanelLayout.createParallelGroup();
-//        SequentialGroup vgroup = propertiesPanelLayout.createSequentialGroup();
-//        for (JRadioButton b: buttonArr){
-//            hgroup.addComponent(b);
-//            vgroup.addComponent(b);
-//        }
         this.setLayout(propertiesPanelLayout);
         propertiesPanelLayout.setHorizontalGroup(
                 propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -207,8 +208,6 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                                                 .addComponent(lbl2))
                                         .addGap(0, 0, Short.MAX_VALUE)))
                         .addContainerGap())
-                //                .addGroup(hgroup)
-                //                .addComponent(evidenceCheck)
                 .addComponent(evidenceLbl)
                 .addComponent(radioPanel)
                 .addGroup(propertiesPanelLayout.createSequentialGroup()
@@ -232,18 +231,20 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                         .addGap(18, 18, 18)
                         .addComponent(nodeDescriptionLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 61, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 7, Short.MAX_VALUE)
-                        //                        .addGroup(vgroup)
-                        //                        .addComponent(evidenceCheck)
                         .addComponent(evidenceLbl)
                         .addComponent(radioPanel)
                         .addGroup(propertiesPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                                 .addComponent(applyBtn)
                                 .addComponent(cancelBtn)))
-        // Pack the two frames into the parent
         );
         pack();
     }
 
+    /**
+     * Listener for 'Apply' button press.
+     * Performs updates to Model and View.
+     * @param evt 
+     */
     private void applyBtnPressed(java.awt.event.MouseEvent evt) {
 
         //TRY: somehow make use of graphPanel.allVertices?
@@ -325,6 +326,9 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         dispose();
     }
 
+    /**
+     * 
+     */
     private void setParameterBoxes() {
         String instanceString = "";
         java.util.Enumeration<AbstractButton> radioButtons = checkButtonGroup.getElements();
@@ -392,7 +396,7 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         } else {
             System.err.println("Calling checkParameterBox() for a continuous variable.");
         }
-        return null;
+        return "null"; // this should not happen
     }
 
     private void cancelBtnPressed(java.awt.event.MouseEvent evt) {

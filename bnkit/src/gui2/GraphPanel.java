@@ -38,10 +38,9 @@ import javax.swing.JPanel;
 
 /**
  *
- * @author jun View class GraphPanel visually represents the graph structure.
+ * @author jun 
+ * View class GraphPanel is responsible for displaying the graph structure visually.
  *
- * Mouse and keyboard input are captured in this class to allow node selection
- * and movement, edge insertion, key events eg. zoom, save/load.
  */
 public final class GraphPanel extends JPanel implements Serializable, Observer {
 
