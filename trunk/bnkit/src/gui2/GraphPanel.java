@@ -8,39 +8,22 @@ package gui2;
 import bn.BNet;
 import bn.BNode;
 import bn.EnumVariable;
-import bn.JPT;
 import bn.Predef;
 import bn.Variable;
 import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
-import bn.file.BNBuf;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.layout.mxGraphLayout;
 import com.mxgraph.layout.mxParallelEdgeLayout;
 import com.mxgraph.layout.mxPartitionLayout;
-import com.mxgraph.model.mxCell;
-import com.mxgraph.model.mxGeometry;
 import com.mxgraph.model.mxIGraphModel;
-import com.mxgraph.swing.handler.mxRubberband;
 import com.mxgraph.swing.mxGraphComponent;
-import com.mxgraph.swing.util.mxGraphTransferable;
 import com.mxgraph.util.mxConstants;
-import com.mxgraph.util.mxEvent;
-import com.mxgraph.util.mxEventObject;
-import com.mxgraph.util.mxEventSource.mxIEventListener;
 import com.mxgraph.util.mxRectangle;
-import com.mxgraph.util.mxResources;
 import com.mxgraph.view.mxGraph;
-import com.mxgraph.view.mxGraphSelectionModel;
 import com.mxgraph.view.mxStylesheet;
 import java.awt.BorderLayout;
-import java.awt.datatransfer.Transferable;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseWheelEvent;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -52,23 +35,25 @@ import java.util.Map;
 import java.util.Random;
 import javax.swing.JFileChooser;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 
 /**
  *
- * @author jun
+ * @author jun View class GraphPanel visually represents the graph structure.
+ *
+ * Mouse and keyboard input are captured in this class to allow node selection
+ * and movement, edge insertion, key events eg. zoom, save/load.
  */
-public class GraphPanel extends JPanel implements Serializable, Observer {
+public final class GraphPanel extends JPanel implements Serializable, Observer {
 
     private mxGraph graph;
     final mxGraphComponent graphComponent;
-    private Map<String, Object> allVertices = new HashMap<String, Object>();
-    private BNContainer bnc;
+    private final Map<String, Object> allVertices = new HashMap<String, Object>();
     public final Object lastPressedVertex = null;
-    public List<Object> selectedCells = new ArrayList<>();
-    private List<NodeModel> nodeModels = new ArrayList<>();
+    private List<Object> selectedCells = new ArrayList<>();
+    private final List<NodeModel> nodeModels = new ArrayList<>();
     private BNModel model;
-    private Map<String, Integer> nodeCounts = new HashMap<>();
+    private final Map<String, Integer> nodeCounts = new HashMap<>(); // Track number of each type of node to ensure
+                                                                     // new nodes are assigned unique names.
     private NodeModel queryNode; // For now, there is only one query node
 
     public mxGraphComponent getGraphComponent() {
@@ -84,17 +69,26 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     }
 
     public BNContainer getBNContainer() {
-        return bnc;
+        return model.getBNC();
     }
 
-    public NodeModel getQueryNode(){
+    public NodeModel getQueryNode() {
         return queryNode;
     }
-    
-    public void setQueryNode(NodeModel node){
+
+    public void setQueryNode(NodeModel node) {
         queryNode = node;
     }
-    
+
+    public Map getNodeCounts() {
+        return nodeCounts;
+    }
+
+    @Deprecated
+    /**
+     * Not presently used. Pre-defines visual
+     * styles for nodes. 
+     */
     public void defStyleSheets(mxGraph graph) {
         String STRING_STYLE = "STRING_STYLE";
         String BOOL_STYLE = "BOOL_STYLE";
@@ -108,19 +102,15 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         style.put(mxConstants.STYLE_SHAPE, mxConstants.SHAPE_ELLIPSE);
         stylesheet.putCellStyle(STRING_STYLE, style);
 
-        // bool nodes are elliptical
+        // bool nodes are hexagonal
         style = new Hashtable<String, Object>();
         style.put(mxConstants.STYLE_SHAPE, mxConstants.SHAPE_HEXAGON);
         stylesheet.putCellStyle(BOOL_STYLE, style);
 
+        // Edges are orthogonal
         style = new Hashtable<String, Object>();
         style.put(mxConstants.STYLE_EDGE, mxConstants.EDGESTYLE_ORTHOGONAL);
         stylesheet.putCellStyle(EDGE_ORTH, style);
-
-    }
-
-    public void setBNContainer(BNContainer bnc) {
-        this.bnc = bnc;
     }
 
     public Object[] getAllVertices() {
@@ -145,10 +135,10 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         }
     }
 
-    public List<Object> getSelectedCells(){
+    public List<Object> getSelectedCells() {
         return selectedCells;
     }
-    
+
     public void addCellSelection(Object o) {
         selectedCells.add(o);
     }
@@ -184,191 +174,13 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         return null;
     }
 
-    public void setLayout(String lay) {
-        mxGraph graph = getGraph();
-        final mxGraphLayout layout;
-        graph.getModel().beginUpdate();
-        layout = new mxHierarchicalLayout(graph);
-        ((mxHierarchicalLayout) layout).setInterHierarchySpacing(50);
-        ((mxHierarchicalLayout) layout).setIntraCellSpacing(50);
-        layout.execute(graph.getDefaultParent());
-
-        graph.getModel().endUpdate();
-
-    }
-
     /**
-     * Creates a new Vertex 'node' in the View.
-     *
-     * @param name
-     * @param predef
-     * @param params
+     * Automatically arrange graph into layout.
+     * Passed index specifies layout configuration. 
+     * Presently, only mxParallelEdgeLayout is used.
+     * @param layout_index 
      */
-    public void createNode(String name, String predef, String params) {
-        // Set defaults for initialising node...
-        if (name == null) {
-            name = predef + " node-" + nodeCounts.get(predef);
-        }
-        // Set default parameters.
-        if (params == null) {
-            params = predef.equalsIgnoreCase("String") ? "a;b"
-                    : predef.equalsIgnoreCase("Number") ? "5" : // this bugs out when real int provided
-                    null;
-        }
-
-        String type = Predef.getBNodeType(predef);
-        try {
-            String color = (Predef.isEnumerable(predef) ? "yellow" : "orange"); // yellow for enumerable nodes, orange for continuous
-//                String cellStyle = (Predef.parameterName(predef).equals("String") ? "STRING_STYLE" : "BOOL_STYLE");
-            graph.getModel().beginUpdate();
-            Variable var = Predef.getVariable(name, predef, params);
-
-            try {
-                // Create visible node
-                Random rand = new Random();
-                this.defStyleSheets(graph); // custom vertex and edge styles
-                Object newvertex = graph.insertVertex(graph.getDefaultParent(), null, name, 10 + rand.nextInt(50),
-                        10 + rand.nextInt(50), 100, 50, "ROUNDED;strokeColor=black;fillColor=" + color);
-                
-                // TODO: find a new home for this
-                this.addVertex(name, newvertex);
-                
-                // 'Select' the new node.
-                selectedCells.clear();
-                this.addCellSelection(newvertex);
-                System.out.println("bnode is: " + Predef.getBNode(var, new ArrayList<Variable>(), type));
-                System.out.println("type is: " + type);
-                
-                // Add Node to BNodeMap.
-
-//                nm.register(mainFrame);
-            } finally {
-                graph.getModel().endUpdate();
-            }
-//            }
-        } catch (RuntimeException e) {
-//            error_msg = e.getLocalizedMessage();
-        }
-    }
-
-    public Transferable createTransferableNode(String predef) {
-        // Changes in GraphPanel mxModel
-//        this.addVertex(name, newvertex);
-//        selectedCells.clear();
-//        this.addCellSelection(newvertex);
-
-        String name = predef + " node-" + nodeCounts.get(predef);
-        
-        // Changes in GraphPanel View
-        mxRectangle bounds = new mxRectangle(0, 0, 100, 50);
-        mxGeometry geometry = new mxGeometry(0, 0, 100, 50);
-        geometry.setRelative(false);
-        String color = (Predef.isEnumerable(predef) ? "yellow" : "orange");
-        mxCell vertex = new mxCell(name, geometry, "ROUNDED;strokeColor=black;fillColor=" + color);
-//                vertex.setId(null);
-        vertex.setVertex(true);
-        vertex.setConnectable(true);
-        return new mxGraphTransferable(new Object[]{vertex}, bounds);
-    }
-
-    public Object generateNode() {
-
-        return null;
-    }
-
-    public void addNodetoBNC(String name, String predef, String params) {
-        if (name == null) {
-            name = predef + " node-" + nodeCounts.get(predef);
-        }
-        // Set default parameters.
-        if (params == null) {
-            params = predef.equalsIgnoreCase("String") ? "a;b"
-                    : predef.equalsIgnoreCase("Number") ? "5" : // this bugs out when real int provided
-                    null;
-        }
-
-        String type = Predef.getBNodeType(predef);
-        nodeCounts.put(predef, nodeCounts.get(predef) + 1);
-        Variable var = Predef.getVariable(name, predef, params);
-        if (type.equalsIgnoreCase("CPT")) {
-            NodeModel nm = Predef.getNodeModel(var, new ArrayList<Variable>(), type);
-
-            //TODO: investigate this...
-            // This should not be necessary. Predef.getBNode is not correctly storing
-            // number node predef and name
-            if (predef.equalsIgnoreCase("Number")) {
-                nm.getVariable().setPredef("Number");
-                nm.getVariable().setName("Number node-" + (nodeCounts.get("Number") -1));
-                System.out.println("name is:" + "Number node-" + nodeCounts.get("Number"));
-            }
-
-//            mxModel.getBNC().addNode(newBNode);
-//            model.getBNC().addNode(nm);
-            bnc.addNode(nm);
-            System.out.println(">>node" +  nm.getName()+" added to bnc!!");
-            System.out.println("@ bnc:" + bnc.getNodeModelArr());
-        } else {
-            System.out.println("GPT case");
-//            BNode newBNode = Predef.getBNode(var, new ArrayList<Variable>(), type);
-            NodeModel nm = Predef.getNodeModel(var, new ArrayList<Variable>(), type);
-//            model.getBNC().addNode(nm);
-            bnc.addNode(nm);
-            System.out.println("node added to bnc!!");
-        }
-
-    }
-
-    private GraphPanel getGraphPanel() {
-        return this;
-    }
-
-    public void deleteSelected() {
-        if (selectedCells.isEmpty()) {
-            return;
-        }
-        System.out.println("Delete selection ");
-        mxIGraphModel mxModel = graph.getModel();
-        for (Object cell : selectedCells) {
-
-            // Edges must be deleted first, otherwise removeParent fails.
-            if (graph.getModel().isEdge(cell)) {
-                Object child = mxModel.getTerminal(cell, false);
-                Object parent = mxModel.getTerminal(cell, true);
-                System.out.println("deleting edge between " + ((mxCell) parent).getValue()
-                        + " and " + ((mxCell) child).getValue());
-                BNode childnode = bnc.getNodeModel(graph.getLabel(child));
-
-                Variable parentvar = bnc.getVariable(graph.getLabel(parent));
-//                graph.removeCells(new Object[]{cell});
-                System.out.println("delete vert:: childnode: " + childnode + " parentvar: " + parentvar);
-                bnc.removeParent(childnode, parentvar);
-            }
-
-        }
-        for (Object cell : selectedCells) {
-            if (mxModel.isVertex(cell)) {
-                String nodename = graph.getLabel(cell);
-                BNode node = bnc.getNodeModel(nodename);
-                nodeCounts.put(node.getVariable().getPredef(), nodeCounts.get(node.getVariable().getPredef()) - 1);
-                bnc.removeNode(node);
-                removeVertex(cell);
-            }
-        }
-        graph.removeCells(selectedCells.toArray(new Object[selectedCells.size()]));
-    }
-
-    public void deleteAll() {
-        for (Object cell : graph.getChildVertices(graph.getDefaultParent())) {
-            addCellSelection(cell);
-            removeVertex(cell);
-        }
-//        deleteSelected();
-        graph.removeCells(graph.getChildVertices(graph.getDefaultParent()));
-        bnc.clear();
-    }
-
     public void executeLayout(int layout_index) {
-        final mxGraph graph = getGraph();
         final mxGraphLayout layout;
         graph.getModel().beginUpdate();
         try {
@@ -389,11 +201,12 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         }
     }
 
+    /**
+     * Displays a save dialog for saving network to file.
+     * File structure is XML.
+     */
     public void saveNetwork() {
         JFileChooser c = new JFileChooser();
-
-//        FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
-//        c.setFileFilter(filter);
         int rVal = c.showSaveDialog(c);
         if (rVal == JFileChooser.APPROVE_OPTION) {
             File file = c.getSelectedFile();
@@ -401,58 +214,51 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
             if (file != null) {
                 try {
                     System.out.println("file saved!");
-                    bnc.save(file.getCanonicalPath());
+                    model.getBNC().save(file.getCanonicalPath());
                 } catch (IOException ex) {
 
                 }
             }
         }
         if (rVal == JFileChooser.CANCEL_OPTION) {
-            // do nothing for now
         }
     }
 
+    /** 
+     * Displays a load dialog to load network from XML-format file.
+     * 
+     */
     public void loadNetwork() {
         JFileChooser c = new JFileChooser();
-
-//        FileFilter filter = new FileNameExtensionFilter("XML file", "xml");
-//        c.setFileFilter(filter);
         int rVal = c.showOpenDialog(c);
         if (rVal == JFileChooser.APPROVE_OPTION) {
             File file = c.getSelectedFile();
             if (file != null) {
                 try {
-//                    bnc.load(file.getCanonicalPath());
-                    bnc.loadnm(file.getCanonicalPath(), true);
-                    renderNetwork(bnc);
-                    this.setLayout("");
-                    // also need to add nodes to graph.
+                    model.getBNC().loadnm(file.getCanonicalPath(), true);
+                    renderNetwork(model.getBNC());
+                    executeLayout(1);
                 } catch (IOException ex) {
 
                 }
             }
-            // open
         }
         if (rVal == JFileChooser.CANCEL_OPTION) {
 
         }
-        // Later replace this with
-        // graphPanel.loadNetwork();
     }
 
     GraphPanel(BNModel mod) {
         this();
         model = mod;
-        bnc = model.getBNC();
+//        bnc = model.getBNC();
     }
 
     public GraphPanel() {
         super();
         this.graph = new mxGraph();
         Object parent = this.graph.getDefaultParent();
-        // To have scroll bars by default, set min graph size smaller than frame container
-        this.graph.setMinimumGraphSize(new mxRectangle(0, 0, 400, 500));
-        this.graph.setMaximumGraphBounds(new mxRectangle(0, 0, 2000, 1600));
+        this.graph.setMinimumGraphSize(new mxRectangle(0, 0, 800, 600));
         this.graph.setAllowDanglingEdges(false);
         this.graph.setAllowLoops(false);
         this.graph.setCellsEditable(false);
@@ -461,13 +267,11 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         this.graph.setAllowNegativeCoordinates(true);
         this.setAutoscrolls(true);
 
-        for (String predef : Predef.getVariableTypes()) {
-            nodeCounts.put(predef, 0);
-        }
+        clearNodeCounts();
 
         Map<String, Object> stil = new HashMap<String, Object>();
         stil.put(mxConstants.STYLE_ROUNDED, false);
-        stil.put(mxConstants.STYLE_EDGE, mxConstants.EDGESTYLE_ORTHOGONAL);
+//        stil.put(mxConstants.STYLE_EDGE, mxConstants.EDGESTYLE_ORTHOGONAL);
         stil.put(mxConstants.STYLE_SHAPE, mxConstants.SHAPE_CONNECTOR);
         stil.put(mxConstants.STYLE_ENDARROW, mxConstants.ARROW_CLASSIC);
         stil.put(mxConstants.STYLE_VERTICAL_ALIGN, mxConstants.ALIGN_MIDDLE);
@@ -479,198 +283,34 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
         graphComponent = new mxGraphComponent(this.graph);
         this.add(graphComponent, BorderLayout.CENTER);
 
-        // Enable rubberband (multiple) selection
-        mxRubberband rubberband = new mxRubberband(graphComponent);
-        graphComponent.setPanning(true);
-
-        // Set tooltips for nodes.
-        graphComponent.setToolTips(true);
-
-//        graphComponent.getToolTipText();
-        // Listener for edge creation
-        graphComponent.getConnectionHandler().addListener(mxEvent.CONNECT, new mxIEventListener() {
-            public void invoke(Object sender, mxEventObject evt) {
-                Object edge = evt.getProperty("cell");
-                Object parentNode = ((mxCell) edge).getTerminal(true);
-                Object childNode = ((mxCell) edge).getTerminal(false);
-
-                System.out.println("Created edge: " + edge);
-                System.out.println("Between " + parentNode + " and " + childNode);
-
-                selectedCells.clear();
-                selectedCells.add(edge);
-
-                // update parent-child relationships
-                NodeModel nm = bnc.getNodeModel(graph.getLabel(childNode));
-                Variable parentvar = bnc.getVariable(graph.getLabel(parentNode));
-                bnc.addParent(nm, parentvar);
-
-//                ((mxCell) childNode).setValue("test remove me");
-            }
-        });
-
-        // Mouse scroll handler for zooming
-        graphComponent.getGraphControl().addMouseWheelListener(new MouseAdapter() {
-            public void mouseWheelMoved(MouseWheelEvent e) {
-                System.out.println("Mouse scrolled");
-                if (e.getWheelRotation() < 0) {
-                    graphComponent.zoomIn();
-                } else {
-                    graphComponent.zoomOut();
-                }
-                System.out.println(mxResources.get("scale") + ": "
-                        + (int) (100 * graphComponent.getGraph().getView().getScale())
-                        + "%");
-            }
-        });
-
-        // Register listeners for key presses.
-        graphComponent.getGraphControl().addKeyListener(new KeyAdapter() {
-            public void keyDown(KeyEvent e) {
-                // required
-            }
-
-            public void keyTyped(KeyEvent e) {
-                //required
-            }
-
-            public void keyPressed(KeyEvent e) {
-
-                int key = e.getKeyCode();
-                if (key == KeyEvent.VK_DELETE) {
-                    deleteSelected();
-                } else if ((key == KeyEvent.VK_S) && ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0)) {
-                    saveNetwork();
-                } else if ((key == KeyEvent.VK_O) && ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0)) {
-                    loadNetwork();
-                } else if ((key == KeyEvent.VK_EQUALS) && ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0)) {
-                    graphComponent.zoomIn();
-                } else if ((key == KeyEvent.VK_MINUS) && ((e.getModifiers() & KeyEvent.CTRL_MASK) != 0)) {
-                    graphComponent.zoomOut();
-                }
-            }
-
-            public void keyReleased(KeyEvent e) {
-            }
-        });
-
-        graphComponent.getGraphControl().addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
-                Object cell = graphComponent.getCellAt(e.getX(), e.getY());
-                // Clear previous selections
-                if (selectedCells != null) {
-                    selectedCells.clear();
-                }
-                selectedCells.add(cell);
-
-                // TODO: set this node to QUERY!
-                
-                if (cell != null) {
-
-                    // If right-click, open properties dialog
-                    if (SwingUtilities.isRightMouseButton(e)) {
-//                        BNode node = bnc.getNode(graph.getLabel(cell));
-
-                        // Why is this failing?
-                        System.out.println("cell is: " + graph.getLabel(cell));
-                        NodeModel nm = bnc.getNodeModel(graph.getLabel(cell));
-
-                        // register listener here.
-                        NodePropertiesDialog npp = new NodePropertiesDialog(null, true, nm, getGraphPanel());
-                        npp.setVisible(true);
-                    } else {
-                        // Single-clicked single cell
-                        graphComponent.getGraphControl().requestFocus();
-                        mxIGraphModel model = graph.getModel();
-                        // select whatever is pointed at
-                        if (model.isVertex(cell)) {
-                            System.out.println("Cell is: " + cell
-                                    + ", Selected node is:" + bnc.getNode(graph.getLabel(cell)));
-
-                            // now add this to MainJFrame's propertiesPanel
-//                        nodeProps.setBNode(bnc.getNode(graph.getLabel(cell)));
-//                        nodeProps.updateDisplay();
-                            if (e.getClickCount() == 2) {
-                                System.out.println("Double-clicked-to-select Vertex=" + graph.getLabel(cell));
-                                BNode node = bnc.getNodeModel(graph.getLabel(cell));
-                                NodeParamsDialog dialog = new NodeParamsDialog(null, true);
-                                NodeModel nm = bnc.getNodeModel(graph.getLabel(cell));
-
-                                //TODO: find a way to correctly setmodel
-                                dialog.setModel(nm);
-                                dialog.setVisible(true);
-                            }
-
-                        } else if (graph.getModel().isEdge(cell)) {
-                            System.out.println("Clicked-to-select Edge=" + graph.getLabel(cell));
-                        }
-                    }
-                } else {
-                    selectedCells.clear();
-                    System.out.println("deselected");
-                    graphComponent.getGraphControl().requestFocus();
-                }
-            }
-        });
-
-        // Multiple selection
-        // This handles general click events (by mouse selection or Ctrl+A)
-        graph.getSelectionModel().addListener(mxEvent.CHANGE, new mxIEventListener() {
-            @Override
-            public void invoke(Object sender, mxEventObject evt) {
-                if (sender instanceof mxGraphSelectionModel) {
-                    selectedCells.clear();
-                    for (Object cell : ((mxGraphSelectionModel) sender).getCells()) {
-                        System.out.println("selected cell=" + graph.getLabel(cell));
-                        selectedCells.add(cell);
-                        graphComponent.getGraphControl().requestFocus();
-                    }
-                }
-            }
-        });
-
-        graphComponent.getGraphControl().addMouseListener(new MouseAdapter() {
-            public void mouseReleased(MouseEvent e) {
-                Object cell = graphComponent.getCellAt(e.getX(), e.getY());
-                if (cell != null) {
-                }
-            }
-
-        });
-
     }
+
     /**
-     * Perform Inference.
-     * Selected node is set as Query node, and NodeModels which are so specified
-     * set as Evidence. Presently only variable elimination is implemented so this
-     * is used by default for inference.
+     * Perform Inference. Selected node is set as Query node, and NodeModels
+     * which are so specified set as Evidence. Presently only variable
+     * elimination is implemented so this is used by default for inference.
      */
-    public void doInference(){
-        
+    public void doInference() {
+
         if (queryNode == null) {
             System.err.println("queryNode is null. Returning...");
             return;
         }
-        // Check Query node is not Evidenced.
-//        BNet bn = new BNet();
-//        for (NodeModel nm: bnc.getNodeModelArr().values()){
-//            if (nm.getInferenceModel().equalsIgnoreCase("Evidence")){
-//                bn.add(nm.getBNode()); // expects cpt or GDT
-//            }
-//        }
-        BNet bn = bnc.getBNetnm();
-        //aa
+        BNet bn = model.getBNC().getBNet();
         CGVarElim ve = new CGVarElim();
         ve.instantiate(bn);
         Query q = ve.makeQuery(queryNode.getVariable());
-        CGTable res = (CGTable)ve.infer(q);
+        CGTable res = (CGTable) ve.infer(q);
         res.display();
-        
-        //set mainFrame's panel??
     }
-    
-    // TODO: eventually, inference algorithm should be selectable.
-    public void doInference(String inferAlg){}
+    /**
+     * Reset nodeCounts count values.
+     */
+    public void clearNodeCounts(){
+        for (String predef : Predef.getVariableTypes()) {
+            nodeCounts.put(predef, 0);
+        }
+    } 
     
     /**
      * Re-renders the network. This involves removing all vertices in View and
@@ -680,15 +320,11 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
      */
     public void renderNetwork(BNContainer bnc) {
         // Clear graph then repopulate.
-        graph.removeCells(this.getAllCells());
-
-        for (BNode node : bnc.getBNetnm().getNodes()) {
-            // Just iterate through elements in nodems??
-
+        graph.removeCells(graph.getChildVertices(graph.getDefaultParent()));
+        
+        // Iterate through list of nodes stored in Model and draw them.
+        for (BNode node : bnc.getBNet().getNodes()) {
             NodeModel nm = new NodeModel(node);
-            // check if parents is null beforehand
-//            NodeModel nm = new NodeModel( node.getVariable(), node.getParents());
-
             Variable var = nm.getVariable();
             if (var != null) {
                 String predef = var.getPredef();
@@ -709,8 +345,9 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
             } else {
                 System.err.println("In renderNetwork, node var is null");
             }
-        } // variables done... now connect them
-        for (BNode node : bnc.getBNetnm().getNodes()) {
+        } 
+        // Insert edges.
+        for (BNode node : bnc.getBNet().getNodes()) {
             NodeModel nm = new NodeModel(node);
             String child_name = nm.getVariable().getName();
             Object child_vertex = this.getVertex(child_name);
@@ -721,20 +358,48 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
                     graph.getModel().beginUpdate();
                     System.out.println("Inserting edge between " + parent_name + " and " + child_name);
                     try {
-
                         Object newedge = graph.insertEdge(graph.getDefaultParent(), null, "", parent_vertex, child_vertex);
-
                     } finally {
                         graph.getModel().endUpdate();
                     }
                 }
             } else {
-//                System.out.println("No parents :(");
             }
         }
         this.executeLayout(1);
     }
 
+    /**
+     * Adds node to model. 
+     *
+     * @param name
+     * @param predef
+     * @param params
+     */
+    public void addNodetoBNC(String name, String predef, String params) {
+        if (name == null) {
+            name = predef + " node-" + nodeCounts.get(predef);
+        }
+        // Set default parameters.
+        if (params == null) {
+            params = predef.equalsIgnoreCase("String") ? "a;b"
+                    : predef.equalsIgnoreCase("Number") ? "5"
+                    : null;
+        }
+
+        String type = Predef.getBNodeType(predef);
+        nodeCounts.put(predef, nodeCounts.get(predef) + 1);
+        Variable var = Predef.getVariable(name, predef, params);
+        NodeModel nm = Predef.getNodeModel(var, new ArrayList<Variable>(), type);
+
+        if (predef.equalsIgnoreCase("Number")) {
+            nm.getVariable().setPredef("Number");
+            nm.getVariable().setName("Number node-" + (nodeCounts.get("Number") - 1));
+            System.out.println("name is:" + "Number node-" + nodeCounts.get("Number"));
+        }
+        model.getBNC().addNode(nm);
+    }
+    
     @Override
     // Method called by Observable mxModel NodeModel.
     public void update() {
@@ -744,48 +409,6 @@ public class GraphPanel extends JPanel implements Serializable, Observer {
     @Override
     public void setSubject(Observable sub) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-    
-    public void testInfer(){
-//        String bn_file = "cgSimple3.new";
-//        BNet bn = BNBuf.load(bn_file);
-        BNet bn = bnc.getBNetnm();
-//        BNet bn = new BNet();
-        
-        for (BNode node : bn.getNodes()) {
-            if (node.getName().equals("DNase(Open)")) {
-                node.setInstance(10.54);
-            }
-//			if(node.getName().equals("DNase(UWash)")){
-//				node.setInstance(10.53);
-//			}
-//			if(node.getName().equals("Chromatin")){
-//				node.setInstance(true);
-//			}
-            if (node.getName().equals("RepeatSeq")) {
-                node.setInstance("two");
-            }
-//			if(node.getName().equals("Proxy")){
-//				node.setInstance(true);
-//			}
-            if (node.getName().equals("Variance")) {
-                node.setInstance(false);
-            }
-            if (node.getName().equals("Unstable")) {
-                node.setInstance(false);
-            }
-
-        }
-
-        System.out.println("Variable Elimination------------");
-        CGVarElim ve = new CGVarElim();
-        ve.instantiate(bn);
-
-        Query q = ve.makeQuery(bn.getNode("DNase(UWash)").getVariable());
-
-        CGTable res = (CGTable) ve.infer(q);
-//        res.display();
-        res.displaySampled();
     }
 
 }

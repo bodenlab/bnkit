@@ -6,7 +6,6 @@
 package gui2;
 
 import bn.Predef;
-import com.mxgraph.view.mxGraph;
 import java.awt.Color;
 import java.util.ArrayList;
 import javax.swing.BorderFactory;
@@ -22,14 +21,15 @@ import javax.swing.border.Border;
 /**
  *
  * @author Jun Ling
+ * MainJFrame is the main view of the project.
+ * It presents GUI elements which allow addition and modification of nodes.
+ * This class passes 
  */
 public class MainJFrame extends javax.swing.JFrame{
 
-    BNContainer bnc;
     gui2.GraphPanel graphPanel;
     ArrayList<JButton> BtnArr = new ArrayList<>();
     public boolean usingButtons;
-
     /**
      * Creates new form MainJFrame
      * @param usebuttons
@@ -37,9 +37,9 @@ public class MainJFrame extends javax.swing.JFrame{
     public MainJFrame(boolean usebuttons) {
         usingButtons = usebuttons;
         initComponents();
-        bnc = new BNContainer();
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setTitle("bnKit");
+        this.setResizable(false);
     }
     
     /**
@@ -59,7 +59,7 @@ public class MainJFrame extends javax.swing.JFrame{
         deleteAllBtn = new javax.swing.JButton();
         applyLayoutBtn = new javax.swing.JButton();
         jButtonRefresh = new javax.swing.JButton();
-        jPanel1 = new javax.swing.JPanel();
+        queryPanel = new javax.swing.JPanel();
         queryNodeLbl = new javax.swing.JLabel();
         setQueryBtn = new javax.swing.JButton();
         inferenceBtn = new javax.swing.JButton();
@@ -83,14 +83,14 @@ public class MainJFrame extends javax.swing.JFrame{
         );
         addNodePanelLayout.setVerticalGroup(
             addNodePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 537, Short.MAX_VALUE)
+            .addGap(0, 0, Short.MAX_VALUE)
         );
 
         javax.swing.GroupLayout drawPanelLayout = new javax.swing.GroupLayout(drawPanel);
         drawPanel.setLayout(drawPanelLayout);
         drawPanelLayout.setHorizontalGroup(
             drawPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 410, Short.MAX_VALUE)
+            .addGap(0, 790, Short.MAX_VALUE)
         );
         drawPanelLayout.setVerticalGroup(
             drawPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -112,7 +112,7 @@ public class MainJFrame extends javax.swing.JFrame{
         jButtonRefresh.setText("Refresh");
         actionsPanel.add(jButtonRefresh);
 
-        jPanel1.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+        queryPanel.setBorder(javax.swing.BorderFactory.createEtchedBorder());
 
         queryNodeLbl.setText("Query Node: null");
 
@@ -120,32 +120,34 @@ public class MainJFrame extends javax.swing.JFrame{
 
         inferenceBtn.setText("Infer");
 
-        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
-        jPanel1.setLayout(jPanel1Layout);
-        jPanel1Layout.setHorizontalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
+        inferResultLbl.setVerticalAlignment(javax.swing.SwingConstants.TOP);
+
+        javax.swing.GroupLayout queryPanelLayout = new javax.swing.GroupLayout(queryPanel);
+        queryPanel.setLayout(queryPanelLayout);
+        queryPanelLayout.setHorizontalGroup(
+            queryPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(queryPanelLayout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addGroup(queryPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(inferResultLbl, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addGroup(jPanel1Layout.createSequentialGroup()
+                    .addGroup(queryPanelLayout.createSequentialGroup()
                         .addComponent(setQueryBtn)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addComponent(inferenceBtn))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
+                    .addGroup(queryPanelLayout.createSequentialGroup()
                         .addComponent(queryNodeLbl, javax.swing.GroupLayout.PREFERRED_SIZE, 213, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(0, 0, Short.MAX_VALUE)))
+                        .addGap(0, 145, Short.MAX_VALUE)))
                 .addContainerGap())
         );
-        jPanel1Layout.setVerticalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
+        queryPanelLayout.setVerticalGroup(
+            queryPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(queryPanelLayout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(queryNodeLbl)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(inferResultLbl, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                .addComponent(inferResultLbl, javax.swing.GroupLayout.PREFERRED_SIZE, 176, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 257, Short.MAX_VALUE)
+                .addGroup(queryPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(setQueryBtn)
                     .addComponent(inferenceBtn))
                 .addContainerGap())
@@ -156,17 +158,16 @@ public class MainJFrame extends javax.swing.JFrame{
         panelContainerPanelLayout.setHorizontalGroup(
             panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(panelContainerPanelLayout.createSequentialGroup()
-                .addGroup(panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                    .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 246, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addComponent(queryPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
+            .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
         );
         panelContainerPanelLayout.setVerticalGroup(
             panelContainerPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(panelContainerPanelLayout.createSequentialGroup()
                 .addComponent(actionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 111, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addComponent(queryPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         jMenuFile.setText("File");
@@ -207,10 +208,9 @@ public class MainJFrame extends javax.swing.JFrame{
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addComponent(addNodePanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(panelContainerPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+            .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(drawPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addContainerGap())
+                .addComponent(drawPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         pack();
@@ -342,11 +342,6 @@ public class MainJFrame extends javax.swing.JFrame{
         // and add to button group.
         for (String s : Predef.getVariableTypes()) {
             dummylbl = new NodeLabel(graphPanel, s);
-
-            // change appearnace
-            Border border = BorderFactory.createLineBorder(Color.BLUE, 2);
-            dummylbl.setBorder(border);
-
             LblArr.add(dummylbl);
         }
         // Add buttons.
@@ -366,23 +361,18 @@ public class MainJFrame extends javax.swing.JFrame{
     }
     
 //    @Override
-//    public void update() {
-//        // Update the View. Called by the Model
-////        renderNetwork(bnc);
-//        // Instead...
-//        // What is the link between the view and the model?
-//
-//        final mxGraph graph = graphPanel.getGraph();
-//        for (Object cell : graphPanel.getAllVertices()) {
-////             ((mxCell) cell).setValue("rofl");
-//        }
-//    }
-//
+    public void update() {
+        //graphPanel's rendernetwork should be here...
+        for (Object cell : graphPanel.getAllVertices()) {
+//             ((mxCell) cell).setValue("rofl");
+        }
+    }
+
 //    @Override
-//    public void setSubject(Observable sub) {
-//        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-//    }
-//
+    public void setSubject(Observable sub) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
     private void jMenuHelpActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuHelpActionPerformed
         String message = "<html>"
                 + "Basic Controls<br>"
@@ -409,9 +399,9 @@ public class MainJFrame extends javax.swing.JFrame{
     private javax.swing.JMenu jMenuHelp;
     private javax.swing.JMenuItem jMenuItemOpen;
     private javax.swing.JMenuItem jMenuItemSave;
-    private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel panelContainerPanel;
     private javax.swing.JLabel queryNodeLbl;
+    private javax.swing.JPanel queryPanel;
     private javax.swing.JButton setQueryBtn;
     // End of variables declaration//GEN-END:variables
 

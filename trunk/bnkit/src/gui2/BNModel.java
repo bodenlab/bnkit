@@ -14,7 +14,10 @@ import java.util.List;
 
 /**
  *
- * @author Study Room
+ * @author Jun Ling
+ * The BNModel class contains state information about nodes present
+ * in the graph. A Bayesian Network data structure is stored and periodically
+ * updated 
  */
 public class BNModel implements Observable{
     private final BNContainer bnc;
@@ -43,10 +46,21 @@ public class BNModel implements Observable{
         return BNodeMap;
     }
     
+    
     public void setBNodeMap(HashMap<Object, BNode> BNodeMap) {
         this.BNodeMap = BNodeMap;
     }
-
+    
+    /**
+     * Returns model's underlying bayesian network data structure.
+     * @return bnet 
+     */
+    public BNet getBNet (){
+        if (bnet == null){
+            bnet = bnc.getBNet();
+        }
+        return bnet;
+    }
     
     /**
      * Add a Cell/Bnode pair into the model's HashMap.

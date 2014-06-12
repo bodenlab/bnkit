@@ -13,7 +13,6 @@ import bn.Distrib;
 import bn.EnumTable;
 import bn.EnumVariable;
 import bn.Factor;
-import bn.FactorTable;
 import bn.GDT;
 import bn.Variable;
 import java.util.ArrayList;
@@ -25,12 +24,11 @@ import java.util.List;
  * in EnumVariable var's members are observed.
  */
 //http://stackoverflow.com/questions/1658702/how-do-i-make-a-class-extend-observable-when-it-has-extended-another-class-too
-public class NodeModel implements BNode {
+public class NodeModel implements BNode, Observable{
 
     @Override
     public Factor makeFactor(BNet bn) {
         return bnode.makeFactor(bn);
-//        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
@@ -40,7 +38,7 @@ public class NodeModel implements BNode {
 
     @Override
     public Distrib getDistrib(Object[] key) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return bnode.getDistrib(key);
     }
 
     private enum DistributionType {
@@ -80,14 +78,6 @@ public class NodeModel implements BNode {
     }
 
     public NodeModel(BNode bnod) {
-//        try {
-//            EnumVariable evar = (EnumVariable) bnode.getVariable();
-//            this.bnode = new CPT(evar, bnode.getParents());
-//            // change the 'String' constructor to a method.
-//        } catch(ClassCastException e) {
-//            Variable var = (Variable<Continuous>) bnode.getVariable();
-//            this.bnode = new GDT(var, bnode.getParents());
-//        }
         this.bnode = bnod;
         this.observers = new ArrayList<>();
     }
@@ -101,7 +91,6 @@ public class NodeModel implements BNode {
             var = (Variable<Continuous>) var;
             this.bnode = new GDT(var);
         }
-//        this("CPT");
         this.observers = new ArrayList<>();
     }
     
@@ -161,41 +150,7 @@ public class NodeModel implements BNode {
         }
         return names;
     }
-    
-//    @Override
-//    public void register(Observer obj) {
-//        if (obj == null) {
-//            throw new NullPointerException("Null Observer");
-//        }
-//        synchronized (MUTEX) {
-//            if (!observers.contains(obj)) {
-//                observers.add(obj);
-//            }
-//        }
-//    }
-//
-//    @Override
-//    public void unregister(Observer obj) {
-//        synchronized (MUTEX) {
-//            observers.remove(obj);
-//        }
-//    }
-//
-//    @Override
-//    public void notifyObservers() {
-//        List<Observer> observersLocal = null;
-//        // This needs to be thread-safe!
-//        synchronized (MUTEX) {
-//            if (!changed) {
-//                return;
-//            }
-//            observersLocal = new ArrayList<>(this.observers);
-//            this.changed = false;
-//        }
-//        for (Observer obj : observersLocal) {
-//            obj.update();
-//        }
-//    }
+  
 
     public void setName(String name) {
         this.bnode.getVariable().setName(name);
@@ -208,11 +163,45 @@ public class NodeModel implements BNode {
         changed = true;
 //        notifyObservers();
     }
+    @Override
+    public void register(Observer obj) {
+        if (obj == null) {
+            throw new NullPointerException("Null Observer");
+        }
+        synchronized (MUTEX) {
+            if (!observers.contains(obj)) {
+                observers.add(obj);
+            }
+        }
+    }
 
-//    @Override
-//    public Object getUpdate(Observer obj) {
-//        return this.getVariable();
-//    }
+    @Override
+    public void unregister(Observer obj) {
+        synchronized (MUTEX) {
+            observers.remove(obj);
+        }
+    }
+
+    @Override
+    public void notifyObservers() {
+        List<Observer> observersLocal = null;
+        // This needs to be thread-safe!
+        synchronized (MUTEX) {
+            if (!changed) {
+                return;
+            }
+            observersLocal = new ArrayList<>(this.observers);
+            this.changed = false;
+        }
+        for (Observer obj : observersLocal) {
+            obj.update();
+        }
+    }
+    
+    @Override
+    public Object getUpdate(Observer obj) {
+        return this.getVariable();
+    }
 
     @Override
     public String getName() {
@@ -309,11 +298,6 @@ public class NodeModel implements BNode {
     public Object getInstance() {
         return bnode.getInstance();
     }
-
-//    @Override
-//    public FactorTable makeFactor(BNet bn) {
-//        return bnode.makeFactor(bn);
-//    }
 
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
