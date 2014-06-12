@@ -6,6 +6,7 @@
 package gui2;
 
 import bn.BNet;
+import bn.JPT;
 import bn.alg.CGTable;
 import bn.alg.Query;
 import com.mxgraph.model.mxCell;
@@ -16,19 +17,23 @@ import javax.swing.JButton;
 
 /**
  *
- * @author Jun All the controller logic lives here. Receives calls from View
+ * @author jun 
+ * Controller logic for MainJFrame lives here in BNController. 
+ * Receives calls from View
  * classes MainJFrame and GraphPanel.
  */
-public class BNController implements Observer {
+public class BNController{ //implements Observer 
 
     private final MainJFrame mainFrame;
     private final BNModel model;
     private final GraphPanel graphPanel;
+    private final GraphPanelController graphPanelController;
 
-    public BNController(MainJFrame mf, GraphPanel gp, BNModel mod) {
+    public BNController(MainJFrame mf, GraphPanel gp, BNModel mod, GraphPanelController gpc) {
         this.mainFrame = mf;
         this.graphPanel = gp;
         this.model = mod;
+        this.graphPanelController = gpc;
     }
 
     /**
@@ -46,8 +51,8 @@ public class BNController implements Observer {
                         System.out.println("btn presed");
                         JButton thisbtn = (JButton) e.getSource();
                         String type = thisbtn.getText();
-                        graphPanel.createNode(null, type, null);
-                        graphPanel.addNodetoBNC(null, type, null);
+                        graphPanelController.createNode(null, type, null);
+                        graphPanelController.addNodetoBNC(null, type, null);
                     }
                 });
             }
@@ -58,14 +63,14 @@ public class BNController implements Observer {
         mainFrame.getDeleteButton().addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                graphPanel.deleteSelected();
+                graphPanelController.deleteSelected();
             }
         });
 
         mainFrame.getDeleteAllButton().addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                graphPanel.deleteAll();
+                graphPanelController.deleteAll();
             }
         });
 
@@ -73,7 +78,7 @@ public class BNController implements Observer {
             @Override
             public void actionPerformed(ActionEvent e) {
                 graphPanel.renderNetwork(model.getBNC());
-                graphPanel.setLayout("");
+                graphPanel.executeLayout(1);
                 for (NodeModel node : model.getBNC().getNodeModelArr().values()) {
                     System.out.println(" >Node is: " + node.getName());
                 }
@@ -97,7 +102,7 @@ public class BNController implements Observer {
         mainFrame.getLayoutButton().addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                graphPanel.setLayout("");
+                graphPanel.executeLayout(1);
             }
         });
 
@@ -136,14 +141,14 @@ public class BNController implements Observer {
         });
     }
 
-    @Override
+//    @Override
     public void update() {
         // When update occurs, update View
         // and update the tables in BNode list.
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
-    @Override
+//    @Override
     public void setSubject(Observable sub) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
@@ -154,15 +159,32 @@ public class BNController implements Observer {
             return;
         }
         
-        BNet bn = graphPanel.getBNContainer().getBNetnm();
+        BNet bn = graphPanel.getBNContainer().getBNet();
         //aa
         bn.alg.CGVarElim ve = new bn.alg.CGVarElim();
         ve.instantiate(bn);
         Query q = ve.makeQuery(graphPanel.getQueryNode().getVariable());
         CGTable res = (CGTable)ve.infer(q);
-        res.display();
+//        res.display();
+        
+//        System.out.println("Variable elimination--------------");
+//		bn.alg.CGVarElim ve = new bn.alg.CGVarElim();
+//		ve.instantiate(bn);
+//		Query q = ve.makeQuery(B);
+//		JPT jpt = ve.infer(q).getJPT();
+//		jpt.display();
+        if (graphPanel.getQueryNode().getType().equalsIgnoreCase("CPT")){
+            JPT jpt = ve.infer(q).getJPT();
+            jpt.display();
+            mainFrame.getResultLabel().setText("<html>" + jpt.toString());
+        } else {
+            mainFrame.getResultLabel().setText("<html>" + res.toString());
+        }
+        
         
         //set mainFrame's panel??
-        mainFrame.getResultLabel().setText(null);
+        
+        
+        mainFrame.validate();
     }
 }

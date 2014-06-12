@@ -42,7 +42,7 @@ public class ProjectMain {
             public void run() {
                 
                 // Initialise the views.
-                MainJFrame mainFrame = new MainJFrame(true);
+                MainJFrame mainFrame = new MainJFrame(false);
                 mainFrame.setVisible(true);
                 
                 // Initialise the model.
@@ -50,14 +50,15 @@ public class ProjectMain {
                 
                 // Initialise the controllers.
                 GraphPanel graphPanel = new GraphPanel(model);
+                GraphPanelController gpController = new GraphPanelController(graphPanel, model);
                 graphPanel.getGraphComponent().requestFocus();
-                BNController Controller = new BNController(mainFrame, graphPanel, model);
-                
-                
+                BNController bnController = new BNController(mainFrame, graphPanel, model, gpController);
+
                 mainFrame.setGraphPanel(graphPanel);
                 mainFrame.initDrawPanel();
                 mainFrame.initNodeControls();
-                Controller.InitButtonHandlers();
+                gpController.initHandlers();
+                bnController.InitButtonHandlers();
                 
                 
             }

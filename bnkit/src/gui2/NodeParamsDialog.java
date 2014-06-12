@@ -99,6 +99,11 @@ public class NodeParamsDialog extends javax.swing.JDialog {
 
         public Class getColumnClass(int c) {
             Object value = this.getValueAt(0, c);
+            // By default, booleans will be rendered as checkbox. Override this
+            // behaviour
+//            if (value.getClass().equals(boolean.class)){
+//                return Object.class;
+//            }
             return (value == null ? Object.class : value.getClass());
         }
 
@@ -107,7 +112,6 @@ public class NodeParamsDialog extends javax.swing.JDialog {
          * editable.
          */
         public boolean isCellEditable(int row, int col) {
-            //TODO: update editable conditions.
             if (table != null) {
                 if (col < node.getParents().size()) {
                     return false;
@@ -129,11 +133,9 @@ public class NodeParamsDialog extends javax.swing.JDialog {
                 Enumerable domain = (Enumerable) node.getBNode().getVariable().getDomain();
                 table.setValue(myParamsTable.getSelectedRow(), 
                         getEnumVar(value, domain));
-                
             }
             table.display();
             
-            // need enumdistrib
             fireTableCellUpdated(row, col);
         }
     }
