@@ -5,6 +5,7 @@
  */
 package gui2;
 
+import testing.Observable;
 import bn.Predef;
 import java.awt.Color;
 import java.util.ArrayList;
@@ -26,7 +27,7 @@ import javax.swing.border.Border;
  */
 public class MainJFrame extends javax.swing.JFrame{
 
-    gui2.GraphPanel graphPanel;
+    GraphPanel graphPanel;
     ArrayList<JButton> BtnArr = new ArrayList<>();
     public boolean usingButtons;
     /**

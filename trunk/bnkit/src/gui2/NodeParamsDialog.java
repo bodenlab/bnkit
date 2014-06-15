@@ -47,17 +47,15 @@ public class NodeParamsDialog extends javax.swing.JDialog {
     class MyTableModel extends AbstractTableModel {
 
         private final NodeModel node;
-        private EnumTable table;
+        private final EnumTable table;
 
         public MyTableModel(NodeModel nd) {
             this.node = nd;
             this.table = node.getTable();
-            System.out.println("@@Printing node");
             node.print();
             if (table == null) {
-                System.out.println("node table is null");
+                System.err.println("node table is null");
             } else {
-                System.out.println("In MyTableModel, print table");
                 table.display();
             }
         }
@@ -81,7 +79,7 @@ public class NodeParamsDialog extends javax.swing.JDialog {
         public String getColumnName(int col) {
             if (table != null) {
                 List<EnumVariable> parents = node.getParents();
-                if (col < parents.size()) {
+                if (col < parents.size()) { 
                     return parents.get(col).getName();
                 }
             }

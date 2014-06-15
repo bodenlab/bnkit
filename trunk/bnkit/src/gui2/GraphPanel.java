@@ -5,6 +5,8 @@
  */
 package gui2;
 
+import testing.Observable;
+import testing.Observer;
 import bn.BNet;
 import bn.BNode;
 import bn.EnumVariable;
@@ -236,7 +238,7 @@ public final class GraphPanel extends JPanel implements Serializable, Observer {
                 try {
                     model.getBNC().loadnm(file.getCanonicalPath(), true);
                     renderNetwork(model.getBNC());
-                    executeLayout(1);
+                    executeLayout(0);
                 } catch (IOException ex) {
 
                 }
@@ -365,7 +367,7 @@ public final class GraphPanel extends JPanel implements Serializable, Observer {
             } else {
             }
         }
-        this.executeLayout(1);
+        this.executeLayout(0);
     }
 
     /**

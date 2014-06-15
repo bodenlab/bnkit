@@ -8,22 +8,24 @@ package gui2;
 import bn.BNet;
 import bn.Enumerable;
 import bn.Predef;
+import bn.Variable;
 import com.mxgraph.model.mxCell;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 import javax.swing.AbstractButton;
 import javax.swing.ButtonGroup;
 import javax.swing.JRadioButton;
 
 /**
  *
- * @author jun
- * Dialog presented when node is right-clicked on.
- * 
- * Allows nodes to be parameterised and evidenced. Model
- * and View are updated accordingly.
+ * @author jun Dialog presented when node is right-clicked on.
+ *
+ * Allows nodes to be parameterised and evidenced. Model and View are updated
+ * accordingly.
  */
 public class NodePropertiesDialog extends javax.swing.JDialog {
 
@@ -60,16 +62,17 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                 + nodeModel.getVariable().getParams());
 
         nodeNameField.setText(nodeModel.getName());
-        nodeNameField.setEditable(false); // Temporary
+//        nodeNameField.setEditable(false); // Temporary
         nodeParametersField.setText(nodeModel.getVariable().getParams());
         nodeDescriptionLabel.setText(getTypeDescription(nodeModel.getVariable().getPredef()));
     }
 
     /**
-     * Returns a short description about the queried predef.
-     * This needs to be maintained manually.
+     * Returns a short description about the queried predef. This needs to be
+     * maintained manually.
+     *
      * @param predef
-     * @return predef-description 
+     * @return predef-description
      */
     private String getTypeDescription(String predef) {
         String header = "<html>" + predef + " (" + nodeModel.getType() + ")<br>";
@@ -116,11 +119,11 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         ArrayList<String> paramsList = new ArrayList<>();
 
         if (nodeModel == null) {
-            System.out.println("NodePropertiesFialog constructed with null NodeModel");
+            System.out.println("NodePropertiesDialog constructed with null NodeModel");
         }
+        
         String params = nodeModel.getVariable().getParams();
 
-        
         // Populate the parameter checkboxes.
         if (Predef.isEnumerable(nodeModel.getVariable().getPredef())) {
             paramsList.add("None");
@@ -172,17 +175,18 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         }
 
         // Select checkboxes if node is evidenced.
-        
         if (Predef.isEnumerable(nodeModel.getVariable().getPredef())) {
             setParameterBoxes();
         }
 
+        // Listener for 'Apply' button click
         applyBtn.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 applyBtnPressed(evt);
             }
         });
 
+        // Listener for 'Cancel' button click
         cancelBtn.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 cancelBtnPressed(evt);
@@ -241,66 +245,74 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
     }
 
     /**
-     * Listener for 'Apply' button press.
-     * Performs updates to Model and View.
-     * @param evt 
+     * Handler for 'Apply' button press. Performs updates to Model and View.
+     *
+     * @param evt
      */
     private void applyBtnPressed(java.awt.event.MouseEvent evt) {
 
-        //TRY: somehow make use of graphPanel.allVertices?
-        // If old name is not the same as the new name, need to remove
-        // the old <key,value> pair from the map and re-enter it.
-        String oldNodeName = nodeModel.getVariable().getName();
+        // Apply name change
+        Variable oldVar = Predef.getVariable(nodeModel.getName(),
+                nodeModel.getVariable().getPredef(), nodeModel.getVariable().getParams());
+        NodeModel nmCopy = new NodeModel(oldVar);
+        
         String newNodeName = nodeNameField.getText();
-        if (!oldNodeName.equals(newNodeName)) {
-
-            bnc.removeNode(nodeModel);
+        if (!oldVar.getName().equals(newNodeName)) {
             nodeModel.getVariable().setName(newNodeName);
-            bnc.addNode(nodeModel);
 
-            // Bayesian Network requires at least one parent-child relationship
-            // check in BNet constructor failing
-            BNet bn = bnc.getBNet();
-
-            // The node will have no children, because the 'child' will point to old name.
-            // Make children point to new parent name
-            System.out.println("==bn is: " + Arrays.toString(bn.getNodes().toArray()));
-            if (bn.getChildren(nodeModel) != null) { // always null.... nodemodel has changed.
-                for (String nodename : bn.getChildren(nodeModel)) {
-                    System.out.println("!!Child is: " + nodename);
-                    bnc.getNodeModel(nodename).setName(newNodeName);
-                }
-            } else {
-                System.out.println(nodeModel.getName() + " has no children");
+            // Iterate through all nodes and check if their parentvars match the old var
+            for (NodeModel nm : bnc.getNodeModelArr().values()) {
+                if (!(nm.getParents() == null) ) {
+                    for (Variable pvars : nm.getParents()) {
+                        if (pvars.getName().equals(oldVar.getName())) { // this is a child
+                            bnc.removeParent(nm, oldVar);
+                            bnc.addParent(nm, nodeModel.getVariable());
+                        }
+                    }
+                } 
             }
-
-            // Alternate brute-force method for getting children to point to new parent name
-//            for (NodeModel nm: bnc.getNodeModelArr().values()){
-//                System.out.println("!!nm is:" + nm.getName());
-//                if (nm.getParents() != null && !nm.getParents().isEmpty()){ // null object pattern...
-//                    for (Variable v: nm.getParents()){
-//                        System.out.println("parent node is: " + v.getName());
-//                        if (v.getName().equals(oldNodeName)){
-//                            v.setName(newNodeName);
-//                        }
-//                    }
-//                }
-//            }
-            //TODO: use a placeholder node for search?
-//            NodeModel tempnode = new NodeModel(nodeModel);
-            // Since get by ID is not exposed in Java implementation of JGraphX,
-            // have to bruteforce search for matching cell...
-            // TODO: replace this with listener, and have View handle the name update
-            for (Object cell : graphPanel.getAllVertices()) {
-                if (((mxCell) cell).getValue().equals(oldNodeName)) {
+            
+            //Rename cells in View.
+            for (Object cell : graphPanel.getGraph().getChildVertices(graphPanel.getGraph().getDefaultParent())) {
+                if (((mxCell) cell).getValue().equals(oldVar.getName())) {
                     graphPanel.getGraph().getModel().setValue(
                             cell, newNodeName);
                 }
             }
-        }
-        // Update variables
-        nodeModel.getVariable().setParams(nodeParametersField.getText());
 
+        }
+
+        // Update done, remove old node from bnc, add new node.
+        bnc.removeNode(nmCopy);
+        bnc.addNode(nodeModel);
+        
+        // Modify oldvar to track change in params
+        oldVar = Predef.getVariable(nodeModel.getName(),
+                nodeModel.getVariable().getPredef(), nodeModel.getVariable().getParams());
+        
+        // Update node variables
+        nodeModel.getVariable().setParams(nodeParametersField.getText());
+        // now update parent params of child nodes.
+        // Update parentVars of children of nodeModel
+//            for (NodeModel nm : bnc.getNodeModelArr().values()) {
+//                if (!(nm.getParents() == null) ) {
+//                    for (Variable pvars : nm.getParents()) {
+//                        if (pvars.getName().equals(oldVar.getName()) &&
+//                                !(pvars.getParams().equals(oldVar.getParams()))) {
+//                            System.err.println(nodeModel.getVariable().getParams());
+//                            System.err.println(pvars.getParams());
+//                            bnc.addParent(nm, nodeModel.getVariable());
+//                            bnc.removeParent(nm, oldVar);
+//                            System.err.println(pvars.getParams());
+//                        }
+//                    }
+//                } else{
+//                } 
+//            }
+//        
+         
+
+        // Update state
         if (Predef.isEnumerable(nodeModel.getVariable().getPredef())) {
             if (checkParameterBox().equals("null")) {
                 nodeModel.setInferenceModel("IGNORE");
@@ -323,11 +335,14 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
                 }
             }
         }
+        
+ 
+        
         dispose();
     }
 
     /**
-     * 
+     *
      */
     private void setParameterBoxes() {
         String instanceString = "";
@@ -343,7 +358,7 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
             }
             return;
         }
-        
+
         instanceString = nodeModel.getInstance().toString();
 
         // TODO: wrap casts in try catches
@@ -371,7 +386,7 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
     private Object checkParameterBox() {
         String checkTxt;
         if (Predef.isEnumerable(nodeModel.getVariable().getPredef())) {
-            if (selectedRadioButton.getText().isEmpty()){
+            if (selectedRadioButton.getText().isEmpty()) {
                 return "null";
             } else {
                 checkTxt = selectedRadioButton.getText();
@@ -396,9 +411,14 @@ public class NodePropertiesDialog extends javax.swing.JDialog {
         } else {
             System.err.println("Calling checkParameterBox() for a continuous variable.");
         }
-        return "null"; // this should not happen
+        return "null";
     }
 
+    /**
+     * Handler for 'Cancel' button press. Discards changes and closes dialog.
+     *
+     * @param evt
+     */
     private void cancelBtnPressed(java.awt.event.MouseEvent evt) {
         dispose();
     }

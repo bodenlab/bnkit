@@ -38,7 +38,7 @@ public class NodeLabel extends JLabel implements Transferable,
     //marks this NodeLabel as the source of the Drag
 
     private DragSource source;
-    private gui2.GraphPanel graphPanel;
+    private GraphPanel graphPanel;
     private Transferable transferable;
 
     public NodeLabel(gui2.GraphPanel graph, String msg) {

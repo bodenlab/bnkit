@@ -5,6 +5,7 @@
  */
 package gui2;
 
+import testing.Observer;
 import bn.BNet;
 import bn.BNode;
 import bn.CPT;
@@ -25,7 +26,7 @@ import java.util.List;
  * NodeModel implements Observable in the Observer pattern. 
  */
 
-public class NodeModel implements BNode, Observable{
+public class NodeModel implements BNode{
 
     @Override
     public Factor makeFactor(BNet bn) {
@@ -155,45 +156,45 @@ public class NodeModel implements BNode, Observable{
         changed = true;
 //        notifyObservers();
     }
-    @Override
-    public void register(Observer obj) {
-        if (obj == null) {
-            throw new NullPointerException("Null Observer");
-        }
-        synchronized (MUTEX) {
-            if (!observers.contains(obj)) {
-                observers.add(obj);
-            }
-        }
-    }
-
-    @Override
-    public void unregister(Observer obj) {
-        synchronized (MUTEX) {
-            observers.remove(obj);
-        }
-    }
-
-    @Override
-    public void notifyObservers() {
-        List<Observer> observersLocal = null;
-        // This needs to be thread-safe!
-        synchronized (MUTEX) {
-            if (!changed) {
-                return;
-            }
-            observersLocal = new ArrayList<>(this.observers);
-            this.changed = false;
-        }
-        for (Observer obj : observersLocal) {
-            obj.update();
-        }
-    }
-    
-    @Override
-    public Object getUpdate(Observer obj) {
-        return this.getVariable();
-    }
+//    @Override
+//    public void register(Observer obj) {
+//        if (obj == null) {
+//            throw new NullPointerException("Null Observer");
+//        }
+//        synchronized (MUTEX) {
+//            if (!observers.contains(obj)) {
+//                observers.add(obj);
+//            }
+//        }
+//    }
+//
+//    @Override
+//    public void unregister(Observer obj) {
+//        synchronized (MUTEX) {
+//            observers.remove(obj);
+//        }
+//    }
+//
+//    @Override
+//    public void notifyObservers() {
+//        List<Observer> observersLocal = null;
+//        // This needs to be thread-safe!
+//        synchronized (MUTEX) {
+//            if (!changed) {
+//                return;
+//            }
+//            observersLocal = new ArrayList<>(this.observers);
+//            this.changed = false;
+//        }
+//        for (Observer obj : observersLocal) {
+//            obj.update();
+//        }
+//    }
+//    
+//    @Override
+//    public Object getUpdate(Observer obj) {
+//        return this.getVariable();
+//    }
 
     @Override
     public String getName() {
@@ -217,10 +218,7 @@ public class NodeModel implements BNode, Observable{
 
     @Override
     public Variable getVariable() {
-        // need to do this more intelligently...
-        // should watch for a change in stored BNode
         changed = true;
-//        notifyObservers();
         return bnode.getVariable();
     }
 
@@ -310,5 +308,10 @@ public class NodeModel implements BNode, Observable{
     public void randomize(long seed) {
         bnode.randomize(seed);
     }
-
+    
+    // update parent variable
+    public void update(NodeModel oldparent, NodeModel newparent){
+        
+    }
+    
 }
