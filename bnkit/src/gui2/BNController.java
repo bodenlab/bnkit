@@ -5,6 +5,7 @@
  */
 package gui2;
 
+import testing.Observable;
 import bn.BNet;
 import bn.JPT;
 import bn.alg.CGTable;
@@ -48,7 +49,6 @@ public class BNController{ //implements Observer
                 button.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        System.out.println("btn presed");
                         JButton thisbtn = (JButton) e.getSource();
                         String type = thisbtn.getText();
                         graphPanelController.createNode(null, type, null);
@@ -78,7 +78,7 @@ public class BNController{ //implements Observer
             @Override
             public void actionPerformed(ActionEvent e) {
                 graphPanel.renderNetwork(model.getBNC());
-                graphPanel.executeLayout(1);
+                graphPanel.executeLayout(0);
                 for (NodeModel node : model.getBNC().getNodeModelArr().values()) {
                     System.out.println(" >Node is: " + node.getName());
                 }
@@ -102,7 +102,7 @@ public class BNController{ //implements Observer
         mainFrame.getLayoutButton().addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                graphPanel.executeLayout(1);
+                graphPanel.executeLayout(0);
             }
         });
 

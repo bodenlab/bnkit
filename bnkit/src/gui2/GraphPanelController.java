@@ -25,6 +25,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Random;
 import javax.swing.SwingUtilities;
@@ -141,7 +142,11 @@ public class GraphPanelController {
 
                     // If right-click, open properties dialog
                     if (SwingUtilities.isRightMouseButton(e)) {
-                        System.out.println("cell is: " + graph.getLabel(cell));
+                        System.out.println("graph children are: ");
+                        for (Object node: graph.getChildVertices(graph.getDefaultParent())){
+                            System.out.println(" >"  + ((mxCell) node).getValue() );
+                        }
+                        
                         NodeModel nm = bnc.getNodeModel(graph.getLabel(cell));
 
                         // register listener here.

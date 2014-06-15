@@ -6,6 +6,8 @@
 
 package gui2;
 
+import testing.Observable;
+import testing.Observer;
 import bn.BNet;
 import bn.BNode;
 import java.util.ArrayList;

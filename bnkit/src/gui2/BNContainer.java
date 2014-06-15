@@ -24,13 +24,11 @@ import java.util.Set;
  *
  * @author mikael 
  *  modified by jun.
- * All instances of BNode have been superceded by NodeModel. NodeModel functions
- * synonymously with BNode but also supports the Observer pattern (as an Observable).
  */
 public class BNContainer {
 
     private Map<String, Variable> vars = new HashMap<String, Variable>(); // all variables that are considered and can be used to create nodes
-    private Map<String, NodeModel> nodems = new HashMap<String, NodeModel>(); // analog of nodes using nodemodel objects.
+    private Map<String, NodeModel> nodems = new HashMap<String, NodeModel>(); // analog of graph nodes using nodemodel objects.
 
     /**
      * Removes all stored BNodes and NodeModels
@@ -47,6 +45,7 @@ public class BNContainer {
         BNet bnet = new BNet();
         for (Map.Entry m : nodems.entrySet()) {
             BNode bn = ((NodeModel) m.getValue()).getBNode();
+            System.err.println("Added:" + bn.getName() + " to BNet" );
             bnet.add(bn);
         }
         return bnet;
@@ -172,12 +171,9 @@ public class BNContainer {
         }
         BNet bnet = BNBuf.load(filename);
         for (BNode node : bnet.getNodes()) {
-            System.out.println(""); // print out the variables.s.s.dflsf
             NodeModel nm = new NodeModel(node);
             vars.put(nm.getVariable().getName(), nm.getVariable());
             nodems.put(nm.getName(), nm);
-            System.out.println("!!!NODEMODEL " + nm.getStateAsText());
-            System.out.println("NODE !! " + node.getStateAsText());
         }
     }
 
