@@ -338,7 +338,11 @@ public class CGVarElim implements Inference {
                     }
                 } else {    
                     // This is the final (first) bucket 
-                    return result.getSum();
+                    double sum = result.getSum();
+                    if (sum == 0) {
+                        System.err.println("Likelihood is zero");
+                    }
+                    return sum;
                 }
             }
         }

@@ -416,8 +416,6 @@ public class EM extends LearningAlg {
                         }
                         break; // end EM_OPTION == 2
                 }                        
-                if ((round % 10 == 0) || round == 1) 
-                    log_likelihood += Math.log(((CGVarElim)inf).likelihood());
             }
             
             // finally complete the M-step by transferring counts to probabilities
@@ -427,6 +425,30 @@ public class EM extends LearningAlg {
                 }
             }
 
+            if ((round % 10 == 0)) { // || round == 1) {
+                // for each sample with observations...
+                for (int i = 0; i < values.length; i++) {
+                    // set variables and keys according to observations
+                    for (int j = 0; j < vars.length; j++) {
+                        BNode instantiate_me = bn.getNode(vars[j]);
+                        if (instantiate_me == null) {
+                            throw new EMRuntimeException("Variable \"" + vars[i].getName() + "\" is not part of Bayesian network");
+                        }
+                        if (values[i][j] != null) { // check so that the observation is not null
+                            // the node is instantiated to the value in the data set
+                            instantiate_me.setInstance(values[i][j]);
+                        } else { // the observation is null
+                            // the node is reset, i.e. un-instantiated 
+                            instantiate_me.resetInstance();
+                        }
+                    }
+                    log_likelihood += Math.log(((CGVarElim)inf).likelihood());
+                    if (Double.isInfinite(log_likelihood)) {
+                        System.err.println("Log-likelihood is infinite: " + log_likelihood);
+                    }
+                }
+            }
+            
             if ((round % 10 == 0) || round == 1) {
                 // summarise progress
                 // copy previous LL (log-likelihood of data)
