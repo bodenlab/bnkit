@@ -1,0 +1,14 @@
+#summary This page documents ideas and observations that could lead to improvements
+
+= Introduction =
+
+This page documents ideas and observations that could lead to improvements.
+
+
+= Details =
+
+List of issues, ideas for improvements
+
+  * EM currently has two alternative strategies for determining expected values of latent variables, both leading to the same values. The choice of which strategy to use is currently set via a variable (EM_OPTION). The choice will in some cases have significant implications for computational efficiency. The most efficient choice is determined by a variety of factors, including number of (latent) nodes, number of parents of nodes, etc. It would be convenient if EM can choose which strategy to use overall or even for each individual sample--since these factors are often tied to characteristics of an individual sample.
+
+  * Initialisation and randomisation of nodes can be informed by the available training data. Currently, that is not the case, and this leads to severe problems if for instance Gaussian densities are off (e.g. mean is 0 and variance is 1, when actual observations have a mean of 1000 and a variance of 100).
