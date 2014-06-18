@@ -78,7 +78,7 @@ public class EM extends LearningAlg {
     /**
      * EM status print-outs
      */
-    public boolean EM_PRINT_STATUS = false;
+    public boolean EM_PRINT_STATUS = true;
 
     /**
      * EM option: currently two different approaches to determine expectations.
@@ -425,7 +425,7 @@ public class EM extends LearningAlg {
                 }
             }
 
-            if ((round % 10 == 0)) { // || round == 1) {
+            if (round % 10 == 0) { // || round == 1) {
                 // for each sample with observations...
                 for (int i = 0; i < values.length; i++) {
                     // set variables and keys according to observations
@@ -449,7 +449,7 @@ public class EM extends LearningAlg {
                 }
             }
             
-            if ((round % 10 == 0) || round == 1) {
+            if (round % 10 == 0) {
                 // summarise progress
                 // copy previous LL (log-likelihood of data)
                 double mean_LL = last_LL[0] / last_LL.length;
