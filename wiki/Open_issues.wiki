@@ -14,3 +14,7 @@ List of issues, ideas for improvements
   * Initialisation and randomisation of nodes can be informed by the available training data. Currently, that is not the case, and this leads to severe problems if for instance Gaussian densities are off (e.g. mean is 0 and variance is 1, when actual observations have a mean of 1000 and a variance of 100). Potentially, a new method for initialisation of parameters can be added to the BNode interface.
 
   * Bayesian learning can consider prior probabilities of variables. These can come in the form of conjugate priors such as the beta or Dirichlet family, or as pseudo-counts. Such priors can help in situations where specific observations are scarce.
+
+  * The efficiency of variable elimination (class CGVarElim) is very sensitive to the order in which variables are factorised and multiplied. There are some general heuristics which are currently used but many optimisations can be researched and implemented, e.g. dynamic programming can find the optimal ordering from individual factor sizes.
+
+  * 
