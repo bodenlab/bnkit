@@ -39,7 +39,8 @@ public class CPT implements BNode, Serializable {
     private EnumDistrib prior; // one (enumerable) probability distribution that is used if this variable is NOT conditioned
     final private int nParents;
     private CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in CPT
-
+    private boolean relevant = false; //for inference, track whether the node is relevant to the query
+    
     /**
      * Create a conditional probability table for a variable. The variable is
      * conditioned on a set of Enumerable variables.
@@ -266,6 +267,7 @@ public class CPT implements BNode, Serializable {
             if (varinstance != null) {
                 ft.evidenced = true;
             } else {
+            	//FIXME what is this loop doing? Should it be searchkey[i]??
                 for (int i = 0; i < searchkey.length; i++) {
                     if (searchkey != null) {
                         ft.evidenced = true;
@@ -322,7 +324,115 @@ public class CPT implements BNode, Serializable {
             return ft;
         }
     }
-
+    
+    /**
+     * Make a Factor out of this CPT. If a variable is instantiated it will
+     * be factored out.
+     * If a parent is not relevant, it will not be included in the factor
+     *
+     * @param bn the BNet instance that can be used to check the status of nodes
+     * so that factoring can be done (instantiation of variables are done for a
+     * BNet node).
+     * @param rel true if you want to only include relevant nodes
+     */
+    public Factor makeFactor(BNet bn, boolean rel) {
+        List<EnumVariable> vars_old = this.getParents();
+        EnumVariable var = this.getVariable();
+        Object varinstance = null;
+        BNode cnode = bn.getNode(var);
+        if (cnode != null) {
+            varinstance = cnode.getInstance();
+        }
+        Enumerable dom = var.getDomain();
+        if (vars_old != null) { // there are parent variables
+            Object[] searchkey = new Object[vars_old.size()];
+            List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
+            List<EnumVariable> irrel_pars = new ArrayList<>(); //irrelevant parents
+            for (int i = 0; i < vars_old.size(); i++) {
+                EnumVariable parent = vars_old.get(i);
+                // Record irrelevant parents to sum out
+                //FIXME when should a parent be removed? Allow it to influence factor table then remove it?
+                // If parent is evidenced it will not be included in factor table
+                if (!bn.getNode(parent).isRelevant() && bn.getNode(parent).getInstance() == null) {
+                	irrel_pars.add(parent);
+                }
+                BNode pnode = bn.getNode(parent);
+                if (pnode != null) {
+                    searchkey[i] = pnode.getInstance();
+                }
+                if (searchkey[i] == null) {
+                    vars_new.add(parent);
+                }
+            }
+            if (varinstance == null) {
+                vars_new.add(var);
+            }
+            Factor ft = new Factor(vars_new);
+            if (varinstance != null) {
+                ft.evidenced = true;
+            } else {
+            	//FIXME what is this loop doing? Should it be searchkey[i]??
+                for (int i = 0; i < searchkey.length; i++) {
+                    if (searchkey != null) {
+                        ft.evidenced = true;
+                        break;
+                    }
+                }
+            }
+            int[] indices = table.getIndices(searchkey);
+            Object[] newkey = new Object[vars_new.size()];
+            for (int index : indices) {
+                EnumDistrib d = table.getValue(index);
+                if (d != null) {
+                    Object[] key = table.getKey(index);
+                    int newcnt = 0;
+                    for (int i = 0; i < key.length; i++) {
+                        if (searchkey[i] == null) {
+                            newkey[newcnt++] = key[i];
+                        }
+                    }
+                    if (varinstance != null) { // the variable for this CPT is instantiated
+                        if (newkey.length == 0) // atomic FactorTable
+                            ft.setFactor(null, d.get(varinstance));
+                        else
+                            ft.addFactor(newkey, d.get(varinstance));
+                    } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
+                        for (int j = 0; j < dom.size(); j++) {
+                            newkey[newkey.length - 1] = dom.get(j);
+                            Double p = d.get(j);
+                            if (p != null) {
+                                ft.addFactor(newkey, p);
+                            }
+                        }
+                    }
+                } else { // this entry is null
+                    //
+                }
+            }
+            if (!irrel_pars.isEmpty()) {
+            	ft = ft.marginalize(irrel_pars);
+            	System.out.println();
+            }
+            return ft;
+        } else { // no parents, just a prior
+            if (varinstance != null) { // instantiated prior
+                Factor ft = new Factor();
+                ft.setFactor(this.prior.get(varinstance));
+                return ft;
+            }
+            List<Variable> vars_new = new ArrayList<>(1);
+            vars_new.add(var);
+            Factor ft = new Factor(vars_new);
+            Object[] newkey = new Object[1];
+            EnumDistrib d = this.prior;
+            for (int j = 0; j < dom.size(); j++) {
+                newkey[0] = dom.get(j);
+                ft.addFactor(newkey, d.get(j));
+            }
+            return ft;
+        }
+    }
+    
     /**
      * Get the name of the CPT
      */
@@ -811,6 +921,14 @@ public class CPT implements BNode, Serializable {
     public String getType() {
         return "CPT";
     }
+    
+	public boolean isRelevant() {
+		return relevant;
+	}
+
+	public void setRelevant(boolean relevant) {
+		this.relevant = relevant;
+	}
 
     /**
      * @param args

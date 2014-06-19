@@ -153,6 +153,11 @@ public interface BNode {
      * Make BNode into a Factor
      */
     public Factor makeFactor(BNet bn);
+    
+    /**
+     * Make BNode into a Factor
+     */
+    public Factor makeFactor(BNet bn, boolean rel);
 
     /**
      * Method used to modify the CPT/CDT to be modified (EM uses this).
@@ -184,5 +189,15 @@ public interface BNode {
     public boolean isTrainable();
 
     public void randomize(long seed);
+    
+    /**
+     * Set whether or not a node is relevant to the current query (Inference)
+     */
+    public void setRelevant(boolean relevant);
+    
+    /**
+     * @return true if this node is relevant to the current query (Inference)
+     */
+    public boolean isRelevant();
 
 }

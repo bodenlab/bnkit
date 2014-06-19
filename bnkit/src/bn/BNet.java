@@ -29,6 +29,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 /**
  * Defines a Bayesian Network. The class will manage efficient access to the
@@ -337,6 +339,19 @@ public class BNet implements Serializable {
         }
         return ordered;
     }
+    
+    /**
+     * Get an alphabetical ordering of nodes
+     * @return list of alphabetically ordered nodes
+     */
+    public List<BNode> getAlphabetical() { 
+    	List<BNode> nodes = new ArrayList<>();
+    	SortedSet<String> names = new TreeSet<>(this.getNames());
+    	for (String n : names) {
+    		nodes.add(this.getNode(n));
+    	}
+    	return nodes;
+    }
 
     /**
      * Retrieve all node variables in order (from root/s to leaves; with parallel paths
@@ -435,6 +450,7 @@ public class BNet implements Serializable {
             } // else, ignore
         }
     }
+
     /**
      * Determine which subset of nodes that are relevant to a specific query and
      * evidence combination. "Every variable that is not an ancestor of a query
@@ -475,6 +491,112 @@ public class BNet implements Serializable {
         nbn.compile();
         return nbn;
     }
+    
+    /**
+     * Algorithm for finding nodes reachable from X(query) given Z(evidence) via active trails
+     * Based on Algorithm 3.1 in Probabilistic Graphical Models - Principles and Techniques, Koller, D., Friedman, N., pg.75
+     * @param query the variables that are in the query
+     * @return a new BN with relevant CPTs only
+     */
+     public List<BNode> getDconnected(Variable... query) {
+//     	BNet nbn = new BNet();
+     	//Get set of evidence
+     	Set<BNode> z = new HashSet<BNode>(); //Evidence
+     	for (BNode node : this.getNodes()) {
+     		if (node.getInstance() != null) {
+     			z.add(node);
+     		}
+     	}
+     	//Record all ancestors of evidence
+     	//Phase I
+     	Set<BNode> a = new HashSet<BNode>(); //Ancestors of evidence
+     	for (BNode v : z) {
+     		
+     		List<BNode> anc = this.getAncestors(v);
+     		a.addAll(anc);
+     		a.add(v);
+     	}
+     	
+     	//PhaseII: traverse active trails starting from X (query)
+     	List<NodeDirection> l = new ArrayList<NodeDirection>(); //nodes to be visited
+     	//Have to add query as node to be visited
+     	//FIXME direction for the query?
+     	//I think a query node can always be added once with a single direction and that will always work
+     	for (Variable q : query) {
+     		BNode qNode = this.getNode(q);
+     		l.add(new NodeDirection(qNode, "up"));
+     		
+//     		if (qNode.isRoot()) {
+//     			l.add(new NodeDirection(qNode, "down"));
+//     		} else if (this.getChildren(qNode) == null) {
+//     			l.add(new NodeDirection(qNode, "up"));
+//     		} else {
+//     			l.add(new NodeDirection(qNode, "up"));
+//     			l.add(new NodeDirection(qNode, "down"));
+//     		}
+     		
+     	}
+     	
+     	Set<NodeDirection> v = new HashSet<NodeDirection>(); //node,direction marked as visited
+     	Set<BNode> r = new HashSet<BNode>(); //nodes reachable via active trail
+     	
+     	while (!l.isEmpty()) {
+     		NodeDirection cur = l.remove(0);
+     		if (!cur.within(v)) { //hasn't been visited
+     			r.add(cur.getNode()); //node is reachable
+//     			if (!z.contains(cur.getNode())) { //isn't evidenced
+//     				//FIXME when should an evidence node be included?
+//     				//At final step check overlap between ancestors of added nodes and evidence?
+//     				r.add(cur.getNode()); //node is reachable
+//     			}
+     			v.add(cur); //mark node as visited
+     			if (cur.getDirection()=="up" && !z.contains(cur.getNode())){ //trail up through Y, active if Y not in Z
+     				//get set of parent nodes
+     				if (cur.getNode().getParents()!=null) {
+         				//find parents to be visited from bottom
+         				for (Variable par : cur.getNode().getParents()) {
+         					l.add(new NodeDirection(this.getNode(par), "up"));
+         				}
+     				}
+     				if (this.getChildren(cur.getNode()) != null) {
+     					//find children to be visited from top
+         				for (String c : this.getChildren(cur.getNode())) {
+         					l.add(new NodeDirection(this.getNode(c), "down"));
+         				}
+     				}
+     			} else if (cur.getDirection() == "down") { //trails down through Y
+     				if (!z.contains(cur.getNode())) { //downward trails to Y's children are active
+         				if (this.getChildren(cur.getNode()) != null) {
+         					//find children to be visited from top
+ 	        				for (String c : this.getChildren(cur.getNode())) {
+ 	        					l.add(new NodeDirection(this.getNode(c), "down"));
+ 	        				}
+         				}
+     				}
+     				if (a.contains(cur.getNode())) { //v-structure (converging) trails are active
+         				if (cur.getNode().getParents()!=null) {
+ 	        				//find parents to be visited from bottom
+ 	        				for (Variable par : cur.getNode().getParents()) {
+ 	        					l.add(new NodeDirection(this.getNode(par), "up"));
+ 	        				}
+         				}
+     				}	
+     			}
+     		}
+     	}
+     	//Add all reachable nodes IN ORDER and set all non-relevant nodes to false
+    	//FIXME If a parent of a relevant node is evidence should it be included?
+    	List<BNode> output = new ArrayList<BNode>();
+     	for (BNode n : this.getOrdered()) {
+     		if (r.contains(n)) {
+	     		n.setRelevant(true);
+	     		output.add(n);
+     		} else {
+     			n.setRelevant(false);
+     		}
+     	}
+     	return output;
+     }
     
    
     /**
@@ -691,7 +813,38 @@ public class BNet implements Serializable {
         s.addAll(Arrays.asList(array));
         return s;
     }
-
+    
+    /**
+     * Small class to store node and direction for dConnectedness
+     * @author Alex
+     *
+     */
+    public class NodeDirection {
+    	private BNode node;
+    	private String direction;
+    	
+    	public NodeDirection(BNode node, String direction) {
+    		this.node = node;
+    		this.direction = direction;
+    	}
+    	
+    	public BNode getNode() {
+    		return node;
+    	}
+    	
+    	public String getDirection() {
+    		return direction;
+    	}
+    	
+    	public boolean within(Set<NodeDirection> input) {
+    		for (NodeDirection n : input) {
+    			if (this.node.equals(n.getNode()) && this.direction.equals(n.getDirection())){
+    				return true;
+    			}
+    		}
+    		return false;
+    	}
+    }
 }
 
 /**

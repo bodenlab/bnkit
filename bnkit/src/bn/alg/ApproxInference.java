@@ -58,24 +58,25 @@ public class ApproxInference implements Inference {
         List<BNode> X = new ArrayList<>(); // Query variables
         List<BNode> E = new ArrayList<>(); // Evidence variables
         List<BNode> Z = new ArrayList<>(); // 
-        BNet qbn = bn.getRelevant(qvars); // create new BN with variables that are relevant to query, 
+//        BNet qbn = bn.getRelevant(qvars); // create new BN with variables that are relevant to query, 
+        List<BNode> rnl = bn.getDconnected(qvars); //List of relevant nodes to be used based on FULL network
         try {
             for (Variable x : qvars) 
-                X.add(qbn.getNode(x));
-            for (BNode node : qbn.getOrdered()) { // topological order: top-down
+                X.add(bn.getNode(x));
+            for (BNode node : rnl) { // topological order: top-down
                 Variable var = node.getVariable();
                 if (node.getInstance() != null) {
-                    E.add(qbn.getNode(var));
+                    E.add(bn.getNode(var));
                     //need to keep track of ALL non-evidence variables
                     //this includes the query variable
                 } else {
-                    Z.add(qbn.getNode(var));
+                    Z.add(bn.getNode(var));
                 }
             }
         } catch (RuntimeException e) {
             throw new RuntimeException("makeQuery, ApproxInfer didn't work");
         }
-        return new AQuery(X, E, Z, qbn);
+        return new AQuery(X, E, Z, rnl);
     }
 
     /**
@@ -87,9 +88,11 @@ public class ApproxInference implements Inference {
     public CGTable infer(Query query) {
         AQuery q = (AQuery) query;
         // BN that will be queried
-        BNet cbn = q.qbn;
+//        BNet cbn = q.qbn;
+        List<BNode> rnl = q.rnl;
         // First set all non-evidenced nodes including query
-        cbn.sampleInstance(); // will instantiate all nodes
+        bn.sampleInstance();
+//        bn.sampleInstance(rnl); // will instantiate all nodes
         SampleTrace data = new SampleTrace(q.X, iterations);    // Storage class - maintains instance of each query node for each 'state' the chain passes through
         data.count();                            // Observe the current instantiation, starting 'state' of chain
         
@@ -101,7 +104,8 @@ public class ApproxInference implements Inference {
             //Iterate over all non-evidenced nodes, including query nodes
             for (BNode node : q.Z) {
                 // These variables are in "topological order" (a node is never seen until all its parents have been seen)
-                // Get the Markov blanket for the node
+                // Get the Markov blanket for the node 
+            	//The minimal set of nodes which d-separates node A from all other nodes is A's Markov blanket (MB)
                 // Sample from the Markov blanket distribution of the node
                 Object result = bn.getMBProb(node);
                 if (result != null) {
@@ -159,13 +163,13 @@ public class ApproxInference implements Inference {
         final List<BNode> X;
         final List<BNode> E;
         final List<BNode> Z;
-        final BNet qbn;
+        final List<BNode> rnl;
 
-        AQuery(List<BNode> X, List<BNode> E, List<BNode> Z, BNet qbn) {
+        AQuery(List<BNode> X, List<BNode> E, List<BNode> Z, List<BNode> rnl) {
             this.X = X;
             this.E = E;
             this.Z = Z;
-            this.qbn = qbn;
+            this.rnl = rnl;
         }
     }
 
