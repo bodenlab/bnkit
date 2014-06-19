@@ -23,6 +23,7 @@ import bn.EnumVariable;
 import bn.Factor;
 import bn.JPT;
 import bn.Variable;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -71,9 +72,10 @@ public class CGVarElim implements Inference {
         List<Variable> E = new ArrayList<>(); // Assignment
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
         Q.addAll(Arrays.asList(qvars));
-        BNet qbn = bn.getRelevant(qvars);
+//        BNet qbn = bn.getRelevant(qvars);
+        List<BNode> rnl = bn.getDconnected(qvars); //relevant ordered node list
         //BNet qbn = bn;
-        for (BNode node : qbn.getOrdered()) {
+        for (BNode node : rnl) {
             Variable var = node.getVariable();
             if (node.getInstance() != null) {
                 E.add(var);
@@ -81,7 +83,7 @@ public class CGVarElim implements Inference {
                 X.add(var);
             }
         }
-        return new CGQuery(Q, E, X, qbn);
+        return new CGQuery(Q, E, X, rnl);
     }
 
     /**
@@ -112,8 +114,11 @@ public class CGVarElim implements Inference {
         }        
         int nBuckets = buckets.size();
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
-        for (BNode node : q.qbn.getNodes()) {
-            Factor ft = node.makeFactor(q.qbn);
+        for (BNode node : q.rnl) {
+            Factor ft = node.makeFactor(bn, true); //Adding bool forces new makeFactor method to be used on only relevant nodes
+//            Factor ft = node.makeFactor(bn);
+//            System.out.println(node.toString());
+//            ft.display();
             boolean added = false;
             if (ft.isAtomic()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
                 buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
@@ -135,8 +140,16 @@ public class CGVarElim implements Inference {
             }
         }
         // Purge buckets, merge sum-out variables
+//        System.out.println(buckets.size());
+        List<Integer> remove = new ArrayList<>();
         for (int i = 1; i < nBuckets; i++) { // ignore query bucket
-            Bucket b = buckets.get(i);
+        	try {
+        		Bucket b = buckets.get(i);
+        	} catch (IndexOutOfBoundsException e) {
+        		System.out.println("i = "+i+", nBuckets = "+nBuckets);
+        		System.out.println(buckets.size());
+        	}
+        	Bucket b = buckets.get(i);
             if (b.factors.isEmpty()) { // no factors, put sum-out variables in other bucket(s)
                 for (Variable sumout : b.vars) { // check each sum-out variable
                     for (int jj = i + 1; jj < nBuckets; jj++) { // search suitable bucket for sum-out
@@ -150,9 +163,12 @@ public class CGVarElim implements Inference {
                         }
                     }
                 }
-                buckets.remove(i); // we can safely remove bucket since variables have been assigned to others
+                remove.add(i);
+//                buckets.remove(i); // we can safely remove bucket since variables have been assigned to others
+                //FIXME if you remove a bucket the loop fails because nBuckets has not been updated
             }
         }
+        buckets.removeAll(remove);
         nBuckets = buckets.size(); // update bucket number
         // Create a factor of each bucket, by performing factor products and marginalisation as appropriate
         for (int i = nBuckets - 1; i >= 0; i--) {
@@ -263,7 +279,7 @@ public class CGVarElim implements Inference {
             buckets.add(new Bucket((EnumVariable)null));
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
         for (BNode node : bn.getNodes()) {
-            Factor ft = node.makeFactor(bn);
+            Factor ft = node.makeFactor(bn, true);
             boolean added = false;
             if (ft.isAtomic()) { // this happen if the FT has no variables
                 buckets.get(0).put(ft);
@@ -283,6 +299,7 @@ public class CGVarElim implements Inference {
             }
         }
         // Purge buckets, merge sum-out variables
+        //FIXME error same as above
         for (int i = 1; i < nBuckets; i++) { // do not re-organise penultimate bucket
             Bucket b = buckets.get(i);
             if (b.factors.isEmpty()) { // no factors, put sum-out variables in other bucket(s)
@@ -338,7 +355,7 @@ public class CGVarElim implements Inference {
                     }
                 } else {    
                     // This is the final (first) bucket 
-                    double sum = result.getSum();
+                	double sum = result.getSum();
                     if (sum == 0) {
                         System.err.println("Likelihood is zero");
                     }
@@ -360,12 +377,12 @@ public class CGVarElim implements Inference {
         final List<Variable> Q;
         final List<Variable> E;
         final List<Variable> X;
-        final BNet qbn;
-        CGQuery(List<Variable> Q, List<Variable> E, List<Variable> X, BNet qbn) {
+        final List<BNode> rnl;
+        CGQuery(List<Variable> Q, List<Variable> E, List<Variable> X, List<BNode> rnl) {
             this.Q = Q;
             this.E = E;
             this.X = X;
-            this.qbn = qbn;
+            this.rnl = rnl;
         }
     }
 
