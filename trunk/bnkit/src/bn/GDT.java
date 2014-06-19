@@ -307,7 +307,9 @@ public class GDT implements BNode, Serializable {
                     //
                 }
             }
-            ft = ft.marginalize(irrel_pars);
+            if (!irrel_pars.isEmpty()) {
+            	ft = ft.marginalize(irrel_pars);
+            }
             return ft;
         } else { // no parents, just a prior
             if (varinstance != null) // instantiated prior is not possible to factorise
