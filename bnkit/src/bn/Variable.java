@@ -136,7 +136,7 @@ public class Variable<E extends Domain> {
      * Get all variables in the current variable namespace 
      * @return all variables
      */
-    public Set<Variable<?>> getAll() {
+    public static Set<Variable<?>> getAll() {
         return pool.keySet();
     }
 
