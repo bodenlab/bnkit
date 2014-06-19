@@ -57,6 +57,8 @@ public class GDT implements BNode, Serializable {
     final private double[] means;       // save the means 
     final private double[] vars; 	// save the variances
     final private double[] n;           // save the numbers of samples
+    
+    private boolean relevant = false;
 
     /**
      * Create a Gaussian density table for a variable. The variable is
@@ -239,6 +241,81 @@ public class GDT implements BNode, Serializable {
         }
     }
 
+    /**
+     * Make a FactorTable out of this GDT. If a variable is instantiated it will
+     * be factored out.
+     * If a parent is not relevant, it will not be included in the factor
+     *
+     *Marginalization technique requires updating
+     *
+     * @param bn the BNet instance that can be used to check the status of nodes
+     * so that factoring can be done (instantiation of variables are done for a
+     * BNet node).
+     * @return the FactorTable created from the GDT, provided instantiations of BN
+     */
+    @Override
+    public Factor makeFactor(BNet bn, boolean relevant) {
+        List<EnumVariable> vars_old = this.getParents();
+        Object varinstance = null;
+        BNode cnode = bn.getNode(var);
+        if (cnode != null) {
+            varinstance = cnode.getInstance();
+        }
+        if (vars_old != null) { // there are parent variables
+            Object[] searchkey = new Object[vars_old.size()];
+            List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
+            List<EnumVariable> irrel_pars = new ArrayList<>(); //irrelevant parents
+            for (int i = 0; i < vars_old.size(); i++) {
+                EnumVariable parent = vars_old.get(i);
+                // Record irrelevant parents to sum out
+                //FIXME when should a parent be removed? Allow it to influence factor table then remove it?
+                // If parent is evidenced it will not be included in factor table
+                if (!bn.getNode(parent).isRelevant() && bn.getNode(parent).getInstance() == null) {
+                	irrel_pars.add(parent);
+                }
+                BNode pnode = bn.getNode(parent);
+                if (pnode != null)
+                    searchkey[i] = pnode.getInstance();
+                if (searchkey[i] == null)
+                    vars_new.add(parent);
+            }
+            Factor ft;
+            if (varinstance == null)
+                vars_new.add(this.var);
+            ft = new Factor(vars_new);
+            if (varinstance != null)
+                ft.evidenced = true;
+            int[] indices = table.getIndices(searchkey);
+            Object[] newkey = new Object[ft.getNEnum()];
+            for (int index : indices) {
+                GaussianDistrib d = table.getValue(index);
+                if (d != null) {
+                    Object[] key = table.getKey(index);
+                    int newcnt = 0;
+                    for (int i = 0; i < key.length; i++) {
+                        if (searchkey[i] == null) {
+                            newkey[newcnt++] = key[i];
+                        }
+                    }
+                    if (varinstance != null) { // the variable for this GDT is instantiated
+                        ft.addFactor(newkey, d.get(varinstance));
+                    } else { // the variable for this GDT is NOT instantiated...
+                        ft.addFactor(newkey, 1.0);
+                        ft.setDistrib(newkey, this.var, d);
+                    }
+                } else { // this entry is null
+                    //
+                }
+            }
+            ft = ft.marginalize(irrel_pars);
+            return ft;
+        } else { // no parents, just a prior
+            if (varinstance != null) // instantiated prior is not possible to factorise
+                return null;
+            throw new RuntimeException("GDTs can not be factorised unless it has enumerable parent variables");
+        }
+    }
+    
     /**
      * Get the conditional probability of the variable (represented by this GDT)
      * when set to a specified value.
@@ -764,6 +841,13 @@ public class GDT implements BNode, Serializable {
         return false;
     }
 
+    public boolean isRelevant() {
+		return relevant;
+	}
+
+	public void setRelevant(boolean relevant) {
+		this.relevant = relevant;
+	}
     /**
      * @param args
      */
