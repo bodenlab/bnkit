@@ -5,7 +5,7 @@
  */
 package gui2;
 
-import testing.Observer;
+import gui2.test.Observer;
 import bn.BNet;
 import bn.BNode;
 import bn.CPT;
@@ -15,8 +15,10 @@ import bn.EnumTable;
 import bn.EnumVariable;
 import bn.Factor;
 import bn.GDT;
+import bn.SampleTable.*;
 import bn.Variable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -26,19 +28,16 @@ import java.util.List;
  * NodeModel implements Observable in the Observer pattern. 
  */
 
-public class NodeModel implements BNode{
+public class NodeModel {
 
-    @Override
     public Factor makeFactor(BNet bn) {
         return bnode.makeFactor(bn);
     }
 
-    @Override
     public void countInstance(Object[] key, Object value) {
         bnode.countInstance(key, value);
     }
 
-    @Override
     public Distrib getDistrib(Object[] key) {
         return bnode.getDistrib(key);
     }
@@ -196,65 +195,53 @@ public class NodeModel implements BNode{
 //        return this.getVariable();
 //    }
 
-    @Override
     public String getName() {
         return bnode.getName();
     }
 
-    @Override
     public Double get(Object[] key, Object value) {
         return bnode.get(key, value);
     }
 
-    @Override
     public Double get(Object value, Object... key) {
         return bnode.get(value, key);
     }
 
-    @Override
     public Double get(Object value) {
         return bnode.get(value);
     }
 
-    @Override
     public Variable getVariable() {
         changed = true;
         return bnode.getVariable();
     }
 
-    @Override
     public List<EnumVariable> getParents() {
         return bnode.getParents();
     }
 
-    @Override
     public EnumTable getTable() {
         changed = true;
 //        notifyObservers();
         return bnode.getTable();
     }
 
-    @Override
     public Distrib getDistrib() {
         return bnode.getDistrib();
     }
 
-    @Override
     public void print() {
         bnode.print();
     }
 
-    @Override
     public String getType() {
         return bnode.getType();
     }
 
-    @Override
     public String getStateAsText() {
         return bnode.getStateAsText();
     }
 
-    @Override
     public boolean setState(String dump) {
         changed = true;
 //        notifyObservers();
@@ -267,44 +254,36 @@ public class NodeModel implements BNode{
         return success;
     }
     
-    @Override
     public boolean isRoot() {
         return bnode.isRoot();
     }
 
-    @Override
     public void setInstance(Object value) {
         changed = true;
 //        notifyObservers();
         bnode.setInstance(value);
     }
 
-    @Override
     public void resetInstance() {
         bnode.resetInstance();
     }
 
-    @Override
     public Object getInstance() {
         return bnode.getInstance();
     }
 
-    @Override
     public void countInstance(Object[] key, Object value, Double prob) {
         bnode.countInstance(key, value, prob);
     }
 
-    @Override
     public void maximizeInstance() {
         bnode.maximizeInstance();
     }
 
-    @Override
     public boolean isTrainable() {
         return bnode.isTrainable();
     }
 
-    @Override
     public void randomize(long seed) {
         bnode.randomize(seed);
     }
