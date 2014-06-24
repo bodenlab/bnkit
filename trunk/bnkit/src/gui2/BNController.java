@@ -5,7 +5,7 @@
  */
 package gui2;
 
-import testing.Observable;
+import gui2.test.Observable;
 import bn.BNet;
 import bn.JPT;
 import bn.alg.CGTable;

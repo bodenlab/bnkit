@@ -115,7 +115,7 @@ public class BNContainer {
                             newparents.add((Variable) v);
                         }
                     }
-                    NodeModel newchild = Predef.getNodeModel(child.getVariable(), new ArrayList<Variable>(newparents), Predef.getType(child));
+                    NodeModel newchild = Predef.getNodeModel(child.getVariable(), new ArrayList<>(newparents), Predef.getType(child.getBNode()));
                     additions.add(newchild);
                 }
             }
@@ -141,7 +141,7 @@ public class BNContainer {
                         newparents.add((Variable) v);
                     }
                 }
-                NodeModel newchild = Predef.getNodeModel(child.getVariable(), newparents, Predef.getType(child));
+                NodeModel newchild = Predef.getNodeModel(child.getVariable(), newparents, Predef.getType(child.getBNode()));
                 nodems.put(newchild.getName(), newchild);
             }
         }
@@ -158,7 +158,7 @@ public class BNContainer {
             return;
         }
         newparents.add((Variable) parent);
-        NodeModel newchild = Predef.getNodeModel(child.getVariable(), new ArrayList<Variable>(newparents), Predef.getType(child));
+        NodeModel newchild = Predef.getNodeModel(child.getVariable(), new ArrayList<Variable>(newparents), Predef.getType(child.getBNode()));
         nodems.remove(child.getName());
         nodems.put(newchild.getName(), newchild);
     }
