@@ -53,6 +53,13 @@ public class Factor {
     public boolean evidenced = false;   // flag to indicate if the Factor was reduced due to evidence (used by inference)
     public boolean function = false;    // flag to indicate if the factor was the result of a product or marginalization
     
+//    private JDF removed = null;    // collection of JDFs that represent densities that have been removed due to its conditions rendered impossible (prob = 0)
+    /**
+     * CG_SAFETY forces factors to store entries that are associated with 0 (impossible) to save densities that are associated with them.
+     * Set CG_SAFETY to false if time and space efficiency is critical.
+     */
+    public static boolean CG_SAFETY = true;    // save conditional densities, accept space and time overhead. Must be static/simulation-wide.
+    
     /**
      * Construct a factor with no variables.
      */
@@ -830,12 +837,11 @@ public class Factor {
     /**
      * Takes the product between the two factors provided as arguments.
      * Variables to be "joined" from the factors must have the same name and
- implement the same domain for the product to be determined.
-
- This method has been partially adapted for continuous variables, but it assumes
- that continuous variables cannot be reached by multiple paths. For that
- to work, they have to be joined the same way as discrete variables. Currently,
- continuous variables are just mixed without checking if the other factors has them.
+     * implement the same domain for the product to be determined.
+     * This method has been partially adapted for continuous variables, but it assumes
+     * that continuous variables cannot be reached by multiple paths. For that
+     * to work, they have to be joined the same way as discrete variables. Currently,
+     * continuous variables are just mixed without checking if the other factors has them.
      *
      * @param ft1 factor one
      * @param ft2 factor two
@@ -903,17 +909,25 @@ public class Factor {
         // now we know the overlap so can define the result FT
         ft3vars.addAll(ft1.getEnumVariables());
         ft3vars.addAll(unique_ft2);
-        ft3vars.addAll(ft1.getNonEnumVariables());
-        ft3vars.addAll(ft2.getNonEnumVariables()); // as explained above, FT1 and FT2 do not overlap in terms of non-enums
+        List<Variable> ft1_nonenum = ft1.getNonEnumVariables();
+        ft3vars.addAll(ft1_nonenum);
+        List<Variable> ft2_nonenum = ft2.getNonEnumVariables();
+        ft3vars.addAll(ft2_nonenum); // as explained above, FT1 and FT2 do not overlap in terms of non-enums
         Factor ft3 = new Factor(ft3vars);
+        boolean CG_SAFETY_REQ = /* (ft1_nonenum.size() + ft2_nonenum.size() > 0) && */ Factor.CG_SAFETY;
+//        if (CG_SAFETY_REQ) {
+//            // TODO?
+//        }
         for (Map.Entry<Integer, Double> entry1 : ft1.factorTable.getMapEntries()) {
-            if (entry1.getValue() == 0.0) // if the value associated with the entry is 0, the product will always be zero, 
-                continue; // ... so we abort, to save time as there is no point in doing any calculations
+            double f1 = entry1.getValue();
+            if (f1 == 0.0 && !CG_SAFETY_REQ) // if the value associated with the entry is 0, the product will always be zero, 
+                continue; // ... so without the CG_SAFETY active, we abort, to save time as there is no point in doing any calculations
             for (Map.Entry<Integer, Double> entry2 : ft2.factorTable.getMapEntries()) {
-                if (entry2.getValue() == 0.0) // if the value associated with the entry is 0, the product will be zero, 
-                    continue; // ... so we abort, as there is no point in doing any more calculcations
-                int ft1_index = entry1.getKey().intValue();
-                int ft2_index = entry2.getKey().intValue();
+                double f2 = entry2.getValue();
+                if ((f2 == 0.0 || f1 == 0.0) && !CG_SAFETY_REQ) // if the value associated with the entry is 0, the product will be zero, 
+                    continue; // unless CG safety is active, there is no point in doing any more calculcations
+                int ft1_index = entry1.getKey();
+                int ft2_index = entry2.getKey();
                 Object[] ft1_key = ft1.getKey(ft1_index);
                 Object[] ft2_key = ft2.getKey(ft2_index);
                 boolean match = true;
@@ -932,9 +946,13 @@ public class Factor {
                         ft3_key[i] = ft2_key[ft2_idx];
                         i++;
                     }
+//                    if ((f2 == 0.0 || f1 == 0.0) && CG_SAFETY_REQ) { // if the value associated with the entry is 0, the product will be zero, but CG safety is active
+//                        // TODO?
+//                    } else {
                     int ft3_index = ft3.addFactor(ft3_key, entry1.getValue() * entry2.getValue());
                     if (ft1.hasNonEnumVariables() || ft2.hasNonEnumVariables())
                         ft3.setJDF(ft3_index, JDF.combine(ft1.getJDF(ft1_index), ft2.getJDF(ft2_index)));
+//                    }
                 }
             }
         }
