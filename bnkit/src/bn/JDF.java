@@ -114,10 +114,12 @@ public class JDF {
      * be created (with weight assigned as provided).
      * @param var the variable that will have a new, or amended mixed distribution
      * @param d the distribution that will form part of the mixture
-     * @param weight the (absolute) weight that the new distribution will have
+     * @param weight the (absolute) weight that the new distribution will have, if NaN it is set to 1.0
      * @return the new "mixed" distribution
      */
     public Distrib mixDistrib(Variable var, Distrib d, double weight) {
+        if (Double.isNaN(weight))
+            weight = 1.0;
         Distrib prev = varmap.get(var);
         if (prev != null) {
             try {

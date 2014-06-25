@@ -790,8 +790,13 @@ public class Factor {
                 double weight = entry.getValue().doubleValue(); // NOT normalized
                 int newindex = factorTable.maskIndex(oldindex, varsToSumOut);
                 ft.addFactor(newindex, weight);
-                for (Variable nonenum : this.getNonEnumVariables())
-                    ft.addDistrib(newindex, nonenum, getDistrib(oldindex, nonenum), weight / sum); // HERE normalized weighting
+                for (Variable nonenum : this.getNonEnumVariables()) {
+                    double myWeight = 1.0; // if all factors are zero, sum is 0, so we apply a constant, uniform weight 
+                    if (sum != 0) // not all factors are zero
+                        myWeight = weight / sum; // HERE normalized weighting
+                    if (myWeight != 0.0) // do not add densities with zero weight
+                        ft.addDistrib(newindex, nonenum, getDistrib(oldindex, nonenum), myWeight); 
+                }
             }
             ft.function = true;
             return ft;
