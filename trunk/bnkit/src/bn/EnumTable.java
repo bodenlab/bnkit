@@ -331,7 +331,10 @@ public class EnumTable<E> {
             }
         }
         idx = new int[tot];
-        getTheoreticalIndicesRecursive(key, idx, 0, startentry, 0);
+        if (tot == 1) // no null values
+            idx[0] = startentry;
+        else
+            getTheoreticalIndicesRecursive(key, idx, 0, startentry, 0);
         return idx;
     }
 
@@ -497,7 +500,7 @@ public class EnumTable<E> {
     public static void main(String[] args) {
         EnumTable<Character> t = new EnumTable<>(Predef.Boolean(),Predef.Nominal("S1","S2","S3"),Predef.Number(4));
         t.display();
-        int[] idx = t.getTheoreticalIndices(new Object[] {true,null,2});
+        int[] idx = t.getTheoreticalIndices(new Object[] {true,"S2",2});
         if (idx != null) {
             for (int i = 0; i <idx.length; i++)
                 System.out.println(idx[i]);
