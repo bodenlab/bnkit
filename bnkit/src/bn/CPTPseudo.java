@@ -783,13 +783,8 @@ public class CPTPseudo implements BNode, Serializable {
                                 newKey[x] = null; //All other parent's keys are set to null
                             }
                         }
-                        int[] countable_idxs = count.table.getTheoreticalIndices(newKey);
-                        if (countable_idxs.length == 1) {
-                            int index = count.getIndex(newKey);
-                            count.count(index, obsCount);
-                            continue;
-                        }
                         //get all possible indices for the marginalised key
+                        int[] countable_idxs = count.table.getTheoreticalIndices(newKey);
                         //for each index, add the corresponding count
                         for (int x = 0; x < countable_idxs.length; x++) {
                             count.count(countable_idxs[x], obsCount);
