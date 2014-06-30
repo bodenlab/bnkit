@@ -772,7 +772,8 @@ public class CPTPseudo implements BNode, Serializable {
                     Object po = pdom.get(i); //parent observation
                     for (int j = 0; j < cdom.size(); j++) {
                         Object co = cdom.get(j); // child observation
-                        double obsCount = this.pseudoMatrix.getValue(i, j); //the count
+//                        double obsCount = this.pseudoMatrix.getValue(i, j); //the count
+                        double obsCount = this.pseudoMatrix.getValue(i, co);
                         // add one as count table key includes child observation
                         Object[] newKey = new Object[key.length + 1];
                         newKey[0] = co;
@@ -785,6 +786,7 @@ public class CPTPseudo implements BNode, Serializable {
                         }
                         //get all possible indices for the marginalised key
                         int[] countable_idxs = count.table.getTheoreticalIndices(newKey);
+                        //get all possible indices for the marginalised key
                         //for each index, add the corresponding count
                         for (int x = 0; x < countable_idxs.length; x++) {
                             count.count(countable_idxs[x], obsCount);
@@ -883,15 +885,15 @@ public class CPTPseudo implements BNode, Serializable {
     /**
      * Put random entries in the CPT if not already set.
      */
-    public void randomize(long seed, boolean force) {
+    public void randomize(long seed) {
         Random rand = new Random(seed);
         if (table == null) {
-            if (prior == null || force)
+            if (prior == null)
                 prior = EnumDistrib.random(var.getDomain());
         } else {
             int nrows = table.getSize();
             for (int i = 0; i < nrows; i++) {
-                if (!table.hasValue(i) || force)
+                if (!table.hasValue(i))
                     table.setValue(i, EnumDistrib.random(var.getDomain()));
             }
         }
