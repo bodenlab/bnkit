@@ -1,7 +1,10 @@
 package bn;
 
+import com.sun.deploy.util.ArrayUtil;
+
 import java.io.*;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This is just a very simple class for loading/storing a tab delimited matrix file and
@@ -14,6 +17,7 @@ import java.util.ArrayList;
 public class PseudoMatrix {
 
     private ArrayList<ArrayList<Double>> matrix;
+    public ArrayList<Object> valuemap = new ArrayList<>();
 
     /**
      * Create a PseudoMatrix
@@ -36,12 +40,57 @@ public class PseudoMatrix {
 
     public Double getValue(int index1, int index2){
         return this.matrix.get(index1).get(index2);
-//        if (index2<index1) {
-//            return this.matrix.get(index1).get(index2);
-//        }else {
-//            return this.matrix.get(index2).get(index1);
-//        }
     }
+
+    public Double getValue(int index1, Object key){
+        if (valuemap == null){
+            return null;
+        }
+        Double value = null;
+        for (int i = 0; i < valuemap.size(); i++){
+            if ((valuemap.get(i).toString()).equals(key.toString())){
+                value = getValue(index1, i);
+            }
+        }
+        return value;
+    }
+
+    public Double getValue(Object key){
+        if (valuemap == null){
+            return null;
+        }
+        Double value = null;
+        for (int i = 0; i < valuemap.size(); i++){
+            if (valuemap.get(i).equals(key)){
+                value = getValue(0, i);
+            }
+        }
+        return value;
+    }
+
+    public void normalize(){
+        for (int row = 0; row < matrix.size(); row ++){
+            double total = Sum(matrix.get(row));
+            ArrayList<Double> newrow = new ArrayList<Double>();
+            if (total == 0){
+                return;
+            } else {
+                for (int col = 0; col < matrix.get(row).size(); col++) {
+                    newrow.add(matrix.get(row).get(col)/total);
+                }
+            }
+            matrix.set(row, newrow);
+        }
+    }
+
+    public double Sum(List<Double> values){
+        double sum = 0;
+        for (int i = 0; i < values.size(); i++) {
+            sum += values.get(i);
+        }
+        return sum;
+    }
+
     public void scaleValues(double scalar){
         ArrayList<ArrayList<Double>> newmatrix = new ArrayList<ArrayList<Double>>();
         for (int i =0; i < this.matrix.size(); i++){
@@ -57,6 +106,15 @@ public class PseudoMatrix {
 
     public void addValues(ArrayList<Double> values) {
         this.matrix.add(values);
+    }
+
+    public void setMapping(List<Object> amap){
+        valuemap.clear();
+        for (int i = 0; i < amap.size(); i++)
+            valuemap.add(amap.get(i));
+        if (valuemap.size() != this.matrix.get(0).size()){
+            System.err.println("Matrix map does not match the length of matrix entries");
+        }
     }
 
     public void addValues(ArrayList<Double> values, int repeat) {
