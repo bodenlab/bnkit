@@ -411,7 +411,6 @@ public class CPT implements BNode, Serializable {
             }
             if (!irrel_pars.isEmpty()) {
             	ft = ft.marginalize(irrel_pars);
-            	System.out.println();
             }
             return ft;
         } else { // no parents, just a prior
