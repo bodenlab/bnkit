@@ -25,8 +25,7 @@ import bn.EnumVariable;
 import bn.JDF;
 import bn.Variable;
 import bn.alg.CGVarElim.CGVarElimRuntimeException;
-import bn.alg.EMParallel.EMRuntimeException;
-import bn.alg.EMParallel.EMc1;
+
 
 import java.util.ArrayList;
 import java.util.Arrays;
