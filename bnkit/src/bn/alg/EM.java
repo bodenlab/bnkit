@@ -25,13 +25,19 @@ import bn.EnumVariable;
 import bn.JDF;
 import bn.Variable;
 import bn.alg.CGVarElim.CGVarElimRuntimeException;
+import bn.alg.EMParallel.EMRuntimeException;
+import bn.alg.EMParallel.EMc1;
+
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Implementation of Expectation-Maximization for learning in Bayesian network.
@@ -79,6 +85,11 @@ public class EM extends LearningAlg {
      * EM status print-outs
      */
     public boolean EM_PRINT_STATUS = true;
+    
+    /**
+     * Threads to be used in EM - case 3
+     */
+    public int EM_THREAD_COUNT = 1;
 
     /**
      * EM option: currently two different approaches to determine expectations.
@@ -99,13 +110,23 @@ public class EM extends LearningAlg {
     public void setPrintStatus(Boolean status){
         this.EM_PRINT_STATUS = status;
     }
+    
+    /**
+     * Set the threads to be used in EM - case 1
+     * @param thread
+     */
+    public void setThreadCount(int thread) {
+    	this.EM_THREAD_COUNT = thread;
+    }
 
     /**
      * Set EM training option
      * @param option
      */
     public void setEMOption(int option){
-        this.EM_OPTION = (option == 1) ? 1 : 2;
+    	this.EM_OPTION = (option == 1) ? 
+    			option : 
+    				(option == 2 ? 2 : 3);
     }
 
     /**
@@ -137,7 +158,7 @@ public class EM extends LearningAlg {
         // note that only named nodes (variables) will be included, and their parents or children (the latter as latent variables)
         Set<Variable> updateVars = new HashSet<>();
         updateVars.addAll(Arrays.asList(vars));
-        Map<BNode, Object[]> update = new HashMap<>(); 			// the set of nodes that may need to be updated:
+        Map<BNode, Object[]> update = new HashMap<>(); 			// the set of nodes that may need to be updated: 
         for (BNode node : bn.getNodes()) {      		// check all nodes
             Variable var = node.getVariable();			// this is the variable of the node
             if (updateVars.contains(var)) {			// is it in the data set?
@@ -211,216 +232,231 @@ public class EM extends LearningAlg {
                 Variable.Assignment[] evidence = Variable.Assignment.array(vars, values[i]); // the evidence here
                 
                 switch (EM_OPTION) {
-                    case 1: 
+                case 1: 
 
-                        // Principal way 1: go through each of the BN nodes... pose of query for, and update each...
-                        
-                        for (BNode node : update.keySet()) {
+                	// Principal way 1: go through each of the BN nodes... pose of query for, and update each...
 
-                            if (node.isTrainable()) {
-                                
-                                // identify what variables that we need to infer, to generate expectations
-                                List<Variable> query_vars = new ArrayList<>();
-                                Object[] evid_key = null; // only applicable if the node has parents
-                                if (!node.isRoot()) {
-                                    evid_key = EnumTable.getKey(node.getParents(), evidence);
-                                    // add to the variables that must be queried during inference
-                                    for (int key_index = 0; key_index < evid_key.length; key_index ++) {
-                                        if (evid_key[key_index] == null)
-                                            query_vars.add(node.getParents().get(key_index));
-                                    }
-                                }
-                                Variable var = node.getVariable();
-                                Object ovalue = node.getInstance(); // check the value, if instantiated
-                                if (ovalue == null)
-                                    query_vars.add(var);
-                                
-                                // check if inference is required
-                                if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
-                                    try {
-                                        latentVariablesExist = true;
-                                        Variable[] query_arr = new Variable[query_vars.size()];
-                                        query_vars.toArray(query_arr);
-                                        Query q = inf.makeQuery(query_arr);
-                                        CGTable qr = (CGTable) inf.infer(q);
-                                        int[] indices = qr.getIndices(); 
-                                        // for each permutation of the enumerable query variables
-                                        for (int qr_index : indices) {
-                                            Object[] qr_key = qr.getKey(qr_index);
-                                            double p = qr.getFactor(qr_index);
-                                            JDF jdf = null;
-                                            if (qr.hasNonEnumVariables())
-                                                jdf = qr.getJDF(qr_index);
+                	for (BNode node : update.keySet()) {
 
-                                            if (!node.isRoot()) { // if node has parents
-                                                // we need to construct a key for the update of the node
-                                                // first, put in the result from the inference, but in the order of the node's parents
-                                                Variable.Assignment[] expected = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
-                                                Object[] inf_key = EnumTable.getKey(node.getParents(), expected);
-                                                // second, overlay the evidence
-                                                EnumTable.overlay(evid_key, inf_key);
-                                                if (ovalue != null)
-                                                    node.countInstance(evid_key, ovalue, p);
-                                                else { // we don't know the value so use expected value
-                                                    try {
-                                                        EnumVariable evar = (EnumVariable) var;
-                                                        for (Variable.Assignment assigned : expected) {
-                                                            if (assigned.var.equals(evar)) {
-                                                                node.countInstance(evid_key, assigned.val, p);
-                                                                break;
-                                                            }
-                                                        }
-                                                    } catch (ClassCastException e) {
-                                                        // we think it is a continuous variable, so we should have a distrib for it
-                                                        Distrib d = jdf.getDistrib(var);
-                                                        node.countInstance(evid_key, d, p);
-                                                    }
-                                                }
-                                            } else { // node IS root
-                                                if (ovalue != null)
-                                                    node.countInstance(null, ovalue, p);
-                                                else { // we don't know the value so use expected value
-                                                    try {
-                                                        EnumVariable evar = (EnumVariable) var;
-                                                        Variable.Assignment[] expected = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
-                                                        for (Variable.Assignment assigned : expected) {
-                                                            if (assigned.var.equals(evar)) {
-                                                                node.countInstance(null, assigned.val, p);
-                                                                break;
-                                                            }
-                                                        }
-                                                    } catch (ClassCastException e) {
-                                                        // we think it is a continuous variable, but it is a root node!
-                                                        throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + var.getName() + " is a non-enumerable root node");
-                                                    }
-                                                }
-                                            }
-                                        } 
-                                    } catch (CGVarElimRuntimeException e) {
-                                        throw new EMRuntimeException("Failed query for sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
-                                    }
-                                } else { // all variables are instantiated, no need to do inference
-                                    node.countInstance(evid_key, ovalue);
-                                }
-                            }
-                        }
+                		if (node.isTrainable()) {
 
-                        break; // end EM_OPTION == 1
-                        
-                    case 2:
-                        // Principal way 2: collect query variables from all (trainable) nodes... pose one query and update all (trainable) nodes
-                        Set<Variable> query_vars = new HashSet<>(); // all query variables are stored here
+                			// identify what variables that we need to infer, to generate expectations
+                			List<Variable> query_vars = new ArrayList<>();
+                			Object[] evid_key = null; // only applicable if the node has parents
+                			if (!node.isRoot()) {
+                				evid_key = EnumTable.getKey(node.getParents(), evidence);
+                				// add to the variables that must be queried during inference
+                				for (int key_index = 0; key_index < evid_key.length; key_index ++) {
+                					if (evid_key[key_index] == null)
+                						query_vars.add(node.getParents().get(key_index));
+                				}
+                			}
+                			Variable var = node.getVariable();
+                			Object ovalue = node.getInstance(); // check the value, if instantiated
+                			if (ovalue == null)
+                				query_vars.add(var);
 
-                        for (BNode node : update.keySet()) {
-                            // check if the node should be updated, and if so collect query variables from it
-                            if (node.isTrainable()) {
-                                // if the node has parents, we need to check out the variables of its parents too
-                                if (!node.isRoot()) {
-                                    Object[] evid_key = EnumTable.getKey(node.getParents(), evidence);
-                                    update.put(node, evid_key); // associate each node with a (potentially partial) key for evidence, expected values later...
-                                    // add to the variables that must be queried during inference
-                                    for (int key_index = 0; key_index < evid_key.length; key_index ++) {
-                                        if (evid_key[key_index] == null)
-                                            query_vars.add(node.getParents().get(key_index));
-                                    }
-                                }
-                                Object ovalue = node.getInstance(); // check the value, if instantiated
-                                if (ovalue == null) 
-                                    query_vars.add(node.getVariable());
-                            }
-                        }
-                        
-                        if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
-                            // so we need to perform inference, which can go bad (hence potential for exception)
-                            try {
-                                latentVariablesExist = true;
-                                // perform inference, ALL query variables in one go
-                                Variable[] query_arr = new Variable[query_vars.size()];
-                                query_vars.toArray(query_arr);
-                                Query q = inf.makeQuery(query_arr);
-                                CGTable qr = (CGTable) inf.infer(q); 
+                			// check if inference is required
+                			if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
+                				try {
+                					latentVariablesExist = true;
+                					Variable[] query_arr = new Variable[query_vars.size()];
+                					query_vars.toArray(query_arr);
+                					Query q = inf.makeQuery(query_arr);
+                					CGTable qr = (CGTable) inf.infer(q);
+                					int[] indices = qr.getIndices(); 
+                					// for each permutation of the enumerable query variables
+                					for (int qr_index : indices) {
+                						Object[] qr_key = qr.getKey(qr_index);
+                						double p = qr.getFactor(qr_index);
+                						JDF jdf = null;
+                						if (qr.hasNonEnumVariables())
+                							jdf = qr.getJDF(qr_index);
 
-                                int[] indices = qr.getIndices(); // FIXME: For efficiency, at least initially, consider only looking at indices of events that are more probable...
-                                // for each permutation of the enumerable query variables
-                                for (int qr_index : indices) {
-                                    Object[] qr_key = qr.getKey(qr_index);
-                                    double p = qr.getFactor(qr_index);
-                                    JDF jdf = null;
-                                    if (qr.hasNonEnumVariables())
-                                        jdf = qr.getJDF(qr_index);
-                                    Variable.Assignment[] assignment = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
-                                    for (BNode node : update.keySet()) {
-                                        // check if the node should be updated, and if so put together expectations for maximisation...
-                                        if (node.isTrainable()) {
-                                            // if the node has parents, we need to check out the variables of its parents too
-                                            if (!node.isRoot()) {
-                                                Object[] evid_key = update.get(node);
-                                                Object[] inf_key = EnumTable.getKey(node.getParents(), assignment);
-                                                EnumTable.overlay(evid_key, inf_key);
-                                                Object value = node.getInstance();
-                                                if (value != null)
-                                                    node.countInstance(evid_key, value, p);
-                                                else { // we don't know the value so use expected value
-                                                    Variable var = node.getVariable();
-                                                    try {
-                                                        EnumVariable evar = (EnumVariable) var;
-                                                        for (Variable.Assignment assigned : assignment) {
-                                                            if (assigned.var.equals(evar)) {
-                                                                node.countInstance(evid_key, assigned.val, p);
-                                                                break;
-                                                            }
-                                                        }
-                                                    } catch (ClassCastException e) {
-                                                        // we think it is a continuous variable, so we should have a distrib for it
-                                                        Distrib d = jdf.getDistrib(var);
-                                                        node.countInstance(evid_key, d, p);
-                                                    }
-                                                }
-                                            } else { // node IS root
-                                                Object value = node.getInstance();
-                                                if (value != null)
-                                                    node.countInstance(null, value, p);
-                                                else { // we don't know the value so use expected value
-                                                    Variable var = node.getVariable();
-                                                    try {
-                                                        EnumVariable evar = (EnumVariable) var;
-                                                        for (Variable.Assignment assigned : assignment) {
-                                                            if (assigned.var.equals(evar)) {
-                                                                node.countInstance(null, assigned.val, p);
-                                                                break;
-                                                            }
-                                                        }
-                                                    } catch (ClassCastException e) {
-                                                        // we think it is a continuous variable, but it is a root node!
-                                                        throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + var.getName() + " is a non-enumerable root node");
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } catch (CGVarElimRuntimeException e) {
-                                throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + e.getMessage());
-                            }
-                        } else { // nothing needs to be inferred
-                            for (BNode node : update.keySet()) {
-                                // check if the node should be updated, and if so put together expectations for maximisation...
-                                if (node.isTrainable()) {
-                                    // if the node has parents, we need to check out the variables of its parents too
-                                    if (!node.isRoot()) {
-                                        Object[] evid_key = update.get(node);
-                                        node.countInstance(evid_key, node.getInstance());
-                                    }
-                                }
-                            }
-                        }
-                        break; // end EM_OPTION == 2
+                						if (!node.isRoot()) { // if node has parents
+                							// we need to construct a key for the update of the node
+                							// first, put in the result from the inference, but in the order of the node's parents
+                							Variable.Assignment[] expected = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
+                							Object[] inf_key = EnumTable.getKey(node.getParents(), expected);
+                							// second, overlay the evidence
+                							EnumTable.overlay(evid_key, inf_key);
+                							if (ovalue != null)
+                								node.countInstance(evid_key, ovalue, p);
+                							else { // we don't know the value so use expected value
+                								try {
+                									EnumVariable evar = (EnumVariable) var;
+                									for (Variable.Assignment assigned : expected) {
+                										if (assigned.var.equals(evar)) {
+                											node.countInstance(evid_key, assigned.val, p);
+                											break;
+                										}
+                									}
+                								} catch (ClassCastException e) {
+                									// we think it is a continuous variable, so we should have a distrib for it
+                									Distrib d = jdf.getDistrib(var);
+                											node.countInstance(evid_key, d, p);
+                								}
+                							}
+                						} else { // node IS root
+                							if (ovalue != null)
+                								node.countInstance(null, ovalue, p);
+                							else { // we don't know the value so use expected value
+                								try {
+                									EnumVariable evar = (EnumVariable) var;
+                									Variable.Assignment[] expected = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
+                									for (Variable.Assignment assigned : expected) {
+                										if (assigned.var.equals(evar)) {
+                											node.countInstance(null, assigned.val, p);
+                											break;
+                										}
+                									}
+                								} catch (ClassCastException e) {
+                									// we think it is a continuous variable, but it is a root node!
+                									throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + var.getName() + " is a non-enumerable root node");
+                								}
+                							}
+                						}
+                					} 
+                				} catch (CGVarElimRuntimeException e) {
+                					throw new EMRuntimeException("Failed query for sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
+                				}
+                			} else { // all variables are instantiated, no need to do inference
+                				node.countInstance(evid_key, ovalue);
+                			}
+                		}
+                	}
+
+                	break; // end EM_OPTION == 1
+
+                case 2:
+                	// Principal way 2: collect query variables from all (trainable) nodes... pose one query and update all (trainable) nodes
+                	Set<Variable> query_vars = new HashSet<>(); // all query variables are stored here
+
+                	for (BNode node : update.keySet()) {
+                		// check if the node should be updated, and if so collect query variables from it
+                		if (node.isTrainable()) {
+                			// if the node has parents, we need to check out the variables of its parents too
+                			if (!node.isRoot()) {
+                				Object[] evid_key = EnumTable.getKey(node.getParents(), evidence);
+                				update.put(node, evid_key); // associate each node with a (potentially partial) key for evidence, expected values later...
+                				// add to the variables that must be queried during inference
+                				for (int key_index = 0; key_index < evid_key.length; key_index ++) {
+                					if (evid_key[key_index] == null)
+                						query_vars.add(node.getParents().get(key_index));
+                				}
+                			}
+                			Object ovalue = node.getInstance(); // check the value, if instantiated
+                			if (ovalue == null) 
+                				query_vars.add(node.getVariable());
+                		}
+                	}
+
+                	if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
+                		// so we need to perform inference, which can go bad (hence potential for exception)
+                		try {
+                			latentVariablesExist = true;
+                			// perform inference, ALL query variables in one go
+                			Variable[] query_arr = new Variable[query_vars.size()];
+                			query_vars.toArray(query_arr);
+                			Query q = inf.makeQuery(query_arr);
+                			CGTable qr = (CGTable) inf.infer(q); 
+
+                			int[] indices = qr.getIndices(); // FIXME: For efficiency, at least initially, consider only looking at indices of events that are more probable...
+                			// for each permutation of the enumerable query variables
+                			for (int qr_index : indices) {
+                				Object[] qr_key = qr.getKey(qr_index);
+                				double p = qr.getFactor(qr_index);
+                				JDF jdf = null;
+                				if (qr.hasNonEnumVariables())
+                					jdf = qr.getJDF(qr_index);
+                				Variable.Assignment[] assignment = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
+                				for (BNode node : update.keySet()) {
+                					// check if the node should be updated, and if so put together expectations for maximisation...
+                					if (node.isTrainable()) {
+                						// if the node has parents, we need to check out the variables of its parents too
+                						if (!node.isRoot()) {
+                							Object[] evid_key = update.get(node);
+                							Object[] inf_key = EnumTable.getKey(node.getParents(), assignment);
+                							EnumTable.overlay(evid_key, inf_key);
+                							Object value = node.getInstance();
+                							if (value != null)
+                								node.countInstance(evid_key, value, p);
+                							else { // we don't know the value so use expected value
+                								Variable var = node.getVariable();
+                							try {
+                								EnumVariable evar = (EnumVariable) var;
+                								for (Variable.Assignment assigned : assignment) {
+                									if (assigned.var.equals(evar)) {
+                										node.countInstance(evid_key, assigned.val, p);
+                										break;
+                									}
+                								}
+                							} catch (ClassCastException e) {
+                								// we think it is a continuous variable, so we should have a distrib for it
+                								Distrib d = jdf.getDistrib(var);
+                										node.countInstance(evid_key, d, p);
+                							}
+                							}
+                						} else { // node IS root
+                							Object value = node.getInstance();
+                							if (value != null)
+                								node.countInstance(null, value, p);
+                							else { // we don't know the value so use expected value
+                								Variable var = node.getVariable();
+                								try {
+                									EnumVariable evar = (EnumVariable) var;
+                									for (Variable.Assignment assigned : assignment) {
+                										if (assigned.var.equals(evar)) {
+                											node.countInstance(null, assigned.val, p);
+                											break;
+                										}
+                									}
+                								} catch (ClassCastException e) {
+                									// we think it is a continuous variable, but it is a root node!
+                									throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + var.getName() + " is a non-enumerable root node");
+                								}
+                							}
+                						}
+                					}
+                				}
+                			}
+                		} catch (CGVarElimRuntimeException e) {
+                			throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + e.getMessage());
+                		}
+                	} else { // nothing needs to be inferred
+                		for (BNode node : update.keySet()) {
+                			// check if the node should be updated, and if so put together expectations for maximisation...
+                			if (node.isTrainable()) {
+                				// if the node has parents, we need to check out the variables of its parents too
+                				if (!node.isRoot()) {
+                					Object[] evid_key = update.get(node);
+                					node.countInstance(evid_key, node.getInstance());
+                				}
+                			}
+                		}
+                	}
+                	break; // end EM_OPTION == 2
+
+                case 3:
+                	// Principal way 1 with parallel implementation: go through each of the BN nodes... pose of query for, and update each...
+                	ExecutorService executor = Executors.newFixedThreadPool(EM_THREAD_COUNT);
+                	for (BNode node : update.keySet()) {
+                		EMc1 work = new EMc1(node, evidence, i);
+                		executor.execute(work);
+                	}
+                	executor.shutdown();
+                	while (!executor.isTerminated()) {
+                	}
+                	//                        System.out.println("Finished all threads");
+
+                	break; // end EM_OPTION == 3
                 }                        
             }
             
             // finally complete the M-step by transferring counts to probabilities
             for (BNode node : update.keySet()) {
                 if (node.isTrainable()) {
+                	
                     node.maximizeInstance();
                 }
             }
@@ -483,5 +519,126 @@ public class EM extends LearningAlg {
             super(message);
         }
     }
+    
+    /**
+     * Runnable 'worker' for case 3 of EM
+     * In order for the code to be threaded, the process of the for loop for case 1 had
+     * to be removed to a new class
+     * This class can then be handed as work to each thread
+     * @author Alex
+     *
+     */
+    public class EMc1 implements Runnable{
+    	
+    	private boolean init = false;
+    	private BNode node;
+    	private Variable.Assignment[] evidence;
+    	private int i;
+    	
+    	public EMc1(BNode node, Variable.Assignment[] evidence, int i) {
+    		this.init = true;
+    		this.node = node;
+    		this.evidence = evidence;
+    		this.i = i;
+    	}
+    	
+    	@Override
+		public void run() {
+//    		System.out.println(Thread.currentThread().getName()+" Start. Node = "+node.toString());
+    		case3(node, evidence, i);
+//    		System.out.println(Thread.currentThread().getName()+" End.");
+		}
+    	
+    	public void case3 (BNode node, Variable.Assignment[] evidence, int i) {
+        	
+        	boolean latentVariablesExist = false;
+        	
+            if (node.isTrainable()) {
+                
+                // identify what variables that we need to infer, to generate expectations
+                List<Variable> query_vars = new ArrayList<>();
+                Object[] evid_key = null; // only applicable if the node has parents
+                if (!node.isRoot()) {
+                    evid_key = EnumTable.getKey(node.getParents(), evidence);
+                    // add to the variables that must be queried during inference
+                    for (int key_index = 0; key_index < evid_key.length; key_index ++) {
+                        if (evid_key[key_index] == null)
+                            query_vars.add(node.getParents().get(key_index));
+                    }
+                }
+                Variable var = node.getVariable();
+                Object ovalue = node.getInstance(); // check the value, if instantiated
+                if (ovalue == null)
+                    query_vars.add(var);
+                
+                // check if inference is required
+                if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
+                    try {
+                        latentVariablesExist = true;
+                        Variable[] query_arr = new Variable[query_vars.size()];
+                        query_vars.toArray(query_arr); //FIXME NOT THREADSAFE - does inference update these nodes in any way?
+                        Query q = inf.makeQuery(query_arr);
+                        CGTable qr = (CGTable) inf.infer(q);
+                        int[] indices = qr.getIndices(); 
+                        // for each permutation of the enumerable query variables
+                        for (int qr_index : indices) {
+                            Object[] qr_key = qr.getKey(qr_index);
+                            double p = qr.getFactor(qr_index);
+                            JDF jdf = null;
+                            if (qr.hasNonEnumVariables())
+                                jdf = qr.getJDF(qr_index);
 
+                            if (!node.isRoot()) { // if node has parents
+                                // we need to construct a key for the update of the node
+                                // first, put in the result from the inference, but in the order of the node's parents
+                                Variable.Assignment[] expected = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
+                                Object[] inf_key = EnumTable.getKey(node.getParents(), expected);
+                                // second, overlay the evidence
+                                EnumTable.overlay(evid_key, inf_key); //FIXME
+                                if (ovalue != null)
+                                    node.countInstance(evid_key, ovalue, p);
+                                else { // we don't know the value so use expected value
+                                    try {
+                                        EnumVariable evar = (EnumVariable) var;
+                                        for (Variable.Assignment assigned : expected) {
+                                            if (assigned.var.equals(evar)) {
+                                                node.countInstance(evid_key, assigned.val, p);
+                                                break;
+                                            }
+                                        }
+                                    } catch (ClassCastException e) {
+                                        // we think it is a continuous variable, so we should have a distrib for it
+                                        Distrib d = jdf.getDistrib(var);
+                                        node.countInstance(evid_key, d, p);
+                                    }
+                                }
+                            } else { // node IS root
+                                if (ovalue != null)
+                                    node.countInstance(null, ovalue, p);
+                                else { // we don't know the value so use expected value
+                                    try {
+                                        EnumVariable evar = (EnumVariable) var;
+                                        Variable.Assignment[] expected = Variable.Assignment.array(qr.getEnumVariables(), qr_key);
+                                        for (Variable.Assignment assigned : expected) {
+                                            if (assigned.var.equals(evar)) {
+                                                node.countInstance(null, assigned.val, p);
+                                                break;
+                                            }
+                                        }
+                                    } catch (ClassCastException e) {
+                                        // we think it is a continuous variable, but it is a root node!
+                                        throw new EMRuntimeException("Failed query for sample #"+(i+1)+": " + var.getName() + " is a non-enumerable root node");
+                                    }
+                                }
+                            }
+                        } 
+                    } catch (CGVarElimRuntimeException e) {
+                        throw new EMRuntimeException("Failed query for sample #"+(i+1)+" and node " + node.getName()+ ": " + e.getMessage());
+                    }
+                } else { // all variables are instantiated, no need to do inference
+                    node.countInstance(evid_key, ovalue);
+                }
+            }
+        }
+    }
 }
