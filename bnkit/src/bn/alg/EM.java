@@ -484,17 +484,25 @@ public class EM extends LearningAlg {
                 }
             }
             
-            if (round % 10 == 0) {
+            if (round % 10 == 0) { // & round %50 == 0
                 // summarise progress
                 // copy previous LL (log-likelihood of data)
-                double mean_LL = last_LL[0] / last_LL.length;
-                for (int i = 0; i < last_LL.length - 1; i ++) {
-                    last_LL[i] = last_LL[i + 1];
-                    mean_LL += (last_LL[i] / last_LL.length);
-                }
-                last_LL[last_LL.length - 1] = log_likelihood;
-                if ((-mean_LL - -log_likelihood) < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
-                    EM_TERMINATE = true;
+            	if (round <= 50) {
+            		for (int i = 0; i < last_LL.length - 1; i ++) {
+                        last_LL[i] = last_LL[i + 1];
+                    }
+            		last_LL[last_LL.length - 1] = log_likelihood;
+            		System.out.println(Arrays.toString(last_LL));
+            	} else {
+	                double mean_LL = last_LL[0] / last_LL.length;
+	                for (int i = 0; i < last_LL.length - 1; i ++) {
+	                    last_LL[i] = last_LL[i + 1];
+	                    mean_LL += (last_LL[i] / last_LL.length);
+	                }
+	                last_LL[last_LL.length - 1] = log_likelihood;
+	                if ((-mean_LL - -log_likelihood) < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
+	                    EM_TERMINATE = true;
+            	}
 
                 if (EM_PRINT_STATUS)
                     System.err.println("Completed " + round + " round(s), L=" + log_likelihood);
