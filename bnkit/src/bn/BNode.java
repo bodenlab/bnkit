@@ -196,6 +196,12 @@ public interface BNode {
     public void setRelevant(boolean relevant);
     
     /**
+     * Set whether or not a node should be trained
+     * @param trainable
+     */
+    public void setTrainable(boolean trainable);
+    
+    /**
      * @return true if this node is relevant to the current query (Inference)
      */
     public boolean isRelevant();
