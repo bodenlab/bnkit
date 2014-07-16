@@ -26,7 +26,6 @@ import bn.JDF;
 import bn.Variable;
 import bn.alg.CGVarElim.CGVarElimRuntimeException;
 
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -157,7 +156,8 @@ public class EM extends LearningAlg {
         // note that only named nodes (variables) will be included, and their parents or children (the latter as latent variables)
         Set<Variable> updateVars = new HashSet<>();
         updateVars.addAll(Arrays.asList(vars));
-        Map<BNode, Object[]> update = new HashMap<>(); 			// the set of nodes that may need to be updated: 
+        Map<BNode, Object[]> updateMap = new HashMap<>(); 			// the set of nodes that may need to be updated:
+        Map<BNode, Object[]> update = Collections.synchronizedMap(updateMap); //THREAD SAFE MAP
         for (BNode node : bn.getNodes()) {      		// check all nodes
             Variable var = node.getVariable();			// this is the variable of the node
             if (updateVars.contains(var)) {			// is it in the data set?
@@ -440,6 +440,7 @@ public class EM extends LearningAlg {
                 	// Principal way 1 with parallel implementation: go through each of the BN nodes... pose of query for, and update each...
                 	ExecutorService executor = Executors.newFixedThreadPool(EM_THREAD_COUNT);
                 	for (BNode node : update.keySet()) {
+//                		node.getTable().getSize();
                 		EMc1 work = new EMc1(node, evidence, i);
                 		executor.execute(work);
                 	}
@@ -492,7 +493,7 @@ public class EM extends LearningAlg {
                         last_LL[i] = last_LL[i + 1];
                     }
             		last_LL[last_LL.length - 1] = log_likelihood;
-            		System.out.println(Arrays.toString(last_LL));
+//            		System.out.println(Arrays.toString(last_LL));
             	} else {
 	                double mean_LL = last_LL[0] / last_LL.length;
 	                for (int i = 0; i < last_LL.length - 1; i ++) {
