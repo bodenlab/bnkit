@@ -20,8 +20,10 @@ package bn;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 
 /**
@@ -31,7 +33,7 @@ import java.util.Random;
  *
  * @author mikael
  */
-public class CPT implements BNode, Serializable {
+public class CPT implements BNode, Serializable{
 
     private static final long serialVersionUID = 1L;
     final private EnumVariable var;
@@ -567,7 +569,7 @@ public class CPT implements BNode, Serializable {
         if (!isPrior()) {
             throw new RuntimeException("Unable to set prior. CPT " + var + " is conditioned.");
         }
-        if (!prob.isValid()) {
+        if (!prob.isNormalised()) {
             throw new RuntimeException("Probability value is invalid: " + prob);
         }
         prior = prob;
@@ -737,6 +739,12 @@ public class CPT implements BNode, Serializable {
             return;
         }
         if (table != null) { // there are parents in the CPT
+        	
+        	for (Object e : table.getValues()) {
+            	EnumDistrib d = (EnumDistrib) e;
+            	d.setValid(false);
+            }
+        	
             // add the counts to the CPT
             for (Map.Entry<Integer, Double> entry : count.table.getMapEntries()) {
                 double nobserv = entry.getValue().doubleValue();

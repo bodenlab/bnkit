@@ -30,6 +30,7 @@ public class EnumDistrib implements Distrib {
     private final double[] distrib;
     private final Enumerable domain;
     private boolean normalised = false;
+    private boolean valid = false;
     private Random rand = new Random();
 
     /**
@@ -64,6 +65,7 @@ public class EnumDistrib implements Distrib {
             for (int i = 0; i < distrib.length; i++) {
                 this.distrib[i] = distrib[i];
             }
+            valid = true;
             normalise();
         }
     }
@@ -87,6 +89,7 @@ public class EnumDistrib implements Distrib {
         }
         this.domain = new Enumerable(mydomain);
         this.distrib = mydistrib;
+        valid = true;
         normalise();
     }
     
@@ -108,6 +111,7 @@ public class EnumDistrib implements Distrib {
         }
         this.domain = discrete;
         this.distrib = mydistrib;
+        valid = true;
         normalise();
     }
     
@@ -122,7 +126,7 @@ public class EnumDistrib implements Distrib {
     }
 
     public String toString() {
-        if (!isValid()) {
+        if (!isNormalised()) {
             normalise();
         }
         StringBuffer sbuf = new StringBuffer("<");
@@ -140,7 +144,7 @@ public class EnumDistrib implements Distrib {
      * @return the probability value
      */
     public double get(Object value) {
-        if (!isValid()) {
+        if (!isNormalised()) {
             normalise();
         }
         int index = domain.getIndex(value);
@@ -155,14 +159,14 @@ public class EnumDistrib implements Distrib {
      * @return the probability value
      */
     public double get(int index) {
-        if (!isValid()) {
+        if (!isNormalised()) {
             normalise();
         }
         return distrib[index];
     }
 
     public double[] get() {
-        if (!isValid()) {
+        if (!isNormalised()) {
             normalise();
         }
         return distrib;
@@ -175,7 +179,7 @@ public class EnumDistrib implements Distrib {
      * @return a value of the domain
      */
     public Object sample() {
-        if (!isValid()) {
+        if (!isNormalised()) {
             normalise();
         }
         double p = rand.nextDouble();
@@ -198,6 +202,11 @@ public class EnumDistrib implements Distrib {
      * @param prob the probability
      */
     public void set(Object value, double prob) {
+    	if (!isValid()) {
+    		for (int i = 0; i < distrib.length; i ++)
+    			distrib[i] = 0;
+    		setValid(true);
+    	}
         normalised = false;
         int index = domain.getIndex(value);
         distrib[index] = prob;
@@ -216,13 +225,22 @@ public class EnumDistrib implements Distrib {
                 this.distrib[i] = distrib[i];
             }
             normalise();
+            setValid(true);
         } else {
             throw new RuntimeException("Invalid size distribution");
         }
     }
 
-    public boolean isValid() {
+    public boolean isNormalised() {
         return normalised;
+    }
+
+    public boolean isValid() {
+        return valid;
+    }
+    
+    public void setValid(boolean status) {
+    	valid = status;
     }
 
     public void normalise() {
