@@ -102,6 +102,23 @@ public class PseudoMatrix {
         this.matrix = newmatrix;
     }
 
+    public void scaleDiagonal(double scalar){
+        ArrayList<ArrayList<Double>> newmatrix = new ArrayList<ArrayList<Double>>();
+        for (int i =0; i < this.matrix.size(); i++){
+            ArrayList<Double> row = new ArrayList<Double>();
+            for (int j =0; j < this.matrix.get(i).size(); j++){
+                Double curval = this.matrix.get(i).get(j);
+                if (i == j){
+                    row.add(curval * scalar);
+                } else{
+                    row.add(curval);
+                }
+            }
+            newmatrix.add(row);
+        }
+        this.matrix = newmatrix;
+    }
+
     public void addValues(ArrayList<Double> values) {
         this.matrix.add(values);
     }
@@ -141,7 +158,7 @@ public class PseudoMatrix {
             BufferedReader reader = new BufferedReader(new FileReader(file));
             String line;
             ArrayList<ArrayList<Double>> lines = new ArrayList<>();
-            this.matrix = new ArrayList<>();
+//            this.matrix = new ArrayList<>();
             try {
 
                 while ((line = reader.readLine()) != null) {

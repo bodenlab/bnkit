@@ -772,8 +772,8 @@ public class CPTPseudo implements BNode, Serializable {
                     Object po = pdom.get(i); //parent observation
                     for (int j = 0; j < cdom.size(); j++) {
                         Object co = cdom.get(j); // child observation
-//                        double obsCount = this.pseudoMatrix.getValue(i, j); //the count
-                        double obsCount = this.pseudoMatrix.getValue(i, co);
+                        double obsCount = this.pseudoMatrix.getValue(i, j); //the count
+//                        double obsCount = this.pseudoMatrix.getValue(i, co);
                         // add one as count table key includes child observation
                         Object[] newKey = new Object[key.length + 1];
                         newKey[0] = co;
@@ -824,7 +824,48 @@ public class CPTPseudo implements BNode, Serializable {
                 cond.addAll(table.getParents());
             }
             count = new CountTable(cond);
-
+            //CPTPseudo specific. Here the count table is initialized with pseudo counts
+            //Domain lengths determine the matrix[i][j]...up to user to supply correctly formatted pseudo matrix
+            Integer p_idx = getMainParentIndex();
+            Enumerable cdom = this.getVariable().getDomain(); //child (this node's) domain
+            if (key == null) { // if the node is a root
+                //then create new key of length 1
+                Object[] newKey = new Object[1];
+                for (int j = 0; j < cdom.size(); j++){ //go through child domain
+                    Object co = new Object[]{cdom.get(j)}; // child observation
+                    double obsCount = this.pseudoMatrix.getValue(0, j); //the count for the child observation
+                    newKey[0] = co;
+                    count.count(newKey, obsCount);
+                }
+            } else {
+                //get the parent domain. p_idx will have to be != 0 if more than one parent
+                Enumerable pdom = this.getParents().get(p_idx).getDomain(); //parent domain
+                for (int i = 0; i < pdom.size(); i++) {
+                    Object po = pdom.get(i); //parent observation
+                    for (int j = 0; j < cdom.size(); j++) {
+                        Object co = cdom.get(j); // child observation
+                        double obsCount = this.pseudoMatrix.getValue(i, j); //the count
+//                        double obsCount = this.pseudoMatrix.getValue(i, co);
+                        // add one as count table key includes child observation
+                        Object[] newKey = new Object[key.length + 1];
+                        newKey[0] = co;
+                        for (int x = 1; x < newKey.length; x++) {
+                            if (x == p_idx + 1) {
+                                newKey[x] = po; //We use the observation for the main parent
+                            } else {
+                                newKey[x] = null; //All other parent's keys are set to null
+                            }
+                        }
+                        //get all possible indices for the marginalised key
+                        int[] countable_idxs = count.table.getTheoreticalIndices(newKey);
+                        //get all possible indices for the marginalised key
+                        //for each index, add the corresponding count
+                        for (int x = 0; x < countable_idxs.length; x++) {
+                            count.count(countable_idxs[x], obsCount);
+                        }
+                    }
+                }
+            }
         }
         if (key == null) {
             key = new Object[0];
