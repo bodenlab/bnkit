@@ -601,7 +601,7 @@ public class CPTPseudo implements BNode, Serializable {
         if (!isPrior()) {
             throw new RuntimeException("Unable to set prior. CPT " + var + " is conditioned.");
         }
-        if (!prob.isValid()) {
+        if (!prob.isNormalised()) {
             throw new RuntimeException("Probability value is invalid: " + prob);
         }
         prior = prob;
