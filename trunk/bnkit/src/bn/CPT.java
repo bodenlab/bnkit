@@ -678,6 +678,9 @@ public class CPT implements BNode, Serializable{
      */
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
+    	if (prob == 0.0) {
+    		return;
+    	}
         if (count == null) { // create count table if none exists
             List<EnumVariable> cond = new ArrayList<EnumVariable>();
             cond.add(var); // first variable is always the conditioned variable
@@ -740,10 +743,10 @@ public class CPT implements BNode, Serializable{
         }
         if (table != null) { // there are parents in the CPT
         	
-        	for (Object e : table.getValues()) {
-            	EnumDistrib d = (EnumDistrib) e;
+        	//Set all 'old' distributions in the CPT to valid = false
+        	for (EnumDistrib d : this.table.getValues()) {
             	d.setValid(false);
-            }
+            }      	
         	
             // add the counts to the CPT
             for (Map.Entry<Integer, Double> entry : count.table.getMapEntries()) {
@@ -761,7 +764,16 @@ public class CPT implements BNode, Serializable{
                 } else {
                     d.set(cntkey[0], nobserv);
                 }
-            } // normalisation happens internally when values are required			
+            } // normalisation happens internally when values are required	
+    		
+            //Remove 'old' entries from CPT
+            for (Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
+            	EnumDistrib obs = entry.getValue();
+            	Object[] cptkey = table.getKey(entry.getKey().intValue());
+            	if (!obs.isValid()) {
+            		table.map.remove(cptkey);
+            	}
+            }
         } else { // there are no parents
             Object[] cntkey = new Object[1];
             double[] cnts = new double[var.size()];
