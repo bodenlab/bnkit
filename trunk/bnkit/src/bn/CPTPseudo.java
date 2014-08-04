@@ -719,11 +719,11 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     public Integer getMainParentIndex(){
-        if (this.mainparent_index != null) {
+        if (this.mainparent_index != null || isPrior()) {
             //if main parent has been set, do nothing. Indexing will be correct.
         }
         //not set but one parent, so just automatically set
-        else if (this.mainparent_index == null && this.getParents().size() == 1) {
+        else if (this.mainparent_index == null && this.nParents == 1) {
             this.mainparent_index = 0;
         } else {
             throw new RuntimeException("No main parent has been specified and number of" +
@@ -744,6 +744,9 @@ public class CPTPseudo implements BNode, Serializable {
      */
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
+        if (prob == 0.0) {
+            return;
+        }
         if (count == null) { // create count table if none exists
             List<EnumVariable> cond = new ArrayList<EnumVariable>();
             cond.add(var); // first variable is always the conditioned variable
@@ -751,7 +754,6 @@ public class CPTPseudo implements BNode, Serializable {
                 cond.addAll(table.getParents());
             }
             count = new CountTable(cond);
-
             //CPTPseudo specific. Here the count table is initialized with pseudo counts
             //Domain lengths determine the matrix[i][j]...up to user to supply correctly formatted pseudo matrix
             Integer p_idx = getMainParentIndex();
@@ -832,7 +834,7 @@ public class CPTPseudo implements BNode, Serializable {
                 //then create new key of length 1
                 Object[] newKey = new Object[1];
                 for (int j = 0; j < cdom.size(); j++){ //go through child domain
-                    Object co = new Object[]{cdom.get(j)}; // child observation
+                    Object co = cdom.get(j); // child observation
                     double obsCount = this.pseudoMatrix.getValue(0, j); //the count for the child observation
                     newKey[0] = co;
                     count.count(newKey, obsCount);
@@ -890,6 +892,11 @@ public class CPTPseudo implements BNode, Serializable {
             return;
         }
         if (table != null) { // there are parents in the CPT
+
+            //Set all 'old' distributions in the CPT to valid = false
+            for (EnumDistrib d : this.table.getValues()) {
+                d.setValid(false);
+            }
             // add the counts to the CPT
             for (Map.Entry<Integer, Double> entry : count.table.getMapEntries()) {
                 double nobserv = entry.getValue().doubleValue();
@@ -907,6 +914,15 @@ public class CPTPseudo implements BNode, Serializable {
                     d.set(cntkey[0], nobserv);
                 }
             } // normalisation happens internally when values are required
+
+            //Remove 'old' entries from CPT
+            for (Map.Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
+                EnumDistrib obs = entry.getValue();
+                Object[] cptkey = table.getKey(entry.getKey().intValue());
+                if (!obs.isValid()) {
+                    table.map.remove(cptkey);
+                }
+            }
         } else { // there are no parents
             Object[] cntkey = new Object[1];
             double[] cnts = new double[var.size()];
