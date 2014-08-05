@@ -53,7 +53,6 @@ public class Factor {
     public boolean evidenced = false;   // flag to indicate if the Factor was reduced due to evidence (used by inference)
     public boolean function = false;    // flag to indicate if the factor was the result of a product or marginalization
     
-//    private JDF removed = null;    // collection of JDFs that represent densities that have been removed due to its conditions rendered impossible (prob = 0)
     /**
      * CG_SAFETY forces factors to store entries that are associated with 0 (impossible) to save densities that are associated with them.
      * Set CG_SAFETY to false if time and space efficiency is critical.
@@ -335,26 +334,7 @@ public class Factor {
     }
 
     /**
-     * Add a non-enumerable distribution as required by marginalisation of enumerable variables.
-     * @param key the key identifying the setting of the enumerable variables
-     * @param nonenum the non-enumerable variable to be set
-     * @param d the distribution that applies to the non-enumerable variable
-     * @param weight the weight assigned to the distribution
-     * @return the index for the key
-     */
-    public int addDistrib(Object[] key, Variable nonenum, Distrib d, double weight) {
-        if (densityTable != null) {
-            int index = densityTable.getIndex(key);
-            return addDistrib(index, nonenum, d, weight);
-        } else if (atomicDensity != null) { // no enumerable, but some non-enumerable variables
-            atomicDensity.mixDistrib(nonenum, d, weight);
-            return -1; // no index since there are no enum variables
-        }
-        throw new FactorRuntimeException("Cannot add distribution of factor: " + this);
-    }
-
-    /**
-     * Add a non-enumerable distribution as required by marginalisation of enumerable variables.
+     * Add a non-enumerable distribution as required by marginalization (removal) of enumerable variables.
      * @param key_index the key index identifying the setting of the enumerable variables ("condition")
      * @param nonenum the non-enumerable variable to be set
      * @param d the distribution that applies to the non-enumerable variable
@@ -380,13 +360,92 @@ public class Factor {
     }
 
     /**
-     * Add a non-enumerable distribution as required by marginalisation of enumerable variables.
+     * Add a non-enumerable distribution as required by marginalization (removal) of enumerable variables.
+     * @param key the key identifying the setting of the enumerable variables
+     * @param nonenum the non-enumerable variable to be set
+     * @param d the distribution that applies to the non-enumerable variable
+     * @param weight the weight assigned to the distribution
+     * @return the index for the key
+     */
+    public int addDistrib(Object[] key, Variable nonenum, Distrib d, double weight) {
+        if (densityTable != null) {
+            int index = densityTable.getIndex(key);
+            return addDistrib(index, nonenum, d, weight);
+        } else if (atomicDensity != null) { // no enumerable, but some non-enumerable variables
+            atomicDensity.mixDistrib(nonenum, d, weight);
+            return -1; // no index since there are no enum variables
+        }
+        throw new FactorRuntimeException("Cannot add distribution of factor: " + this);
+    }
+
+    /**
+     * Add a non-enumerable distribution as required by marginalization (removal) of enumerable variables.
      * @param nonenum the non-enumerable variable to be set
      * @param d the distribution that applies to the non-enumerable variable
      * @param weight the weight assigned to the distribution
      * @return the index for the key
      */
     public int addDistrib(Variable nonenum, Distrib d, double weight) {
+        if (atomicDensity != null) { // no enumerable, but some non-enumerable variables
+            atomicDensity.mixDistrib(nonenum, d, weight);
+            return -1; // no index since there are no enum variables
+        }
+        throw new FactorRuntimeException("Cannot add distribution of factor: " + this);
+    }
+
+    /**
+     * Update a non-enumerable distribution as required by maximization (removal) of enumerable variables.
+     * @param key_index the key index identifying the setting of the enumerable variables ("condition")
+     * @param nonenum the non-enumerable variable to be set
+     * @param d the distribution that applies to the non-enumerable variable
+     * @param weight the weight assigned to the distribution
+     * @return the index for the key
+     */
+    public int keepmaxDistrib(int key_index, Variable nonenum, Distrib d, double weight) {
+        if (densityTable != null) {
+            JDF current = densityTable.getValue(key_index);
+            if (current == null) { // no previous density for this "condition", so we create a new one
+                JDF replacement = new JDF(nvars);
+                replacement.mixDistrib(nonenum, d, weight); 
+                densityTable.setValue(key_index, replacement);
+            } else {
+                throw new RuntimeException("Not yet implemented");
+            }
+            return key_index;
+        } else if (atomicDensity != null) { // no enumerable, but some non-enumerable variables
+            atomicDensity.mixDistrib(nonenum, d, weight);
+            return -1; // no index since there are no enum variables
+        }
+        throw new FactorRuntimeException("Cannot add distribution of factor: " + this);
+    }
+
+    /**
+     * Update a non-enumerable distribution as required by maximization (removal) of enumerable variables.
+     * @param key the key identifying the setting of the enumerable variables
+     * @param nonenum the non-enumerable variable to be set
+     * @param d the distribution that applies to the non-enumerable variable
+     * @param weight the weight assigned to the distribution
+     * @return the index for the key
+     */
+    public int keepmaxDistrib(Object[] key, Variable nonenum, Distrib d, double weight) {
+        if (densityTable != null) {
+            int index = densityTable.getIndex(key);
+            return keepmaxDistrib(index, nonenum, d, weight);
+        } else if (atomicDensity != null) { // no enumerable, but some non-enumerable variables
+            atomicDensity.mixDistrib(nonenum, d, weight);
+            return -1; // no index since there are no enum variables
+        }
+        throw new FactorRuntimeException("Cannot add distribution of factor: " + this);
+    }
+
+    /**
+     * Update a non-enumerable distribution as required by maximization (removal) of enumerable variables.
+     * @param nonenum the non-enumerable variable to be set
+     * @param d the distribution that applies to the non-enumerable variable
+     * @param weight the weight assigned to the distribution
+     * @return the index for the key
+     */
+    public int keepmaxDistrib(Variable nonenum, Distrib d, double weight) {
         if (atomicDensity != null) { // no enumerable, but some non-enumerable variables
             atomicDensity.mixDistrib(nonenum, d, weight);
             return -1; // no index since there are no enum variables
@@ -660,6 +719,65 @@ public class Factor {
     }
 
     /**
+     * Update the value of a specified entry identified by index if specified value is larger than current.
+     * @param index the entry index or -1 for setting an atomic factor
+     * @param value specified value to potentially replace the current instance (assumed to be
+ 0 if not instantiated)
+     * @return the index
+     */
+    synchronized public int keepmaxFactor(int index, double value) {
+        normalized = false;
+        if (factorTable != null) {
+            Double prev = factorTable.map.get(index);
+            if (prev == null) {
+                factorTable.map.put(index, value);
+            } else if (prev <= value) {
+                factorTable.map.put(index, value);
+            }
+            return index;
+        } else if (atomicFactor != null) {
+            if (atomicFactor <= value)
+                atomicFactor = value;
+            return -1;
+        }
+        throw new FactorRuntimeException("Operation on invalid factor: ");
+    }
+
+    /**
+     * Update the value of a specified entry identified by index if specified value is larger than current.
+     * @param key the entry key
+     * @param value specified value to potentially replace the current instance (assumed to be
+ 0 if not instantiated)
+     * @return the index for the modified entry
+     */
+    synchronized public int keepmaxFactor(Object[] key, double value) {
+        if (factorTable != null) {
+            int index = factorTable.getIndex(key);
+            return keepmaxFactor(index, value);
+        } else if (atomicFactor != null) {
+            if (atomicFactor <= value)
+                atomicFactor = value;
+            return -1;
+        }
+        throw new FactorRuntimeException("Operation on invalid factor: " + this);
+    }
+
+    /**
+     * Update the value of a specified entry identified by index if specified value is larger than current.
+     * @param value specified value to potentially replace the current instance (assumed to be
+ 0 if not instantiated)
+     * @return the index for the modified entry, always -1
+     */
+    synchronized public int keepmaxFactor(double value) {
+        if (atomicFactor != null) {
+            if (atomicFactor <= value)
+                atomicFactor = value;
+            return -1;
+        }
+        throw new FactorRuntimeException("Operation on invalid factor: " + this);
+    }
+
+    /**
      * Normalise the factors so they mix up to 1.0.
      * Use with caution as sometimes the raw factors are more useful.
      */
@@ -814,12 +932,72 @@ public class Factor {
      * Specifically, it is able to sum out enumerable variables even if continuous variables 
      * are uninstantiated, by convolution of densities into mixtures.
      * 
-     * @param parentsToSumOut variables that will be summed out from the current
+     * @param varsToSumOut variables that will be summed out from the current
      * table
      * @return the new FactorTable containing the remaining variables
      */
-    public Factor marginalize(EnumVariable[] parentsToSumOut) {
-        return this.marginalize(EnumVariable.toList(parentsToSumOut));
+    public Factor marginalize(EnumVariable[] varsToSumOut) {
+        return this.marginalize(EnumVariable.toList(varsToSumOut));
+    }
+
+    /** 
+     * Max-out one or more enumerable variables from the current table.
+     * This is a way to remove variables from the table in a way that tracks the maximally
+     * probably explanation of the evidence.
+     * 
+     * TODO: This method has not yet been tested. Consider non-enumerable variables.
+     * 
+     * @param varsToMaxOut variables that will be max:ed out from the current
+     * table
+     * @return the new FactorTable containing the remaining variables
+     */
+    public Factor maximize(Collection<EnumVariable> varsToMaxOut) {
+        if (factorTable != null) {
+            int nVars = factorTable.nParents;
+            List<Variable> newvars = new ArrayList<>(nVars - varsToMaxOut.size());
+            for (int i = 0; i < nVars; i++) {
+                if (!varsToMaxOut.contains(factorTable.parents.get(i))) {
+                    newvars.add(factorTable.parents.get(i));
+                }
+            }
+            double sum = 0; // sum for normalising weight of distributions for non-enumerables
+            Factor ft; 
+            if (hasNonEnumVariables()) {
+                newvars.addAll(this.getNonEnumVariables());
+                sum = getSum(); // only need to compute this if we have non-enumerables, used below...
+            }
+            ft = new Factor(newvars);
+            for (Map.Entry<Integer, Double> entry : this.getMapEntries()) {
+                int oldindex = entry.getKey();
+                double weight = entry.getValue(); // NOT normalized
+                int newindex = factorTable.maskIndex(oldindex, varsToMaxOut);
+                ft.keepmaxFactor(newindex, weight);
+                for (Variable nonenum : this.getNonEnumVariables()) {
+                    double myWeight = 1.0; // if all factors are zero, sum is 0, so we apply a constant, uniform weight 
+                    if (sum != 0) // not all factors are zero
+                        myWeight = weight / sum; // HERE normalized weighting
+                    if (myWeight != 0.0) // do not add densities with zero weight
+                        ft.addDistrib(newindex, nonenum, getDistrib(oldindex, nonenum), myWeight); 
+                }
+            }
+            ft.function = true;
+            return ft;
+        } else {
+            return null;
+        }
+    }
+    
+    /** 
+     * Max-out one or more enumerable variables from the current table.
+     * This is a way to remove variables from the table in a way that tracks the maximally
+     * probably explanation of the evidence.
+     * 
+     * @param varsToMaxOut variables that will be max:ed out from the current
+     * table
+     * @return the new FactorTable containing the remaining variables
+     */
+    public Factor maximize(EnumVariable[] varsToMaxOut) {
+        return this.maximize(EnumVariable.toList(varsToMaxOut));
     }
 
     /**

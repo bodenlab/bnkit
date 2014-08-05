@@ -770,4 +770,27 @@ public class CGTable implements QueryResult {
         }
     }
     
+    /**
+     * Method to retrieve the most probable explanation to the evidence, in terms of query variables. 
+     * @return the most probable assignment of query variables
+     */
+    public Variable.Assignment[] getMPE() {
+        Variable.Assignment[] assign = new Variable.Assignment[evars.size() + nvars.size()];
+        int mostProbKey = 0;
+        double mostProbValue = -1;
+        for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) {
+            if (entry.getValue() > mostProbValue) {
+                mostProbKey = entry.getKey();
+                mostProbValue = entry.getValue();
+            }
+        }
+        Object[] values = factorTable.getKey(mostProbKey);
+        JDF jdf = densityTable.getValue(mostProbKey);
+        
+        for (int i = 0; i < values.length; i ++)
+            assign[i] = Variable.assign(nvars.get(i), values[i]);
+        for (int i = 0; i < evars.size(); i ++)
+            assign[i + values.length] = Variable.assign(evars.get(i), jdf.getDistrib(evars.get(i)));
+        return assign;
+    }
 }

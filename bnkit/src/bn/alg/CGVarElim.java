@@ -45,6 +45,10 @@ import java.util.List;
 public class CGVarElim implements Inference {
 
     public BNet bn;
+    
+    // Query status settings:
+    static int STATUS_BEL = 0; // Belief (probability of)
+    static int STATUS_MPE = 1; // Most probable explanation
 
     @Override
     public void instantiate(BNet bn) {
@@ -54,7 +58,7 @@ public class CGVarElim implements Inference {
 
     /**
      * Construct the data structure for the specified variables in preparation
-     * of inference. There are three types of variables (given the BN): 
+     * of inference of belief. There are three types of variables (given the BN): 
      *  1. Assignment variables E--which have been assigned values via the BN 
      *  2. Query variables Q--for which probabilities are sought P(Q|E) 
      *  3. Other variables X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
@@ -85,6 +89,44 @@ public class CGVarElim implements Inference {
         }
         return new CGQuery(Q, E, X, rnl);
     }
+    
+    /**
+     * Construct the data structure for the specified variables in preparation
+     * of inference of the most probable explanation. 
+     * There are three types of variables (given the BN): 
+     *  1. Assignment variables E--which have been assigned values via the BN 
+     *  2. Query variables Q--for which the most probable setting is sought
+     *  3. Other variables X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
+     *  Note that inference should return a JPT with variables in the *same* order 
+     *  as that specified by Q.
+     * @param qvars variables to include in query
+     */
+    @SuppressWarnings("rawtypes")
+    public Query makeMPE(Variable... qvars) {
+	// Find out which variables in the BN that will be max:ed out and organise them into "buckets".
+        // They will be listed in "topological order" (parents before children) as per heuristics given in Dechter.
+        // Each sumout variable will be assigned a bucket.
+        List<Variable> Q = new ArrayList<>(); // Query
+        List<Variable> E = new ArrayList<>(); // Assignment
+        List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
+        Q.addAll(Arrays.asList(qvars));
+//        BNet qbn = bn.getRelevant(qvars);
+        List<BNode> rnl = bn.getDconnected(qvars); //relevant ordered node list
+        //BNet qbn = bn;
+        for (BNode node : rnl) {
+            Variable var = node.getVariable();
+            if (node.getInstance() != null) {
+                E.add(var);
+            } else if (!Q.contains(var)) {
+                X.add(var);
+            }
+        }
+        CGQuery q = new CGQuery(Q, E, X, rnl);
+        q.setStatus(STATUS_MPE);
+        return q;
+    }
+    
+    
 
     /**
      * Perform exact inference for the specified variables, with support for continuous variables 
@@ -197,7 +239,11 @@ public class CGVarElim implements Inference {
                         List<EnumVariable> evars = new ArrayList<>(b.vars.size());
                         for (Variable bvar : b.vars) 
                             evars.add((EnumVariable)bvar);
-                        result = result.marginalize(evars);   // sum-out variables of bucket
+                        if (q.getStatus() == STATUS_BEL)
+                            result = result.marginalize(evars);   // sum-out variables of bucket
+                        else
+                            result = result.maximize(evars);   // max-out variables of bucket
+                            
                         if (result.isAtomic())          // if no enumerable variables, we may still have non-enumerables
                             buckets.get(0).put(result); // so we put the factor in the first bucket
                         else {                          // there are enumerables so...
@@ -210,10 +256,10 @@ public class CGVarElim implements Inference {
                             }
                         }
                     } catch (ClassCastException e) {
-                        throw new CGVarElimRuntimeException("Cannot marginalize continuous variables");
+                        throw new CGVarElimRuntimeException("Cannot marginalize or maximize-out continuous variables");
                     }
                 } else {    
-                    // This is the final (first) bucket so we should not marginalize out query variables (and non-enumerables), 
+                    // This is the final (first) bucket so we should not marginalize/maximize out query variables (and non-enumerables), 
                     // instead we should extract query results from the final factor, including a JPT.
                     // If Q is only a non-enumerable variable or list there-of, we will not be able to create a JPT.
                     // The first section below is just making sure that the variables are presented in the same order as that in the query
@@ -373,16 +419,26 @@ public class CGVarElim implements Inference {
         }
     }
 
-    public class CGQuery implements Query {
+    class CGQuery implements Query {
         final List<Variable> Q;
         final List<Variable> E;
         final List<Variable> X;
         final List<BNode> rnl;
+        private int status = STATUS_BEL;
+        
         CGQuery(List<Variable> Q, List<Variable> E, List<Variable> X, List<BNode> rnl) {
             this.Q = Q;
             this.E = E;
             this.X = X;
             this.rnl = rnl;
+        }
+        
+        void setStatus(int status) {
+            this.status = status;
+        }
+        
+        int getStatus() {
+            return this.status;
         }
     }
 
