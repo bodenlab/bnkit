@@ -66,21 +66,34 @@ public class SimpleExample {
             System.out.println("Variable elimination--------------");
             CGVarElim ve = new CGVarElim();
             ve.instantiate(bn);
+            
             Query q = ve.makeQuery(B);
-            JPT jpt = ve.infer(q).getJPT();
-            jpt.display();
+            System.out.println("Query is \'" + q + "\'");
+            CGTable r0 = (CGTable)ve.infer(q);
+            r0.display();
+
             j.setInstance(false);
-            jpt = ve.infer(q).getJPT();
-            jpt.display();
+            q = ve.makeQuery(B);
+            System.out.println("Query is \'" + q + "\'");
+            r0 = (CGTable)ve.infer(q);
+            r0.display();
             
             j.resetInstance();
             m.resetInstance();
             a.setInstance(true);
+            q = ve.makeQuery(J,M,E);
+            System.out.println("Query is \'" + q + "\'");
+            r0 = (CGTable)ve.infer(q);
+            r0.display();
+
             Query q_mpe = ve.makeMPE(J,M,E);
-            CGTable r = (CGTable)ve.infer(q_mpe); 
-            Assignment[] assign = r.getMPE();
-            for (int i = 0; i < assign.length; i ++)
-                System.out.println("\t" + assign[i].var + " = " + assign[i].val);
+            System.out.println("Query is \'" + q_mpe + "\'");
+            CGTable r1 = (CGTable)ve.infer(q_mpe); 
+            Assignment[] assign = r1.getMPE();
+            for (Assignment assign1 : assign) {
+                System.out.println("\t" + assign1.var + " = " + assign1.val);
+            }
+            r1.display();
             
             b.resetInstance();
             j.setInstance(true);
