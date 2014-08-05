@@ -785,12 +785,13 @@ public class CGTable implements QueryResult {
             }
         }
         Object[] values = factorTable.getKey(mostProbKey);
-        JDF jdf = densityTable.getValue(mostProbKey);
-        
         for (int i = 0; i < values.length; i ++)
-            assign[i] = Variable.assign(nvars.get(i), values[i]);
-        for (int i = 0; i < evars.size(); i ++)
-            assign[i + values.length] = Variable.assign(evars.get(i), jdf.getDistrib(evars.get(i)));
+            assign[i] = Variable.assign(evars.get(i), values[i]);
+        if (nvars.size() > 0) {
+            JDF jdf = densityTable.getValue(mostProbKey);
+            for (int i = 0; i < evars.size(); i ++)
+                assign[i + values.length] = Variable.assign(evars.get(i), jdf.getDistrib(evars.get(i)));
+        }
         return assign;
     }
 }

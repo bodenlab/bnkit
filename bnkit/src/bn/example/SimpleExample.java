@@ -10,6 +10,7 @@ import bn.EnumVariable;
 import bn.Enumerable;
 import bn.JPT;
 import bn.Predef;
+import bn.Variable.Assignment;
 import bn.alg.ApproxInference;
 import bn.alg.CGTable;
 import bn.alg.CGVarElim;
@@ -71,7 +72,17 @@ public class SimpleExample {
             j.setInstance(false);
             jpt = ve.infer(q).getJPT();
             jpt.display();
-
+            
+            j.resetInstance();
+            m.resetInstance();
+            a.setInstance(true);
+            Query q_mpe = ve.makeMPE(J,M,E);
+            CGTable r = (CGTable)ve.infer(q_mpe); 
+            Assignment[] assign = r.getMPE();
+            for (int i = 0; i < assign.length; i ++)
+                System.out.println("\t" + assign[i].var + " = " + assign[i].val);
+            
+            b.resetInstance();
             j.setInstance(true);
             m.setInstance(true);
             System.out.println("Approximate Inference------------");
