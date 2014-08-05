@@ -440,6 +440,21 @@ public class CGVarElim implements Inference {
         int getStatus() {
             return this.status;
         }
+        
+        public String toString() {
+            StringBuilder sbuf = new StringBuilder();
+            sbuf.append("Q:");
+            for (Variable v:Q)
+                sbuf.append(v.getName()).append(",");
+            sbuf.append("|E:");
+            for (Variable v:E)
+                sbuf.append(v.getName()).append(",");
+            sbuf.append("|X:");
+            for (Variable v:X)
+                sbuf.append(v.getName()).append(",");
+            sbuf.append("|Status:").append(status);
+            return sbuf.toString();
+        }
     }
 
     
