@@ -239,10 +239,10 @@ public class CGVarElim implements Inference {
                         List<EnumVariable> evars = new ArrayList<>(b.vars.size());
                         for (Variable bvar : b.vars) 
                             evars.add((EnumVariable)bvar);
-                        if (q.getStatus() == STATUS_BEL)
-                            result = result.marginalize(evars);   // sum-out variables of bucket
+                        if (q.getStatus() == STATUS_MPE)
+                            result = result.maximize(evars);      // max-out variables of bucket
                         else
-                            result = result.maximize(evars);   // max-out variables of bucket
+                            result = result.marginalize(evars);   // sum-out variables of bucket
                             
                         if (result.isAtomic())          // if no enumerable variables, we may still have non-enumerables
                             buckets.get(0).put(result); // so we put the factor in the first bucket
