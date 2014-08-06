@@ -945,7 +945,8 @@ public class Factor {
      * This is a way to remove variables from the table in a way that tracks the maximally
      * probably explanation of the evidence.
      * 
-     * TODO: This method has not yet been tested. Consider non-enumerable variables.
+     * TODO: This method has not yet been tested extensively. 
+     * Consider non-enumerable variables.
      * 
      * @param varsToMaxOut variables that will be max:ed out from the current
      * table
@@ -967,15 +968,29 @@ public class Factor {
                 sum = getSum(); // only need to compute this if we have non-enumerables, used below...
             }
             ft = new Factor(newvars);
+            Map<Integer, Integer> indexMap = new HashMap<>();
             for (Map.Entry<Integer, Double> entry : this.getMapEntries()) {
                 int oldindex = entry.getKey();
                 double weight = entry.getValue(); // NOT normalized
                 int newindex = factorTable.maskIndex(oldindex, varsToMaxOut);
-                ft.keepmaxFactor(newindex, weight);
+                Integer maxindex = indexMap.get(newindex);
+                if (maxindex == null) // nothing to compare with
+                    indexMap.put(newindex, oldindex); 
+                else {
+                    double oldweight = this.getFactor(maxindex);
+                    if (weight > oldweight)
+                        indexMap.put(newindex, oldindex);
+                }
+            }
+            for (Map.Entry<Integer, Integer> entry : indexMap.entrySet()) {
+                int newindex = entry.getKey();
+                int oldindex = entry.getValue();
+                double weight = this.getFactor(oldindex);
+                ft.setFactor(newindex, weight);
                 for (Variable nonenum : this.getNonEnumVariables()) {
                     double myWeight = 1.0; // if all factors are zero, sum is 0, so we apply a constant, uniform weight 
                     if (sum != 0) // not all factors are zero
-                        myWeight = weight / sum; // HERE normalized weighting
+                        myWeight = weight / sum; // HERE semi-normalized weighting (disregarding max:ed out entries)
                     if (myWeight != 0.0) // do not add densities with zero weight
                         ft.addDistrib(newindex, nonenum, getDistrib(oldindex, nonenum), myWeight); 
                 }
