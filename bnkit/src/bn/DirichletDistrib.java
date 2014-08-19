@@ -31,6 +31,17 @@ public class DirichletDistrib implements Distrib, Serializable {
         }
     }
 
+    public DirichletDistrib(Enumerable domain, double... alpha) {
+        if (domain.size() != alpha.length)
+            throw new RuntimeException("Invalid distribution");
+        this.domain = domain;
+        this.alpha = alpha;
+        gammas = new GammaDistrib[this.alpha.length];
+        for (int i = 0; i < gammas.length; i++) {
+            gammas[i] = new GammaDistrib(alpha[i], 1);
+        }
+    }
+    
     /**
      * Returns the probability of a vector of values from this distribution.
      */
@@ -83,6 +94,27 @@ public class DirichletDistrib implements Distrib, Serializable {
         }
         denom = GammaDistrib.gamma(denom);
         return numer / denom;
+    }
+    
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < alpha.length; i ++) {
+            if (i < alpha.length - 1)
+                sb.append(String.format("%4.2f,", alpha[i]));
+            else
+                sb.append(String.format("%4.2f;", alpha[i]));
+        }
+        return sb.toString();
+    }
+    
+    public static void main(String[] args) {
+        DirichletDistrib d = new DirichletDistrib(new Enumerable(3), 1, 2, 5);
+        System.out.println(d);
+        for (int i = 0; i < 10; i ++) {
+            EnumDistrib d0 = (EnumDistrib) d.sample();
+            double p = d.get(d0);
+            System.out.println(i + ": " + d0 + " p = " + String.format("%4.2f;", p));
+        }
     }
 }
 /*
