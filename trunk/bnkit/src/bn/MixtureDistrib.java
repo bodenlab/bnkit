@@ -18,13 +18,9 @@
 
 package bn;
 
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
-import java.util.Set;
 
 /**
  * Mixture of probability distributions.
@@ -57,7 +53,7 @@ public class MixtureDistrib implements Distrib {
         if (prev_weight == null)
             mixture.put(d2, weight2);
         else
-            mixture.put(d2, prev_weight.doubleValue() + weight2);
+            mixture.put(d2, prev_weight + weight2);
         density += weight2;
         return density;
     }
@@ -84,13 +80,13 @@ public class MixtureDistrib implements Distrib {
     public MixtureDistrib getNormalizedClone() {
         double sum = 0;
         for (Double weight : mixture.values()) 
-            sum += weight.doubleValue();
+            sum += weight;
         MixtureDistrib md = null;
         for (Map.Entry<Distrib, Double> entry : mixture.entrySet()) {
             if (md == null) 
-                md = new MixtureDistrib(entry.getKey(), entry.getValue().doubleValue() / sum);
+                md = new MixtureDistrib(entry.getKey(), entry.getValue() / sum);
             else
-                md.addDistrib(entry.getKey(), entry.getValue().doubleValue() / sum);
+                md.addDistrib(entry.getKey(), entry.getValue() / sum);
         }
         return md;
     }
@@ -99,11 +95,15 @@ public class MixtureDistrib implements Distrib {
     public double get(Object value) {
         double p = 0.0;
         for (Map.Entry<Distrib, Double> entry : mixture.entrySet()) {
-            p += entry.getKey().get(value) * entry.getValue().doubleValue();
+            p += entry.getKey().get(value) * entry.getValue();
         }
         return p;
     }
 
+    /**
+     * Sample the mixture distribution.
+     * @return the sample
+     */
     @Override
     public Object sample() {
         double y = rand.nextDouble() * density;
@@ -111,7 +111,7 @@ public class MixtureDistrib implements Distrib {
         double p = 0.0;
         for (Map.Entry<Distrib, Double> entry : mixture.entrySet()) {
             current = entry.getKey();
-            p += entry.getValue().doubleValue();
+            p += entry.getValue();
             if (p >= y)
                 break;
         }
