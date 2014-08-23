@@ -3,23 +3,27 @@ package bn;
 import java.io.Serializable;
 import java.util.Arrays;
 
-/*
- * Implementation is based on Bayesian Logic (BLOG) inference engine version 0.7 
- * (see copyright message below).
+/**
+ * Implementation of Dirichlet distribution.
+ * The class implements functionality for constructing Dirichlet for 
+ * generating enumerable distributions of a specified domain.
+ * The class implements sampling and ML estimation from enumerable distributions.
+ * Some functionality is adapted from other sources (see copyright messages below).
  */
-
 public class DirichletDistrib implements Distrib, Serializable {
 
     private static final long serialVersionUID = 1L;
-	
+
+    /** Dirichlet prior */
     private double[] alpha;
     private GammaDistrib[] gammas;
+    /** Domain for enumerable distributions that can be generated from the Dirichlet and/or
+     * learned from.     */
     private final Enumerable domain;
     
     /**
-     * Constructs a Dirichlet distribution with the given domain and
-     * parameter value for all dimensions.
-     * 
+     * Construct a Dirichlet distribution with the given domain and
+     * "alpha" parameter value for all dimensions.
      */
     public DirichletDistrib(Enumerable domain, double same_alpha) {
         this.domain = domain;
@@ -31,6 +35,10 @@ public class DirichletDistrib implements Distrib, Serializable {
         }
     }
 
+    /**
+     * Construct a Dirichlet distribution with the given domain and
+     * "alpha" parameter values.
+     */
     public DirichletDistrib(Enumerable domain, double... alpha) {
         if (domain.size() != alpha.length)
             throw new RuntimeException("Invalid distribution");
@@ -57,7 +65,20 @@ public class DirichletDistrib implements Distrib, Serializable {
     }
     
     /**
+     * Set new prior parameters for distribution.
+     * @param alpha new prior
+     */
+    public void setPrior(double[] alpha) {
+        for (int i = 0; i < this.alpha.length; i ++) {
+            this.alpha[i] = alpha[i];
+            gammas[i] = new GammaDistrib(this.alpha[i], 1);
+        }
+    }
+    
+    /**
      * Returns the probability of a vector of values from this distribution.
+     * @param dist an enumerable distribution
+     * @return the probability
      */
     public double get(Object dist) {
         EnumDistrib d = (EnumDistrib) dist;
@@ -74,6 +95,7 @@ public class DirichletDistrib implements Distrib, Serializable {
 	
     /**
      * Returns an enumerable sampled from this distribution.
+     * @return an enumerable distribution, chosen in proportion to its probability
      */
     @Override
     public Object sample() {
@@ -95,7 +117,6 @@ public class DirichletDistrib implements Distrib, Serializable {
     /**
      * Computes the normalization constant for a Dirichlet distribution with
      * the given parameters.
-     * 
      * @param a list of parameters of a Dirichlet distribution
      * @return the normalization constant for such a distribution
      */
@@ -110,6 +131,10 @@ public class DirichletDistrib implements Distrib, Serializable {
         return numer / denom;
     }
     
+    /**
+     * String representation of the Dirichlet distribution, containing alpha values.
+     * @return string representation of object
+     */
     public String toString() {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < alpha.length; i ++) {
@@ -120,7 +145,6 @@ public class DirichletDistrib implements Distrib, Serializable {
         }
         return sb.toString();
     }
-    
     
     /**
      * Retrieve the number of documents that contain exactly a specified number of 
@@ -163,7 +187,6 @@ public class DirichletDistrib implements Distrib, Serializable {
         return ret;
     }
     
-    
     /**
      * Retrieve the number of documents that are a specified number of (counted) words long.
      * Example, getObservationLengths(counts, 20) is the number of documents that are exactly 20 tokens long.	 
@@ -200,46 +223,45 @@ public class DirichletDistrib implements Distrib, Serializable {
         return wMax;
     }
     
-    
     /*
-    The following method getMLE is based on the method 
+    The following method findDirichletFromCounts is based on the method 
     cc.mallet.types.Dirichlet#learnParameters, found in MALLET.
     This software is copyright (C) 2002 Univ. of Massachusetts Amherst, Computer Science Dept.
     "MALLET" (MAchine Learning for LanguagE Toolkit).
     http://www.cs.umass.edu/~mccallum/mallet
     This software is provided under the terms of the Common Public License,
     version 1.0, as published by http://www.opensource.org.	For further
-    information, see the file `LICENSE' included with this distribution. 
+    information, see the file `LICENSE' available with the MALLET software distribution. 
     */
-
     
     /** 
      * Learn Dirichlet parameters using frequency histograms.
      * Currently this implementation has issues, including 
-     * inefficiencies,
-     * convergence criterion, and 
-     * finding negative priors.
-     * @param counts An array of count histograms. <code>observations[10][3]</code> could be the number of documents that contain exactly 3 tokens of word type 10.
-     * @returns The sum of the learned parameters.
+     * inefficiencies, convergence criterion, and finding negative priors.
+     * @param counts An array of count histograms.
+     * @param alphaStart initial alpha values
+     * @return the new alpha values
      */ 
-    public double setMLE(int[][] counts) {
-        return setMLE(counts, 1.00001, 1.0, 200);
+    public double[] findDirichletFromCounts(int[][] counts, double[] alphaStart) {
+        return findDirichletFromCounts(counts, alphaStart, 1.00001, 1.0, 200);
     }
 
     /** 
      * Learn Dirichlet parameters using frequency histograms
      * 
      * @param counts An array of count histograms. <code>observations[10][3]</code> could be the number of documents that contain exactly 3 tokens of word type 10.
+     * @param alphaStart initial alpha values
      * @param shape Gamma prior E(X) = shape * scale, var(X) = shape * scale<sup>2</sup>
      * @param scale 
      * @param numIterations 200 to 1000 generally insures convergence, but 1-5 is often enough to step in the right direction
-     * @returns The sum of the learned parameters.
+     * @return the new alpha values
      */ 
-    public double setMLE(int[][] counts, double shape, double scale, int numIterations) {
+    public static double[] findDirichletFromCounts(int[][] counts, double[] alphaStart, double shape, double scale, int numIterations) {
         double parametersSum = 0;
-        //	Initialize the parameter sum
-        for (int k=0; k < alpha.length; k++) {
-            parametersSum += alpha[k];
+        //	Initialize the parameters
+        double[] alpha = new double[alphaStart.length];
+        for (int k=0; k < alphaStart.length; k++) {
+            parametersSum += alphaStart[k];
         }
         double oldParametersK;
         double currentDigamma;
@@ -295,41 +317,55 @@ public class DirichletDistrib implements Distrib, Serializable {
                 parametersSum += alpha[k];
             }
         }
-        return parametersSum;
+        return alpha;
     }
 
+    /*
+    The code below is based on Python code for MLE of Dirichlet copyright Max Sklar.
+    // Source: https://github.com/maxsklar/research/tree/master/2014_05_Dirichlet/python
+    // Paper: http://arxiv.org/pdf/1405.0099.pdf
+    # Copyright 2013 Max Sklar
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
 
+        http://www.apache.org/licenses/LICENSE-2.0
 
-// Below is Python code for MLE of Dir
-// Source: https://github.com/maxsklar/research/tree/master/2014_05_Dirichlet/python
-// Paper: http://arxiv.org/pdf/1405.0099.pdf
-//
-//    #!/usr/bin/python
-//    #
-//    # A library for finding the optimal dirichlet prior from counts
-//    # By: Max Sklar
-//    # @maxsklar
-//    # https://github.com/maxsklar
-//
-//    # Copyright 2013 Max Sklar
-//
-//    # Find the "sufficient statistic" for a group of multinomials.
-//    # Essentially, it's the average of the log probabilities
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    */
+    /**
+     * Find the "sufficient statistic" for a group of multinomials.
+     * Essentially, it's the average of the log probabilities.
+     * @param multinomials instances of enumerable distributions
+     * @param k number of values in distribution
+     */ 
     public static double[] getSufficientStatistic(EnumDistrib[] multinomials, int k) {
         int N = multinomials.length;
         int K = k;
         double[] retVal = new double[K];
         for (EnumDistrib m : multinomials) {
-            for (int cnt = 0; cnt < K; cnt ++) 
-                retVal[cnt] += Math.log(m.get(cnt));
+            for (int cnt = 0; cnt < K; cnt ++) {
+                double prob = m.get(cnt);
+                double logProb = Math.log(prob);
+                retVal[cnt] += logProb;
+            }
         }
         for (int cnt = 0; cnt < K; cnt ++)
             retVal[cnt] /= N;
         return retVal;
     }
-//
-//    # Find the log probability of the data for a given dirichlet
-//    # This is equal to the log probabiliy of the data.. up to a linear transform
+
+    /**
+     * Find the log probability of the data for a given Dirichlet.
+     * This is equal to the log probability of the data. up to a linear transform.
+     * @param alphaTrials initial alpha
+     * @param ss sufficient statistics for the data
+     * @return the log probability
+     */
     private static double logProbForMultinomials(double[] alphaTrials, double[] ss) {
         double alpha_sum = 0;
         double lgamma_sum = 0;
@@ -343,8 +379,14 @@ public class DirichletDistrib implements Distrib, Serializable {
         double retVal = GammaDistrib.lgamma(alpha_sum) - lgamma_sum + pq;
         return retVal;
     }
-//
-//    #Gives the derivative with respect to the log of prior.  This will be used to adjust the loss
+
+    /**
+     * Gives the derivative with respect to the log of prior.  
+     * This will be used to adjust the loss.
+     * @param alphaTrials initial alpha
+     * @param ss sufficient statistics for the data
+     * @return the gradient
+     */
     private static double[] getGradientForMultinomials(double[] alphaTrials, double[] ss) {
         int K = alphaTrials.length;
         double alpha_sum = 0;
@@ -353,15 +395,19 @@ public class DirichletDistrib implements Distrib, Serializable {
         }
         double C = GammaDistrib.digamma(alpha_sum);
         double[] retVal = new double[K];
-        Arrays.fill(retVal, C);
         for (int i = 0; i < alphaTrials.length; i ++) {
             retVal[i] += (C + ss[i] - GammaDistrib.digamma(alphaTrials[i]));
         }
         return retVal;
     }
-//
-//    #The hessian is actually the sum of two matrices: a diagonal matrix and a constant-value matrix.
-//    #We'll write two functions to get both
+
+    /**
+     * The Hessian is the sum of two matrices: 
+     * a diagonal matrix and a constant-value matrix.
+     * Two functions define them. This is the constant.
+     * @param alpha alpha parameters
+     * @return Hessian constant
+     */
     private static double priorHessianConst(double[] alpha) { 
         double alpha_sum = 0;
         for (int i = 0; i < alpha.length; i ++) {
@@ -369,15 +415,30 @@ public class DirichletDistrib implements Distrib, Serializable {
         }
         return -GammaDistrib.trigamma(alpha_sum);
     }
+
+    /**
+     * The Hessian is the sum of two matrices: 
+     * a diagonal matrix and a constant-value matrix.
+     * Two functions define them. This is the diagonal.
+     * @param alpha alpha parameters
+     * @return Hessian diagonal
+     */
     private static double[] priorHessianDiag(double[] alpha) { 
         double[] retVal = new double[alpha.length];
         for (int i = 0; i < alpha.length; i ++) 
             retVal[i] = GammaDistrib.trigamma(alpha[i]);
         return retVal;
     }
-//
-//    # Compute the next value to try here
-//    # http://research.microsoft.com/en-us/um/people/minka/papers/dirichlet/minka-dirichlet.pdf (eq 18)
+    
+    /**
+     * Compute the next value to try here.
+     * http://research.microsoft.com/en-us/um/people/minka/papers/dirichlet/minka-dirichlet.pdf (eq 18)
+     * @param alpha alpha parameters
+     * @param hConst constant of Hessian
+     * @param hDiag diagonal of Hessian
+     * @param gradient the gradient 
+     * @return step to change alpha
+     */
     private static double[] getPredictedStep(double[] alpha, double hConst, double[] hDiag, double[] gradient) {
         int K = alpha.length;
         double[] retVal = new double[K];
@@ -392,8 +453,15 @@ public class DirichletDistrib implements Distrib, Serializable {
             retVal[doc] = (b - gradient[doc]) / hDiag[doc];
         return retVal;
     }
-//
-//    # Uses the diagonal hessian on the log-alpha values	
+
+    /**
+     * Use the Hessian on the log-alpha value to compute the next step.
+     * @param alpha alpha parameters
+     * @param hConst constant of Hessian
+     * @param hDiag diagonal of Hessian
+     * @param gradient the gradient 
+     * @return step to change alpha
+     */
     private static double[] getPredictedStepAlt(double[] alpha, double hConst, double[] hDiag, double[] gradient) {
         int K = alpha.length;
         double[] retVal = new double[K];
@@ -411,42 +479,106 @@ public class DirichletDistrib implements Distrib, Serializable {
             retVal[doc] = gradient[doc] / (gradient[doc] - alpha[doc]*hDiag[doc]) * (1 - hConst * alpha[doc] * sumSs);
         return retVal;
     }
-//
-//    #The currentPriors and data are global, so we don't need to pass them in
-    private static double getTotalLoss(double[] trialPriors, double[] ss) {
-        return -1.0*logProbForMultinomials(trialPriors, ss);
+
+    /**
+     * Get the loss for current parameters (alpha-values) with the data represented by "sufficient statistics".
+     * @param alpha alpha (parameters defining prior)
+     * @param ss sufficient statistics for the data
+     * @return loss
+     */
+    private static double getTotalLoss(double[] alpha, double[] ss) {
+        return -1.0*logProbForMultinomials(alpha, ss);
     }
-//
+
+    /**
+     * Use Hessian to predict step from current parameters (alpha-values).
+     * @param alpha initial alpha
+     * @param gradient gradient
+     * @return step (change to alpha)
+     */
     private static double[] predictStepUsingHessian(double[] alpha, double[] gradient) {
         double totalHConst = priorHessianConst(alpha);
         double[] totalHDiag = priorHessianDiag(alpha);		
         return getPredictedStep(alpha, totalHConst, totalHDiag, gradient);
     }
-//
-    private static double[] predictStepLogSpace(double[] alpha, double[] gradient, double[] ss) {
+ 
+    /**
+     * Use Hessian to predict step from current parameters (alpha-values).
+     * @param alpha initial alpha
+     * @param gradient gradient
+     * @return step (change to alpha)
+     */
+    private static double[] predictStepLogSpace(double[] alpha, double[] gradient) {
         double totalHConst = priorHessianConst(alpha);
         double[] totalHDiag = priorHessianDiag(alpha);
         return getPredictedStepAlt(alpha, totalHConst, totalHDiag, gradient);
     }
-//
-//
-//    # Returns whether it's a good step, and the loss	
-    private static double testTrialPriors(double[] trialPriors, double[] ss) {
-        for (double alpha : trialPriors) {
-            if (alpha <= 0)
+
+    /**
+     * Returns whether it's a good alpha, and the loss.
+     * @param alpha alpha (parameters defining prior)
+     * @param ss sufficient statistics for the data
+     * @return loss (+infinite if invalid (negative or zero alpha)
+     */
+    private static double testTrialPriors(double[] alpha, double[] ss) {
+        for (double a : alpha) {
+            if (a <= 0)
                 return Double.POSITIVE_INFINITY;
         }
-        return getTotalLoss(trialPriors, ss);
+        return getTotalLoss(alpha, ss);
     }
-//
+
     private static double sqVectorSize(double[] v) {
         double s = 0;
         for (int doc = 0; doc < v.length; doc ++) 
             s += Math.pow(v[doc], 2);
         return s;
     }
-//
-    public static double[] findDirichletPriors(double[] alphaStart, double[] ss) {
+
+    /**
+     * Find the optimal alpha parameters for a Dirichlet based on given instances of enumerable distribution.
+     * @param dists array of enumerable distributions compatible with this Dirichlet
+     * @return the alpha values
+     */
+    public double[] findPrior(EnumDistrib[] dists) {
+        if (dists.length > 0) {
+            double[] ss = DirichletDistrib.getSufficientStatistic(dists, alpha.length);
+            return DirichletDistrib.findPrior(alpha, ss);
+        }
+        throw new RuntimeException("Invalid data for estimation of Dirichlet");
+    }
+    
+    /**
+     * Find and set the optimal alpha parameters for a Dirichlet based on given instances of enumerable distribution.
+     * @param dists array of enumerable distributions compatible with this Dirichlet
+     */
+    public void setPrior(EnumDistrib[] dists) {
+        if (dists.length > 0) {
+            double[] ss = DirichletDistrib.getSufficientStatistic(dists, alpha.length);
+            setPrior(DirichletDistrib.findPrior(alpha, ss));
+        }
+        throw new RuntimeException("Invalid data for estimation of Dirichlet");
+    }
+    
+    /**
+     * Find the optimal alpha parameters for a Dirichlet based on given instances of enumerable distribution.
+     * @param dists array of enumerable distributions compatible with this Dirichlet
+     * @param alphaStart initial alpha values
+     * @return the optimal alpha values
+     */
+    public static double[] findPrior(EnumDistrib[] dists, double[] alphaStart) {
+        double[] ss = DirichletDistrib.getSufficientStatistic(dists, alphaStart.length);
+        return DirichletDistrib.findPrior(alphaStart, ss);
+    }
+    
+    /**
+     * Find the optimal alpha parameters for a Dirichlet based on sufficient statistics extracted for
+     * data set.
+     * @param alphaStart initial alpha values
+     * @param ss sufficient statistics for the data
+     * @return the optimal alpha values
+     */
+    public static double[] findPrior(double[] alphaStart, double[] ss) {
         double[] currentPriors = new double[alphaStart.length];
         System.arraycopy(alphaStart, 0, currentPriors, 0, currentPriors.length);
         double[] trialPriors = new double[currentPriors.length];
@@ -462,6 +594,7 @@ public class DirichletDistrib implements Distrib, Serializable {
             double gradientSize = sqVectorSize(gradient);
             if (gradientSize < gradientToleranceSq) {
                 // Converged with small gradient
+                System.out.println("Exited after " + count + " rounds with loss = " + currentLoss + " gradient = " + gradient);
                 return currentPriors;
             }
             // First, try the second order method...
@@ -470,17 +603,25 @@ public class DirichletDistrib implements Distrib, Serializable {
                 trialPriors[a] = currentPriors[a] + trialStep[a];
             double loss = testTrialPriors(trialPriors, ss);
             if (loss < currentLoss) {
+                System.out.println("-");
                 currentLoss = loss;
                 // replace with new-found priors
                 System.arraycopy(trialPriors, 0, currentPriors, 0, currentPriors.length);
                 continue;
             }
             // Next, try first-order, iterative option...
-            trialStep = predictStepLogSpace(currentPriors, gradient, ss);
+            trialStep = predictStepLogSpace(currentPriors, gradient);
             for (int a = 0; a < currentPriors.length; a ++)
                 trialPriors[a] = currentPriors[a] * Math.exp(trialStep[a]);
-            // un-used result ?
-            // loss = testTrialPriors(trialPriors, ss);
+            loss = testTrialPriors(trialPriors, ss);
+            if (loss < currentLoss) {
+                currentLoss = loss;
+                System.out.println("x");
+                // replace with new-found priors
+                System.arraycopy(trialPriors, 0, currentPriors, 0, currentPriors.length);
+                continue;
+            }
+            
             // Step in the direction of the gradient until there is a loss improvement
             loss = Double.POSITIVE_INFINITY;
             double learnRate = 1.0;
@@ -490,26 +631,35 @@ public class DirichletDistrib implements Distrib, Serializable {
                 loss = testTrialPriors(trialPriors, ss);
                 learnRate *= 0.9;
             }
-            if (learnRate / 0.9 < learnRateTolerance)
+            if (learnRate < learnRateTolerance) {
                 // Converged with small learn rate
-                return currentPriors;
-
+                System.out.println("Exited after " + count + " rounds with loss = " + loss + " learning rate = " + learnRate);
+                return trialPriors;
+            }
             currentLoss = loss;
             for (int a = 0; a < currentPriors.length; a ++)
                 currentPriors[a] = trialPriors[a];
         }
         // Reached max iterations
+        System.out.println("Exited after " + count + " rounds with loss = " + currentLoss);
         return currentPriors;
     }
-
-//    def findDirichletPriorsFromMultinomials(multinomials, initAlphas):
-//            ss = getSufficientStatistic(multinomials)
-//            return findDirichletPriors(ss, initAlphas)
 
     
     public static void main(String[] args) {
         java.util.Random rand = new java.util.Random();
-        int N = 30;
+//        Enumerable dom = new Enumerable(2);
+//        EnumDistrib[] samples = {
+//            new EnumDistrib(dom, 0.3, 0.7),
+//            new EnumDistrib(dom, 0.2, 0.8),
+//            new EnumDistrib(dom, 0.1, 0.9),
+//            new EnumDistrib(dom, 0.4, 0.6)};
+//        double[] ss = DirichletDistrib.getSufficientStatistic(samples, 2);
+//        double[] alpha = DirichletDistrib.findDirichletPriors(new double[] {.5, 0.5}, ss);
+//        DirichletDistrib d = new DirichletDistrib(dom, alpha);
+        
+
+        int N = 10;
         int K = 3;
         Enumerable dom = new Enumerable(K);
         DirichletDistrib d0 = new DirichletDistrib(dom, 12, 2, 15);
@@ -523,93 +673,16 @@ public class DirichletDistrib implements Distrib, Serializable {
             System.out.println(i + ": " + d + " p = " + String.format("%4.2f;", p));
         }
         double[] ss = DirichletDistrib.getSufficientStatistic(samples, K);
-        double[] alpha = DirichletDistrib.findDirichletPriors(new double[] {2,3,4}, ss);
-        d0.alpha = alpha;
-        System.out.println(d0);
+        double[] alpha = DirichletDistrib.findPrior(new double[] {0.33,0.33,0.33}, ss);
+        d0.setPrior(alpha);
+        System.out.println("Dirichlet Alpha: " + d0);
         for (int i = 0; i < 30; i ++) {
             EnumDistrib d = (EnumDistrib) d0.sample();
             double p = d0.get(d);
             System.out.println(i + ": " + d + " p = " + String.format("%4.2f;", p));
         }
+        System.out.println("Final loss = " +DirichletDistrib.getTotalLoss(alpha, ss));
+        System.out.println("Best loss = " + DirichletDistrib.getTotalLoss(new double[] {1,2}, ss));
     }
 
 }
-
-// Below is R-code for MLE estimation of Dirichlet distribution params from data
-// Source: http://web.hku.hk/~kaing/Dirichlet_app01.pdf
-//
-//    function(X, ind, N)
-//    {
-//        # Aa <- MLE.Dirichlet.EM.gradient(X, ind, N)
-//        # --------------------------------------------------------
-//        # Aim:    Finding the MLEs of the Dirichlet parameter
-//        #         vector a = (a_1, ..., a_n)
-//        # Method: Using the EM gradient algorithm (2.75)
-//        # Input:  X:     an m x n observed data matrix
-//        #         ind=1: using (2.71) as the initial values
-//        #         ind=2: using (2.73) as the initial values
-//        #         N:     the number of iterations required for
-//    #
-//    # Output: A ---- N by n matrix whose t-th row is aˆ(t)
-//    #         a ---- the MLE of a = (a_1, ..., a_n)
-//    # --------------------------------------------------------
-//    m <- dim(X)[1]
-//    n <- dim(X)[2]
-//    one <- rep(1, n)
-//    xmean <- apply(X, 2, mean)
-//    G <- (apply(X, 2, prod))ˆ(1/m)
-//    if(ind == 1) {
-//          a <- min(X) * one
-//    }
-//    if(ind == 2) {
-//          ga <-  - digamma(1)
-//          b <- xmean
-//          de0 <- sum(b * log(G))
-//          aplus <- ((n - 1) * ga)/(sum(b * log(b)) - de0)
-//          a <- b * aplus
-//    }
-//    A <- matrix(0, N, n)
-//    for(tt in 1:N) {
-//          aplus <- sum(a)
-//          g <- digamma(aplus) - digamma(a) + log(G)
-//          b <- trigamma(a)
-//    the EM gradient algorithm
-//    }
-//        return(A, a)
-//    }
-//    a <- a + g/b A[tt, ]<-a
-
-/*
- * Copyright (c) 2005, Regents of the University of California
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * * Redistributions of source code must retain the above copyright
- *   notice, this list of conditions and the following disclaimer.
- *
- * * Redistributions in binary form must reproduce the above copyright
- *   notice, this list of conditions and the following disclaimer in
- *   the documentation and/or other materials provided with the
- *   distribution.  
- *
- * * Neither the name of the University of California, Berkeley nor
- *   the names of its contributors may be used to endorse or promote
- *   products derived from this software without specific prior 
- *   written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- */
