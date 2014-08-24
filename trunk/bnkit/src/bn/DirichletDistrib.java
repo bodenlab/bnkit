@@ -92,6 +92,10 @@ public class DirichletDistrib implements Distrib, Serializable {
         throw new RuntimeException("Invalid data for estimation of Dirichlet");
     }
     
+    public Domain getDomain() {
+        return domain;
+    }
+    
     /**
      * Returns the probability of a vector of values from this distribution.
      * @param dist an enumerable distribution
