@@ -24,6 +24,8 @@ public class DirichletDistrib implements Distrib, Serializable {
     /**
      * Construct a Dirichlet distribution with the given domain and
      * "alpha" parameter value for all dimensions.
+     * @param domain the domain over which this distribution can generate distributions
+     * @param same_alpha the alpha value that applies to all components
      */
     public DirichletDistrib(Enumerable domain, double same_alpha) {
         this.domain = domain;
@@ -38,6 +40,8 @@ public class DirichletDistrib implements Distrib, Serializable {
     /**
      * Construct a Dirichlet distribution with the given domain and
      * "alpha" parameter values.
+     * @param domain the domain over which this distribution can generate distributions
+     * @param alpha the alpha values that apply
      */
     public DirichletDistrib(Enumerable domain, double... alpha) {
         if (domain.size() != alpha.length)
@@ -73,6 +77,19 @@ public class DirichletDistrib implements Distrib, Serializable {
             this.alpha[i] = alpha[i];
             gammas[i] = new GammaDistrib(this.alpha[i], 1);
         }
+    }
+    
+    /**
+     * Find and set the optimal alpha parameters for a Dirichlet based on given instances of enumerable distribution.
+     * @param dists array of enumerable distributions compatible with this Dirichlet
+     */
+    public void setPrior(EnumDistrib[] dists) {
+        if (dists.length > 0) {
+            double[] ss = DirichletDistrib.getSufficientStatistic(dists, alpha.length);
+            setPrior(DirichletDistrib.findPrior(alpha, ss));
+            return;
+        }
+        throw new RuntimeException("Invalid data for estimation of Dirichlet");
     }
     
     /**
@@ -242,8 +259,8 @@ public class DirichletDistrib implements Distrib, Serializable {
      * @param alphaStart initial alpha values
      * @return the new alpha values
      */ 
-    public double[] findDirichletFromCounts(int[][] counts, double[] alphaStart) {
-        return findDirichletFromCounts(counts, alphaStart, 1.00001, 1.0, 200);
+    public double[] findPriorFromCounts(int[][] counts, double[] alphaStart) {
+        return findPriorFromCounts(counts, alphaStart, 1.00001, 1.0, 200);
     }
 
     /** 
@@ -256,7 +273,7 @@ public class DirichletDistrib implements Distrib, Serializable {
      * @param numIterations 200 to 1000 generally insures convergence, but 1-5 is often enough to step in the right direction
      * @return the new alpha values
      */ 
-    public static double[] findDirichletFromCounts(int[][] counts, double[] alphaStart, double shape, double scale, int numIterations) {
+    public static double[] findPriorFromCounts(int[][] counts, double[] alphaStart, double shape, double scale, int numIterations) {
         double parametersSum = 0;
         //	Initialize the parameters
         double[] alpha = new double[alphaStart.length];
@@ -549,18 +566,6 @@ public class DirichletDistrib implements Distrib, Serializable {
     }
     
     /**
-     * Find and set the optimal alpha parameters for a Dirichlet based on given instances of enumerable distribution.
-     * @param dists array of enumerable distributions compatible with this Dirichlet
-     */
-    public void setPrior(EnumDistrib[] dists) {
-        if (dists.length > 0) {
-            double[] ss = DirichletDistrib.getSufficientStatistic(dists, alpha.length);
-            setPrior(DirichletDistrib.findPrior(alpha, ss));
-        }
-        throw new RuntimeException("Invalid data for estimation of Dirichlet");
-    }
-    
-    /**
      * Find the optimal alpha parameters for a Dirichlet based on given instances of enumerable distribution.
      * @param dists array of enumerable distributions compatible with this Dirichlet
      * @param alphaStart initial alpha values
@@ -594,7 +599,7 @@ public class DirichletDistrib implements Distrib, Serializable {
             double gradientSize = sqVectorSize(gradient);
             if (gradientSize < gradientToleranceSq) {
                 // Converged with small gradient
-                System.out.println("Exited after " + count + " rounds with loss = " + currentLoss + " gradient = " + gradient);
+                // System.out.println("Exited after " + count + " rounds with loss = " + currentLoss + " gradient = " + gradient);
                 return currentPriors;
             }
             // First, try the second order method...
@@ -603,7 +608,6 @@ public class DirichletDistrib implements Distrib, Serializable {
                 trialPriors[a] = currentPriors[a] + trialStep[a];
             double loss = testTrialPriors(trialPriors, ss);
             if (loss < currentLoss) {
-                System.out.println("-");
                 currentLoss = loss;
                 // replace with new-found priors
                 System.arraycopy(trialPriors, 0, currentPriors, 0, currentPriors.length);
@@ -616,7 +620,6 @@ public class DirichletDistrib implements Distrib, Serializable {
             loss = testTrialPriors(trialPriors, ss);
             if (loss < currentLoss) {
                 currentLoss = loss;
-                System.out.println("x");
                 // replace with new-found priors
                 System.arraycopy(trialPriors, 0, currentPriors, 0, currentPriors.length);
                 continue;
@@ -633,7 +636,7 @@ public class DirichletDistrib implements Distrib, Serializable {
             }
             if (learnRate < learnRateTolerance) {
                 // Converged with small learn rate
-                System.out.println("Exited after " + count + " rounds with loss = " + loss + " learning rate = " + learnRate);
+                // System.out.println("Exited after " + count + " rounds with loss = " + loss + " learning rate = " + learnRate);
                 return trialPriors;
             }
             currentLoss = loss;
@@ -641,7 +644,7 @@ public class DirichletDistrib implements Distrib, Serializable {
                 currentPriors[a] = trialPriors[a];
         }
         // Reached max iterations
-        System.out.println("Exited after " + count + " rounds with loss = " + currentLoss);
+        // System.out.println("Exited after " + count + " rounds with loss = " + currentLoss);
         return currentPriors;
     }
 
@@ -683,6 +686,33 @@ public class DirichletDistrib implements Distrib, Serializable {
         }
         System.out.println("Final loss = " +DirichletDistrib.getTotalLoss(alpha, ss));
         System.out.println("Best loss = " + DirichletDistrib.getTotalLoss(new double[] {1,2}, ss));
+        
+        DirichletDistrib d1 = new DirichletDistrib(Enumerable.nacid, 1.0);
+        EnumDistrib[] dd = new EnumDistrib[dna.length];
+        for (int j = 0; j < dna.length; j ++) {
+            dd[j] = new EnumDistrib(Enumerable.nacid);
+            for (Object sym : Enumerable.nacid.values) {
+                int cnt = 0;
+                for (int i = 0; i < dna[j].length(); i ++)
+                    cnt += (dna[j].charAt(i) == (Character)sym ? 1 : 0);
+                dd[j].set(sym, (double) cnt / dna[j].length());
+            }
+            System.out.println(dd[j]);
+        }
+        d1.setPrior(dd);
+        System.out.println(d1);
+        for (int j = 0; j < 10; j ++)
+            System.out.println(d1.sample());
     }
 
+    static String[] dna = {
+            "TTCGGCACGAGTCTCGGGCGGGAGAAGAAGAAGAATTAGTAAAGTGTGATCATAATGTCTGCTAGCGGCG",
+            "GCACCGGAGATGAAGATAAGAAGCCTAATGATCAGATGGTTCATATCAATCTCAAGGTTAAGGGTCAGGA",
+            "TGGGAATGAAGTTTTTTTCAGGATCAAACGTAGCACACAGATGCGCAAGCTCATGAATGCTTATTGTGAC",
+            "CGGCAGTCAGTGGACATGAACTCAATTGCATTCTTATTTGATGGGCGCAGGCTTAGGGCAGAGCAAACTC",
+            "CTGATGAGCTGGAGATGGAGGAGGGTGATGAAATCGATGCAATGCTACATCAAACTGGAGGCAGTTGCTG",
+            "CACTTGTTTCTCTAATTTTTAACTTGGTTTATGTTAGTAGATTGTTTAGGGTAATACTTTCAACTCCCTC",
+            "ATCTGCTCTAAGATGGGTAAATTTATGAATGTTTAGTTTTCAGTATTAGATGATGACACTACTAAATGGT",
+            "TCAATTTTCATGGCATTTGTAAAAGTTTACTCTTAATATGGTTAAAAA"};
+    
 }
