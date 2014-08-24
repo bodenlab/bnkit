@@ -25,7 +25,7 @@ import java.util.Random;
  *
  * @author mikael
  */
-public class EnumDistrib implements Distrib {
+public class EnumDistrib implements Distrib, Domain {
 
     private final double[] distrib;
     private final Enumerable domain;
@@ -276,6 +276,16 @@ public class EnumDistrib implements Distrib {
         }
         d.normalised = true;
         return d;
+    }
+
+    @Override
+    public boolean isValid(Object value) {
+        try {
+            EnumDistrib x = (EnumDistrib) value;
+            return true;
+        } catch (ClassCastException e) {
+            return false;
+        }
     }
 
 }
