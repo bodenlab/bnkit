@@ -31,16 +31,17 @@ public class NoisyORExample {
 		CPT gene3 = new CPT(v_gene3);
 		CPT gene4 = new CPT(v_gene4);
 		NoisyOR disease = new NoisyOR(v_disease, new EnumVariable[] {v_gene1, v_gene2, v_gene3, v_gene4}, new String [] {"high", "high", "high", "low"});
-		disease.put(new Object[] {"high", "low", "low", "medium"}, new EnumDistrib(v_gene1.getDomain(), new double[]{0.1, 0.3, 0.6}));
-		disease.put(new Object[] {"medium", "high", "medium", "medium"}, new EnumDistrib(v_gene1.getDomain(), new double[]{0.8, 0.15, 0.05}));
-		disease.put(new Object[] {"low", "high", "low", "medium"}, new EnumDistrib(v_gene1.getDomain(), new double[]{0.75, 0.15, 0.1}));
-		disease.put(new Object[] {"medium", "medium", "high", "medium"}, new EnumDistrib(v_gene1.getDomain(), new double[]{0.8, 0.15, 0.05}));
-		disease.put(new Object[] {"medium", "medium", "low", "low"}, new EnumDistrib(v_gene1.getDomain(), new double[]{0.15, 0.15, 0.70}));
+		//CPT disease = new CPT(v_disease, new EnumVariable[] {v_gene1, v_gene2, v_gene3, v_gene4});
+		disease.put(new Object[] {"high", "low", "low", "medium"}, new EnumDistrib(v_disease.getDomain(), new double[]{0.1, 0.3, 0.6}));
+		disease.put(new Object[] {"medium", "high", "medium", "medium"}, new EnumDistrib(v_disease.getDomain(), new double[]{0.8, 0.15, 0.05}));
+		disease.put(new Object[] {"low", "high", "low", "medium"}, new EnumDistrib(v_disease.getDomain(), new double[]{0.75, 0.15, 0.1}));
+		disease.put(new Object[] {"medium", "medium", "high", "medium"}, new EnumDistrib(v_disease.getDomain(), new double[]{0.8, 0.15, 0.05}));
+		disease.put(new Object[] {"medium", "medium", "low", "low"}, new EnumDistrib(v_disease.getDomain(), new double[]{0.15, 0.15, 0.70}));
 		disease.print();
 		Enumerable en = disease.getVariable().getDomain();
 		System.out.println(en.getIndex("terminal"));
 		System.out.println(en.get(2));
-		System.out.println(disease.get(new Object[] {"high", "low", "low", "medium"}, "medium"));
+		System.out.println(disease.get(new Object [] {"high", "medium", "low", "low"},"terminal"));
 	}
 	
 	public static void main1 (String [] args) {
