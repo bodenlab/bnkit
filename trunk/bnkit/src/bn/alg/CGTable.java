@@ -778,19 +778,30 @@ public class CGTable implements QueryResult {
         Variable.Assignment[] assign = new Variable.Assignment[evars.size() + nvars.size()];
         int mostProbKey = 0;
         double mostProbValue = -1;
-        for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) {
-            if (entry.getValue() > mostProbValue) {
-                mostProbKey = entry.getKey();
-                mostProbValue = entry.getValue();
-            }
+        if (this.isAtomic()) {
+	        for (int i = 0; i < nvars.size(); i ++){
+	            assign[i] = Variable.assign(nvars.get(i), atomicDensity.getDistrib(nvars.get(i)));
+	        }
+	        return assign;
+        } else {
+	        for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) {
+	            if (entry.getValue() > mostProbValue) {
+	                mostProbKey = entry.getKey();
+	                mostProbValue = entry.getValue();
+	            }
+	        }
         }
+        //values.length will be no. enumVars
         Object[] values = factorTable.getKey(mostProbKey);
+        //add all enum assignments to list
         for (int i = 0; i < values.length; i ++)
             assign[i] = Variable.assign(evars.get(i), values[i]);
+        //add all nonEnum assignments to list
         if (nvars.size() > 0) {
             JDF jdf = densityTable.getValue(mostProbKey);
-            for (int i = 0; i < evars.size(); i ++)
-                assign[i + values.length] = Variable.assign(evars.get(i), jdf.getDistrib(evars.get(i)));
+            for (int i = 0; i < nvars.size(); i ++){
+                assign[i + values.length] = Variable.assign(nvars.get(i), jdf.getDistrib(nvars.get(i)));
+            }
         }
         return assign;
     }
