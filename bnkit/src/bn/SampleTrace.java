@@ -96,7 +96,11 @@ public class SampleTrace {
                 for (Map.Entry<BNode, SampleTable> entry : nonEnumSamples.entrySet()) {
                     BNode node = entry.getKey();
                     SampleTable samples = entry.getValue();
-                    samples.count(enumRecord[round - 1], node.getInstance());
+                    if (allNonEnumerable) {
+                    	samples.count(node.getInstance());
+                    } else {
+                    	samples.count(enumRecord[round - 1], node.getInstance());
+                    }
                 }
             }
         }
