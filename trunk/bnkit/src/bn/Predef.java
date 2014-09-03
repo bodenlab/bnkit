@@ -163,32 +163,42 @@ public class Predef {
      */
     public static Object getObject(Variable var, String vstr) {
         try {
-            if (var.getPredef().equals("Boolean")) {
-                return Boolean.parseBoolean(vstr);
-            } else if (var.getPredef().equals("Nucleic acid")) {
-                Character ch = new Character(vstr.charAt(0));
-                if (var.getDomain().isValid(ch)) {
-                    return ch;
-                }
-            } else if (var.getPredef().equals("Amino acid")) {
-                Character ch = new Character(vstr.charAt(0));
-                if (var.getDomain().isValid(ch)) {
-                    return ch;
-                }
-            } else if (var.getPredef().equals("String")) {
-                if (var.getDomain().isValid(vstr)) {
-                    return vstr;
-                }
-            } else if (var.getPredef().equals("Number")) {
-                Integer n = Integer.parseInt(vstr);
-                if (var.getDomain().isValid(n)) {
-                    return n;
-                }
-            } else if (var.getPredef().equals("Real")) {
-                Double y = Double.parseDouble(vstr);
-                if (var.getDomain().isValid(y)) {
-                    return y;
-                }
+            switch (var.getPredef()) {
+                case "Boolean":
+                    return Boolean.parseBoolean(vstr);
+                case "Nucleic acid":
+                    {
+                        Character ch = vstr.charAt(0);
+                        if (var.getDomain().isValid(ch)) {
+                            return ch;
+                        }       break;
+                    }
+                case "Amino acid":
+                    {
+                        Character ch = vstr.charAt(0);
+                        if (var.getDomain().isValid(ch)) {
+                            return ch;
+                        }       break;
+                    }
+                case "String":
+                    if (var.getDomain().isValid(vstr)) {
+                        return vstr;
+                    }   break;
+                case "Number":
+                    Integer n = Integer.parseInt(vstr);
+                    if (var.getDomain().isValid(n)) {
+                        return n;
+                    }   break;
+                case "Real":
+                    Double y = Double.parseDouble(vstr);
+                    if (var.getDomain().isValid(y)) {
+                        return y;
+                    }   break;
+                case "Distrib":
+                    EnumDistrib d = EnumDistrib.parseEnumDistrib(vstr, (Enumerable)var.getDomain());
+                    if (var.getDomain().isValid(d)) {
+                        return d;
+                    }   break;
             }
         } catch (NumberFormatException e) {
             return null;
@@ -266,4 +276,18 @@ public class Predef {
         return Predef.Real("Rl");
     }
 
+    public static Variable<EnumDistrib> Distrib(String... values) {
+        return Predef.Distrib(values, "Distrib");
+    }
+    
+    public static Variable<EnumDistrib> Distrib(Enumerable dom, String name) {
+        EnumDistrib domain = new EnumDistrib(dom);
+        Variable<EnumDistrib> var = new Variable<>(domain, name);
+        var.setPredef("Distrib");
+        return var;
+    } 
+    
+    public static Variable<EnumDistrib> Distrib(String[] values, String name) {
+        return Predef.Distrib(new Enumerable(values), name);
+    } 
 }

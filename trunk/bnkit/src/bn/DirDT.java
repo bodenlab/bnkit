@@ -24,10 +24,9 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Class for Dirichlet Density Table (DirDT). This is a table for a 
- * variable that can take enumerable distributions as values, 
- * with each row specifying a single Dirichlet density, specifying what distributions it produces. 
- * The node has one or more enumerable parents.
+ * Class for Dirichlet Density Table (DirDT). This is a table for a variable that can take enumerable 
+ * distributions as values, with each row specifying a single Dirichlet density, specifying what 
+ * distributions it produces. The node has one or more enumerable parents.
  *
  * @author m.boden
  */
@@ -40,10 +39,10 @@ public class DirDT implements BNode, Serializable {
     private EnumTable<DirichletDistrib> table = null;
 
     // Parameters used for training. Some of which are allocated prior to training, and then re-used to save time.
-    
     private SampleTable<EnumDistrib> count = null; // the table that will contain all samples of the type "EnumDistrib" during learning
     
     private boolean relevant = false;
+    private EnumDistrib instance = null; // the value this node takes, null if unspecified
 
     /**
      * Create a Dirichlet density table for a variable. The variable is
@@ -54,12 +53,9 @@ public class DirDT implements BNode, Serializable {
      */
     public DirDT(Variable<EnumDistrib> var, List<EnumVariable> parents) {
         this.var = var;
-        int maxrows = 0;
         if (parents != null) {
-            if (parents.size() > 0) {
+            if (parents.size() > 0) 
                 this.table = new EnumTable<>(parents);
-                maxrows = this.table.getSize();
-            }
         }
     }
 
@@ -81,7 +77,6 @@ public class DirDT implements BNode, Serializable {
      */
     public DirDT(Variable<EnumDistrib> var) {
         this.var = var;
-        int maxrows = 0;
     }
     
     /**
@@ -122,11 +117,7 @@ public class DirDT implements BNode, Serializable {
     @Override
     public Factor makeFactor(BNet bn) {
         List<EnumVariable> vars_old = this.getParents();
-        Object varinstance = null;
-        BNode cnode = bn.getNode(var);
-        if (cnode != null) {
-            varinstance = cnode.getInstance();
-        }
+        Object varinstance = this.getInstance();
         if (vars_old != null) { // there are parent variables
             Object[] searchkey = new Object[vars_old.size()];
             List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
@@ -184,16 +175,13 @@ public class DirDT implements BNode, Serializable {
      * @param bn the BNet instance that can be used to check the status of nodes
      * so that factoring can be done (instantiation of variables are done for a
      * BNet node).
+     * @param relevant
      * @return the FactorTable created from the DirDT, provided instantiations of BN
      */
     @Override
     public Factor makeFactor(BNet bn, boolean relevant) {
         List<EnumVariable> vars_old = this.getParents();
-        Object varinstance = null;
-        BNode cnode = bn.getNode(var);
-        if (cnode != null) {
-            varinstance = cnode.getInstance();
-        }
+        Object varinstance = this.getInstance();
         if (vars_old != null) { // there are parent variables
             Object[] searchkey = new Object[vars_old.size()];
             List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
@@ -201,7 +189,7 @@ public class DirDT implements BNode, Serializable {
             for (int i = 0; i < vars_old.size(); i++) {
                 EnumVariable parent = vars_old.get(i);
                 // Record irrelevant parents to sum out
-                //FIXME when should a parent be removed? Allow it to influence factor table then remove it?
+                // FIXME when should a parent be removed? Allow it to influence factor table then remove it?
                 // If parent is evidenced it will not be included in factor table
                 if (!bn.getNode(parent).isRelevant() && bn.getNode(parent).getInstance() == null) {
                 	irrel_pars.add(parent);
@@ -389,12 +377,10 @@ public class DirDT implements BNode, Serializable {
         return table == null;
     }
 
-    private Double instance = null;
-
     @Override
     public void setInstance(Object value) {
         try {
-            instance = (Double) value;
+            instance = (EnumDistrib) value;
         } catch (ClassCastException e) {
             e.printStackTrace();
         }
@@ -406,7 +392,7 @@ public class DirDT implements BNode, Serializable {
     }
 
     @Override
-    public Double getInstance() {
+    public EnumDistrib getInstance() {
         return instance;
     }
     
@@ -461,8 +447,7 @@ public class DirDT implements BNode, Serializable {
             int nrows = table.getSize();
             for (int i = 0; i < nrows; i++) {
                 if (!table.hasValue(i))
-                    throw new RuntimeException("Not yet implemented");
-                    //table.setValue(i, new GaussianDistrib(rand.nextGaussian(), rand.nextDouble()));
+                    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
         }
     }
@@ -476,7 +461,7 @@ public class DirDT implements BNode, Serializable {
      */
     @Override
     public void maximizeInstance() {
-        throw new RuntimeException("Not yet implemented");
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
@@ -505,84 +490,12 @@ public class DirDT implements BNode, Serializable {
 
     @Override
     public String getStateAsText() {
-        StringBuilder sbuf = new StringBuilder("\n");
-        if (isRoot()) {
-            DirichletDistrib d = prior;
-            if (d != null) {
-                //sbuf.append("").append(d.getMean()).append(", ").append(d.getVariance()).append(";\n");
-            }
-        } else {
-            for (int i = 0; i < table.getSize(); i++) {
-                DirichletDistrib d = table.map.get(new Integer(i));
-                if (d != null) {
-                    sbuf.append(i).append(": ");	// use index as key because values above can be of different non-printable types
-                    //sbuf.append("").append(d.getMean()).append(", ").append(d.getVariance()).append("; (");
-                    // If we want to *see* the key, may not work well for some non-printable types
-                    Object[] key = table.getKey(i);
-                    for (int j = 0; j < key.length; j++) {
-                        if (j < key.length - 1) {
-                            sbuf.append(key[j]).append(", ");
-                        } else {
-                            sbuf.append(key[j]).append(")\n");
-                        }
-                    }
-                }
-            }
-        }
-        return sbuf.toString();
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
     public boolean setState(String dump) {
-        if (isRoot()) {
-            String[] line = dump.split(";");
-            if (line.length >= 1) {
-                String[] y = line[0].split(",");
-                if (y.length == 2) {
-                    double[] distrib = new double[y.length];
-                    try {
-                        for (int i = 0; i < distrib.length; i++) {
-                            distrib[i] = Double.parseDouble(y[i]);
-                        }
-                    } catch (NumberFormatException e) {
-                        e.printStackTrace();
-                        return false;
-                    }
-                    //this.put(new DirichletDistrib(distrib[0], distrib[1]));
-                    return true;
-                }
-            }
-        } else {
-            for (String line : dump.split("\n")) {
-                line = line.trim();
-                // 0: 0.4, 0.6; (true, true)
-                String[] specline = line.split(";");
-                if (specline.length >= 1) {
-                    String[] parts = specline[0].split(":");
-                    if (parts.length >= 2) {
-                        try {
-                            int index = Integer.parseInt(parts[0]);
-                            String[] y = parts[1].split(",");
-                            if (y.length == 2) {
-                                double[] distrib = new double[y.length];
-                                try {
-                                    for (int i = 0; i < distrib.length; i++) {
-                                        distrib[i] = Double.parseDouble(y[i]);
-                                    }
-                                } catch (NumberFormatException e) {
-                                    e.printStackTrace();
-                                    return false;
-                                }
-                                //this.put(table.getKey(index), new DirichletDistrib(distrib[0], distrib[1]));
-                            }
-                        } catch (NumberFormatException e) {
-                            System.err.println("Number format wrong and ignored: " + line);
-                        }
-                    }
-                }
-            }
-        }
-        return false;
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     public boolean isRelevant() {
