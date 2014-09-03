@@ -17,6 +17,8 @@ List of issues, ideas for improvements
 
   * Bayesian learning can consider prior probabilities of variables. These can come in the form of conjugate priors such as the beta or Dirichlet family, or as pseudo-counts. Such priors can help in situations where specific observations are scarce.
 
+  * Implement message passing (loopy belief propagation) as an alternative inference algorithm to support efficient inference in larger networks.
+
   * The efficiency of variable elimination (class CGVarElim) is very sensitive to the order in which variables are factorised and multiplied. There are some general heuristics which are currently used but many optimisations can be researched and implemented, e.g. dynamic programming can find the optimal ordering from individual factor sizes.
 
   * Factor is responsible for representing and manipulating factor tables, that are used heavily in variable elimination. Factor uses EnumTable as its main data structure. While access by key is relatively efficient, the current implementation of factor product, needs to "join" existing factors, and is somewhat wasteful. The principal problem is that a join needs to match and construct "keys" for every entry. Hypothetically, by organising the variables in canonical order, this operation can be streamlined.
