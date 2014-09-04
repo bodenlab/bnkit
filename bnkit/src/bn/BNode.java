@@ -30,6 +30,18 @@ public interface BNode {
     public String getName();
 
     /**
+     * Assign a tag name for this node.
+     * @param name
+     */
+    public void setTag(String name);
+
+    /**
+     * Get the tag name for this node
+     * @return tag name
+     */
+    public String getTag();
+
+    /**
      * Compute the probability of this variable taking the specified value
      *
      * @param key the condition
