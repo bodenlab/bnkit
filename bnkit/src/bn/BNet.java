@@ -104,7 +104,8 @@ public class BNet implements Serializable {
     public List<BNode> getTagged(String name){
         ArrayList<BNode> tagged = new ArrayList();
         for (BNode node : this.getAlphabetical()){
-            if (node.getTag().equals(name)){
+            String tag = node.getTag();
+            if (tag == name){
                 tagged.add(node);
             }
         }
