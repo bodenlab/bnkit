@@ -45,6 +45,8 @@ public class CPTPseudo implements BNode, Serializable {
     private PseudoMatrix pseudoMatrix; //stores the pseudo counts
     private Integer mainparent_index;
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
+    private String tag;
+
 
     /**
      * Create a conditional probability table for a variable. The variable is
@@ -461,6 +463,22 @@ public class CPTPseudo implements BNode, Serializable {
             }
             return ft;
         }
+    }
+
+    /**
+     * Assign a tag name for this node.
+     * @param name
+     */
+    public void setTag(String name){
+        this.tag = name;
+    }
+
+    /**
+     * Get the tag name for this node
+     * @return tag name
+     */
+    public String getTag(){
+        return this.tag;
     }
 
     /**

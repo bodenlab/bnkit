@@ -59,6 +59,7 @@ public class GDT implements BNode, Serializable {
     final private double[] n;           // save the numbers of samples
     
     private boolean relevant = false;
+    private String tag;
 
     /**
      * Create a Gaussian density table for a variable. The variable is
@@ -104,7 +105,23 @@ public class GDT implements BNode, Serializable {
         vars = new double[maxrows];
         n = new double[maxrows];
     }
-    
+
+    /**
+     * Assign a tag name for this node.
+     * @param name
+     */
+    public void setTag(String name){
+        this.tag = name;
+    }
+
+    /**
+     * Get the tag name for this node
+     * @return tag name
+     */
+    public String getTag(){
+        return this.tag;
+    }
+
     /**
      * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
      * Requires all parent nodes to be instantiated.

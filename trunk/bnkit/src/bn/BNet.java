@@ -19,16 +19,7 @@
 package bn;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -80,6 +71,35 @@ public class BNet implements Serializable {
      * Construct a BN.
      */
     public BNet() {
+    }
+
+    /**
+     * Get all nodes that have a tag assigned
+     * @return List of tagged nodes
+     */
+    public List<BNode> getTagged(){
+        ArrayList<BNode> tagged = new ArrayList();
+        for (BNode node : this.getAlphabetical()){
+            if (node.getTag() != null){
+                tagged.add(node);
+            }
+        }
+        return tagged;
+    }
+
+    /**
+     * Return nodes with a specific tag
+     * @param name name of tag
+     * @return list of nodes with tag name
+     */
+    public List<BNode> getTagged(String name){
+        ArrayList<BNode> tagged = new ArrayList();
+        for (BNode node : this.getAlphabetical()){
+            if (node.getTag().equals(name)){
+                tagged.add(node);
+            }
+        }
+        return tagged;
     }
 
     /**
@@ -339,19 +359,6 @@ public class BNet implements Serializable {
         }
         return ordered;
     }
-    
-    /**
-     * Get an alphabetical ordering of nodes
-     * @return list of alphabetically ordered nodes
-     */
-    public List<BNode> getAlphabetical() { 
-    	List<BNode> nodes = new ArrayList<>();
-    	SortedSet<String> names = new TreeSet<>(this.getNames());
-    	for (String n : names) {
-    		nodes.add(this.getNode(n));
-    	}
-    	return nodes;
-    }
 
     /**
      * Retrieve all node variables in order (from root/s to leaves; with parallel paths
@@ -367,11 +374,24 @@ public class BNet implements Serializable {
     }
 
     /**
+     * Get an alphabetical ordering of nodes
+     * @return list of alphabetically ordered nodes
+     */
+    public List<BNode> getAlphabetical() {
+        List<BNode> nodes = new ArrayList<>();
+        SortedSet<String> names = new TreeSet<>(this.getNames());
+        for (String n : names) {
+            nodes.add(this.getNode(n));
+        }
+        return nodes;
+    }
+
+    /**
      * Get the names of all variables in the BN.
      *
      * @return the names of the nodes in the BN
      */
-    public Set<String> getNames() {
+    public Set<String> getNames(){
         return nodes.keySet();
     }
 
@@ -597,6 +617,12 @@ public class BNet implements Serializable {
      	}
      	return output;
      }
+
+    public void resetNodes(){
+        for (BNode node : this.getNodes()){
+            node.resetInstance();
+        }
+    }
     
    
     /**

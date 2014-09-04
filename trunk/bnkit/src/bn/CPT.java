@@ -20,7 +20,6 @@ package bn;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -42,7 +41,9 @@ public class CPT implements BNode, Serializable{
     final private int nParents;
     private CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in CPT
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
-    
+    private String tag = null;
+
+
     /**
      * Create a conditional probability table for a variable. The variable is
      * conditioned on a set of Enumerable variables.
@@ -152,6 +153,23 @@ public class CPT implements BNode, Serializable{
             }
             this.nParents = cptParents.size();
         }
+    }
+
+
+    /**
+     * Assign a tag name for this node.
+     * @param name
+     */
+    public void setTag(String name){
+        this.tag = name;
+    }
+
+    /**
+     * Get the tag name for this node
+     * @return tag name
+     */
+    public String getTag(){
+        return this.tag;
     }
 
     /**
