@@ -75,6 +75,8 @@ public class CGTable implements QueryResult {
             for (Map.Entry<Integer, Double> entry : f.getMapEntries()) {
                 int key_index = entry.getKey();
                 double p = entry.getValue() / sum;
+                if (p == 0)
+                	continue;
                 factorTable.setValue(key_index, p);
                 if (hasNonEnum) {
                     JDF f_jdf = f.getJDF(key_index);
