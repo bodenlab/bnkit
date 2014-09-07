@@ -22,8 +22,16 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * This interface must be implemented by a node in a Bayesian network.
- * @author mikael
+ * Interface that must be implemented by anything that appears as a 
+ * node in a Bayesian network (BNet).
+ * A node is a network-aware representation of a variable.
+ * This is where the parameters/settings of the variable are stored, 
+ * and managed.
+ * The node is what is instantiated when a variable takes on a value.
+ * The variable decides on what type of values that can be assigned.
+ * The node will point to what (enumerable) variables that condition 
+ * the assignments of the node variable.
+ * @author Mikael Boden
  */
 public interface BNode {
 

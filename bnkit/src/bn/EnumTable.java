@@ -46,6 +46,11 @@ public class EnumTable<E> {
     }
 
     public EnumTable(Collection<EnumVariable> useParents) {
+        this(useParents, new HashMap<Integer, E>());
+    }
+
+    private EnumTable(Collection<EnumVariable> useParents, Map<Integer, E> map) {
+        this.map = map;
         this.parents = new ArrayList<>(useParents.size());
         this.pararr = new EnumVariable[useParents.size()];
         this.nParents = useParents.size();
@@ -64,9 +69,25 @@ public class EnumTable<E> {
             prod *= this.domsize[parent];
             this.period[parent] = prod;
         }
-        this.map = new HashMap<>();
+    }
+    
+    public EnumTable retrofit(List<EnumVariable> useParents) {
+        if (this.nParents != useParents.size())
+            throw new RuntimeException("Invalid retrofitting");
+        for (int i = 0; i < this.nParents; i ++) {
+            Variable p1 = this.getParents().get(i);
+            Variable p2 = useParents.get(i);
+            if (!p1.getDomain().equals(p2.getDomain()))
+                throw new RuntimeException("Invalid retrofitting: " + p1.getName() + " does not share domain with " + p2.getName());
+        }
+        EnumTable dup = new EnumTable(useParents, this.getMap());
+        return dup;
     }
 
+    public void setEmpty() {
+        this.map.clear();
+    }
+    
     /**
      * Get the theoretical number of entries in this table. Note this number is
      * always greater or equal to the actual, populated number of entries.
@@ -271,6 +292,10 @@ public class EnumTable<E> {
         return map.entrySet();
     }
 
+    private Map<Integer, E> getMap() {
+        return map;
+    }
+    
     /**
      * Identify each index that is linked to the specified key (which may
      * include "wildcards", indicated by null values).
