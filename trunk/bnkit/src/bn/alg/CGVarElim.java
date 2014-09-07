@@ -294,21 +294,18 @@ public class CGVarElim implements Inference {
     }
 
     /**
-     * Determine the log-transformed probability of the instantiated variables. 
-     * This function does not integrate over/marginalize continuous variables in case they are not instantiated.
+     * Determine the probability of the instantiated variables. 
+     * This function does not integrate over/marginalize continuous (and other density-based) variables. 
+     * Hence, such variables may have influence the result if they are not instantiated.
      * @return the likelihood of the evidence (instantiated nodes)
      */
     public double likelihood() {
-        JPT answer = null;
 	// All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
         // Assignment will be incorporated into the factor when it is constructed.
-        List<Variable> E = new ArrayList<>(); // evidence variables
         List<Variable> X = new ArrayList<>(); // unspecified variables, to-be summed-out
         for (BNode node : bn.getOrdered()) {
             Variable var = node.getVariable();
-            if (node.getInstance() != null) 
-                E.add(var);
-            else
+            if (node.getInstance() == null) 
                 X.add(var);
         }
         List<Bucket> buckets = new ArrayList<>();
@@ -317,7 +314,6 @@ public class CGVarElim implements Inference {
             try {
                 buckets.add(new Bucket((EnumVariable)x));
             } catch (ClassCastException e) {
-                ;
             }
         }
         int nBuckets = buckets.size();
@@ -401,7 +397,7 @@ public class CGVarElim implements Inference {
                     }
                 } else {    
                     // This is the final (first) bucket 
-                	double sum = result.getSum();
+                    double sum = result.getSum();
                     if (sum == 0) {
                         System.err.println("Likelihood is zero");
                     }
