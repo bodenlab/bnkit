@@ -89,7 +89,7 @@ public class BNet implements Serializable {
     public List<BNode> getTagged(){
         ArrayList<BNode> tagged = new ArrayList();
         for (BNode node : this.getAlphabetical()){
-            if (node.getTag() != null){
+            if (node.getTags() != null){
                 tagged.add(node);
             }
         }
@@ -97,20 +97,23 @@ public class BNet implements Serializable {
     }
 
     /**
-     * Return nodes with a specific tag
-     * @param name name of tag
-     * @return list of nodes with tag name
+     * Return nodes which have all the specified tags
+     * @param tags tag names
+     * @return list of nodes with all tags
      */
-    public List<BNode> getTagged(String name){
+    public List<BNode> getTagged(String... tags){
         ArrayList<BNode> tagged = new ArrayList();
-        for (BNode node : this.getAlphabetical()){
-            String tag = node.getTag();
-            if (tag.equals(name)){
+        Set tagset = new HashSet();
+        Collections.addAll(tagset, tags);
+        for (BNode node : this.getAlphabetical()){ //for each node
+            if (node.getTags().containsAll(tagset)){
                 tagged.add(node);
             }
         }
         return tagged;
     }
+
+//  ADD: getTagged but for nodes that have at least one of the tags
 
     /**
      * Add a node to the BN. All nodes must implement the BNode interface.

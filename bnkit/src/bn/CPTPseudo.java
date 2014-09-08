@@ -37,7 +37,7 @@ import java.util.*;
 public class CPTPseudo implements BNode, Serializable {
     private static final long serialVersionUID = 1L;
     final private EnumVariable var;
-    final private EnumTable<EnumDistrib> table; // table of (enumerable) probability distributions
+    private EnumTable<EnumDistrib> table; // table of (enumerable) probability distributions
     private EnumDistrib prior; // one (enumerable) probability distribution that is used if this variable is NOT conditioned
     final private int nParents;
     private CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in CPT
@@ -45,7 +45,7 @@ public class CPTPseudo implements BNode, Serializable {
     private PseudoMatrix pseudoMatrix; //stores the pseudo counts
     private Integer mainparent_index;
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
-    private String tag;
+    private Set<String> tags = new HashSet<>();
 
 
     /**
@@ -108,6 +108,10 @@ public class CPTPseudo implements BNode, Serializable {
         this.table = null;
         this.nParents = 0;
         this.pseudoMatrix = pseudo;
+    }
+
+    public CPTPseudo(EnumVariable var, EnumVariable... parents){
+        this(var, null, parents);
     }
 
     /**
@@ -179,6 +183,23 @@ public class CPTPseudo implements BNode, Serializable {
             }
             this.nParents = cptParents.size();
         }
+    }
+
+    /**
+     * Assign tags for this node.
+     * @param tags
+     */
+    public void setTags(String... tags){
+        for (String tag : tags)
+            this.tags.add(tag);
+    }
+
+    /**
+     * Get the tags for this node
+     * @return set of tag names
+     */
+    public Set getTags(){
+        return this.tags;
     }
 
     @Override
@@ -463,22 +484,6 @@ public class CPTPseudo implements BNode, Serializable {
             }
             return ft;
         }
-    }
-
-    /**
-     * Assign a tag name for this node.
-     * @param name
-     */
-    public void setTag(String name){
-        this.tag = name;
-    }
-
-    /**
-     * Get the tag name for this node
-     * @return tag name
-     */
-    public String getTag(){
-        return this.tag;
     }
 
     /**
@@ -1101,6 +1106,32 @@ public class CPTPseudo implements BNode, Serializable {
             }
         }
         return false;
+    }
+
+    /**
+     * Tie all parameters essential to inference and training for this CPT to those of another CPT.
+     * Variables should be separate but they are required to (1) be of the same type/domain, and (2) be listed in the same order.
+     * @param source the CPT from which parameters will be copied and held fixed.
+     */
+    public void tieTo(CPTPseudo source) {
+        CPTPseudo src = (CPTPseudo)source;
+        if (!this.var.getDomain().equals(source.getVariable().getDomain()))
+            throw new RuntimeException("Invalid sharing: " + var.getName() + " does not share domain with " + source.getVariable().getName());
+        if (this.nParents != src.nParents)
+            throw new RuntimeException("Invalid sharing: " + var.getName() + " has different number of parents from " + source.getVariable().getName());
+        for (int i = 0; i < this.nParents; i ++) {
+            Variable p1 = this.getParents().get(i);
+            Variable p2 = src.getParents().get(i);
+            if (!p1.getDomain().equals(p2.getDomain()))
+                throw new RuntimeException("Invalid sharing: " + p1.getName() + " does not share domain with " + p2.getName());
+        }
+        // need to tie:
+        // - count (used during learning)
+        // - prior (if applicable)
+        // - table (if applicable)
+        this.prior = source.prior;
+        if (this.nParents > 0)
+            this.table = source.table.retrofit(this.getParents());
     }
 
     @Override
