@@ -18,17 +18,8 @@
 package bn;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Random;
-
-import bn.alg.EM;
-import bn.alg.LearningAlg;
 
 /**
  * Class for Noisy-OR version of a conditional probability table
@@ -49,7 +40,8 @@ public class NoisyOR implements BNode, Serializable{
     final private int nParents;
     private CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in NoisyOR
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
-    private String tag = null;
+    private Set<String> tags = new HashSet<>();
+
 
     /**
      * Create a NoisyOR table for a variable. The variable is
@@ -219,19 +211,20 @@ public class NoisyOR implements BNode, Serializable{
     }
 
     /**
-     * Assign a tag name for this node.
-     * @param name
+     * Assign tags for this node.
+     * @param tags
      */
-    public void setTag(String name){
-        this.tag = name;
+    public void setTags(String... tags){
+        for (String tag : tags)
+            this.tags.add(tag);
     }
 
     /**
-     * Get the tag name for this node
-     * @return tag name
+     * Get the tags for this node
+     * @return set of tag names
      */
-    public String getTag(){
-        return this.tag;
+    public Set getTags(){
+        return this.tags;
     }
 
     /**

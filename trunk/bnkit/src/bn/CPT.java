@@ -18,12 +18,8 @@
 package bn;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Random;
 
 /**
  * Class for Conditional Probability Table (CPT). This is a table for a
@@ -41,7 +37,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     final private int nParents;
     private CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in CPT
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
-    private String tag = null;
+    private Set<String> tags = new HashSet<>();
 
 
     /**
@@ -172,23 +168,21 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
         }
     }
 
-
     /**
-     * Assign a tag name for this node.
-     * @param name
+     * Assign tags for this node.
+     * @param tags
      */
-    @Override
-    public void setTag(String name){
-        this.tag = name;
+    public void setTags(String... tags){
+        for (String tag : tags)
+            this.tags.add(tag);
     }
 
     /**
-     * Get the tag name for this node
-     * @return tag name
+     * Get the tags for this node
+     * @return set of tag names
      */
-    @Override
-    public String getTag(){
-        return this.tag;
+    public Set getTags(){
+        return this.tags;
     }
 
     /**

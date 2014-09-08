@@ -18,10 +18,7 @@
 package bn;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 /**
  * Class for Gaussian Density Table (GDT). This is a table for a continuous
@@ -59,7 +56,7 @@ public class GDT implements BNode, Serializable {
     final private double[] n;           // save the numbers of samples
     
     private boolean relevant = false;
-    private String tag;
+    private Set<String> tags = new HashSet<>();
 
     /**
      * Create a Gaussian density table for a variable. The variable is
@@ -107,19 +104,20 @@ public class GDT implements BNode, Serializable {
     }
 
     /**
-     * Assign a tag name for this node.
-     * @param name
+     * Assign tags for this node.
+     * @param tags
      */
-    public void setTag(String name){
-        this.tag = name;
+    public void setTags(String... tags){
+        for (String tag : tags)
+            this.tags.add(tag);
     }
 
     /**
-     * Get the tag name for this node
-     * @return tag name
+     * Get the tags for this node
+     * @return set of tag names
      */
-    public String getTag(){
-        return this.tag;
+    public Set getTags(){
+        return this.tags;
     }
 
     /**

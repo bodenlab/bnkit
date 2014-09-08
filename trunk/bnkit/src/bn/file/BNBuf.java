@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Iterator;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -141,7 +142,7 @@ public class BNBuf {
                     NamedNodeMap node_atts = node.getAttributes();
                     Node node_type = node_atts.getNamedItem("type");
                     Node node_var = node_atts.getNamedItem("var");
-                    Node node_tag = node_atts.getNamedItem("tag");
+
                     Node node_trainable = node_atts.getNamedItem("trainable");
                     if (node_var == null) {
                         System.err.println("Node specification invalid and ignored: Missing \"var\" field.");
@@ -173,7 +174,14 @@ public class BNBuf {
                             }
                         }
                         String type = node_type.getNodeValue();
-                        String tag = node_tag.getNodeValue();
+                        //Collect tags
+                        ArrayList<String> tags = new ArrayList();
+                        for (int x = 0; x < node_atts.getLength(); x++){
+                            String name = node_atts.item(x).getNodeName();
+                            if (name.split("_")[0].equals("tag")){
+                                tags.add(node_atts.item(x).getNodeValue());
+                            }
+                        }
                         BNode bnode = null;
                         if (type != null) {
                             bnode = Predef.getBNode(var, parent_vars, type);
@@ -188,7 +196,7 @@ public class BNBuf {
                             if (dump != null) {
                                 bnode.setState(dump);
                             }
-                            bnode.setTag(tag);
+                            bnode.setTags(tags.toArray(new String[tags.size()]));
                             bn.add(bnode);
                         } else {
                             System.err.println("Node specification invalid and ignored: " + node_var.getNodeValue());
@@ -358,7 +366,15 @@ public class BNBuf {
                 Variable var = node.getVariable();
                 node_element.setAttribute("var", var.getName());
                 node_element.setAttribute("type", node.getType());
-                node_element.setAttribute("tag", node.getTag());
+                //add tags
+                int i = 0;
+                if (node.getTags() != null){
+                    Iterator<String> titer = node.getTags().iterator();
+                    while (titer.hasNext()) { // add each tag
+                        node_element.setAttribute("tag_" + i, titer.next());
+                        i++;
+                    }
+                }
                 if (!node.isTrainable()) {
                 	node_element.setAttribute("trainable", String.valueOf(node.isTrainable()));
                 }
