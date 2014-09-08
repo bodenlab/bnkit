@@ -141,6 +141,7 @@ public class BNBuf {
                     NamedNodeMap node_atts = node.getAttributes();
                     Node node_type = node_atts.getNamedItem("type");
                     Node node_var = node_atts.getNamedItem("var");
+                    Node node_tag = node_atts.getNamedItem("tag");
                     Node node_trainable = node_atts.getNamedItem("trainable");
                     if (node_var == null) {
                         System.err.println("Node specification invalid and ignored: Missing \"var\" field.");
@@ -172,6 +173,7 @@ public class BNBuf {
                             }
                         }
                         String type = node_type.getNodeValue();
+                        String tag = node_tag.getNodeValue();
                         BNode bnode = null;
                         if (type != null) {
                             bnode = Predef.getBNode(var, parent_vars, type);
@@ -186,6 +188,7 @@ public class BNBuf {
                             if (dump != null) {
                                 bnode.setState(dump);
                             }
+                            bnode.setTag(tag);
                             bn.add(bnode);
                         } else {
                             System.err.println("Node specification invalid and ignored: " + node_var.getNodeValue());
@@ -355,6 +358,7 @@ public class BNBuf {
                 Variable var = node.getVariable();
                 node_element.setAttribute("var", var.getName());
                 node_element.setAttribute("type", node.getType());
+                node_element.setAttribute("tag", node.getTag());
                 if (!node.isTrainable()) {
                 	node_element.setAttribute("trainable", String.valueOf(node.isTrainable()));
                 }
