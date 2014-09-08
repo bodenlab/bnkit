@@ -105,7 +105,7 @@ public class BNet implements Serializable {
         ArrayList<BNode> tagged = new ArrayList();
         for (BNode node : this.getAlphabetical()){
             String tag = node.getTag();
-            if (tag == name){
+            if (tag.equals(name)){
                 tagged.add(node);
             }
         }
@@ -172,7 +172,7 @@ public class BNet implements Serializable {
 
             for (BNode root : getRoots()) {
                 List<BNode> ordered_from_root = new ArrayList<>();
-                if (ordered.contains(root)) {
+                if (ordered.contains(root) && ordered.size() == this.nodes.size()) {
                     continue;
                 }
                 ordered_from_root.add(root);
