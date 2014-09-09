@@ -20,6 +20,7 @@ package bn;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Interface that must be implemented by anything that appears as a 
@@ -41,13 +42,18 @@ public interface BNode {
      * Assign a tag name for this node.
      * @param name
      */
-    public void setTag(String name);
+    public void setTags(String... name);
 
     /**
      * Get the tag name for this node
      * @return tag name
      */
-    public String getTag();
+    public Set getTags();
+
+    /***
+     * Clear all tags for this node
+     */
+    public void resetTags();
 
     /**
      * Compute the probability of this variable taking the specified value
