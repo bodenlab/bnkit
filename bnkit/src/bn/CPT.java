@@ -37,8 +37,6 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     final private int nParents;
     private CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in CPT
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
-    private Set<String> tags = new HashSet<>();
-
 
     /**
      * Create a conditional probability table for a variable. The variable is
@@ -166,23 +164,6 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             }
             this.nParents = cptParents.size();
         }
-    }
-
-    /**
-     * Assign tags for this node.
-     * @param tags
-     */
-    public void setTags(String... tags){
-        for (String tag : tags)
-            this.tags.add(tag);
-    }
-
-    /**
-     * Get the tags for this node
-     * @return set of tag names
-     */
-    public Set getTags(){
-        return this.tags;
     }
 
     /**

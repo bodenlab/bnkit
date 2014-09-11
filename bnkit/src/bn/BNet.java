@@ -76,6 +76,8 @@ public class BNet implements Serializable {
      */
     private List<Variable> orderedVars = new ArrayList<>();
 
+    private HashMap<String, Set<BNode>> tagged = new HashMap<>();
+
     /**
      * Construct a BN.
      */
@@ -87,9 +89,38 @@ public class BNet implements Serializable {
      * @return List of tagged nodes
      */
     public List<BNode> getTagged(){
-        ArrayList<BNode> tagged = new ArrayList();
-        for (BNode node : this.getAlphabetical()){
-            if (node.getTags() != null){
+        ArrayList tagged = new ArrayList();
+        Iterator it = this.tagged.entrySet().iterator();
+        while (it.hasNext()){
+            Map.Entry<String, Set<BNode>> pairs = (Map.Entry)it.next();
+            for (BNode node : pairs.getValue()){
+                tagged.add(node);
+            }
+        }
+        return tagged;
+    }
+
+
+    /**
+     * Return nodes that are in all specified tag groups
+     * @param tags tag names
+     * @return list of nodes
+     */
+    public List<BNode> getTagged(String... tags){
+        ArrayList tagged = new ArrayList();
+        for (BNode node : this.getTagged()){
+            boolean common = false;
+            for (String tag: tags){
+                if (!this.tagged.keySet().contains(tag)){
+                    throw new IllegalArgumentException("Tag " + tag + " does not exist");
+                }
+                if (this.tagged.get(tag).contains(node)){
+                    common = true;
+                } else{
+                    common = false;
+                }
+            }
+            if (common){
                 tagged.add(node);
             }
         }
@@ -97,20 +128,49 @@ public class BNet implements Serializable {
     }
 
     /**
-     * Return nodes which have all the specified tags
-     * @param tags tag names
-     * @return list of nodes with all tags
+     * Remove a node from a tag group
+     * @param tag
+     * @param node
      */
-    public List<BNode> getTagged(String... tags){
-        ArrayList<BNode> tagged = new ArrayList();
-        Set tagset = new HashSet();
-        Collections.addAll(tagset, tags);
-        for (BNode node : this.getAlphabetical()){ //for each node
-            if (node.getTags().containsAll(tagset)){
-                tagged.add(node);
+    public void removeTag(String tag, BNode node){
+        this.tagged.get(tag).remove(node);
+    }
+
+    /**
+     * Assign nodes to a specific tag group
+     * @param tag
+     * @param nodes
+     */
+    public void setTags(String tag, BNode... nodes){
+        if (!this.tagged.containsKey(tag)){
+            this.tagged.put(tag, new HashSet<BNode>());
+        }
+        for (BNode node : nodes){
+            this.tagged.get(tag).add(node);
+        }
+    }
+
+    public void setTags(String[] tags, BNode... nodes){
+        for (String tag: tags){
+            this.setTags(tag, nodes);
+        }
+    }
+
+    /**
+     * Get the tag groups in which a node belongs
+     * @param node
+     * @return List of tag groups
+     */
+    public List<String> getTags(BNode node){
+        ArrayList<String> tags = new ArrayList();
+        Iterator it = this.tagged.entrySet().iterator();
+        while (it.hasNext()){
+            Map.Entry<String, Set<BNode>> pairs = (Map.Entry)it.next();
+            if (pairs.getValue().contains(node)){
+                tags.add(pairs.getKey());
             }
         }
-        return tagged;
+        return tags;
     }
 
 //  ADD: getTagged but for nodes that have at least one of the tags

@@ -40,7 +40,6 @@ public class DirDT implements BNode, Serializable {
     
     private boolean relevant = false;
     private EnumDistrib instance = null; // the value this node takes, null if unspecified
-    private Set<String> tags = new HashSet<>();
 
     /**
      * Create a Dirichlet density table for a variable. The variable is
@@ -75,23 +74,6 @@ public class DirDT implements BNode, Serializable {
      */
     public DirDT(Variable<EnumDistrib> var) {
         this.var = var;
-    }
-
-    /**
-     * Assign tags for this node.
-     * @param tags
-     */
-    public void setTags(String... tags){
-        for (String tag : tags)
-            this.tags.add(tag);
-    }
-
-    /**
-     * Get the tags for this node
-     * @return set of tag names
-     */
-    public Set getTags(){
-        return this.tags;
     }
 
     /**
