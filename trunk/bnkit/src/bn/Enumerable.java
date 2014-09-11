@@ -82,6 +82,10 @@ public class Enumerable implements Domain {
         }
     }
 
+    public Object[] getValues(){
+        return this.values;
+    }
+
     public static Enumerable bool = new Enumerable(new Boolean[]{true, false});
     public static Enumerable nacid = new Enumerable(new Character[]{'A', 'C', 'G', 'T'});
     public static Enumerable aacid = new Enumerable(new Character[]{'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y'});
