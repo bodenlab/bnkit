@@ -196,8 +196,8 @@ public class BNBuf {
                             if (dump != null) {
                                 bnode.setState(dump);
                             }
-                            bnode.setTags(tags.toArray(new String[tags.size()]));
                             bn.add(bnode);
+                            bn.setTags(tags.toArray(new String[tags.size()]), bnode);
                         } else {
                             System.err.println("Node specification invalid and ignored: " + node_var.getNodeValue());
                         }
@@ -368,12 +368,10 @@ public class BNBuf {
                 node_element.setAttribute("type", node.getType());
                 //add tags
                 int i = 0;
-                if (node.getTags() != null){
-                    Iterator<String> titer = node.getTags().iterator();
-                    while (titer.hasNext()) { // add each tag
-                        node_element.setAttribute("tag_" + i, titer.next());
-                        i++;
-                    }
+                Iterator<String> titer = bn.getTags(node).iterator();
+                while (titer.hasNext()) { // add each tag
+                    node_element.setAttribute("tag_" + i, titer.next());
+                    i++;
                 }
                 if (!node.isTrainable()) {
                 	node_element.setAttribute("trainable", String.valueOf(node.isTrainable()));
