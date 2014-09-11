@@ -37,6 +37,12 @@ import bn.*;
  */
 public class DataBuf {
 
+    private static HashMap<String, Integer> headerMap = new HashMap<String, Integer>();
+
+    public HashMap<String, Integer> getHeaderMap(){
+        return this.headerMap;
+    }
+
     /**
      * Load a data file containing tab-separated values for variables. Return
      * values for listed variables only, and in the specified order. If the
@@ -121,6 +127,7 @@ public class DataBuf {
                             for (int i = 0; i < words.length; i++) {
                                 if (words[i].equals(vars[j].getName())) {
                                     field_index[j] = i;
+                                    headerMap.put(words[i], j);
                                     found = true;
                                     break;
                                 }
