@@ -754,8 +754,8 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             //Set all 'old' distributions in the CPT to valid = false
             for (EnumDistrib d : this.table.getValues()) {
                 d.setValid(false);
-            }      	
-        	
+            }
+
             // add the counts to the CPT
             for (Map.Entry<Integer, Double> entry : count.table.getMapEntries()) {
                 double nobserv = entry.getValue();
