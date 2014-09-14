@@ -89,15 +89,17 @@ public class BNet implements Serializable {
      * @return List of tagged nodes
      */
     public List<BNode> getTagged(){
-        ArrayList tagged = new ArrayList();
+        ArrayList taggedList = new ArrayList();
+        Set<BNode> taggedSet = new HashSet();
         Iterator it = this.tagged.entrySet().iterator();
         while (it.hasNext()){
             Map.Entry<String, Set<BNode>> pairs = (Map.Entry)it.next();
             for (BNode node : pairs.getValue()){
-                tagged.add(node);
+                taggedSet.add(node);
             }
         }
-        return tagged;
+        taggedList.addAll(taggedSet);
+        return taggedList;
     }
 
 
@@ -107,24 +109,28 @@ public class BNet implements Serializable {
      * @return list of nodes
      */
     public List<BNode> getTagged(String... tags){
-        ArrayList tagged = new ArrayList();
-        for (BNode node : this.getTagged()){
+        ArrayList taggedList = new ArrayList();
+        Set<BNode> taggedSet = new HashSet();
+        List<BNode> taggedNodes = this.getTagged();
+        for (BNode node : taggedNodes){
             boolean common = false;
             for (String tag: tags){
                 if (!this.tagged.keySet().contains(tag)){
                     throw new IllegalArgumentException("Tag " + tag + " does not exist");
                 }
-                if (this.tagged.get(tag).contains(node)){
-                    common = true;
-                } else{
+                if (!this.tagged.get(tag).contains(node)){
                     common = false;
+                    break;
+                } else{
+                    common = true;
                 }
             }
             if (common){
-                tagged.add(node);
+                taggedSet.add(node);
             }
         }
-        return tagged;
+        taggedList.addAll(taggedSet);
+        return taggedList;
     }
 
     /**

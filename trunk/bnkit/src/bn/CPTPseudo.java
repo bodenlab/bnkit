@@ -1,7 +1,26 @@
+/*
+    bnkit -- software for building and using Bayesian networks
+    Copyright (C) 2014  M. Boden et al.
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package bn;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.Map.Entry;
+
 
 /**
  * Class for Pseudo Conditional Probability Table (CPT). This is a table for a
@@ -21,20 +40,15 @@ import java.util.*;
  *      be able to provide a full pseudocounts matrix accounting for every possibility. Hence, the user is required to
  *      set a main parent if the node has more than one parent. Essentially this is equivalent to saying "This parent
  *      is the main parent/variable which is influencing this child node and I only want to apply pseudo counts
- *      specifically in relation to this relationship". This is done with - setMainParentIndex(String name).
+ *      specifically in respect to this relationship". This is done with - setMainParentIndex(String name).
  *      This parent should be the one whose domain entries correspond respectively to each row in a provided PseudoMatrix.
  *      (Where columns should correspond to each possible observation across the child's domain).
- *
- *      - Currently this node type cannot be saved with pseudo counts (I am not even sure it can be correctly
- *      loaded without counts...?).
- *      If you want to apply pseudo counts, you need to specify the network/pseudo nodes in code when needed.
- *
- *      -?
  *
  *
  * @author julian
  */
-public class CPTPseudo implements BNode, Serializable {
+
+public class CPTPseudo implements BNode, TiedNode<CPTPseudo>, Serializable {
     private static final long serialVersionUID = 1L;
     final private EnumVariable var;
     private EnumTable<EnumDistrib> table; // table of (enumerable) probability distributions
@@ -60,12 +74,19 @@ public class CPTPseudo implements BNode, Serializable {
                 this.table = new EnumTable<EnumDistrib>(parents);
                 this.prior = null;
                 this.nParents = parents.size();
+                List<EnumVariable> cond = new ArrayList<>();
+                cond.add(var); // first variable is always the conditioned variable
+                cond.addAll(parents);
+                this.count = new CountTable(cond);
                 this.pseudoMatrix = pseudo;
                 return;
             }
         }
         this.table = null;
         this.nParents = 0;
+        List<EnumVariable> cond = new ArrayList<>();
+        cond.add(var); // first variable is always the conditioned variable
+        this.count = new CountTable(cond);
         this.pseudoMatrix = pseudo;
     }
 
@@ -76,12 +97,19 @@ public class CPTPseudo implements BNode, Serializable {
                 this.table = new EnumTable<EnumDistrib>(parents);
                 this.prior = null;
                 this.nParents = parents.size();
+                List<EnumVariable> cond = new ArrayList<>();
+                cond.add(var); // first variable is always the conditioned variable
+                cond.addAll(this.getParents());
+                this.count = new CountTable(cond);
                 this.pseudoMatrix = null;
                 return;
             }
         }
         this.table = null;
         this.nParents = 0;
+        List<EnumVariable> cond = new ArrayList<>();
+        cond.add(var); // first variable is always the conditioned variable
+        this.count = new CountTable(cond);
         this.pseudoMatrix = null;
     }
 
@@ -99,12 +127,19 @@ public class CPTPseudo implements BNode, Serializable {
                 this.table = new EnumTable<>(EnumVariable.toList(parents));
                 this.prior = null;
                 this.nParents = parents.length;
+                List<EnumVariable> cond = new ArrayList<>();
+                cond.add(var); // first variable is always the conditioned variable
+                cond.addAll(this.getParents());
+                this.count = new CountTable(cond);
                 this.pseudoMatrix = pseudo;
                 return;
             }
         }
         this.table = null;
         this.nParents = 0;
+        List<EnumVariable> cond = new ArrayList<>();
+        cond.add(var); // first variable is always the conditioned variable
+        this.count = new CountTable(cond);
         this.pseudoMatrix = pseudo;
     }
 
@@ -121,6 +156,9 @@ public class CPTPseudo implements BNode, Serializable {
         this.var = var;
         this.table = null;
         this.nParents = 0;
+        List<EnumVariable> cond = new ArrayList<>();
+        cond.add(var); // first variable is always the conditioned variable
+        this.count = new CountTable(cond);
         this.pseudoMatrix = pseudo;
     }
 
@@ -183,14 +221,67 @@ public class CPTPseudo implements BNode, Serializable {
         }
     }
 
-    @Override
-    public Distrib makeDistrib(Collection<Sample> samples) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    /**
+     * Create a CPTPseudo from a JPT. The variable in the JPT var is the variable
+     * conditioned on in the CPTPseudo.
+     *
+     * @param jpt
+     * @param var
+     */
+    public CPTPseudo(JPT jpt, EnumVariable var) {
+        this.var = var;
+        List<EnumVariable> CPTPseudoParents = new ArrayList<>(jpt.getParents().size() - 1);
+        int index = -1;
+        for (int i = 0; i < jpt.getParents().size(); i++) {
+            EnumVariable jptParent = jpt.getParents().get(i);
+            if (jptParent == var) {
+                index = i;
+            } else {
+                CPTPseudoParents.add(jptParent);
+            }
+        }
+        if (index == -1) {
+            throw new RuntimeException("Invalid variable " + var + " for creating CPTPseudo");
+        }
+        if (CPTPseudoParents.isEmpty()) { // no parents in CPTPseudo
+            this.table = null;
+            this.prior = new EnumDistrib(var.getDomain());
+            for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
+                Object[] jptkey = jpt.table.getKey(entry.getKey().intValue());
+                this.prior.set(jptkey[0], entry.getValue());
+            }
+            this.prior.normalise();
+            this.nParents = 0;
+        } else { // there are parents
+            this.table = new EnumTable<>(CPTPseudoParents);
+            for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
+                Object[] jptkey = jpt.table.getKey(entry.getKey().intValue());
+                Object[] CPTPseudokey = new Object[jptkey.length - 1];
+                int j = 0;
+                for (int i = 0; i < jptkey.length; i++) {
+                    if (i != index) // selected variable
+                    {
+                        CPTPseudokey[j++] = jptkey[i];
+                    }
+                }
+                int CPTPseudo_index = this.table.getIndex(CPTPseudokey);
+                EnumDistrib d = this.table.getValue(CPTPseudo_index);
+                if (d == null) {
+                    d = new EnumDistrib(var.getDomain());
+                }
+                d.set(jptkey[index], entry.getValue());
+                this.table.setValue(CPTPseudo_index, d);
+            }
+            for (Map.Entry<Integer, EnumDistrib> CPTPseudo_entry : this.table.getMapEntries()) {
+                CPTPseudo_entry.getValue().normalise();
+            }
+            this.nParents = CPTPseudoParents.size();
+        }
     }
 
     /**
-     * Assign entries in CPT according to a given JPT. Not bullet-proof, watch
-     * out for CPT - JPT incompatibilities, e.g. variable order which is not
+     * Assign entries in CPTPseudo according to a given JPT. Not bullet-proof, watch
+     * out for CPTPseudo - JPT incompatibilities, e.g. variable order which is not
      * checked currently
      *
      * @param jpt
@@ -203,43 +294,43 @@ public class CPTPseudo implements BNode, Serializable {
                 index = i;
             } else {
                 if (!this.getParents().contains(jptParent)) {
-                    throw new RuntimeException("No variable " + jptParent + " in CPT");
+                    throw new RuntimeException("No variable " + jptParent + " in CPTPseudo");
                 }
             }
         }
         if (index == -1) {
             throw new RuntimeException("No variable " + var + " in JPT");
         }
-        if (this.table == null && jpt.getParents().size() == 1) { // no parents in CPT
+        if (this.table == null && jpt.getParents().size() == 1) { // no parents in CPTPseudo
             for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
                 Object[] jptkey = jpt.table.getKey(entry.getKey().intValue());
-                this.prior.set(jptkey[0], entry.getValue().doubleValue());
+                this.prior.set(jptkey[0], entry.getValue());
             }
             this.prior.normalise();
         } else if (jpt.getParents().size() == this.getParents().size() + 1) { // there are parents
             for (Map.Entry<Integer, Double> entry : jpt.table.getMapEntries()) {
                 Object[] jptkey = jpt.table.getKey(entry.getKey().intValue());
-                Object[] cptkey = new Object[jptkey.length - 1];
+                Object[] CPTPseudokey = new Object[jptkey.length - 1];
                 int j = 0;
                 for (int i = 0; i < jptkey.length; i++) {
                     if (i != index) // selected variable
                     {
-                        cptkey[j++] = jptkey[i];
+                        CPTPseudokey[j++] = jptkey[i];
                     }
                 }
-                int cpt_index = this.table.getIndex(cptkey);
-                EnumDistrib d = this.table.getValue(cpt_index);
+                int CPTPseudo_index = this.table.getIndex(CPTPseudokey);
+                EnumDistrib d = this.table.getValue(CPTPseudo_index);
                 if (d == null) {
                     d = new EnumDistrib(var.getDomain());
                 }
-                d.set(jptkey[index], entry.getValue().doubleValue());
-                this.table.setValue(cpt_index, d);
+                d.set(jptkey[index], entry.getValue());
+                this.table.setValue(CPTPseudo_index, d);
             }
-            for (Map.Entry<Integer, EnumDistrib> cpt_entry : this.table.getMapEntries()) {
-                cpt_entry.getValue().normalise();
+            for (Map.Entry<Integer, EnumDistrib> CPTPseudo_entry : this.table.getMapEntries()) {
+                CPTPseudo_entry.getValue().normalise();
             }
         } else {
-            throw new RuntimeException("Cannot set CPT from given JPT: " + jpt);
+            throw new RuntimeException("Cannot set CPTPseudo from given JPT: " + jpt);
         }
     }
 
@@ -249,40 +340,42 @@ public class CPTPseudo implements BNode, Serializable {
      * @param key the parent values
      * @return the distribution of the variable for this node
      */
+    @Override
     public Distrib getDistrib(Object[] key) {
         if (this.table == null || key == null)
             return this.getDistrib();
         try {
             return this.table.getValue(key);
         } catch (EnumTableRuntimeException e) {
-            throw new RuntimeException("Evaluation of CPT " + this.toString() + " failed since condition was not fully specified: " + e.getMessage());
+            throw new RuntimeException("Evaluation of CPTPseudo " + this.toString() + " failed since condition was not fully specified: " + e.getMessage());
         }
     }
 
-//    @Override
-//    public Distrib makeDistrib(Collection<Sample> samples) {
-//        throw new UnsupportedOperationException("Not supported yet.");
-//    }
+    @Override
+    public Distrib makeDistrib(Collection<Sample> samples) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 
 
     /**
-     * Make a Factor out of this CPT. If a variable is instantiated it will
+     * Make a Factor out of this CPTPseudo. If a variable is instantiated it will
      * be factored out.
      *
      * @param bn the BNet instance that can be used to check the status of nodes
      * so that factoring can be done (instantiation of variables are done for a
      * BNet node).
+     * @return factor of CPTPseudo wrt instantiation of bn
      */
     @Override
     public Factor makeFactor(BNet bn) {
         List<EnumVariable> vars_old = this.getParents();
-        EnumVariable var = this.getVariable();
+        EnumVariable myvar = this.getVariable();
         Object varinstance = null;
-        BNode cnode = bn.getNode(var);
+        BNode cnode = bn.getNode(myvar);
         if (cnode != null) {
             varinstance = cnode.getInstance();
         }
-        Enumerable dom = var.getDomain();
+        Enumerable dom = myvar.getDomain();
         if (vars_old != null) { // there are parent variables
             Object[] searchkey = new Object[vars_old.size()];
             List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
@@ -297,13 +390,13 @@ public class CPTPseudo implements BNode, Serializable {
                 }
             }
             if (varinstance == null) {
-                vars_new.add(var);
+                vars_new.add(myvar);
             }
             Factor ft = new Factor(vars_new);
             if (varinstance != null) {
                 ft.evidenced = true;
             } else {
-                for (int i = 0; i < searchkey.length; i++) {
+                for (Object searchkey1 : searchkey) {
                     if (searchkey != null) {
                         ft.evidenced = true;
                         break;
@@ -322,12 +415,12 @@ public class CPTPseudo implements BNode, Serializable {
                             newkey[newcnt++] = key[i];
                         }
                     }
-                    if (varinstance != null) { // the variable for this CPT is instantiated
+                    if (varinstance != null) { // the variable for this CPTPseudo is instantiated
                         if (newkey.length == 0) // atomic FactorTable
                             ft.setFactor(null, d.get(varinstance));
                         else
                             ft.addFactor(newkey, d.get(varinstance));
-                    } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
+                    } else { // the variable for this CPTPseudo is NOT instantiated so we add one entry for each possible instantiation
                         for (int j = 0; j < dom.size(); j++) {
                             newkey[newkey.length - 1] = dom.get(j);
                             Double p = d.get(j);
@@ -348,7 +441,7 @@ public class CPTPseudo implements BNode, Serializable {
                 return ft;
             }
             List<Variable> vars_new = new ArrayList<>(1);
-            vars_new.add(var);
+            vars_new.add(myvar);
             Factor ft = new Factor(vars_new);
             Object[] newkey = new Object[1];
             EnumDistrib d = this.prior;
@@ -361,7 +454,7 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Make a Factor out of this CPT. If a variable is instantiated it will
+     * Make a Factor out of this CPTPseudo. If a variable is instantiated it will
      * be factored out.
      * If a parent is not relevant, it will not be included in the factor
      *
@@ -369,16 +462,18 @@ public class CPTPseudo implements BNode, Serializable {
      * so that factoring can be done (instantiation of variables are done for a
      * BNet node).
      * @param rel true if you want to only include relevant nodes
+     * @return factor of CPTPseudo wrt bn, considering if parents are relevant (rel)
      */
+    @Override
     public Factor makeFactor(BNet bn, boolean rel) {
         List<EnumVariable> vars_old = this.getParents();
-        EnumVariable var = this.getVariable();
+        EnumVariable myvar = this.getVariable();
         Object varinstance = null;
-        BNode cnode = bn.getNode(var);
+        BNode cnode = bn.getNode(myvar);
         if (cnode != null) {
             varinstance = cnode.getInstance();
         }
-        Enumerable dom = var.getDomain();
+        Enumerable dom = myvar.getDomain();
         if (vars_old != null) { // there are parent variables
             Object[] searchkey = new Object[vars_old.size()];
             List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
@@ -400,14 +495,13 @@ public class CPTPseudo implements BNode, Serializable {
                 }
             }
             if (varinstance == null) {
-                vars_new.add(var);
+                vars_new.add(myvar);
             }
             Factor ft = new Factor(vars_new);
             if (varinstance != null) {
                 ft.evidenced = true;
             } else {
-                //FIXME what is this loop doing? Should it be searchkey[i]??
-                for (int i = 0; i < searchkey.length; i++) {
+                for (Object searchkey1 : searchkey) {
                     if (searchkey != null) {
                         ft.evidenced = true;
                         break;
@@ -426,12 +520,12 @@ public class CPTPseudo implements BNode, Serializable {
                             newkey[newcnt++] = key[i];
                         }
                     }
-                    if (varinstance != null) { // the variable for this CPT is instantiated
+                    if (varinstance != null) { // the variable for this CPTPseudo is instantiated
                         if (newkey.length == 0) // atomic FactorTable
                             ft.setFactor(null, d.get(varinstance));
                         else
                             ft.addFactor(newkey, d.get(varinstance));
-                    } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
+                    } else { // the variable for this CPTPseudo is NOT instantiated so we add one entry for each possible instantiation
                         for (int j = 0; j < dom.size(); j++) {
                             newkey[newkey.length - 1] = dom.get(j);
                             Double p = d.get(j);
@@ -455,7 +549,7 @@ public class CPTPseudo implements BNode, Serializable {
                 return ft;
             }
             List<Variable> vars_new = new ArrayList<>(1);
-            vars_new.add(var);
+            vars_new.add(myvar);
             Factor ft = new Factor(vars_new);
             Object[] newkey = new Object[1];
             EnumDistrib d = this.prior;
@@ -468,27 +562,31 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Get the name of the CPT
+     * Get the name of the CPTPseudo
+     * @return
      */
+    @Override
     public String getName() {
         return getVariable().getName();
     }
 
     /**
-     * Get the variable of the CPT.
+     * Get the variable of the CPTPseudo.
      *
-     * @return the variable of the CPT
+     * @return the variable of the CPTPseudo
      */
+    @Override
     public EnumVariable getVariable() {
         return var;
     }
 
     /**
      * Retrieve the names of all parent variables (that is all variables that
-     * are conditioning the CPT variable)
+     * are conditioning the CPTPseudo variable)
      *
      * @return the variables of the parent variables
      */
+    @Override
     public List<EnumVariable> getParents() {
         if (table == null) {
             return null;
@@ -498,24 +596,23 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Check if this CPT is a "root" CPT, i.e. has no parents.
+     * Check if this CPTPseudo is a "root" CPTPseudo, i.e. has no parents.
      *
-     * @return true if the CPT has no parents, false if it has
+     * @return true if the CPTPseudo has no parents, false if it has
      */
+    @Override
     public boolean isRoot() {
-        if (table == null) {
-            return true;
-        }
-        return false;
+        return table == null;
     }
 
     /**
-     * Get the conditional probability of the variable (represented by this CPT)
+     * Get the conditional probability of the variable (represented by this CPTPseudo)
      *
-     * @param key parent key (condition); if null the CPT is assumed to be a
+     * @param key parent key (condition); if null the CPTPseudo is assumed to be a
      * prior.
      * @return the probability of the variable
      */
+    @Override
     public Double get(Object[] key, Object value) {
         if (key == null) {
             return prior.get(value);
@@ -527,12 +624,13 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Get the conditional probability of the variable (represented by this CPT)
+     * Get the conditional probability of the variable (represented by this CPTPseudo)
      *
-     * @param key parent key (condition); if null the CPT is assumed to be a
+     * @param key parent key (condition); if null the CPTPseudo is assumed to be a
      * prior.
      * @return the probability of the variable
      */
+    @Override
     public Double get(Object value, Object... key) {
         if (key == null) {
             return prior.get(value);
@@ -543,6 +641,7 @@ public class CPTPseudo implements BNode, Serializable {
         return table.getValue(key).get(value);
     }
 
+    @Override
     public Double get(Object value) {
         if (isRoot()) {
             return prior.get(value);
@@ -551,16 +650,22 @@ public class CPTPseudo implements BNode, Serializable {
         }
     }
 
+    @Override
     public EnumTable getTable() {
         return table;
     }
 
+    /**
+     *
+     * @return
+     */
+    @Override
     public EnumDistrib getDistrib() {
         return prior;
     }
 
     /**
-     * Set entry (or entries) of the CPT to the specified probability value
+     * Set entry (or entries) of the CPTPseudo to the specified probability value
      * (variable is true).
      *
      * @param key the boolean key (probabilistic condition)
@@ -572,15 +677,12 @@ public class CPTPseudo implements BNode, Serializable {
         } else if (key.length == 0) {
             put(prob);
         } else {
-            //THIS IS A HACK - ISSUE 3 (see repo) - Can't pass multiple keys referring to
-            //single parent classes
-            for (Object k : key)
-                table.setValue(new Object[]{k}, prob);
+            table.setValue(key, prob);
         }
     }
 
     /**
-     * Set entry (or entries) of the CPT to the specified probability value
+     * Set entry (or entries) of the CPTPseudo to the specified probability value
      * (variable is true).
      *
      * @param prob the probability value (must be >=0 and <=1)
@@ -597,13 +699,13 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Set the prior probability of this CPT that has no parents.
+     * Set the prior probability of this CPTPseudo that has no parents.
      *
      * @param prob
      */
     public void put(EnumDistrib prob) {
         if (!isPrior()) {
-            throw new RuntimeException("Unable to set prior. CPT " + var + " is conditioned.");
+            throw new RuntimeException("Unable to set prior. CPTPseudo " + var + " is conditioned.");
         }
         if (!prob.isNormalised()) {
             throw new RuntimeException("Probability value is invalid: " + prob);
@@ -612,30 +714,33 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Checks if this CPT has no parents.
+     * Checks if this CPTPseudo has no parents.
+     * @return
      */
     public boolean isPrior() {
         return table == null;
     }
 
     /**
-     * Provide a non-unique string representation of this CPT.
+     * Provide a non-unique string representation of this CPTPseudo.
      */
+    @Override
     public String toString() {
         if (isPrior()) {
-            return "CPT(" + getVariable().getName() + ")" + (getInstance() == null ? "" : "=" + getInstance());
+            return "CPTPseudo(" + getVariable().getName() + ")" + (getInstance() == null ? "" : "=" + getInstance());
         } else {
-            StringBuffer sbuf = new StringBuffer();
+            StringBuilder sbuf = new StringBuilder();
             for (int i = 0; i < table.nParents; i++) {
-                sbuf.append(table.getParents().get(i).toString() + (i < table.nParents - 1 ? "," : ""));
+                sbuf.append(table.getParents().get(i).toString()).append(i < table.nParents - 1 ? "," : "");
             }
-            return "CPT(" + getVariable().getName() + "|" + sbuf.toString() + ")" + (getInstance() == null ? "" : "=" + getInstance());
+            return "CPTPseudo(" + getVariable().getName() + "|" + sbuf.toString() + ")" + (getInstance() == null ? "" : "=" + getInstance());
         }
     }
 
     /**
      * Just a pretty-print of the title (can be modified for sub-classes so the
      * tables look nice)
+     * @return
      */
     protected String formatTitle() {
         return String.format(" %10s", var.getName());
@@ -644,9 +749,11 @@ public class CPTPseudo implements BNode, Serializable {
     /**
      * Just a pretty-print of the value (can be modified for sub-classes so the
      * tables look nice)
+     * @param x
+     * @return
      */
     protected String formatValue(EnumDistrib x) {
-        StringBuffer sbuf = new StringBuffer("<");
+        StringBuilder sbuf = new StringBuilder("<");
         double[] distrib = x.get();
         for (int i = 0; i < distrib.length; i++) {
             sbuf.append(String.format("%4.2f ", distrib[i]));
@@ -673,10 +780,10 @@ public class CPTPseudo implements BNode, Serializable {
     private Object instance = null;
 
     /**
-     * Set the variable of this CPT to a constant value. This means that parent
+     * Set the variable of this CPTPseudo to a constant value. This means that parent
      * variables will NOT influence inference.
      *
-     * @param value the value that is assigned to this instantiated CPT
+     * @param value the value that is assigned to this instantiated CPTPseudo
      */
     @Override
     public void setInstance(Object value) {
@@ -684,7 +791,7 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Set the variable of this CPT to unspecified, or NOT instantiated.
+     * Set the variable of this CPTPseudo to unspecified, or NOT instantiated.
      */
     @Override
     public void resetInstance() {
@@ -692,9 +799,9 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Retrieve the instantiated value of this CPT.
+     * Retrieve the instantiated value of this CPTPseudo.
      *
-     * @return the value of this CPT if instantiated, null if the CPT is not
+     * @return the value of this CPTPseudo if instantiated, null if the CPTPseudo is not
      * instantiated.
      */
     @Override
@@ -751,13 +858,8 @@ public class CPTPseudo implements BNode, Serializable {
         if (prob == 0.0) {
             return;
         }
-        if (count == null) { // create count table if none exists
-            List<EnumVariable> cond = new ArrayList<EnumVariable>();
-            cond.add(var); // first variable is always the conditioned variable
-            if (table != null) { // then add parents, if any
-                cond.addAll(table.getParents());
-            }
-            count = new CountTable(cond);
+        if (count.table.map.isEmpty()) {
+            //        System.out.println();
             //CPTPseudo specific. Here the count table is initialized with pseudo counts
             //Domain lengths determine the matrix[i][j]...up to user to supply correctly formatted pseudo matrix
             Integer p_idx = getMainParentIndex();
@@ -765,7 +867,7 @@ public class CPTPseudo implements BNode, Serializable {
             if (key == null) { // if the node is a root
                 //then create new key of length 1
                 Object[] newKey = new Object[1];
-                for (int j = 0; j < cdom.size(); j++){ //go through child domain
+                for (int j = 0; j < cdom.size(); j++) { //go through child domain
                     Object co = new Object[]{cdom.get(j)}; // child observation
                     double obsCount = this.pseudoMatrix.getValue(0, j); //the count for the child observation
                     newKey[0] = co;
@@ -779,7 +881,7 @@ public class CPTPseudo implements BNode, Serializable {
                     for (int j = 0; j < cdom.size(); j++) {
                         Object co = cdom.get(j); // child observation
                         double obsCount = this.pseudoMatrix.getValue(i, j); //the count
-//                        double obsCount = this.pseudoMatrix.getValue(i, co);
+                        //                        double obsCount = this.pseudoMatrix.getValue(i, co); //Don't use this...specific use only
                         // add one as count table key includes child observation
                         Object[] newKey = new Object[key.length + 1];
                         newKey[0] = co;
@@ -823,13 +925,7 @@ public class CPTPseudo implements BNode, Serializable {
      */
     @Override
     public void countInstance(Object[] key, Object value) {
-        if (count == null) { // create count table if none exists
-            List<EnumVariable> cond = new ArrayList<EnumVariable>();
-            cond.add(var); // first variable is always the conditioned variable
-            if (table != null) { // then add parents, if any
-                cond.addAll(table.getParents());
-            }
-            count = new CountTable(cond);
+        if (count.table.map.isEmpty()) { // create count table if none exists
             //CPTPseudo specific. Here the count table is initialized with pseudo counts
             //Domain lengths determine the matrix[i][j]...up to user to supply correctly formatted pseudo matrix
             Integer p_idx = getMainParentIndex();
@@ -887,46 +983,46 @@ public class CPTPseudo implements BNode, Serializable {
 
     /**
      * Take stock of all observations counted via
-     * {@link bn.CPT#countInstance(Object[], Object, Double)}, ie implement the
+     * {@link bn.CPTPseudo#countInstance(Object[], Object, Double)}, ie implement the
      * M-step locally.
      */
     @Override
     public void maximizeInstance() {
-        if (count == null) {
+        if (count.table.map.isEmpty()) {
             return;
         }
-        if (table != null) { // there are parents in the CPT
-
-            //Set all 'old' distributions in the CPT to valid = false
+        if (table != null) { // there are parents in the CPTPseudo
+            //Set all 'old' distributions in the CPTPseudo to valid = false
             for (EnumDistrib d : this.table.getValues()) {
                 d.setValid(false);
             }
-            // add the counts to the CPT
+            // add the counts to the CPTPseudo
             for (Map.Entry<Integer, Double> entry : count.table.getMapEntries()) {
-                double nobserv = entry.getValue().doubleValue();
+                double nobserv = entry.getValue();
                 Object[] cntkey = count.table.getKey(entry.getKey().intValue());
-                Object[] cptkey = new Object[cntkey.length - 1];
-                for (int i = 0; i < cptkey.length; i++) {
-                    cptkey[i] = cntkey[i + 1];
+                Object[] CPTPseudokey = new Object[cntkey.length - 1];
+                for (int i = 0; i < CPTPseudokey.length; i++) {
+                    CPTPseudokey[i] = cntkey[i + 1];
                 }
-                EnumDistrib d = this.table.getValue(cptkey);
+                EnumDistrib d = this.table.getValue(CPTPseudokey);
                 if (d == null) {
                     d = new EnumDistrib(var.getDomain());
                     d.set(cntkey[0], nobserv);
-                    this.put(cptkey, d);
+                    this.put(CPTPseudokey, d);
                 } else {
                     d.set(cntkey[0], nobserv);
                 }
             } // normalisation happens internally when values are required
 
-            //Remove 'old' entries from CPT
-            for (Map.Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
+            //Remove 'old' entries from CPTPseudo
+            for (Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
                 EnumDistrib obs = entry.getValue();
-                Object[] cptkey = table.getKey(entry.getKey().intValue());
+                Object[] CPTPseudokey = table.getKey(entry.getKey().intValue());
                 if (!obs.isValid()) {
-                    table.map.remove(cptkey);
+                    table.map.remove(CPTPseudokey);
                 }
             }
+
         } else { // there are no parents
             Object[] cntkey = new Object[1];
             double[] cnts = new double[var.size()];
@@ -936,7 +1032,7 @@ public class CPTPseudo implements BNode, Serializable {
             }
             prior = new EnumDistrib(this.var.getDomain(), cnts);	// EnumDistrib normalises the counts internally
         }
-        count = null; // reset counts
+        count.table.setEmpty(); // reset counts
     }
 
     protected CountTable getCount() {
@@ -944,8 +1040,10 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Put random entries in the CPT if not already set.
+     * Put random entries in the CPTPseudo if not already set.
+     * @param seed
      */
+    @Override
     public void randomize(long seed) {
         Random rand = new Random(seed);
         if (table == null) {
@@ -961,7 +1059,7 @@ public class CPTPseudo implements BNode, Serializable {
     }
 
     /**
-     * Put random entries in the CPT.
+     * Put random entries in the CPTPseudo.
      */
 //	public void randomize(Object[] observations, int seed) {
 //		// TODO: use "observations" to come up with good initial probabilities
@@ -976,11 +1074,12 @@ public class CPTPseudo implements BNode, Serializable {
 //		}
 //	}
     /**
-     * Set this CPT to be trained when the Bayesian network it is part of is
-     * trained. A CPT is trainable (true) by default.
+     * Set this CPTPseudo to be trained when the Bayesian network it is part of is
+     * trained. A CPTPseudo is trainable (true) by default.
      *
      * @param status true if trainable, false otherwise
      */
+    @Override
     public void setTrainable(boolean status) {
         trainable = status;
     }
@@ -988,21 +1087,22 @@ public class CPTPseudo implements BNode, Serializable {
     protected boolean trainable = true;
 
     /**
-     * Check if this CPT should be trained or not
+     * Check if this CPTPseudo should be trained or not
      */
+    @Override
     public boolean isTrainable() {
         return trainable;
     }
 
     @Override
     public String getStateAsText() {
-        StringBuffer sbuf = new StringBuffer("\n");
+        StringBuilder sbuf = new StringBuilder("\n");
         if (isPrior()) {
             EnumDistrib d = prior;
             if (d != null) {
                 double[] distrib = d.get();
                 for (int j = 0; j < distrib.length; j++) {
-                    sbuf.append("" + distrib[j]);
+                    sbuf.append("").append(distrib[j]);
                     if (j < distrib.length - 1) {
                         sbuf.append(", ");
                     }
@@ -1014,9 +1114,9 @@ public class CPTPseudo implements BNode, Serializable {
                 EnumDistrib d = table.map.get(new Integer(i));
                 if (d != null) {
                     double[] distrib = d.get();
-                    sbuf.append(i + ": ");	// use index as key because values above can be of different non-printable types
+                    sbuf.append(i).append(": ");	// use index as key because values above can be of different non-printable types
                     for (int j = 0; j < distrib.length; j++) {
-                        sbuf.append("" + distrib[j]);
+                        sbuf.append("").append(distrib[j]);
                         if (j < distrib.length - 1) {
                             sbuf.append(", ");
                         }
@@ -1026,9 +1126,9 @@ public class CPTPseudo implements BNode, Serializable {
                     Object[] key = table.getKey(i);
                     for (int j = 0; j < key.length; j++) {
                         if (j < key.length - 1) {
-                            sbuf.append(key[j] + ", ");
+                            sbuf.append(key[j]).append(", ");
                         } else {
-                            sbuf.append(key[j] + ")\n");
+                            sbuf.append(key[j]).append(")\n");
                         }
                     }
                 }
@@ -1050,7 +1150,6 @@ public class CPTPseudo implements BNode, Serializable {
                             distrib[i] = Double.parseDouble(y[i]);
                         }
                     } catch (NumberFormatException e) {
-                        e.printStackTrace();
                         return false;
                     }
                     this.put(new EnumDistrib(var.getDomain(), distrib));
@@ -1074,7 +1173,6 @@ public class CPTPseudo implements BNode, Serializable {
                                         distrib[i] = Double.parseDouble(y[i]);
                                     }
                                 } catch (NumberFormatException e) {
-                                    e.printStackTrace();
                                     return false;
                                 }
                                 this.put(table.getKey(index), new EnumDistrib(var.getDomain(), distrib));
@@ -1089,11 +1187,27 @@ public class CPTPseudo implements BNode, Serializable {
         return false;
     }
 
+    @Override
+    public String getType() {
+        return "CPTPseudo";
+    }
+
+    @Override
+    public boolean isRelevant() {
+        return relevant;
+    }
+
+    @Override
+    public void setRelevant(boolean relevant) {
+        this.relevant = relevant;
+    }
+
     /**
-     * Tie all parameters essential to inference and training for this CPT to those of another CPT.
+     * Tie all parameters essential to inference and training for this CPTPseudo to those of another CPTPseudo.
      * Variables should be separate but they are required to (1) be of the same type/domain, and (2) be listed in the same order.
-     * @param source the CPT from which parameters will be copied and held fixed.
+     * @param source the CPTPseudo from which parameters will be copied and held fixed.
      */
+    @Override
     public void tieTo(CPTPseudo source) {
         CPTPseudo src = (CPTPseudo)source;
         if (!this.var.getDomain().equals(source.getVariable().getDomain()))
@@ -1115,17 +1229,5 @@ public class CPTPseudo implements BNode, Serializable {
             this.table = source.table.retrofit(this.getParents());
     }
 
-    @Override
-    public String getType() {
-        return "CPTPseudo";
-    }
-
-    public boolean isRelevant() {
-        return relevant;
-    }
-
-    public void setRelevant(boolean relevant) {
-        this.relevant = relevant;
-    }
-
 }
+
