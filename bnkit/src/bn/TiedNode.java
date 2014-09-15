@@ -27,4 +27,6 @@ package bn;
 public interface TiedNode<T extends BNode> {
 
     void tieTo(T source);
+
+    BNode getTieSource();
 }
