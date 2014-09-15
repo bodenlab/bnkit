@@ -184,7 +184,6 @@ public class BNBuf {
                                 bnode.setState(dump);
                             }
                             bn.add(bnode);
-//                            bn.setTags(tags.toArray(new String[tags.size()]), bnode);
                         } else {
                             System.err.println("Node specification invalid and ignored: " + node_var.getNodeValue());
                         }
@@ -215,7 +214,7 @@ public class BNBuf {
                     NamedNodeMap tie_atts = node.getAttributes();
                     String dep = tie_atts.getNamedItem("dependant").getNodeValue();
                     String source = tie_atts.getNamedItem("source").getNodeValue();
-                    ((CPT)bn.getNode(dep)).tieTo((CPT)bn.getNode(source));
+                    ((TiedNode)bn.getNode(dep)).tieTo(bn.getNode(source));
                 }
             }
             return bn;
@@ -378,13 +377,6 @@ public class BNBuf {
                 Variable var = node.getVariable();
                 node_element.setAttribute("var", var.getName());
                 node_element.setAttribute("type", node.getType());
-                //add tags
-                int i = 0;
-//                Iterator<String> titer = bn.getTags(node).iterator();
-//                while (titer.hasNext()) { // add each tag
-//                    node_element.setAttribute("tag_" + i, titer.next());
-//                    i++;
-//                }
                 if (!node.isTrainable()) {
                 	node_element.setAttribute("trainable", String.valueOf(node.isTrainable()));
                 }
@@ -421,13 +413,16 @@ public class BNBuf {
             }
             //Add tie sections
             for (BNode node : bn.getNodes()){
-                if (node instanceof CPT){
-                    if (((CPT)node).getTieSource() != null){
+                try{
+                    TiedNode tnode = (TiedNode) node;
+                    if (tnode.getTieSource() != null){
                         Element tie_element = doc.createElement("tie");
                         rootElement.appendChild(tie_element);
-                        tie_element.setAttribute("source",((CPT)node).getTieSource());
+                        tie_element.setAttribute("source", tnode.getTieSource().getName());
                         tie_element.setAttribute("dependant", node.getName());
                     }
+                } catch (ClassCastException exception){
+                    ;
                 }
             }
             // for output to file
