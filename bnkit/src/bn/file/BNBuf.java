@@ -22,12 +22,7 @@ import bn.alg.CGVarElim;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Iterator;
+import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -174,14 +169,6 @@ public class BNBuf {
                             }
                         }
                         String type = node_type.getNodeValue();
-                        //Collect tags
-                        ArrayList<String> tags = new ArrayList();
-                        for (int x = 0; x < node_atts.getLength(); x++){
-                            String name = node_atts.item(x).getNodeName();
-                            if (name.split("_")[0].equals("tag")){
-                                tags.add(node_atts.item(x).getNodeValue());
-                            }
-                        }
                         BNode bnode = null;
                         if (type != null) {
                             bnode = Predef.getBNode(var, parent_vars, type);
@@ -197,13 +184,38 @@ public class BNBuf {
                                 bnode.setState(dump);
                             }
                             bn.add(bnode);
-                            bn.setTags(tags.toArray(new String[tags.size()]), bnode);
+//                            bn.setTags(tags.toArray(new String[tags.size()]), bnode);
                         } else {
                             System.err.println("Node specification invalid and ignored: " + node_var.getNodeValue());
                         }
                     } else {
                         System.err.println("Node specification invalid and ignored: " + node_var.getNodeValue());
                     }
+                } else if (nodeName.equalsIgnoreCase("tag")) { //load tags
+                    NamedNodeMap tag_atts = node.getAttributes();
+                    Node tag_label = tag_atts.getNamedItem("label");
+                    String labelVal = tag_label.getNodeValue();
+                    NodeList tn = node.getChildNodes();
+                    for (int j = 0; j < tn.getLength(); j++) {
+                        Node tag_element = tn.item(j);
+                        String tag_spec = tag_element.getNodeName();
+                        if (tag_spec.equalsIgnoreCase("variables")) {
+                            String[] dump = tag_element.getTextContent().split("\n");
+                            List<String> variableNames = Arrays.asList(dump).subList(1,dump.length);
+                            for (String name: variableNames){
+                                BNode bnode = bn.getNode(name);
+                                if (bnode == null){
+                                    System.err.println("Nodename " + name + " in tag specification has no matching node");
+                                }
+                                bn.setTags(labelVal, bn.getNode(name));
+                            }
+                        }
+                    }
+                } else if (nodeName.equalsIgnoreCase("tie")) { //load tied specifications
+                    NamedNodeMap tie_atts = node.getAttributes();
+                    String dep = tie_atts.getNamedItem("dependant").getNodeValue();
+                    String source = tie_atts.getNamedItem("source").getNodeValue();
+                    ((CPT)bn.getNode(dep)).tieTo((CPT)bn.getNode(source));
                 }
             }
             return bn;
@@ -368,11 +380,11 @@ public class BNBuf {
                 node_element.setAttribute("type", node.getType());
                 //add tags
                 int i = 0;
-                Iterator<String> titer = bn.getTags(node).iterator();
-                while (titer.hasNext()) { // add each tag
-                    node_element.setAttribute("tag_" + i, titer.next());
-                    i++;
-                }
+//                Iterator<String> titer = bn.getTags(node).iterator();
+//                while (titer.hasNext()) { // add each tag
+//                    node_element.setAttribute("tag_" + i, titer.next());
+//                    i++;
+//                }
                 if (!node.isTrainable()) {
                 	node_element.setAttribute("trainable", String.valueOf(node.isTrainable()));
                 }
@@ -388,6 +400,34 @@ public class BNBuf {
                 if (dump != null) {
                     param_element.setTextContent(dump);
                     node_element.appendChild(param_element);
+                }
+            }
+            //Add tag sections
+            Set<String> tags = bn.getTagNames();
+            for (String tag : tags){
+                Element tag_element = doc.createElement("tag");
+                rootElement.appendChild(tag_element);
+                tag_element.setAttribute("label", tag);
+                Element variable_element = doc.createElement("variables");
+                String nameStr = "\n";
+                for (BNode node : bn.getTagged(tag)){
+                    Variable var = node.getVariable();
+                    String name = var.getName();
+                    nameStr += name;
+                    nameStr += "\n";
+                }
+                variable_element.setTextContent(nameStr);
+                tag_element.appendChild(variable_element);
+            }
+            //Add tie sections
+            for (BNode node : bn.getNodes()){
+                if (node instanceof CPT){
+                    if (((CPT)node).getTieSource() != null){
+                        Element tie_element = doc.createElement("tie");
+                        rootElement.appendChild(tie_element);
+                        tie_element.setAttribute("source",((CPT)node).getTieSource());
+                        tie_element.setAttribute("dependant", node.getName());
+                    }
                 }
             }
             // for output to file

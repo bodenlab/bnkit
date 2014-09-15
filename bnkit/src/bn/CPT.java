@@ -37,6 +37,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     final private int nParents;
     private CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in CPT
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
+    private String tieSource = null;
 
     /**
      * Create a conditional probability table for a variable. The variable is
@@ -962,6 +963,10 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             this.relevant = relevant;
     }
 
+    public String getTieSource(){
+        return this.tieSource;
+    }
+
     /**
      * Tie all parameters essential to inference and training for this CPT to those of another CPT.
      * Variables should be separate but they are required to (1) be of the same type/domain, and (2) be listed in the same order.
@@ -980,6 +985,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             if (!p1.getDomain().equals(p2.getDomain()))
                 throw new RuntimeException("Invalid sharing: " + p1.getName() + " does not share domain with " + p2.getName());
         }
+        this.tieSource = source.getVariable().getName();
         // need to tie:
         // - count (used during learning)
         // - prior (if applicable)

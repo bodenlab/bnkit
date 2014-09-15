@@ -84,6 +84,10 @@ public class BNet implements Serializable {
     public BNet() {
     }
 
+    public Set<String> getTagNames(){
+        return this.tagged.keySet();
+    }
+
     /**
      * Get all nodes that have a tag assigned
      * @return List of tagged nodes
@@ -111,8 +115,8 @@ public class BNet implements Serializable {
     public List<BNode> getTagged(String... tags){
         ArrayList taggedList = new ArrayList();
         Set<BNode> taggedSet = new HashSet();
-        List<BNode> taggedNodes = this.getTagged();
-        for (BNode node : taggedNodes){
+//        List<BNode> taggedNodes = this.getTagged();
+        for (BNode node : this.nodes.values()){
             boolean common = false;
             for (String tag: tags){
                 if (!this.tagged.keySet().contains(tag)){
