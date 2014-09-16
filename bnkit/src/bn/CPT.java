@@ -778,10 +778,8 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             //Remove 'old' entries from CPT
             for (Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
             	EnumDistrib obs = entry.getValue();
-            	Object[] cptkey = table.getKey(entry.getKey().intValue());
-            	if (!obs.isValid()) {
-                    table.map.remove(cptkey);
-            	}
+            	if (!obs.isValid())
+                    table.map.remove(entry.getKey());
             }
             
         } else { // there are no parents
