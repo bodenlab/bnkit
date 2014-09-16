@@ -722,9 +722,10 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     }
     
     /**
-     * Prob can be set to 1.0 because when counted the value is being observed??
      * Count this observation. Note that for it (E-step in EM) to affect the
      * CPT, {@link bn.CPT#maximizeInstance()} must be called.
+     * Probability of observation is 1.0 (the value is definitely being observed, 
+     * as opposed to expected with a probability).
      *
      * @param key the setting of the parent variables in the observation
      * @param value the setting of the CPT variable
@@ -752,7 +753,8 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             return;
         }
         if (table != null) { // there are parents in the CPT
-            //Set all 'old' distributions in the CPT to valid = false
+            // Set all 'old' distributions in the CPT to valid = false, i.e.
+            // we are marking entries so we can remove 'ghosts' after counting
             for (EnumDistrib d : this.table.getValues()) {
                 d.setValid(false);
             }
@@ -767,7 +769,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                 }
                 EnumDistrib d = this.table.getValue(cptkey);
                 if (d == null) {
-                    d = new EnumDistrib(var.getDomain());
+                    d = new EnumDistrib(var.getDomain()); // this will automatically set entry to "valid" 
                     d.set(cntkey[0], nobserv);
                     this.put(cptkey, d);
                 } else {
@@ -775,7 +777,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                 }
             } // normalisation happens internally when values are required	
     		
-            //Remove 'old' entries from CPT
+            //Remove 'old' (or 'ghost' entries from CPT (for which no counts
             for (Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
             	EnumDistrib obs = entry.getValue();
             	if (!obs.isValid())
