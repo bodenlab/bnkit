@@ -27,7 +27,7 @@ import java.util.*;
  *
  * @author m.boden
  */
-public class DirDT implements BNode, Serializable {
+public class DirDT implements BNode, TiedNode, Serializable {
 
     private static final long serialVersionUID = 1L;
     
@@ -41,6 +41,8 @@ public class DirDT implements BNode, Serializable {
     private boolean relevant = false;
     private EnumDistrib instance = null; // the value this node takes, null if unspecified
 
+    private DirDT tieSource;
+    
     /**
      * Create a Dirichlet density table for a variable. The variable is
      * conditioned on a set of enumerable variables.
@@ -51,8 +53,11 @@ public class DirDT implements BNode, Serializable {
     public DirDT(Variable<EnumDistrib> var, List<EnumVariable> parents) {
         this.var = var;
         if (parents != null) {
-            if (parents.size() > 0) 
+            if (parents.size() > 0) {
                 this.table = new EnumTable<>(parents);
+                this.prior = null;
+                this.count = new SampleTable(parents);
+            }
         }
     }
 
@@ -65,15 +70,6 @@ public class DirDT implements BNode, Serializable {
      */
     public DirDT(Variable<EnumDistrib> var, EnumVariable... parents) {
         this(var, EnumVariable.toList(parents));
-    }
-
-    /**
-     * Create a Dirichlet prior for a variable. Note: the prior distribution is
-     * not set (@see bn.DirDT#put(DirichletDistrib)).
-     * @param var variable
-     */
-    public DirDT(Variable<EnumDistrib> var) {
-        this.var = var;
     }
 
     /**
@@ -296,6 +292,9 @@ public class DirDT implements BNode, Serializable {
         return null;
     }
 
+    /**
+     * @deprecated Do NOT use, will be removed in the future
+     */
     @Override
     public EnumTable getTable() {
         return table;
@@ -358,8 +357,7 @@ public class DirDT implements BNode, Serializable {
 
     @Override
     public void print() {
-        if (table.nParents > 0) // variables in condition
-        {
+        if (table.nParents > 0) { // variables in condition
             table.display();
         } else { // prior
             System.out.println(formatTitle());
@@ -379,7 +377,7 @@ public class DirDT implements BNode, Serializable {
         try {
             instance = (EnumDistrib) value;
         } catch (ClassCastException e) {
-            e.printStackTrace();
+            System.err.println("Invalid setInstance: " + this.getName() + " = " + value);
         }
     }
 
@@ -395,12 +393,12 @@ public class DirDT implements BNode, Serializable {
     
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
+        if (prob == 0)
+            return;
         if (this.isRoot()) {
             throw new RuntimeException("DirDT can not be trained as root");
             // same process as for entries with parents, just a single queue of observations...
         } else {
-            if (count == null) // create count table if none exists
-                count = new SampleTable<>(this.getParents());
             count.count(key, (EnumDistrib)value, prob);
         }
     }
@@ -458,6 +456,31 @@ public class DirDT implements BNode, Serializable {
      */
     @Override
     public void maximizeInstance() {
+        if (count.table.map.isEmpty()) {
+            return;
+        }
+        Enumerable e = this.var.getDomain().getDomain();
+        for (int index = 0; index < this.table.getSize(); index ++) {
+            List<Sample<EnumDistrib>> samples = count.get(index);
+            if (samples != null) {
+                EnumDistrib[] dists = new EnumDistrib[samples.size()];
+                DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
+                for (int j = 0; j < samples.size(); j ++) {
+                    Sample<EnumDistrib> sample = samples.get(j);
+                    EnumDistrib d = (EnumDistrib)sample.instance;
+                    dists[j] = d;
+                    // should be using prob, but not so yet...
+                    double prob = sample.prob;
+                }
+                // FIXME: alpha values should account for probability of this distribution
+                double[] alphas = dd.findPrior(dists);
+                this.put(index, dd);
+            } else { // no counts
+                this.table.removeValue(index);
+            }
+        }
+        
+        count.table.setEmpty();
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
@@ -507,4 +530,31 @@ public class DirDT implements BNode, Serializable {
     public Distrib makeDistrib(Collection<Sample> samples) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
+
+    public void tieTo(BNode source) {
+        DirDT src = (DirDT)source;
+        if (!this.var.getDomain().equals(source.getVariable().getDomain()))
+            throw new RuntimeException("Invalid sharing: " + var.getName() + " does not share domain with " + source.getVariable().getName());
+        if (this.table.nParents != src.table.nParents)
+            throw new RuntimeException("Invalid sharing: " + var.getName() + " has different number of parents from " + source.getVariable().getName());
+        for (int i = 0; i < this.table.nParents; i ++) {
+            Variable p1 = this.getParents().get(i);
+            Variable p2 = src.getParents().get(i);
+            if (!p1.getDomain().equals(p2.getDomain()))
+                throw new RuntimeException("Invalid sharing: " + p1.getName() + " does not share domain with " + p2.getName());
+        }
+        this.tieSource = src;
+        // need to tie:
+        // - count (used during learning)
+        // - prior (if applicable)
+        // - table (if applicable)
+        this.prior = src.prior;
+        if (this.table.nParents > 0)
+            this.table = src.table.retrofit(this.getParents());
+    }
+    public BNode getTieSource(){
+        return this.tieSource;
+    }
+
+
 }

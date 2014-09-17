@@ -538,6 +538,9 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
         }
     }
 
+    /**
+     * @deprecated Do NOT use, will be removed in the future
+     */
     @Override
     public EnumTable getTable() {
         return table;
@@ -955,12 +958,12 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     
     @Override
     public boolean isRelevant() {
-            return relevant;
+        return relevant;
     }
 
     @Override
     public void setRelevant(boolean relevant) {
-            this.relevant = relevant;
+        this.relevant = relevant;
     }
 
     public BNode getTieSource(){
