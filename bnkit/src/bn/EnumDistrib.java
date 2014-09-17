@@ -116,6 +116,12 @@ public class EnumDistrib implements Distrib, Domain {
     }
     
     /**
+     * Get domain of a conjugate distribution.
+     * */
+    public Enumerable getDomain() {
+        return domain;
+    }
+    /**
      * Set the seed for the random number generation that may be used for
      * sampling etc.
      *

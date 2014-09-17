@@ -234,13 +234,3 @@ public class SampleTable<T> implements Serializable {
 
 }
 
-class Sample<T> {
-
-    public final T instance;
-    public final double prob;
-
-    Sample(T instance, double prob) {
-        this.instance = instance;
-        this.prob = prob;
-    }
-}

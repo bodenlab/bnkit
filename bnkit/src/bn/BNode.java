@@ -81,7 +81,7 @@ public interface BNode {
 
     /**
      * Retrieve the table with probability distributions
-     *
+     * @deprecated BNodes should not need to implement this. The only place this is used is in the GUIs.
      * @return the table with entries
      */
     public EnumTable getTable();
@@ -153,6 +153,9 @@ public interface BNode {
 
     /**
      * Make a native Distrib instance out of a collection of samples.
+     * This method is currently only required in very special circumstances:
+     * - in approximate inference, AND
+     * - where the node is non-enumerable (e.g. GDT and DirDT) as used in bn.SampleTrace
      * @param samples
      * @return an instance of Distrib that can be used to populate this node.
      */

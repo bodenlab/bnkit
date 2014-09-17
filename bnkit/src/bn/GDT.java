@@ -384,6 +384,10 @@ public class GDT implements BNode, Serializable {
 //	public GaussianDistrib get(Object[] key) {
 //		return table.getValue(key);
 //	}
+    
+    /**
+     * @deprecated Do NOT use, will be removed in the future
+     */
     @Override
     public EnumTable getTable() {
         return table;

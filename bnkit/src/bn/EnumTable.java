@@ -142,6 +142,11 @@ public class EnumTable<E> {
         return key_index;
     }
 
+    public int removeValue(int key_index) {
+        map.remove(key_index);
+        return key_index;
+    }
+    
     /**
      * Retrieve the index for the specified key
      *
