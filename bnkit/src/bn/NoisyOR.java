@@ -982,15 +982,25 @@ public class NoisyOR implements BNode, Serializable{
                 	}
                 }
             } // normalisation happens internally when values are required	
-    		
-            //Remove 'old' entries from NoisyOR
-            for (Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
+
+            //Remove 'ghost' entries from CPT (which have not been made valid above)
+            for (Iterator<Entry<Integer, EnumDistrib>> it = table.getMapEntries().iterator(); it.hasNext(); ) {
+                Entry<Integer, EnumDistrib> entry = it.next();
             	EnumDistrib obs = entry.getValue();
-            	Object[] NoisyORkey = table.getKey(entry.getKey().intValue());
-            	if (!obs.isValid()) {
-            		table.map.remove(NoisyORkey);
-            	}
+            	if (!obs.isValid()) 
+                    it.remove();
             }
+            
+            // TODO: Below is the code Ralph adapted from CPT. Since the CPT code had bug in this section, 
+            // I (MB) replaced it with that above. Will need to be reviewed.
+//            //Remove 'old' entries from NoisyOR
+//            for (Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
+//            	EnumDistrib obs = entry.getValue();
+//            	Object[] NoisyORkey = table.getKey(entry.getKey().intValue());
+//            	if (!obs.isValid()) {
+//            		table.map.remove(NoisyORkey);
+//            	}
+//            }
         } else { // there are no parents
             Object[] cntkey = new Object[1];
             double[] cnts = new double[var.size()];

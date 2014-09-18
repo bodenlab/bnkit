@@ -771,12 +771,13 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                     d.set(cntkey[0], nobserv);
                 }
             } // normalisation happens internally when values are required	
-    		
+    	
             //Remove 'old' (or 'ghost' entries from CPT (for which no counts
-            for (Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
+            for (Iterator<Entry<Integer, EnumDistrib>> it = table.getMapEntries().iterator(); it.hasNext(); ) {
+                Entry<Integer, EnumDistrib> entry = it.next();
             	EnumDistrib obs = entry.getValue();
-//            	if (!obs.isValid())
-//                    table.map.remove(entry.getKey());
+            	if (!obs.isValid()) 
+                    it.remove();
             }
             
         } else { // there are no parents
