@@ -181,7 +181,8 @@ public class GDT implements BNode, Serializable {
      * @param bn the BNet instance that can be used to check the status of nodes
      * so that factoring can be done (instantiation of variables are done for a
      * BNet node).
-     * @return the FactorTable created from the GDT, provided instantiations of BN
+     * @return the FactorTable created from the GDT, provided instantiations
+     * @deprecated
      */
     @Override
     public Factor makeFactor(BNet bn) {
@@ -243,37 +244,32 @@ public class GDT implements BNode, Serializable {
      * be factored out.
      * If a parent is not relevant, it will not be included in the factor
      *
-     *Marginalization technique requires updating
+     * Marginalization technique requires updating
      *
-     * @param bn the BNet instance that can be used to check the status of nodes
-     * so that factoring can be done (instantiation of variables are done for a
-     * BNet node).
-     * @return the FactorTable created from the GDT, provided instantiations of BN
+     * @param relevant only include relevant nodes, with instantiations if available
+     * @return the FactorTable created from the GDT, provided instantiations
      */
     @Override
-    public Factor makeFactor(BNet bn, boolean relevant) {
+    public Factor makeFactor(Map<Variable, Object> relevant) {
         List<EnumVariable> vars_old = this.getParents();
-        Object varinstance = null;
-        BNode cnode = bn.getNode(var);
-        if (cnode != null) {
-            varinstance = cnode.getInstance();
-        }
+        Variable myvar = this.getVariable();
+        // get value of this node if any assigned
+        Object varinstance = relevant.get(myvar); 
         if (vars_old != null) { // there are parent variables
             Object[] searchkey = new Object[vars_old.size()];
             List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
             List<EnumVariable> irrel_pars = new ArrayList<>(); //irrelevant parents
             for (int i = 0; i < vars_old.size(); i++) {
                 EnumVariable parent = vars_old.get(i);
+                boolean parent_is_relevant = relevant.containsKey(parent);
                 // Record irrelevant parents to sum out
                 //FIXME when should a parent be removed? Allow it to influence factor table then remove it?
-                // If parent is evidenced it will not be included in factor table
-                if (!bn.getNode(parent).isRelevant() && bn.getNode(parent).getInstance() == null) {
-                	irrel_pars.add(parent);
-                }
-                BNode pnode = bn.getNode(parent);
-                if (pnode != null)
-                    searchkey[i] = pnode.getInstance();
-                if (searchkey[i] == null)
+                // If parent is evidenced it will not be included in factor table; it is removed later through marginalization
+                if (!parent_is_relevant) 
+                    irrel_pars.add(parent);
+                else
+                    searchkey[i] = relevant.get(parent);
+                if (searchkey[i] == null) // new factor needs to include this variable (to be summed out before returned if irrelevant)
                     vars_new.add(parent);
             }
             Factor ft;

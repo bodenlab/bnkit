@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  *
@@ -179,7 +180,7 @@ public class SubstNode implements BNode, TiedNode {
     }
 
     @Override
-    public Factor makeFactor(BNet bn, boolean rel) {
+    public Factor makeFactor(Map<Variable, Object> relevant) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
