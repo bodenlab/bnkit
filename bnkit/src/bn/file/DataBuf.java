@@ -23,9 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import bn.*;
 
@@ -36,12 +34,6 @@ import bn.*;
  * @author mikael
  */
 public class DataBuf {
-
-    private static HashMap<String, Integer> headerMap = new HashMap<String, Integer>();
-
-    public HashMap<String, Integer> getHeaderMap(){
-        return this.headerMap;
-    }
 
     /**
      * Load a data file containing tab-separated values for variables. Return
@@ -127,7 +119,6 @@ public class DataBuf {
                             for (int i = 0; i < words.length; i++) {
                                 if (words[i].equals(vars[j].getName())) {
                                     field_index[j] = i;
-                                    headerMap.put(words[i], j);
                                     found = true;
                                     break;
                                 }
