@@ -205,6 +205,21 @@ public class Variable<E extends Domain> {
                 ret[i] = new Assignment(vars.get(i), vals[i]);
             return ret;
         }
+        public static Map<Variable, Object> toMap(Assignment[] assign_array) {
+            Map<Variable, Object> map = new HashMap<>();
+            for (Assignment assign : assign_array)
+                map.put(assign.var, assign.val);
+            return map;
+        } 
+        public static Map<Variable, Object> toMap(Collection<Assignment> assign_list) {
+            Map<Variable, Object> map = new HashMap<>();
+            for (Assignment assign : assign_list)
+                map.put(assign.var, assign.val);
+            return map;
+        } 
+        public String toString() {
+            return var.name + "=" + val.toString();
+        }
     }
 
     /**

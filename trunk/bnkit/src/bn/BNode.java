@@ -20,6 +20,7 @@ package bn;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -163,13 +164,17 @@ public interface BNode {
     
     /**
      * Make BNode into a Factor
+     * @deprecated avoid reference to BNet, other makeFactor replaces this
      */
     public Factor makeFactor(BNet bn);
     
     /**
-     * Make BNode into a Factor
+     * Make BNode into a Factor.
+     * The method reduces the factor so that only nominated nodes are included.
+     * @param rel relevant variables with evidence if available
+     * @return factor from BNode, taking evidence and (ir)relevance of parent variables into account
      */
-    public Factor makeFactor(BNet bn, boolean rel);
+    public Factor makeFactor(Map<Variable, Object> rel);
 
     /**
      * Method used to modify the CPT/CDT to be modified (EM uses this).
@@ -204,6 +209,7 @@ public interface BNode {
     
     /**
      * Set whether or not a node is relevant to the current query (Inference)
+     * @deprecated may interfere when multiple inferences are run multi-threaded
      */
     public void setRelevant(boolean relevant);
     
@@ -215,6 +221,7 @@ public interface BNode {
     
     /**
      * @return true if this node is relevant to the current query (Inference)
+     * @deprecated setting may interfere when multiple inferences are run multi-threaded, hence checking this status is moot
      */
     public boolean isRelevant();
 

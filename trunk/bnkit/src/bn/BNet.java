@@ -600,35 +600,36 @@ public class BNet implements Serializable {
      * Based on Algorithm 3.1 in Probabilistic Graphical Models - Principles and Techniques, Koller, D., Friedman, N., pg.75
      * @param query the variables that are in the query
      * @return a new BN with relevant CPTs only
+     * TODO: Either rename to a "setter" since it actually modifies the BNet (see comment at end), or rewrite so that it only
+     * returns the list of D-connected nodes.
      */
-     public List<BNode> getDconnected(Variable... query) {
-//     	BNet nbn = new BNet();
-     	//Get set of evidence
-     	Set<BNode> z = new HashSet<BNode>(); //Evidence
-     	for (BNode node : this.getNodes()) {
-     		if (node.getInstance() != null) {
-     			z.add(node);
-     		}
-     	}
+    public List<BNode> getDconnected(Variable... query) {
+        //Get set of evidence
+        Set<BNode> z = new HashSet<BNode>(); //Evidence
+        for (BNode node : this.getNodes()) {
+            if (node.getInstance() != null) {
+                z.add(node);
+            }
+        }
      	//Record all ancestors of evidence
-     	//Phase I
-     	Set<BNode> a = new HashSet<BNode>(); //Ancestors of evidence
-     	for (BNode v : z) {
-     		
-     		List<BNode> anc = this.getAncestors(v);
-     		a.addAll(anc);
-     		a.add(v);
-     	}
-     	
-     	//PhaseII: traverse active trails starting from X (query)
-     	List<NodeDirection> l = new ArrayList<NodeDirection>(); //nodes to be visited
-     	//Have to add query as node to be visited
-     	//FIXME direction for the query?
-     	//I think a query node can always be added once with a single direction and that will always work
-     	for (Variable q : query) {
-     		BNode qNode = this.getNode(q);
-     		l.add(new NodeDirection(qNode, "up"));
-     		
+        //Phase I
+        Set<BNode> a = new HashSet<BNode>(); //Ancestors of evidence
+        for (BNode v : z) {
+
+            List<BNode> anc = this.getAncestors(v);
+            a.addAll(anc);
+            a.add(v);
+        }
+
+        //PhaseII: traverse active trails starting from X (query)
+        List<NodeDirection> l = new ArrayList<NodeDirection>(); //nodes to be visited
+        //Have to add query as node to be visited
+        //FIXME direction for the query?
+        //I think a query node can always be added once with a single direction and that will always work
+        for (Variable q : query) {
+            BNode qNode = this.getNode(q);
+            l.add(new NodeDirection(qNode, "up"));
+
 //     		if (qNode.isRoot()) {
 //     			l.add(new NodeDirection(qNode, "down"));
 //     		} else if (this.getChildren(qNode) == null) {
@@ -637,69 +638,68 @@ public class BNet implements Serializable {
 //     			l.add(new NodeDirection(qNode, "up"));
 //     			l.add(new NodeDirection(qNode, "down"));
 //     		}
-     		
-     	}
-     	
-     	Set<NodeDirection> v = new HashSet<NodeDirection>(); //node,direction marked as visited
-     	Set<BNode> r = new HashSet<BNode>(); //nodes reachable via active trail
-     	
-     	while (!l.isEmpty()) {
-     		NodeDirection cur = l.remove(0);
-     		if (!cur.within(v)) { //hasn't been visited
-     			r.add(cur.getNode()); //node is reachable
+        }
+
+        Set<NodeDirection> v = new HashSet<NodeDirection>(); //node,direction marked as visited
+        Set<BNode> r = new HashSet<BNode>(); //nodes reachable via active trail
+
+        while (!l.isEmpty()) {
+            NodeDirection cur = l.remove(0);
+            if (!cur.within(v)) { //hasn't been visited
+                r.add(cur.getNode()); //node is reachable
 //     			if (!z.contains(cur.getNode())) { //isn't evidenced
 //     				//FIXME when should an evidence node be included?
 //     				//At final step check overlap between ancestors of added nodes and evidence?
 //     				r.add(cur.getNode()); //node is reachable
 //     			}
-     			v.add(cur); //mark node as visited
-     			if (cur.getDirection()=="up" && !z.contains(cur.getNode())){ //trail up through Y, active if Y not in Z
-     				//get set of parent nodes
-     				if (cur.getNode().getParents()!=null) {
-         				//find parents to be visited from bottom
-         				for (Variable par : cur.getNode().getParents()) {
-         					l.add(new NodeDirection(this.getNode(par), "up"));
-         				}
-     				}
-     				if (this.getChildren(cur.getNode()) != null) {
-     					//find children to be visited from top
-         				for (String c : this.getChildren(cur.getNode())) {
-         					l.add(new NodeDirection(this.getNode(c), "down"));
-         				}
-     				}
-     			} else if (cur.getDirection() == "down") { //trails down through Y
-     				if (!z.contains(cur.getNode())) { //downward trails to Y's children are active
-         				if (this.getChildren(cur.getNode()) != null) {
-         					//find children to be visited from top
- 	        				for (String c : this.getChildren(cur.getNode())) {
- 	        					l.add(new NodeDirection(this.getNode(c), "down"));
- 	        				}
-         				}
-     				}
-     				if (a.contains(cur.getNode())) { //v-structure (converging) trails are active
-         				if (cur.getNode().getParents()!=null) {
- 	        				//find parents to be visited from bottom
- 	        				for (Variable par : cur.getNode().getParents()) {
- 	        					l.add(new NodeDirection(this.getNode(par), "up"));
- 	        				}
-         				}
-     				}	
-     			}
-     		}
-     	}
+                v.add(cur); //mark node as visited
+                if (cur.getDirection() == "up" && !z.contains(cur.getNode())) { //trail up through Y, active if Y not in Z
+                    //get set of parent nodes
+                    if (cur.getNode().getParents() != null) {
+                        //find parents to be visited from bottom
+                        for (Variable par : cur.getNode().getParents()) {
+                            l.add(new NodeDirection(this.getNode(par), "up"));
+                        }
+                    }
+                    if (this.getChildren(cur.getNode()) != null) {
+                        //find children to be visited from top
+                        for (String c : this.getChildren(cur.getNode())) {
+                            l.add(new NodeDirection(this.getNode(c), "down"));
+                        }
+                    }
+                } else if (cur.getDirection() == "down") { //trails down through Y
+                    if (!z.contains(cur.getNode())) { //downward trails to Y's children are active
+                        if (this.getChildren(cur.getNode()) != null) {
+                            //find children to be visited from top
+                            for (String c : this.getChildren(cur.getNode())) {
+                                l.add(new NodeDirection(this.getNode(c), "down"));
+                            }
+                        }
+                    }
+                    if (a.contains(cur.getNode())) { //v-structure (converging) trails are active
+                        if (cur.getNode().getParents() != null) {
+                            //find parents to be visited from bottom
+                            for (Variable par : cur.getNode().getParents()) {
+                                l.add(new NodeDirection(this.getNode(par), "up"));
+                            }
+                        }
+                    }
+                }
+            }
+        }
      	//Add all reachable nodes IN ORDER and set all non-relevant nodes to false
-    	//FIXME If a parent of a relevant node is evidence should it be included?
-    	List<BNode> output = new ArrayList<BNode>();
-     	for (BNode n : this.getOrdered()) {
-     		if (r.contains(n)) {
-	     		n.setRelevant(true);
-	     		output.add(n);
-     		} else {
-     			n.setRelevant(false);
-     		}
-     	}
-     	return output;
-     }
+        //FIXME If a parent of a relevant node is evidence should it be included?
+        List<BNode> output = new ArrayList<BNode>();
+        for (BNode n : this.getOrdered()) {
+            if (r.contains(n)) {
+                //n.setRelevant(true); // Modifies each globally accessible BNode so may cause issues when inference is multi-threaded
+                output.add(n);
+            } else {
+                //n.setRelevant(false); // Modifies each globally accessible BNode so may cause issues when inference is multi-threaded
+            }
+        }
+        return output;
+    }
 
     public void resetNodes(){
         for (BNode node : this.getNodes()){

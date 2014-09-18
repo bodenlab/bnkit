@@ -23,12 +23,13 @@ import bn.EnumVariable;
 import bn.Factor;
 import bn.JPT;
 import bn.Variable;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Exact inference in Bayesian network by variable elimination, more
@@ -72,22 +73,21 @@ public class CGVarElim implements Inference {
 	// Find out which variables in the BN that will be summed out and organise them into "buckets".
         // They will be listed in "topological order" (parents before children) as per heuristics given in Dechter.
         // Each sumout variable will be assigned a bucket.
-        List<Variable> Q = new ArrayList<>(); // Query
-        List<Variable> E = new ArrayList<>(); // Assignment
-        List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
+        List<Variable> Q = new ArrayList<>(); // Query, all nodes identified by user of this function
+        List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
+        List<Variable> X = new ArrayList<>(); // Un-instantiated but relevant nodes (not d-separated from any query node), to-be summed out
         Q.addAll(Arrays.asList(qvars));
-//        BNet qbn = bn.getRelevant(qvars);
-        List<BNode> rnl = bn.getDconnected(qvars); //relevant ordered node list
-        //BNet qbn = bn;
+        List<BNode> rnl = bn.getDconnected(qvars); //relevant ordered node list, based on the concept of D-separation
         for (BNode node : rnl) {
             Variable var = node.getVariable();
-            if (node.getInstance() != null) {
-                E.add(var);
+            Object val = node.getInstance();
+            if (val != null) {
+                E.add(new Variable.Assignment(var, val));
             } else if (!Q.contains(var)) {
                 X.add(var);
             }
         }
-        return new CGQuery(Q, E, X, rnl);
+        return new CGQuery(Q, E, X);
     }
     
     /**
@@ -107,7 +107,7 @@ public class CGVarElim implements Inference {
         // They will be listed in "topological order" (parents before children) as per heuristics given in Dechter.
         // Each sumout variable will be assigned a bucket.
         List<Variable> Q = new ArrayList<>(); // Query
-        List<Variable> E = new ArrayList<>(); // Assignment
+        List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
         Q.addAll(Arrays.asList(qvars));
 //        BNet qbn = bn.getRelevant(qvars);
@@ -115,13 +115,14 @@ public class CGVarElim implements Inference {
         //BNet qbn = bn;
         for (BNode node : rnl) {
             Variable var = node.getVariable();
-            if (node.getInstance() != null) {
-                E.add(var);
+            Object val = node.getInstance();
+            if (val != null) {
+                E.add(new Variable.Assignment(var, val));
             } else if (!Q.contains(var)) {
                 X.add(var);
             }
         }
-        CGQuery q = new CGQuery(Q, E, X, rnl);
+        CGQuery q = new CGQuery(Q, E, X);
         q.setStatus(STATUS_MPE);
         return q;
     }
@@ -156,8 +157,11 @@ public class CGVarElim implements Inference {
         }        
         int nBuckets = buckets.size();
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
-        for (BNode node : q.rnl) {
-            Factor ft = node.makeFactor(bn, true); //Adding bool forces new makeFactor method to be used on only relevant nodes
+        for (Map.Entry<Variable, Object> e : q.getRelevant().entrySet()) {
+            Variable var = e.getKey();
+            Object val = e.getValue();
+            BNode node = bn.getNode(var);
+            Factor ft = node.makeFactor(q.getRelevant()); // forces new makeFactor method to be used on only relevant nodes
 //            Factor ft = node.makeFactor(bn);
 //            System.out.println(node.toString());
 //            ft.display();
@@ -321,7 +325,8 @@ public class CGVarElim implements Inference {
             buckets.add(new Bucket((EnumVariable)null));
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
         for (BNode node : bn.getNodes()) {
-            Factor ft = node.makeFactor(bn, true);
+            // node is converted into a factor, all nodes are considered relevant
+            Factor ft = node.makeFactor(bn); // Factor ft = node.makeFactor(bn, true);
             boolean added = false;
             if (ft.isAtomic()) { // this happen if the FT has no variables
                 buckets.get(0).put(ft);
@@ -416,17 +421,25 @@ public class CGVarElim implements Inference {
     }
 
     class CGQuery implements Query {
-        final List<Variable> Q;
-        final List<Variable> E;
-        final List<Variable> X;
-        final List<BNode> rnl;
+        // Note only *relevant* evidence and unspecified variables are included here
+        final List<Variable> Q; // query variables, for which values are sought
+        final Map<Variable, Object> E; // evidence variables; their nodes are instantiated to values
+        final List<Variable> X; // unspecified variables, incl all not listed as query or evidence
         private int status = STATUS_BEL;
         
-        CGQuery(List<Variable> Q, List<Variable> E, List<Variable> X, List<BNode> rnl) {
+        CGQuery(List<Variable> Q, List<Variable.Assignment> E, List<Variable> X) {
             this.Q = Q;
-            this.E = E;
+            this.E = new HashMap<>();
+            // evidence variables passed to this method are relevant
+            for (Variable.Assignment assign : E) 
+                this.E.put(assign.var, assign.val);
+            // all query variables are relevant by default, but no values are assigned
+            for (Variable q : Q)
+                this.E.put(q, null);
+            // unspecified variables passed to this method are relevant, but no values are assigned
+            for (Variable x : X)
+                this.E.put(x, null);
             this.X = X;
-            this.rnl = rnl;
         }
         
         void setStatus(int status) {
@@ -437,14 +450,22 @@ public class CGVarElim implements Inference {
             return this.status;
         }
         
+        /**
+         * Get relevant variables for the query as a map, with evidence if available.
+         * @return a map of all relevant variables with assigned values
+         */
+        Map<Variable, Object> getRelevant() {
+            return E;
+        }
+        
         public String toString() {
             StringBuilder sbuf = new StringBuilder();
             sbuf.append("Q:");
             for (Variable v:Q)
                 sbuf.append(v.getName()).append(",");
             sbuf.append("|E:");
-            for (Variable v:E)
-                sbuf.append(v.getName()).append(",");
+            for (Map.Entry<Variable, Object> v:E.entrySet())
+                sbuf.append(v.getKey().toString()).append("=").append(v.getValue().toString()).append(",");
             sbuf.append("|X:");
             for (Variable v:X)
                 sbuf.append(v.getName()).append(",");

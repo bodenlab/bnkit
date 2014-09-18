@@ -596,7 +596,7 @@ public class EM extends LearningAlg {
                         latentVariablesExist = true;
                         Variable[] query_arr = new Variable[query_vars.size()];
                         query_vars.toArray(query_arr); //FIXME NOT THREADSAFE - does inference update these nodes in any way?
-                        Query q = inf.makeQuery(query_arr);
+                        Query q = inf.makeQuery(query_arr); 
                         CGTable qr = (CGTable) inf.infer(q);
                         int[] indices = qr.getIndices();
                         // for each permutation of the enumerable query variables

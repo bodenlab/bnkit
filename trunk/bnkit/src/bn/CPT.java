@@ -253,6 +253,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      * so that factoring can be done (instantiation of variables are done for a
      * BNet node).
      * @return factor of CPT wrt instantiation of bn
+     * @deprecated use other makeFactor, this class should avoid using BNet
      */
     @Override
     public Factor makeFactor(BNet bn) {
@@ -346,21 +347,15 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      * be factored out.
      * If a parent is not relevant, it will not be included in the factor
      *
-     * @param bn the BNet instance that can be used to check the status of nodes
-     * so that factoring can be done (instantiation of variables are done for a
-     * BNet node).
-     * @param rel true if you want to only include relevant nodes
-     * @return factor of CPT wrt bn, considering if parents are relevant (rel)
+     * @param relevant only include relevant nodes, with instantiations if available
+     * @return factor of CPT considering if parents are relevant (rel)
      */
     @Override
-    public Factor makeFactor(BNet bn, boolean rel) {
+    public Factor makeFactor(Map<Variable, Object> relevant) {
         List<EnumVariable> vars_old = this.getParents();
         EnumVariable myvar = this.getVariable();
-        Object varinstance = null;
-        BNode cnode = bn.getNode(myvar);
-        if (cnode != null) {
-            varinstance = cnode.getInstance();
-        }
+        // get value of this node if any assigned
+        Object varinstance = relevant.get(myvar); 
         Enumerable dom = myvar.getDomain();
         if (vars_old != null) { // there are parent variables
             Object[] searchkey = new Object[vars_old.size()];
@@ -368,19 +363,16 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             List<EnumVariable> irrel_pars = new ArrayList<>(); //irrelevant parents
             for (int i = 0; i < vars_old.size(); i++) {
                 EnumVariable parent = vars_old.get(i);
+                boolean parent_is_relevant = relevant.containsKey(parent);
                 // Record irrelevant parents to sum out
                 //FIXME when should a parent be removed? Allow it to influence factor table then remove it?
-                // If parent is evidenced it will not be included in factor table
-                if (!bn.getNode(parent).isRelevant() && bn.getNode(parent).getInstance() == null) {
-                	irrel_pars.add(parent);
-                }
-                BNode pnode = bn.getNode(parent);
-                if (pnode != null) {
-                    searchkey[i] = pnode.getInstance();
-                }
-                if (searchkey[i] == null) {
+                // If parent is evidenced it will not be included in factor table; it is removed later through marginalization
+                if (!parent_is_relevant) 
+                    irrel_pars.add(parent);
+                else
+                    searchkey[i] = relevant.get(parent);
+                if (searchkey[i] == null) // new factor needs to include this variable (to be summed out before returned if irrelevant)
                     vars_new.add(parent);
-                }
             }
             if (varinstance == null) {
                 vars_new.add(myvar);
@@ -783,8 +775,8 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             //Remove 'old' (or 'ghost' entries from CPT (for which no counts
             for (Entry<Integer, EnumDistrib> entry : table.getMapEntries()) {
             	EnumDistrib obs = entry.getValue();
-            	if (!obs.isValid())
-                    table.map.remove(entry.getKey());
+//            	if (!obs.isValid())
+//                    table.map.remove(entry.getKey());
             }
             
         } else { // there are no parents
