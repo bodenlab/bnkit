@@ -18,15 +18,18 @@
 
 package bn.ctmc.matrix;
 
+import bn.Enumerable;
+import bn.ctmc.SubstModel;
+
 /**
  *
  * @author mikael
  */
-public class WAG {
+public class WAG extends SubstModel {
     // WAG model of amino acid evolution
     // Whelan, S. and N. Goldman. Molecular Biology and Evolution. 18(5):691-699, 2001.
     
-    public static char[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
+    public static Character[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
 
     public static double[] F = {
       //A       R       N       D       C   	Q       E       G       H       I  	L       K       M       F       P       S       T       W       Y       V
@@ -54,5 +57,13 @@ public class WAG {
     {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 2.763540, 0.409817}, 
     {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.347826},
     {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000}}; 
+
+    public WAG() {
+        super(F, Q, new Enumerable(S));
+    }
+    
+    public String getName() {
+        return "WAG";
+    }
 
 }

@@ -18,19 +18,24 @@
 
 package bn.ctmc;
 
+import bn.EnumDistrib;
+import bn.EnumTable;
+import bn.EnumVariable;
 import bn.Enumerable;
-import bn.math.Matrix.*;
 import bn.ctmc.matrix.*;
+import bn.math.Matrix.Exp;
 
 /**
  *
  * @author mikael
  */
-public class SubstModel {
+public abstract class SubstModel {
     
     final double[][] R;
+    final double[] F;
     final Exp Rexp;
     final Enumerable alpha;
+    private EnumTable<EnumDistrib> table = null;
 
     /**
      * 
@@ -43,6 +48,7 @@ public class SubstModel {
             throw new IllegalArgumentException("Invalid size of either Q or F");
         if (alphabet.size() != F.length)
             throw new IllegalArgumentException("Invalid size of alphabet");
+        this.F = F;
         R = new double[Q.length][Q.length];
         for (int i = 0; i < Q.length; i ++)  {
             if (Q[i].length != F.length)
@@ -58,7 +64,20 @@ public class SubstModel {
         SubstModel.normalize(F, R);
         Rexp = new Exp(R);
     }
-   
+
+    public abstract String getName();
+    
+    public double[] getF() {
+        return F;
+    }
+    
+    public double[][] getR() {
+        return R;
+    }
+        
+    public Enumerable getDomain() {
+        return alpha;
+    }
     /** 
      * Make it a valid rate matrix (make sum of rows = 0) "in place"
      * @param R the potentially invalid R, to be modified in place
@@ -99,10 +118,26 @@ public class SubstModel {
     public double getProb(Object X, Object Y, double time) {
         if (this.time != time || probs == null) // only re-compute matrix if time has changed
             probs = getProbs(time);
-        
         int index_X = alpha.getIndex(X);
         int index_Y = alpha.getIndex(Y);
         return probs[index_Y][index_X];
+    }
+    
+    public double getProb(Object X) {
+        int index_X = alpha.getIndex(X);
+        return F[index_X];
+    }
+    
+    public EnumDistrib getDistrib(Object Y, double time) {
+        if (this.time != time || probs == null || table == null) { // only re-compute matrix if time has changed
+            probs = getProbs(time);
+            table = new EnumTable<>(new EnumVariable(alpha), new EnumVariable(alpha));
+            for (int i = 0; i < probs.length; i ++) {
+                EnumDistrib d = new EnumDistrib(alpha, probs[i]);
+                table.setValue(i, d);
+            }
+        }
+        return table.getValue(new Object[] {Y});
     }
     
     /**
@@ -139,12 +174,11 @@ public class SubstModel {
         return prob;
     }
     
-    
     public static void main(String[] argv) {
-        SubstModel sm_wag = new SubstModel(WAG.F, WAG.Q, Enumerable.aacid_alt);
-        SubstModel sm_lg = new SubstModel(LG.F, LG.Q, Enumerable.aacid_alt);
-        SubstModel sm_jtt = new SubstModel(JTT.F, JTT.Q, Enumerable.aacid_alt);
-        SubstModel sm_dh = new SubstModel(Dayhoff.F, Dayhoff.Q, Enumerable.aacid_alt);
+        SubstModel sm_wag = new WAG();
+        SubstModel sm_lg = new LG();
+        SubstModel sm_jtt = new JTT();
+        SubstModel sm_dh = new Dayhoff();
 
         System.out.println("R (WAG)");
         bn.math.Matrix.print(sm_wag.R);

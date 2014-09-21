@@ -17,17 +17,20 @@
 
 package bn.ctmc.matrix;
 
+import bn.Enumerable;
+import bn.ctmc.SubstModel;
+
 /**
  *
  * @author mikael
  */
-public class JTT {
+public class JTT extends SubstModel {
     // JTT model of amino acid evolution
     // Jones, D. T., W. R. Taylor, and J. M. Thornton. 1992. The rapid generation of mutation data matrices from protein sequences. CABIOS 8:275–282.
     // The matrix below uses the improvements of 
     // Kosiol, C., and Goldman, N. 2005. Different versions of the Dayhoff rate matrix. Molecular Biology and Evolution 22:193-199.
 
-    public static char[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
+    public static Character[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
 
     public static double[] F = {
       //A         R         N         D         C   	   Q         E         G         H         I  	     L         K         M         F         P         S         T         W         Y         V
@@ -56,5 +59,12 @@ public class JTT {
         {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.165473},
         {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000}};
 
+    public JTT() {
+        super(F, Q, new Enumerable(S));
+    }
+    
+    public String getName() {
+        return "JTT";
+    }
 
 }
