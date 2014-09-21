@@ -16,18 +16,20 @@
  */
 
 package bn.ctmc.matrix;
+import bn.Enumerable;
+import bn.ctmc.SubstModel;
 
 /**
  *
  * @author mikael
  */
-public class Dayhoff {
+public class Dayhoff extends SubstModel {
     // Dayhoff model of amino acid evolution
     // Dayhoff, M. O., R. V. Eck, and C. M. Park. 1972. A model of evolutionary change in proteins. Pp. 89–99 in M. O. Dayhoff, ed., Atlas of Protein Sequence and Structure Vol. 5. National Biomedical Research Foundation, Washington, D.C.
     // The matrix below uses the improvements of 
     // Kosiol, C., and Goldman, N. 2005. Different versions of the Dayhoff rate matrix. Molecular Biology and Evolution 22:193-199.
     
-    public static char[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
+    public static Character[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
     
     public static double[] F = {
        //A         R         N         D         C   	 Q         E         G         H         I  	   L         K         M         F         P   	     S         T         W         Y         V
@@ -56,4 +58,11 @@ public class Dayhoff {
 /*Y*/ {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.279379},
 /*V*/ {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000}};
 
+    public Dayhoff() {
+        super(F, Q, new Enumerable(S));
+    }
+
+    public String getName() {
+        return "Dayhoff";
+    }
 }

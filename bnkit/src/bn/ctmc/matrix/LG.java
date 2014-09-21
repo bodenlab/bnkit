@@ -18,15 +18,18 @@
 
 package bn.ctmc.matrix;
 
+import bn.Enumerable;
+import bn.ctmc.SubstModel;
+
 /**
  *
  * @author mikael
  */
-public class LG {
+public class LG extends SubstModel {
     // LG model of amino acid evolution
     // Le S.Q., Gascuel O. Molecular Biology and Evolution. 2008 25(7):1307-20.
     
-    public static char[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
+    public static Character[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
 
     public static double[] F = {
       //A         R         N         D         C   	  Q         E         G         H         I  	    L         K       M         F         P        S         T         W         Y         V
@@ -54,5 +57,13 @@ public class LG {
     {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 3.151815, 0.189510},
     {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.249313},
     {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000}};
+
+    public LG() {
+        super(F, Q, new Enumerable(S));
+    }
+    
+    public String getName() {
+        return "LG";
+    }
 
 }
