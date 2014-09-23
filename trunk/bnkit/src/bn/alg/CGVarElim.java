@@ -189,13 +189,13 @@ public class CGVarElim implements Inference {
 //        System.out.println(buckets.size());
         List<Integer> remove = new ArrayList<>();
         for (int i = 1; i < nBuckets; i++) { // ignore query bucket
-        	try {
-        		Bucket b = buckets.get(i);
-        	} catch (IndexOutOfBoundsException e) {
-        		System.out.println("i = "+i+", nBuckets = "+nBuckets);
-        		System.out.println(buckets.size());
-        	}
-        	Bucket b = buckets.get(i);
+//        	try {
+//        		Bucket b = buckets.get(i);
+//        	} catch (IndexOutOfBoundsException e) {
+//        		System.out.println("i = "+i+", nBuckets = "+nBuckets);
+//        		System.out.println(buckets.size());
+//        	}
+            Bucket b = buckets.get(i);
             if (b.factors.isEmpty()) { // no factors, put sum-out variables in other bucket(s)
                 for (Variable sumout : b.vars) { // check each sum-out variable
                     for (int jj = i + 1; jj < nBuckets; jj++) { // search suitable bucket for sum-out

@@ -51,6 +51,12 @@ public class Enumerable implements Domain {
         return order;
     }
 
+    /**
+     * Retrieve the index of the value in the domain.
+     * TODO: Improve speed for domains with many values.
+     * @param value
+     * @return 
+     */
     public int getIndex(Object value) {
         if (value instanceof java.lang.String) {
             for (int i = 0; i < values.length; i++) {
