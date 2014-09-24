@@ -11,6 +11,7 @@ import bn.Enumerable;
 import bn.JPT;
 import bn.NoisyOR;
 import bn.Predef;
+import bn.SmartNoisyOR;
 import bn.alg.CGVarElim;
 import bn.alg.EM;
 import bn.alg.LearningAlg;
@@ -19,7 +20,7 @@ import bn.alg.QueryResult;
 
 public class NoisyORExample {
 	
-	public static void main (String [] args) {
+	public static void main1 (String [] args) {
 		
 		EnumVariable v_gene1 = Predef.Nominal(new String [] {"low",  "medium", "high"}, "Gene1");
 		EnumVariable v_gene2 = Predef.Nominal(new String [] {"low",  "medium", "high"}, "Gene2");
@@ -44,7 +45,7 @@ public class NoisyORExample {
 		System.out.println(disease.get(new Object [] {"high", "medium", "low", "low"},"terminal"));
 	}
 	
-	public static void main1 (String [] args) {
+	public static void main2 (String [] args) {
 		EnumVariable v1 = Predef.Boolean();
         EnumVariable v2 = Predef.Boolean();
         EnumVariable v3 = Predef.Boolean();
@@ -121,6 +122,53 @@ public class NoisyORExample {
         JPT jpt=qr.getJPT();
 		jpt.display();
 		//d.print();
+	}
+	
+	public static void main (String [] args) {
+		Object[][] values={
+				// A      B      C      D    E 
+				{true,  false, true,  true},
+				{true,  false,  true,  true},
+				{true,  false, true,  true},
+				{true, false,  true,  false},
+				// true false true -> poscount=3, negcount=1
+				{true,  true,  true,  false},
+				{true, true, true, false},
+				{true, true, true, true},
+				// true true true -> poscount=1, negcount=2
+				{true,  false, false, true},
+				{true, false,  false, true},
+				{true,  false,  false, true},
+				// true false false ->poscount=3, negcount=0
+				{false, true,  false, false},
+				{false, true, false, false},
+				{false, true, false, false},
+				{false, true, false, false},
+				{false, true, false, true},
+				// false, true, false -> poscount = 1, negcount = 4
+				{false, false, false, false},
+				{false, false, false, false},
+				{false, false, false, false},
+				{false, false, false, true}};
+		EnumVariable va = Predef.Boolean("A");
+        EnumVariable vb = Predef.Boolean("B");
+        EnumVariable vc = Predef.Boolean("C");
+        EnumVariable vd = Predef.Boolean("D");
+        CPT a = new CPT(va);
+        CPT b = new CPT(vb);
+        CPT c = new CPT(vc);
+        SmartNoisyOR d = new SmartNoisyOR(vd, new EnumVariable [] {va, vb, vc}, new Object [] {true, true, true});
+        BNet bn = new BNet();
+        bn.add(a,b,c,d);
+        LearningAlg em = new EM(bn);
+        ArrayList<BNode> nodes = new ArrayList<BNode>();
+        nodes.add(a);nodes.add(b);nodes.add(c);nodes.add(d);
+        em.train(values, nodes);
+        a.print();
+        b.print();
+        c.print();
+        d.print();
+		
 	}
 
 }
