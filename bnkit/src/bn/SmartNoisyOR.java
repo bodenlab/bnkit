@@ -569,7 +569,7 @@ public class SmartNoisyOR implements BNode, Serializable{
      * @return the probability of the variable
      */
     public Double get(Object[] key, Object value) {
-        if (key == null) {
+    	if (key == null) {
             return prior.get(value);
         }
         if (key.length == 0) {
@@ -601,8 +601,12 @@ public class SmartNoisyOR implements BNode, Serializable{
         //go through each row (key) in the table and assign the key to the relevant parent
         for (Integer i : indices) {
         	Object [] thisKey = this.table.getKey(i);
+        	nkey = 0;
+        	for (int k=0; k<thisKey.length; k++) {
+        		if (thisKey[k].equals(this.plabels.get(k))) nkey++;
+        	}
         	for (int j=0; j<thisKey.length; j++) {
-        		if (thisKey[j].equals(this.plabels.get(j))) {
+        		if (thisKey[j].equals(this.plabels.get(j)) && nkey == 1) {
         			List<Object []> thisList = keyMap.get(this.table.parents.get(j));
         			thisList.add(thisKey);
         			keyMap.put(this.table.parents.get(j), thisList);
@@ -652,6 +656,8 @@ public class SmartNoisyOR implements BNode, Serializable{
     	if (nkey == 0) {
     		//if none of the valid parent labels are set,
     		//just return the entry for this key
+    		//possibly should return the product of all
+    		//the rows with no parent switched on?
     		return table.getValue(key).get(value);
     	}
         
@@ -667,8 +673,12 @@ public class SmartNoisyOR implements BNode, Serializable{
         //go through each row (key) in the table and assign the key to the relevant parent
         for (Integer i : indices) {
         	Object [] thisKey = this.table.getKey(i);
+        	nkey = 0;
+        	for (int k=0; k<thisKey.length; k++) {
+        		if (thisKey[k].equals(this.plabels.get(k))) nkey++;
+        	}
         	for (int j=0; j<thisKey.length; j++) {
-        		if (thisKey[j].equals(this.plabels.get(j))) {
+        		if (thisKey[j].equals(this.plabels.get(j)) && nkey == 1) {
         			List<Object []> thisList = keyMap.get(this.table.parents.get(j));
         			thisList.add(thisKey);
         			keyMap.put(this.table.parents.get(j), thisList);
@@ -1065,7 +1075,6 @@ public class SmartNoisyOR implements BNode, Serializable{
                 	Object [] keyMapKey = null;
                 	Object [] configMapKey = null;
                 	for (Object [] key : trueCountMap.keySet()) {
-                		for (Object thing : key) {System.out.print(thing + " ");} System.out.println("");
                 		//key = null;
                 		for (Object [] k : keyMap.keySet()) {
                 			if (equals(k, key)) key = k;
