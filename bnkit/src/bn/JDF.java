@@ -279,11 +279,14 @@ public class JDF {
             Variable orig_var = entry.getKey();
             Distrib orig_d = entry.getValue();
             Distrib other_d = other.getDistrib(orig_var);
-            if (orig_d == null && other_d == null) // if none is initialised before
-                throw new JDFRuntimeException("Cannot mix variable without distributions: " + orig_var.toString());
+            if (orig_d == null && other_d == null) { // if none is initialised before
+                //throw new JDFRuntimeException("Cannot mix variable without distributions: " + orig_var.toString());
+                mixed.setDistrib(null, orig_var);
+                continue;
+            }
             MixtureDistrib d;
             if (orig_d != null) {
-                d = new MixtureDistrib(orig_d, 1.0);
+                d = new MixtureDistrib(orig_d, weight_orig); // BUG fixed 26/9/14 (weight_orig used to be 1.0)
                 if (other_d != null)
                     d.addDistrib(other_d, weight_other);
             } else
