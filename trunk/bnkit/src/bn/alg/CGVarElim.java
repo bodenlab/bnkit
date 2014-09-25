@@ -307,9 +307,12 @@ public class CGVarElim implements Inference {
 	// All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
         // Assignment will be incorporated into the factor when it is constructed.
         List<Variable> X = new ArrayList<>(); // unspecified variables, to-be summed-out
+        Map<Variable, Object> R = new HashMap<>(); // all variables that are relevant with corresponding instantiations
         for (BNode node : bn.getOrdered()) {
             Variable var = node.getVariable();
-            if (node.getInstance() == null) 
+            Object instance = node.getInstance();
+            R.put(var, instance); // currently we consider all variables are relevant, even when not specified
+            if (instance == null) 
                 X.add(var);
         }
         List<Bucket> buckets = new ArrayList<>();
@@ -326,7 +329,7 @@ public class CGVarElim implements Inference {
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
         for (BNode node : bn.getNodes()) {
             // node is converted into a factor, all nodes are considered relevant
-            Factor ft = node.makeFactor(bn); // Factor ft = node.makeFactor(bn, true);
+            Factor ft = node.makeFactor(R); // Factor ft = node.makeFactor(bn, true);
             boolean added = false;
             if (ft.isAtomic()) { // this happen if the FT has no variables
                 buckets.get(0).put(ft);
