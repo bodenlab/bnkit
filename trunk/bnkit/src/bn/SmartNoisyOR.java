@@ -1105,9 +1105,7 @@ public class SmartNoisyOR implements BNode, Serializable{
 	                		}
                 		}
                 	}
-                	System.out.println("break\n");
                 	if (current_count != null && equals(cntkey, keyMapKey)) {
-	                	System.out.println("break\n");
 	                	Double value = nobserv/full_count;
 	                	keyMap.put(keyMapKey, current_count + value);
 	                	configMap.put(configMapKey, current_configs + 1);
