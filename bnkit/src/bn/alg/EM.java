@@ -73,6 +73,7 @@ public class EM extends LearningAlg {
      */
     public double EM_CONVERGENCE_CRITERION = 0.005; // e.g: at LL=-904, improvement needs to be above 0.045 for training to continue
 
+
     /**
      * EM maximum number of rounds (iterations). Training stops after the
      * specified number of rounds independently of convergence.
@@ -147,35 +148,11 @@ public class EM extends LearningAlg {
      */
     @Override
     public void train(Object[][] values, Variable[] vars, long seed) {
-
-        int nSample = values.length; // this is how training samples we have
+    	int nSample = values.length; // this is how training samples we have
         // we only need to initialize the relevant nodes.
         //	setRandom(seed); // init network CPTs and CDTs
 
-        // below we create the list of nodes that will be updated during training
-        // note that only named nodes (variables) will be included, and their parents or children (the latter as latent variables)
-        Set<Variable> updateVars = new HashSet<>();
-        updateVars.addAll(Arrays.asList(vars));
-        Map<BNode, Object[]> updateMap = new HashMap<>(); 			// the set of nodes that may need to be updated:
-        Map<BNode, Object[]> update = Collections.synchronizedMap(updateMap); //THREAD SAFE MAP
-        for (BNode node : bn.getNodes()) {      		// check all nodes
-            Variable var = node.getVariable();			// this is the variable of the node
-            if (updateVars.contains(var)) {			// is it in the data set?
-                update.put(node, null);				// if yes, add it and move to next node
-                continue;
-            }
-            List<EnumVariable> parents = node.getParents();	// if no, determine which are the parents of the node
-            if (parents != null) {
-                for (EnumVariable parent : parents) {		// go through the parents
-                    if (updateVars.contains(parent)) {		// check if parent is in data set
-                        update.put(node, null);			// if yes, add the node to the set of nodes to update
-                        break;
-                    }
-                }
-            }
-        } // finished constructing the node update set
-
-        for (BNode node : update.keySet()) {
+        for (BNode node : bn.getNodes()) {
             if (node.isTrainable()) {
                 node.randomize(System.currentTimeMillis());
             }
@@ -188,27 +165,45 @@ public class EM extends LearningAlg {
         boolean latentVariablesExist = false;
         
         boolean EM_TERMINATE = false;
-        
+
         // start training (keep going until convergence or stop criterion is met)
         while (round < EM_MAX_ROUNDS && !EM_TERMINATE) {
-            round++;
-            
-            double log_likelihood = 0;
-            // for each sample with observations...
-            for (int i = 0; i < values.length; i++) {
-                // set variables and keys according to observations
-                for (int j = 0; j < vars.length; j++) {
-                    BNode instantiate_me = bn.getNode(vars[j]);
-                    if (instantiate_me == null) {
-                        throw new EMRuntimeException("Variable \"" + vars[i].getName() + "\" is not part of Bayesian network");
-                    }
-                    if (values[i][j] != null) { // check so that the observation is not null
-                        // the node is instantiated to the value in the data set
-                        instantiate_me.setInstance(values[i][j]);
-                    } else { // the observation is null
-                        // the node is reset, i.e. un-instantiated 
-                        instantiate_me.resetInstance();
-                    }
+        	round++;
+
+        	double log_likelihood = 0;
+        	// the set of nodes to be updated:
+        	Map<BNode, Object[]> updateMap = new HashMap<>();
+        	Map<BNode, Object[]> update = Collections.synchronizedMap(updateMap); //THREAD SAFE MAP
+        	// for each sample with observations...
+        	for (int i = 0; i < values.length; i++) {
+        		// set variables and keys according to observations
+        		for (int j = 0; j < vars.length; j++) {
+        			BNode instantiate_me = bn.getNode(vars[j]);
+        			if (instantiate_me == null) {
+        				throw new EMRuntimeException("Variable \"" + vars[i].getName() + "\" is not part of Bayesian network");
+        			}
+        			if (values[i][j] != null) { // check so that the observation is not null
+        				// the node is instantiated to the value in the data set
+        				instantiate_me.setInstance(values[i][j]);
+        				//Has evidence so needs to be updated
+        				update.put(instantiate_me, null);
+        				List<EnumVariable> parents = instantiate_me.getParents();	// if no, determine which are the parents of the node
+        				if (parents != null) {
+        					for (EnumVariable parent : parents) {		// go through the parents and add them to the update set
+        						update.put(bn.getNode(parent), null);	
+        					}
+        				}
+        				Set<String> children = bn.getChildren(instantiate_me);	// if no, determine which are the parents of the node
+        				if (children != null) {
+        					for (String child : children) {		// go through the children and add them to the update set
+        						BNode c = bn.getNode(child);
+        						update.put(c, null);	
+        					}
+        				}
+        			} else { // the observation is null
+        				// the node is reset, i.e. un-instantiated 
+        				instantiate_me.resetInstance();
+        			}
                 }
 
                 /*
@@ -506,8 +501,18 @@ public class EM extends LearningAlg {
                         last_LL[i] = last_LL[i + 1];
                         mean_LL += (last_LL[i] / last_LL.length);
                     }
+                    double[] sdl_LL = new double[last_LL.length];
+                    for (int j = 0; j < last_LL.length; j++) {
+                    	sdl_LL[j] = (last_LL[j] - mean_LL)*(last_LL[j] - mean_LL);
+                    }
+                    double sd_LL = last_LL[0] / last_LL.length;
+                    for (int i = 0; i < last_LL.length - 1; i++) {
+                        last_LL[i] = last_LL[i + 1];
+                        sd_LL += (last_LL[i] / last_LL.length);
+                    }
                     last_LL[last_LL.length - 1] = log_likelihood;
-                    if ((-mean_LL - -log_likelihood) < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
+//                    if ((-mean_LL - -log_likelihood) < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
+                    if (sd_LL < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
                     {
                         EM_TERMINATE = true;
                     }
