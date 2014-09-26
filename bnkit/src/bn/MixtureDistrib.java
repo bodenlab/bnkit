@@ -124,7 +124,7 @@ public class MixtureDistrib implements Distrib {
     public String toString() {
         StringBuilder sb = new StringBuilder("^" + mixture.size());
         for (Map.Entry<Distrib, Double> entry : mixture.entrySet())
-            sb.append("{" + entry.getKey() + "*" + String.format("%6.4f", entry.getValue()) + "}");
+            sb.append("{" + entry.getKey() + "*" + String.format("%4.2f", entry.getValue()) + "}");
         return sb.toString();
     }
     
