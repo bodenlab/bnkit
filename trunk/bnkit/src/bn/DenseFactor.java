@@ -18,6 +18,7 @@
 package bn;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -75,8 +76,15 @@ public class DenseFactor {
      * @param useVariables variables, either enumerable or non-enumerable
      */
     public DenseFactor(Variable... useVariables) {
+        Set<Variable> varset = new HashSet<>(); 
+        Collections.addAll(varset, useVariables);
+        Variable[] uniqueVars = new Variable[varset.size()];
+        varset.toArray(uniqueVars);
+        
+        // PROBLEM: sets are not ordered...
+        
         int cnt_evars = 0, cnt_nvars = 0;
-        for (Variable useVariable : useVariables) {
+        for (Variable useVariable : uniqueVars) {
             try {
                 EnumVariable evar = (EnumVariable) useVariable;
                 cnt_evars ++;
@@ -88,12 +96,12 @@ public class DenseFactor {
             this.evars = new EnumVariable[cnt_evars];
             this.nvars = new Variable[cnt_nvars];
             cnt_evars = 0; cnt_nvars = 0;
-            for (Variable useVariable : useVariables) {
+            for (Variable uvar : uniqueVars) {
                 try {
-                    EnumVariable evar = (EnumVariable) useVariable;
+                    EnumVariable evar = (EnumVariable) uvar;
                     this.evars[cnt_evars ++] = evar;
                 } catch (ClassCastException e) {
-                    this.nvars[cnt_nvars ++] = useVariable;
+                    this.nvars[cnt_nvars ++] = uvar;
                 }
             }
             this.nEVars = evars.length;
@@ -102,13 +110,13 @@ public class DenseFactor {
             this.nNVars = 0;
             this.nvars = null;
             this.evars = new EnumVariable[cnt_evars];
-            System.arraycopy(useVariables, 0, this.evars, 0, cnt_evars);
+            System.arraycopy(uniqueVars, 0, this.evars, 0, cnt_evars);
             this.nEVars = cnt_evars;
         } else { // only non-enumerable
             this.nEVars = 0;
             this.evars = null;
             this.nvars = new Variable[cnt_nvars];
-            System.arraycopy(useVariables, 0, this.nvars, 0, cnt_nvars);
+            System.arraycopy(uniqueVars, 0, this.nvars, 0, cnt_nvars);
             this.nNVars = cnt_nvars;
         }
         this.step = new int[this.nEVars];
@@ -382,6 +390,7 @@ public class DenseFactor {
 //    }
     
     private static Variable[] concat(Variable[] one, Variable[] two) {
+        // TODO: remove duplicates
         if (one == null && two == null)
             return new Variable[0];
         else if (one == null) {
@@ -424,7 +433,7 @@ public class DenseFactor {
                 dt.assigned[0].addAll(Y.assigned[0]);
             return dt;
         } else if (X.nEVars == 0) { // only X is without enumerables
-            DenseFactor dt = new DenseFactor(concat(Y.evars, Y.nvars));
+            DenseFactor dt = new DenseFactor(concat(Y.evars, concat(X.nvars, Y.nvars)));
             for (int j = 0; j < Y.getSize(); j ++) {
                 dt.map[j] = Y.getValue(j) * X.getValue();
                 if (X.isJDF() && Y.isJDF())
@@ -440,7 +449,7 @@ public class DenseFactor {
             }
             return dt;
         } else if (Y.nEVars == 0) { // only Y is without enumerables
-            DenseFactor dt = new DenseFactor(concat(X.evars, X.nvars));
+            DenseFactor dt = new DenseFactor(concat(X.evars, concat(X.nvars, Y.nvars)));
             for (int j = 0; j < X.getSize(); j ++) {
                 dt.setValue(j, X.getValue(j) * Y.getValue());
                 if (X.isJDF() && Y.isJDF())
@@ -494,7 +503,7 @@ public class DenseFactor {
         if (noverlap == Math.min(X.nEVars, Y.nEVars)) { // at least one table is "contained" by the other
             if (X.nEVars == Y.nEVars) {
                 Object[] ykey = new Object[Y.nEVars];
-                DenseFactor dt = new DenseFactor(X.evars);
+                DenseFactor dt = new DenseFactor(concat(X.evars,concat(X.nvars,Y.nvars)));
                 for (int x = 0; x < X.map.length; x ++) {
                     int y = x; // if ordered the inices in the tables are identical
                     if (!ordered) { // re-index since the variables are listed in a different order
@@ -525,7 +534,7 @@ public class DenseFactor {
                     if (ykeyidx[i] == -1)
                         notInY.add(X.evars[i]);
                 Object[] ykey = new Object[Y.nEVars];
-                DenseFactor dt = new DenseFactor(X.evars);
+                DenseFactor dt = new DenseFactor(concat(X.evars,concat(X.nvars, Y.nvars)));
                 for (int x = 0; x < X.getSize(); x ++) {
                     double xval = X.getValue(x);
                     if (xval == 0)
@@ -567,7 +576,7 @@ public class DenseFactor {
                     if (xkeyidx[i] == -1)
                         notInX.add(Y.evars[i]);
                 Object[] xkey = new Object[X.nEVars];
-                DenseFactor dt = new DenseFactor(Y.evars);
+                DenseFactor dt = new DenseFactor(concat(Y.evars,concat(X.nvars, Y.nvars)));
                 for (int y = 0; y < Y.getSize(); y ++) {
                     double yval = Y.getValue(y);
                     if (yval == 0)
@@ -614,7 +623,7 @@ public class DenseFactor {
             if (xkeyidx[j] == -1)
                 rkey[X.nEVars + ycnt ++] = Y.evars[j];
         }
-        DenseFactor dt = new DenseFactor(rkey);
+        DenseFactor dt = new DenseFactor(concat(rkey, concat(X.nvars, Y.nvars)));
         
         // 2. two tables have nothing in common
         if (noverlap == 0) {
@@ -808,20 +817,22 @@ public class DenseFactor {
             for (int x : indices) {
                 double xval = X.map[x];
                 sum += xval;
-                if (X.isJDF()) {
-                    if (first == null) {  // this will be true only once, for the first entry that will be collapsed
-                        first = X.jdf[x]; // save the JDF for later
-                        prev_weight = xval; // save the value associated with this entry to weight the distributions
-                    } else if (mixture == null) { // for the second entry, the mixture is created, both JDF weighted
-                        mixture = JDF.mix(mixture, prev_weight, X.jdf[x], xval);
-                    } else { // for all subsequent entries, the mixture is mixed unchanged with the new entry's JDF weighted
-                        mixture = JDF.mix(mixture, X.jdf[x], xval);
-                    }
-                }
             }
             Y.map[y] = sum;
-            if (Y.isJDF())
+            if (X.isJDF()) {
+                for (int x : indices) {
+                    double nxval = X.map[x] / sum; // normalized
+                    if (first == null) {  // this will be true only once, for the first entry that will be collapsed
+                        first = X.jdf[x]; // save the JDF for later
+                        prev_weight = nxval; // save the value associated with this entry to weight the distributions
+                    } else if (mixture == null) { // for the second entry, the mixture is created, both JDF weighted
+                        mixture = JDF.mix(first, prev_weight, X.jdf[x], nxval);
+                    } else { // for all subsequent entries, the mixture is mixed unchanged with the new entry's JDF weighted
+                        mixture = JDF.mix(mixture, X.jdf[x], nxval);
+                    }
+                }
                 Y.jdf[y] = mixture;
+            }
         }
         return Y;
     }
@@ -832,7 +843,7 @@ public class DenseFactor {
      * This code is based on that of getMargin.
      * 
      * @param X existing table
-     * @param evars variables to sum-out
+     * @param anyvars variables to sum-out
      * @return the resulting "margin" of the table
      */
     public static DenseFactor getMaxMargin(DenseFactor X, Variable ... anyvars) {
@@ -1142,14 +1153,22 @@ public class DenseFactor {
         for (int j = 0; j < this.nEVars; j++) {
             System.out.print(String.format("[%8s]", this.evars[j].getName()));
         }
-        System.out.println(" P");
+        System.out.print(" F     ");
+        for (int i = 0; i < nNVars; i ++) 
+            System.out.print(String.format("[%8s]", nvars[i].getName()));
+        System.out.println();
         for (int i = 0; i < this.getSize(); i++) {
             System.out.print(String.format("%3d ", i));
             Object[] key = this.getKey(i);
-            for (int j = 0; j < key.length; j++) {
-                System.out.print(String.format(" %-8s ", key[j].toString()));
+            for (Object key1 : key) {
+                System.out.print(String.format(" %-8s ", key1.toString()));
             }
-            System.out.println(String.format(" %5.3f", this.getValue(i)));
+            System.out.print(String.format(" %5.3f ", this.getValue(i)));
+            for (int j = 0; j < nNVars; j ++) {
+                Distrib d = this.getDistrib(i, nvars[j]);
+                System.out.print(String.format(" %s ", (d==null?"-":d.toString())));
+            }
+            System.out.println();
         }
     }
 
@@ -1210,17 +1229,23 @@ public class DenseFactor {
         EnumVariable y2 = Predef.Nominal(new String[] {"a", "b", "c"});
         EnumVariable z1 = Predef.NucleicAcid("NA1");
         EnumVariable z2 = Predef.AminoAcid("AA2");
-        DenseFactor dt0 = new DenseFactor(x1,y1,y2);
-        for (int key_index = 0; key_index < dt0.getSize(); key_index ++)
+        Variable r1 = Predef.Real("R1");
+        Variable r2 = Predef.Real("R2");
+        DenseFactor dt0 = new DenseFactor(x1,y1,r1,y2);
+        for (int key_index = 0; key_index < dt0.getSize(); key_index ++) {
             dt0.setValue(key_index, random.nextDouble());
+            dt0.setDistrib(key_index, r1, new GaussianDistrib(random.nextGaussian(), random.nextDouble()));
+        }
         dt0.display();
     
         DenseFactor mt0 = DenseFactor.getMargin(dt0, y1, x1);
         mt0.display();
         
-        DenseFactor dt1 = new DenseFactor(y1,x1);
-        for (int key_index = 0; key_index < dt1.getSize(); key_index ++)
+        DenseFactor dt1 = new DenseFactor(y1,x1, r2);
+        for (int key_index = 0; key_index < dt1.getSize(); key_index ++) {
             dt1.setValue(key_index, random.nextDouble());
+            dt1.setDistrib(key_index, r2, new GaussianDistrib(random.nextGaussian(), random.nextDouble()));
+        }
         dt1.display();
         
         DenseFactor mt1 = DenseFactor.getMargin(dt1, x1);
@@ -1229,7 +1254,7 @@ public class DenseFactor {
         DenseFactor dt2 = new DenseFactor(x2,y2,z1,x1);
         for (int key_index = 0; key_index < dt2.getSize(); key_index ++)
             dt2.setValue(key_index, random.nextDouble());
-        dt2.display();
+        //dt2.display();
         DenseFactor mt2 = DenseFactor.getMargin(dt2, x2, y2);
         mt2.display();
         
