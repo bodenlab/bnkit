@@ -50,6 +50,7 @@ public class DenseFactor extends AbstractFactor {
     protected final double[] map; // the factors
     protected Set<Variable.Assignment>[] assigned = null; // the latent assignments associated with each factor, disabled by default
     protected JDF[] jdf = null; // the Joint Density Function associated with each factor, disabled by default
+    protected int occupied = 0; // number of entries that are occupied
     
     /**
      * Construct a new table without any variables. 
@@ -175,6 +176,10 @@ public class DenseFactor extends AbstractFactor {
     public int setValue(double value) {
         if (this.getSize() != 1)
             throw new DenseFactorRuntimeException("Table has variables that must be used to index access");
+        if (value != 0 && map[0] == 0)
+            occupied ++;
+        else if (value == 0 && map[0] !=0)
+            occupied --;
         map[0] = value;
         return 0;
     }
@@ -192,6 +197,10 @@ public class DenseFactor extends AbstractFactor {
     public int setValue(int key_index, double value) {
         if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
+        if (value != 0 && map[key_index] == 0)
+            occupied ++;
+        else if (value == 0 && map[key_index] !=0)
+            occupied --;
         map[key_index] = value;
         return key_index;
     }
@@ -208,10 +217,23 @@ public class DenseFactor extends AbstractFactor {
         if (getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key: no variables");
         int index = this.getIndex(key);
+        if (value != 0 && map[index] == 0)
+            occupied ++;
+        else if (value == 0 && map[index] !=0)
+            occupied --;
         map[index] = value;
         return index;
     }
 
+    /**
+     * Find out how many entries that occupied.
+     * @return how many non-zero entries the factor table holds
+     */
+    @Override
+    public int getOccupied() {
+        return occupied;
+    }
+    
     /**
      * Set the JDF for a table without enumerable variables.
      * @param value JDF
@@ -481,6 +503,7 @@ public class DenseFactor extends AbstractFactor {
             for (int i = 0; i < jdf.length; i ++) 
                 this.jdf[i] = new JDF(nvars);
         }
+        occupied = 0;
     }
     
 
@@ -632,8 +655,6 @@ public class DenseFactor extends AbstractFactor {
         System.out.println((endTime - startTime)/100000.0 + "ms");
         System.out.println(getOverlap(dt0, dt0) + " : " + getComplexity(dt0, dt0, true) + "\t" + getComplexity(dt0, dt0, false) + " : " + dt0.getSize() + " v " + dt0.getSize());
     }
-
-
 }
 
 class DenseFactorRuntimeException extends RuntimeException {

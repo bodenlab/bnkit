@@ -30,6 +30,23 @@ import java.util.Random;
 import java.util.Set;
 
 /**
+ * Table for storing and retrieving doubles based on Enumerable keys.
+ * 
+ * The intended use is for "factors", representing the factorisation of (conditional) probabilities.
+ * They form the backbone data structure in algorithms such as variable elimination and 
+ * message-passing in belief propagation. These operations need to be efficient. 
+ * 
+ * AbstractFactor is an abstract class that defines methods for specific implementations but 
+ * implements basic operations that are used externally on factors, including product, and 
+ * variable marginalisation (summing-out or maxing-out).
+ * 
+ * The class is sensitive to the order of variables, and exposes the user to some
+ * details so caution must be exercised.
+ * 
+ * TODO: Consider improving efficiency further to exploit the fact that now all variables are sorted
+ * in the constructor. (Currently, some code does not assume order.)
+ * TODO: Choose type of implementation when new factors are constructed as a result of operations,
+ * informed of their likely requirements.
  *
  * @author mikael
  */
@@ -51,7 +68,7 @@ public abstract class AbstractFactor {
      * This type of factor is used when all variables are summed out. 
      * They can appear as part of products to "scale" its opposite.
      */
-    public AbstractFactor() {
+    protected AbstractFactor() {
         this.evars = null;
         this.nEVars = 0;
         this.nvars = null;
@@ -75,7 +92,7 @@ public abstract class AbstractFactor {
      * @param useVariables variables, either enumerable or non-enumerable, 
      * potentially unsorted and redundant
      */
-    public AbstractFactor(Variable... useVariables) {
+    protected AbstractFactor(Variable... useVariables) {
         // sort and weed out duplicates
         Variable[] uniqueVars = sortRemoveDuplicates(useVariables);
         // count the number of enumerable and non-enumerable variables
@@ -148,7 +165,11 @@ public abstract class AbstractFactor {
         }
         int j = 0;
         int i = 1;
-        Arrays.sort(A);
+        try { 
+            Arrays.sort(A);
+        } catch (java.lang.NullPointerException e) {
+            System.out.println();
+        }
         while (i < A.length) {
             if (A[i] == A[j]) {
                 i++;
@@ -568,16 +589,12 @@ public abstract class AbstractFactor {
             }
         }
         // Failing the above, we must construct a table which is an amalgamate of the two.
-        // Now, we prepare the variable "key" for the new, aggregate table.
-        EnumVariable[] rkey = new EnumVariable[X.nEVars + Y.nEVars - noverlap];
-        System.arraycopy(X.evars, 0, rkey, 0, X.nEVars);
-        int ycnt = 0;
-        for (int j = 0; j < Y.nEVars; j++) {
-            if (ycross2x[j] == -1) {
-                rkey[X.nEVars + ycnt++] = Y.evars[j];
-            }
-        }
-        AbstractFactor dt = new DenseFactor(concat(rkey, concat(X.nvars, Y.nvars)));
+        AbstractFactor dt = new DenseFactor(concat(concat(X.evars, Y.evars), concat(X.nvars, Y.nvars)));
+        Object[] reskey = new Object[dt.nEVars]; // this will initialise all elements to null
+        int[] xcross2dt = new int[X.nEVars]; // map from X index to dt index
+        int[] ycross2dt = new int[Y.nEVars]; // map from Y index to dt index
+        crossReference(X.evars, xcross2dt, dt.evars, null);
+        crossReference(Y.evars, ycross2dt, dt.evars, null);
         // 2. two tables have nothing in common
         if (noverlap == 0) {
             for (int x = 0; x < X.getSize(); x++) {
@@ -585,12 +602,21 @@ public abstract class AbstractFactor {
                 if (xval == 0) {
                     continue; // no point in continuing since product will always be zero for entries with this x-value
                 }
+                Object[] xkey = X.getKey(x);
                 for (int y = 0; y < Y.getSize(); y++) {
                     double yval = Y.getValue(y);
                     if (yval == 0) {
                         continue; // the product will be zero no what
                     }
-                    int idx = x * Y.getSize() + y;
+                    Object[] ykey = Y.getKey(y);
+                    for (int i = 0; i < xkey.length; i ++)
+                        reskey[xcross2dt[i]] = xkey[i];
+                    for (int i = 0; i < ykey.length; i ++)
+                        reskey[ycross2dt[i]] = ykey[i];
+                    int idx = dt.getIndex(reskey);
+                    // **************************
+                    //     This does NOT work
+                    // **************************
                     dt.setValue(idx, xval * yval);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
@@ -614,11 +640,6 @@ public abstract class AbstractFactor {
         }
         // 3. General case, if none of those implemented above has worked
         Object[] searchkey = new Object[Y.nEVars]; // this will initialise all elements to null
-        Object[] reskey = new Object[dt.nEVars]; // this will initialise all elements to null
-        int[] xcross2dt = new int[X.nEVars]; // map from X index to dt index
-        int[] ycross2dt = new int[Y.nEVars]; // map from Y index to dt index
-        crossReference(X.evars, xcross2dt, dt.evars, null);
-        crossReference(Y.evars, ycross2dt, dt.evars, null);
         int option = PRODUCT_OPTION;
         long start0 = 0;
         long start1 = 0;
@@ -1000,6 +1021,14 @@ public abstract class AbstractFactor {
     }
 
     /**
+     * Find out how full the table is.
+     * @return the percentage of table that is occupied with non-zero values
+     */
+    public double getCapacity() {
+        return getOccupied() / getSize();
+    }
+    
+    /**
      * Get the enumerable variables of the table.
      * @return the variables in original order.
      */
@@ -1170,18 +1199,31 @@ public abstract class AbstractFactor {
         System.out.println();
         for (int i = 0; i < this.getSize(); i++) {
             System.out.print(String.format("%3d ", i));
-            Object[] key = this.getKey(i);
-            for (Object key1 : key) {
-                System.out.print(String.format(" %-8s ", key1.toString()));
-            }
-            System.out.print(String.format(" %5.3f ", this.getValue(i)));
-            for (int j = 0; j < nNVars; j++) {
-                Distrib d = this.getDistrib(i, nvars[j]);
-                System.out.print(String.format(" %s ", d == null ? "-" : d.toString()));
-            }
-            if (this.isTraced()) {
-                for (Variable.Assignment a : this.getAssign(i)) {
-                    System.out.print(a + ";");
+            if (this.getSize() == 1) {
+                System.out.print(String.format(" %5.3f ", this.getValue()));
+                for (int j = 0; j < nNVars; j++) {
+                    Distrib d = this.getDistrib(nvars[j]);
+                    System.out.print(String.format(" %s ", d == null ? "-" : d.toString()));
+                }
+                if (this.isTraced()) {
+                    for (Variable.Assignment a : this.getAssign()) {
+                        System.out.print(a + ";");
+                    }
+                }
+            } else {
+                Object[] key = this.getKey(i);
+                for (Object key1 : key) {
+                    System.out.print(String.format(" %-8s ", key1.toString()));
+                }
+                System.out.print(String.format(" %5.3f ", this.getValue(i)));
+                for (int j = 0; j < nNVars; j++) {
+                    Distrib d = this.getDistrib(i, nvars[j]);
+                    System.out.print(String.format(" %s ", d == null ? "-" : d.toString()));
+                }
+                if (this.isTraced()) {
+                    for (Variable.Assignment a : this.getAssign(i)) {
+                        System.out.print(a + ";");
+                    }
                 }
             }
             System.out.println();
@@ -1406,8 +1448,11 @@ public abstract class AbstractFactor {
      */
     public abstract int setDistrib(Variable nvar, Distrib d);
     
+    /**
+     * Find out how many entries that occupied.
+     */
+    public abstract int getOccupied();
     
-
     /**
      * Set all entries to 0.
      */
@@ -1455,8 +1500,9 @@ public abstract class AbstractFactor {
 
     protected static Variable[] getSubset(long seed, Variable[] vars, int n) {
         Random random = new Random(seed);
-        Variable[] subset = new Variable[n];
         Set<Variable> unique = new HashSet<>();
+        n = Math.min(vars.length, n);
+        Variable[] subset = new Variable[n];
         while (unique.size() < n) {
             unique.add(vars[random.nextInt(vars.length)]);
         }
@@ -1466,8 +1512,8 @@ public abstract class AbstractFactor {
 
     protected static AbstractFactor[] getFactorPool(long seed, Variable[] vars, int n) {
         Random random = new Random(seed);
-        int M = Math.abs((int) (random.nextGaussian() * n));
-        int N = Math.abs((int) (random.nextGaussian() * n));
+        int M = Math.abs((int) (random.nextGaussian() * n) + 1);
+        int N = Math.abs((int) (random.nextGaussian() * n) + 1);
         AbstractFactor[] dfs = new DenseFactor[N];
         for (int i = 0; i < dfs.length; i++) {
             int nvars = random.nextInt(Math.max(1, M));
@@ -1477,42 +1523,108 @@ public abstract class AbstractFactor {
             } else {
                 dfs[i] = new DenseFactor();
             }
-            int npop = random.nextInt(dfs[i].getSize()); // number of entries to populate
+            int npop = dfs[i].getSize(); //random.nextInt(dfs[i].getSize()); // number of entries to populate
             for (int j = 0; j < npop; j++) {
-                int index = random.nextInt(npop);
-                dfs[i].setValue(index, random.nextGaussian() / npop);
-                if (dfs[i].isJDF()) {
-                    for (Variable nvar : dfs[i].getNonEnumVars()) {
-                        dfs[i].setDistrib(index, nvar, new GaussianDistrib(random.nextGaussian() * random.nextInt(100), Math.abs(random.nextGaussian() * (random.nextInt(10) + 1))));
+                if (dfs[i].getSize() == 1) {
+                    dfs[i].setValue(Math.abs(random.nextGaussian()) / npop);    
+                    if (dfs[i].isJDF()) {
+                        for (Variable nvar : dfs[i].getNonEnumVars()) {
+                            dfs[i].setDistrib(nvar, new GaussianDistrib(random.nextGaussian() * random.nextInt(100), Math.abs(random.nextGaussian() * (random.nextInt(10) + 1))));
+                        }
+                    }
+                } else {
+                    int index = random.nextInt(npop);
+                    dfs[i].setValue(index, Math.abs(random.nextGaussian()) / npop);
+                    if (dfs[i].isJDF()) {
+                        for (Variable nvar : dfs[i].getNonEnumVars()) {
+                            dfs[i].setDistrib(index, nvar, new GaussianDistrib(random.nextGaussian() * random.nextInt(100), Math.abs(random.nextGaussian() * (random.nextInt(10) + 1))));
+                        }
                     }
                 }
+                
             }
+            //dfs[i].display();
         }
         return dfs;
     }
 
     protected static AbstractFactor productPool(AbstractFactor[] dfs) {
-        AbstractFactor f = dfs[0];
-        long totalTime = 0;
-        for (int i = 1; i < dfs.length; i++) {
-            long startTime;
-            long endTime;
-            startTime = System.nanoTime();
-            AbstractFactor f1 = f;
-            AbstractFactor f2 = dfs[i];
-            f = AbstractFactor.getProduct(f1, f2);
-            endTime = System.nanoTime();
-            System.out.println(f1.nEVars + "\t" + f1.nNVars + "\t" + f2.nEVars + "\t" + f2.nNVars + "\t" + getOverlap(f1, f2) + "\t" + getComplexity(f1, f2, true) + "\t" + (endTime - startTime) / 100000.0);
-            totalTime += (endTime - startTime) / 100000.0;
-        }
-        System.out.println("\t\t\t\t\t\t" + totalTime);
-        return f;
+        if (dfs.length > 1) {
+            AbstractFactor f = dfs[0];
+            long totalTime = 0;
+            for (int i = 1; i < dfs.length; i++) {
+                long startTime;
+                long endTime;
+                startTime = System.nanoTime();
+                AbstractFactor f1 = f;
+                AbstractFactor f2 = dfs[i];
+                f = AbstractFactor.getProduct(f1, f2);
+                endTime = System.nanoTime();
+                if (testProductIntegrity(i, f1, f2, f) == false)
+                    System.err.println("Test failed");
+                System.out.println(f1.nEVars + "\t" + f1.nNVars + "\t" + f2.nEVars + "\t" + f2.nNVars + "\t" + getOverlap(f1, f2) + "\t" + getComplexity(f1, f2, true) + "\t" + (endTime - startTime) / 100000.0);
+                totalTime += (endTime - startTime) / 100000.0;
+            }
+            System.out.println("\t\t\t\t\t\t" + totalTime);
+            return f;
+        } 
+        return null;
     }
 
+    protected static boolean testProductIntegrity(long seed, AbstractFactor X, AbstractFactor Y, AbstractFactor PROD) {
+        Random rand = new Random(seed);
+        int p = rand.nextInt(PROD.getSize());
+        Object[] pkey;
+        if (PROD.getSize() == 1)
+            pkey = new Object[0];
+        else 
+            pkey = PROD.getKey(p);
+        EnumVariable[] pevars = PROD.getEnumVars();
+        EnumVariable[] xevars = X.getEnumVars();
+        EnumVariable[] yevars = Y.getEnumVars();
+        Object[] xkey = new Object[X.nEVars];
+        Object[] ykey = new Object[Y.nEVars];
+        for (int i = 0; i < pkey.length; i ++) {
+            if (!pevars[i].getDomain().isValid(pkey[i]))
+                return false;
+            int xi = -1;
+            for (int j = 0; j < X.nEVars; j ++) {
+                if (xevars[j].equals(pevars[i]))
+                    xi = j;
+            }
+            int yi = -1;
+            for (int j = 0; j < Y.nEVars; j ++) {
+                if (yevars[j].equals(pevars[i]))
+                    yi = j;
+            }
+            if (yi != -1)
+                ykey[yi] = pkey[i];
+            if (xi != -1)
+                xkey[xi] = pkey[i];
+        }
+        double xval ;
+        if (xkey.length != 0)
+            xval = X.getValue(X.getIndex(xkey));
+        else
+            xval = X.getValue();
+        double yval;
+        if (ykey.length != 0)
+            yval = Y.getValue(Y.getIndex(ykey));
+        else
+            yval = Y.getValue();
+        double pval;
+        if (pkey.length == 0) 
+            pval = PROD.getValue();
+        else
+            pval = PROD.getValue(p);
+        //System.out.print(p + "\t");
+        return xval * yval == pval;
+    }
+    
     public static void main(String[] args) {
         Random random = new Random(1);
         System.out.println("X/enum\tX/non\tY/enum\tY/non\tOverlap\tProduct\tTime (ms)");
-        for (long seed = 0; seed < 20; seed++) {
+        for (long seed = 0; seed < 200; seed++) {
             Variable[] vars = getVariablePool(seed, 10);
             AbstractFactor[] dfs = getFactorPool(seed, vars, 8);
             productPool(dfs);
