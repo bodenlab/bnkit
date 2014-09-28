@@ -200,5 +200,10 @@ public class SparseFactor extends AbstractFactor {
     public int[] getIndices(Object[] key) {
         return factorTable.getIndices(key);
     }
+
+    @Override
+    public int getOccupied() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
     
 }
