@@ -30,7 +30,7 @@ import java.util.Set;
  * @param <E>
  *
  */
-public class Variable<E extends Domain> {
+public class Variable<E extends Domain> implements Comparable {
 
     // A domain is a type checking entity (e.g. to check if a value is valid)
     private final E domain;
@@ -83,6 +83,14 @@ public class Variable<E extends Domain> {
         return this.name;
     }
 
+    /**
+     * Get the system-wide index of the variable, given at the time of construction.
+     * @return the canonical index, which is unique for all variables 
+     */
+    public int getCanonicalIndex() {
+        return canonicalIndex;
+    }
+    
     /**
      * Gives a printable, unique, system name to the variable.
      * @return system name
@@ -180,6 +188,16 @@ public class Variable<E extends Domain> {
      */
     public String getParams() {
         return this.params;
+    }
+
+    @Override
+    public int compareTo(Object othvar) {
+        try {
+            Variable var = (Variable)othvar;
+            return this.canonicalIndex - var.canonicalIndex;
+        } catch (ClassCastException e) {
+            throw new RuntimeException("Not a variable: " + othvar.toString());
+        }
     }
 
     /**
