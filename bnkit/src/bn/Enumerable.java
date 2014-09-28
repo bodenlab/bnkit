@@ -64,14 +64,20 @@ public class Enumerable implements Domain {
                     return i;
                 }
             }
-            throw new RuntimeException("Value " + value.toString() + " unknown to enumerable domain " + this.toString());
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < values.length; i++)
+                sb.append(values[i].toString() + ((i < values.length - 1)?", ":""));
+            throw new RuntimeException("Value \"" + value.toString() + "\" unknown to enumerable domain " + this.toString() + " with values: " + sb.toString());
         } else {
             for (int i = 0; i < values.length; i++) {
                 if (value.equals(values[i])) {
                     return i;
                 }
             }
-            throw new RuntimeException("Value " + value.toString() + " unknown to enumerable domain " + this.toString());
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < values.length; i++)
+                sb.append(values[i].toString() + ((i < values.length - 1)?", ":""));
+            throw new RuntimeException("Value \"" + value.toString() + "\" unknown to enumerable domain " + this.toString() + " with values: " + sb.toString());
         }
     }
 
