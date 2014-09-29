@@ -455,8 +455,10 @@ public class SmartNoisyOR implements BNode, Serializable{
              */
             int nkey = 0;
             for (int i=0; i<searchkey.length; i++) {
-            	if (searchkey[i].equals(this.plabels.get(i))) {
-            		nkey++;}
+            	if (searchkey[i] != null) {
+            		if (searchkey[i].equals(this.plabels.get(i))) {
+            			nkey++;}
+            	}
             }
             if (nkey > 1) {
             	insert(searchkey);
@@ -548,6 +550,15 @@ public class SmartNoisyOR implements BNode, Serializable{
         List<EnumVariable> parents = table.getParents();
         return parents;
     }
+    
+    /**
+     * Retrieve the labels used for defining the 'on'/true case 
+     * for the SmartNoisyOR parents
+     * @return the labels of the parent variables
+     */
+    public List<Object> getParentLabels() {
+    	return this.plabels;
+    }
 
     /**
      * Check if this SmartNoisyOR is a "root" SmartNoisyOR, i.e. has no parents.
@@ -578,8 +589,10 @@ public class SmartNoisyOR implements BNode, Serializable{
         //first check if we're looking at the false values
         int nkey = 0;
     	for (int i=0; i<key.length; i++) {
-    		if (key[i].equals(this.plabels.get(i))) {
-    			nkey++;}
+    		if (key[i] != null) {
+    			if (key[i].equals(this.plabels.get(i))) {
+    				nkey++;}
+    		}
     	}
     	if (nkey == 0) {
     		//if none of the valid parent labels are set,
@@ -714,8 +727,10 @@ public class SmartNoisyOR implements BNode, Serializable{
     public void insert(Object [] key) {
         int nkey = 0;
         for (int i=0; i<key.length; i++) {
-            if (key[i].equals(this.plabels.get(i))) {
-            	nkey++;}
+        	if (key[i] != null) {
+        		if (key[i].equals(this.plabels.get(i))) {
+        			nkey++;}
+        	}
         }
         Enumerable en = var.getDomain();
         double [] probabilities = new double[en.size()];
@@ -725,7 +740,26 @@ public class SmartNoisyOR implements BNode, Serializable{
             	Double searchkeyprob = get(key, en.get(i));
             	probabilities[i] = searchkeyprob;
             }
-            table.setValue(key, new EnumDistrib(var.getDomain(), probabilities));
+            //if the key contains a null value
+            Object [] newkey = new Object [key.length];
+            for (int i=0; i<key.length; i++) {
+            	if (key[i] != null)
+            		newkey[i] = key[i];
+            	else {
+            		//set to a non positive value of the parent
+            		List<EnumVariable> parents = this.table.parents;
+					EnumVariable par = parents.get(i-1);
+            		Object [] values = par.getDomain().getValues();
+            		Object lab = null;
+					for (Object v : values) {
+						if (!v.equals(this.plabels.get(i-1))) {
+							lab = v; break;
+						}
+					}
+					newkey[i] = lab;
+            	}
+            }
+            table.setValue(newkey, new EnumDistrib(var.getDomain(), probabilities));
         }
     }
     
@@ -1165,31 +1199,11 @@ public class SmartNoisyOR implements BNode, Serializable{
 	                EnumDistrib d = this.table.getValue(SmartNoisyORkey);
 	                if (d == null) {
 	                	d = new EnumDistrib(var.getDomain());
-	                	//Double obsCount = keyMap.get(cntkey);
-	                	//Double obsCount = trueCountMap.get(cntkey);
-	                	//Double weightedCount = 0.0;
-	                	//for (Object [] ckey : keyMap.keySet()) {
-	                	//	if (ckey[index].equals(this.plabels.get(index-1))) {
-	                	//		weightedCount = weightedCount + keyMap.get(ckey);
-	                	//	}
-	                	//}\
 	                	Double weighted_count = keyMap.get(cntkey);
 	                	Integer nconfigs = configMap.get(cntkey);
 	                	d.set(cntkey[0], weighted_count/nconfigs);
 	                	this.put(SmartNoisyORkey, d);
 	                } else {
-	                	//Double obsCount = null;
-	                	//for (Object [] k : trueCountMap.keySet()) {
-	                	//	if (equals(cntkey, k)) {
-	                	//		obsCount = trueCountMap.get(k);}
-	                	//}
-	                	
-	                	//Double weightedCount = 0.0;
-	                	//for (Object [] ckey : keyMap.keySet()) {
-	                	//	if (ckey[index].equals(this.plabels.get(index-1))) {
-	                	//		weightedCount = weightedCount + keyMap.get(ckey);
-	                	//	}
-	                	//}
 	                	Double weighted_count = keyMap.get(cntkey);
 	                	Integer nconfigs = configMap.get(cntkey);
 	                	d.set(cntkey[0], weighted_count/nconfigs);
@@ -1214,6 +1228,43 @@ public class SmartNoisyOR implements BNode, Serializable{
 	                	this.put(SmartNoisyORkey, d);
                 	}
                 }
+            }
+            
+            /**
+             * TO BE REMOVED when pseudo counts are implemented.
+             * At this point, some rows may not have been assigned values 
+             * if a parent was not observed in the training data. To handle this,
+             * rows that currently have null values will be set with uniform distributions. 
+             */
+            
+            Enumerable dom = var.getDomain();
+            for (int i=0; i<plabels.size(); i++) {
+            	Object [] key = new Object [plabels.size()];
+            	key[i] = plabels.get(i);
+            	for (int j=0; j<plabels.size(); j++) {
+            		if (i!=j) {
+    		        	ArrayList<EnumVariable> parents = (ArrayList<EnumVariable>) getParents();
+    					EnumVariable par = parents.get(i);
+    					Object [] domainValues = par.getDomain().getValues();
+    					Object lab = null;
+    					for (Object v : domainValues) {
+    						if (!v.equals(plabels.get(i))) {
+    							lab = v; break;
+    						}
+    					}
+    					key[j] = lab; 
+            		}
+    	        }
+            	//try and pull the key out of the table
+            	Object value = table.getValue(key);
+            	if (value == null) {
+            		Map<Object, Double> distMap = new HashMap<Object, Double>();
+            		for (int x=0; x<dom.size(); x++) {
+            			distMap.put(dom.get(x), 1.0/dom.size());
+            		}
+            		EnumDistrib dist = new EnumDistrib(distMap);
+            		put(key, dist);
+            	}
             }
             
             // normalisation happens internally when values are required	
