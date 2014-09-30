@@ -505,10 +505,10 @@ public class EM extends LearningAlg {
                     for (int j = 0; j < last_LL.length; j++) {
                     	sdl_LL[j] = (last_LL[j] - mean_LL)*(last_LL[j] - mean_LL);
                     }
-                    double sd_LL = last_LL[0] / last_LL.length;
+                    double sd_LL = sdl_LL[0] / sdl_LL.length;
                     for (int i = 0; i < last_LL.length - 1; i++) {
-                        last_LL[i] = last_LL[i + 1];
-                        sd_LL += (last_LL[i] / last_LL.length);
+                        sdl_LL[i] = sdl_LL[i + 1];
+                        sd_LL += (sdl_LL[i] / sdl_LL.length);
                     }
                     last_LL[last_LL.length - 1] = log_likelihood;
 //                    if ((-mean_LL - -log_likelihood) < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
