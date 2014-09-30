@@ -106,6 +106,13 @@ public class BNet implements Serializable {
         return taggedList;
     }
 
+    /**
+     * Clear all current tags for all nodes
+     */
+    public void removeAllTags(){
+        this.tagged.clear();
+    }
+
 
     /**
      * Return nodes that are in all specified tag groups
@@ -182,8 +189,6 @@ public class BNet implements Serializable {
         }
         return tags;
     }
-
-//  ADD: getTagged but for nodes that have at least one of the tags
 
     /**
      * Add a node to the BN. All nodes must implement the BNode interface.
