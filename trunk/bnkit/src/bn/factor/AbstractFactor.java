@@ -23,9 +23,13 @@ import bn.GaussianDistrib;
 import bn.JDF;
 import bn.Predef;
 import bn.Variable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
@@ -186,6 +190,34 @@ public abstract class AbstractFactor {
      * Gauges the alignment of enumerable variables in two tables to enable
      * optimization of products, in particular.
      * Assumes that variables are ordered per their canonical index.
+     * @param Xvars enumerable variables of a factor X
+     * @param Yvars enumerable variables of a factor Y
+     * @return number of enumerable variables that overlap
+     */
+    public static int getOverlap(EnumVariable[] Xvars, EnumVariable[] Yvars) {
+        if (Xvars == null) Xvars = new EnumVariable[0];
+        if (Yvars == null) Yvars = new EnumVariable[0];
+        int x = 0;
+        int y = 0;
+        int overlap = 0;
+        while (Xvars.length > x && Yvars.length > y) {
+            if (Xvars[x] == Yvars[y]) {
+                x++;
+                y++;
+                overlap++;
+            } else if (Xvars[x].getCanonicalIndex() < Yvars[y].getCanonicalIndex()) {
+                x++;
+            } else {
+                y++;
+            }
+        }
+        return overlap;
+    }
+
+    /**
+     * Gauges the alignment of enumerable variables in two tables to enable
+     * optimization of products, in particular.
+     * Assumes that variables are ordered per their canonical index.
      * @param X factor X
      * @param Y factor Y
      * @return number of enumerable variables that overlap
@@ -210,44 +242,185 @@ public abstract class AbstractFactor {
 
     /**
      * Gauges the computational cost of multiplying the two tables, to enable
-     * optimization of the order in which to products. (For example as a comparator.)
+     * optimization of the order in which to products. 
+     * This "gauge" does not work well at the moment for structuring a binary tree.
+     * 
+     * Assumes that variables are ordered per their canonical index.
+     * Note that the cost of joining shared variables is optional.
+     *
+     * @param Xvars enumerable variables of a factor X
+     * @param Yvars enumerable variables of a factor Y
+     * @param includeJoin set to true if operations that involved share variables should be counted, false otherwise
+     * @return complexity of the product X * Y
+     */
+    protected static int getComplexity(EnumVariable[] Xvars, EnumVariable[] Yvars, boolean includeJoin) {
+        if (Xvars == null) Xvars = new EnumVariable[0];
+        if (Yvars == null) Yvars = new EnumVariable[0];
+        int x = 0;
+        int y = 0;
+        int multiplier = 1;
+        while (Xvars.length > x && Yvars.length > y) {
+            if (Xvars[x] == Yvars[y]) {
+                if (includeJoin)
+                    multiplier *= Xvars[x].size();
+                x++;
+                y++;
+            } else if (Xvars[x].getCanonicalIndex() < Yvars[y].getCanonicalIndex()) {
+                multiplier *= Xvars[x].size();
+                x++;
+            } else {
+                multiplier *= Yvars[y].size();
+                y++;
+            }
+        }
+        while (Xvars.length > x) {
+            multiplier *= Xvars[x++].size();
+        }
+        while (Yvars.length > y) {
+            multiplier *= Yvars[y++].size();
+        }
+        return multiplier;
+    }
+
+    /**
+     * Gauges the computational cost of multiplying the two tables, to enable
+     * optimization of the order in which to products. 
      * Assumes that variables are ordered per their canonical index.
      * Note that the cost of joining shared variables is optional.
      *
      * @param X factor X
      * @param Y factor Y
+     * @param includeJoin set to true if operations that involved share variables should be counted, false otherwise
      * @return complexity of the product X * Y
      */
     public static int getComplexity(AbstractFactor X, AbstractFactor Y, boolean includeJoin) {
-        int x = 0;
-        int y = 0;
-        int overlap = 0;
-        int multiplier = 1;
-        while (X.nEVars > x && Y.nEVars > y) {
-            if (X.evars[x] == Y.evars[y]) {
-                if (includeJoin) {
-                    multiplier *= X.evars[x].size();
-                }
-                x++;
-                y++;
-                overlap++;
-            } else if (X.evars[x].getCanonicalIndex() < Y.evars[y].getCanonicalIndex()) {
-                multiplier *= X.evars[x].size();
-                x++;
-            } else {
-                multiplier *= Y.evars[y].size();
-                y++;
-            }
-        }
-        while (X.nEVars > x) {
-            multiplier *= X.evars[x++].size();
-        }
-        while (Y.nEVars > y) {
-            multiplier *= Y.evars[y++].size();
-        }
-        return multiplier;
+        return getComplexity(X.getEnumVars(), Y.getEnumVars(), includeJoin);
     }
 
+    /**
+     * Create a binary tree with all the pairwise products that are required to complete the full product.
+     * The order of the products are determined so to minimise the computational cost over the full product.
+     * @param factors all the factors that are to be multiplied
+     * @return a binary tree that defines a good order
+     */
+    public static FactorProductTree getProductTree(AbstractFactor[] factors) {
+        int N = factors.length;
+        // deal with special cases
+        if (N == 0)
+            return null;
+        if (N == 1)
+            return new FactorProductTree(factors[0]);
+        if (N == 2) 
+            return new FactorProductTree(new FactorProductTree(factors[0]), new FactorProductTree(factors[1]));
+        // more than two so optimisation is performed...
+        Map<FactorProduct, Integer> cmplx = new HashMap<>();
+        // construct the initial working set, of:
+        // nodes that MUST be used in the final tree
+        List<FactorProductTree> fpool = new ArrayList<>();
+        // first leaves for all factors that must take part of the tree
+        for (int i = 0; i < N; i ++) 
+            fpool.add(new FactorProductTree(factors[i]));
+        // now, the main part of repeatedly identifying the best node and integrating that into the final tree
+        // this will always be N - 1 products/internal nodes (where N is the number of factors)
+        FactorProductTree node = null;
+        for (int rank = 0; rank < N - 1; rank ++) {
+//            int lowest = Integer.MAX_VALUE;
+            int lowest = Integer.MIN_VALUE;
+            int a = -1, b = -1;
+            for (int i = 0; i < fpool.size(); i ++) {
+                EnumVariable[] evars_i = fpool.get(i).getEnumVars();
+                for (int j = i + 1; j < fpool.size(); j ++) {
+                    EnumVariable[] evars_j = fpool.get(j).getEnumVars();
+                    FactorProduct key = new FactorProduct(evars_i, evars_j);
+                    Integer cost = cmplx.get(key);
+                    if (cost == null) {
+                        cost = getComplexity(evars_i, evars_j, false);
+                        cmplx.put(key, cost);
+                    }
+//                    if (cost < lowest) {
+                    if (cost > lowest) {
+                        a = i; 
+                        b = j;
+                        lowest = cost;
+                    }
+                }
+            }
+            FactorProductTree child_a = fpool.get(a);
+            FactorProductTree child_b = fpool.get(b);
+            node = new FactorProductTree(child_a, child_b);
+            fpool.remove(b); // have to remove in opposite order, to not change the indices where "a" is
+            fpool.remove(a);
+            fpool.add(node);
+        }
+        return node;
+    }
+    
+    static private class FactorProduct {
+        final EnumVariable[] Xvars, Yvars;
+        FactorProduct(EnumVariable[] Xvars, EnumVariable[] Yvars) {
+            this.Xvars = Xvars; 
+            this.Yvars = Yvars;
+        }
+        @Override
+	public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (obj == null || (obj.getClass() != this.getClass())) return false;
+            FactorProduct fp = (FactorProduct)obj;
+            return ((Xvars == fp.Xvars && Yvars == fp.Yvars) || ((Xvars == fp.Yvars) && (Yvars == fp.Xvars)));
+        }
+        @Override
+        public int hashCode() {
+            int hash = 7;
+            hash = 31 * hash + (Xvars == null ? 0 : Arrays.hashCode(Xvars)) + (Yvars == null ? 0 : Arrays.hashCode(Yvars));
+            return hash;
+        }
+    }
+    
+    static public class FactorProductTree {
+        private final FactorProductTree x, y;
+        private AbstractFactor f = null;
+        private EnumVariable[] evars = null;
+        /**
+         * Construct a node in the tree
+         * @param x child
+         * @param y child
+         */
+        FactorProductTree(FactorProductTree x, FactorProductTree y) {
+            this.x = x;
+            this.y = y;
+            Variable[] vars = sortRemoveDuplicates(concat(x.getEnumVars(), y.getEnumVars()));
+            this.evars = new EnumVariable[vars.length];
+            for (int i = 0; i < vars.length; i ++)
+                this.evars[i] = (EnumVariable) vars[i];
+        }
+        
+        /**
+         * Construct a leaf node in the tree
+         * @param f the factor
+         */
+        FactorProductTree(AbstractFactor f) {
+            this.x = null;
+            this.y = null;
+            this.f = f;
+        }
+        EnumVariable[] getEnumVars() {
+            if (f == null)
+                return this.evars;
+            else
+                return f.getEnumVars();
+        }
+        /**
+         * Assign the factor to a node in the tree
+         * @param f the factor
+         */
+        void setFactor(AbstractFactor f) {
+            this.f = f;
+        }
+        AbstractFactor getFactor() {
+            return f;
+        }
+    }
+    
     /**
      * Concatenate two arrays of variables into one.
      * Does not consider order or duplicates.
@@ -760,13 +933,15 @@ public abstract class AbstractFactor {
      * @return the resulting "margin" of the table
      */
     public static AbstractFactor getMargin(AbstractFactor X, Variable... anyvars) {
+        // sort and weed out duplicates
+        Variable[] uniqueVars = sortRemoveDuplicates(anyvars);
         // first check that X has enumerable variables, because that would be required
         if (X.nEVars == 0) {
             return X;
         }
         // if X is ok, get rid of non-enumerables
         int cnt_evars = 0;
-        for (Variable var : anyvars) {
+        for (Variable var : uniqueVars) {
             try {
                 EnumVariable evar = (EnumVariable) var;
                 cnt_evars++;
@@ -778,7 +953,7 @@ public abstract class AbstractFactor {
             return X;
         } else {
             cnt_evars = 0;
-            for (Variable var : anyvars) {
+            for (Variable var : uniqueVars) {
                 try {
                     EnumVariable evar = (EnumVariable) var;
                     evars[cnt_evars++] = evar;
@@ -818,7 +993,7 @@ public abstract class AbstractFactor {
             }
             double sum = 0;
             int[] indices = X.getIndices(xkey_search);
-            JDF first = null;
+            JDF first = null, subsequent = null;
             JDF mixture = null;
             double prev_weight = 0;
             for (int x : indices) {
@@ -829,19 +1004,30 @@ public abstract class AbstractFactor {
             if (X.isJDF()) {
                 for (int x : indices) {
                     double nxval = X.getValue(x) / sum; // normalized
-                    if (first == null) {
-                        // this will be true only once, for the first entry that will be collapsed
-                        first = X.getJDF(x); // save the JDF for later
-                        prev_weight = nxval; // save the value associated with this entry to weight the distributions
-                    } else if (mixture == null) {
-                        // for the second entry, the mixture is created, both JDF weighted
-                        mixture = JDF.mix(first, prev_weight, X.getJDF(x), nxval);
-                    } else {
-                        // for all subsequent entries, the mixture is mixed unchanged with the new entry's JDF weighted
-                        mixture = JDF.mix(mixture, X.getJDF(x), nxval);
+                    if (nxval != 0) {
+                        if (first == null) {
+                            // this will be true only once, for the first entry that will be collapsed
+                            first = X.getJDF(x); // save the JDF for later
+                            prev_weight = nxval; // save the value associated with this entry to weight the distributions
+                        } else if (mixture == null) {
+                            // for the subsequent entry, the mixture is created, both JDF weighted
+                            subsequent = X.getJDF(x);
+                            if (subsequent != null)
+                                mixture = JDF.mix(first, prev_weight, subsequent, nxval);
+                        } else {
+                            // for all subsequent entries, the mixture is mixed unchanged with the new entry's JDF weighted
+                            subsequent = X.getJDF(x);
+                            if (subsequent != null)
+                                mixture = JDF.mix(mixture, subsequent, nxval);
+                        }
                     }
                 }
-                Y.setJDF(y, mixture);
+                if (first != null) {
+                    if (mixture != null)
+                        Y.setJDF(y, mixture);
+                    else
+                        Y.setJDF(y, first);
+                }
             }
         }
         return Y;
@@ -857,13 +1043,15 @@ public abstract class AbstractFactor {
      * @return the resulting "margin" of the table
      */
     public static AbstractFactor getMaxMargin(AbstractFactor X, Variable... anyvars) {
+        // sort and weed out duplicates
+        Variable[] uniqueVars = sortRemoveDuplicates(anyvars);
         // first check that X has enumerable variables, because that would be required
         if (X.nEVars == 0) {
             return X;
         }
         // if X is ok, get rid of non-enumerables
         int cnt_evars = 0;
-        for (Variable var : anyvars) {
+        for (Variable var : uniqueVars) {
             try {
                 EnumVariable evar = (EnumVariable) var;
                 cnt_evars++;
@@ -875,7 +1063,7 @@ public abstract class AbstractFactor {
             return X;
         } else {
             cnt_evars = 0;
-            for (Variable var : anyvars) {
+            for (Variable var : uniqueVars) {
                 try {
                     EnumVariable evar = (EnumVariable) var;
                     evars[cnt_evars++] = evar;
@@ -1181,7 +1369,7 @@ public abstract class AbstractFactor {
      * @return
      */
     public Object[] getKey(Variable.Assignment[] evid) {
-        return DenseFactor.getKey(this.evars, evid);
+        return AbstractFactor.getKey(this.evars, evid);
     }
 
     /**
@@ -1264,7 +1452,11 @@ public abstract class AbstractFactor {
      * @param key the entry
      * @return the value of the entry
      */
-    public abstract double getValue(Object[] key);
+    public double getValue(Object[] key) {
+        int index = getIndex(key);
+        return getValue(index);
+    }
+
 
     /**
      * Retrieve the value of the entry identified by the instantiated key
@@ -1272,7 +1464,11 @@ public abstract class AbstractFactor {
      * @param key the entry
      * @return the value of the entry
      */
-    public abstract double getJDF(Object[] key);
+    public double getJDF(Object[] key) {
+        int index = getIndex(key);
+        return getValue(index);
+    }
+
 
     /**
      * Set the only value associated with a table without enumerable variables.
@@ -1299,7 +1495,13 @@ public abstract class AbstractFactor {
      * @param value
      * @return the index at which the value was stored
      */
-    public abstract int setValue(Object[] key, double value);
+    public int setValue(Object[] key, double value) {
+        if (getSize() == 1)
+            throw new AbstractFactorRuntimeException("Invalid key: no variables");
+        int index = getIndex(key);
+        return setValue(index);
+    }
+
 
     /**
      * Set the JDF for a table without enumerable variables.
@@ -1324,7 +1526,12 @@ public abstract class AbstractFactor {
      * @param value JDF
      * @return the index at which the JDF was stored
      */
-    public abstract int setJDF(Object[] key, JDF value);
+    public int setJDF(Object[] key, JDF value) {
+        if (getSize() == 1)
+            throw new AbstractFactorRuntimeException("Invalid key: no variables");
+        int index = getIndex(key);
+        return setJDF(index, value);
+    }
 
     /**
      * Activate tracing of implied assignments.
@@ -1358,7 +1565,10 @@ public abstract class AbstractFactor {
      * @param assign assignment
      * @return index of entry
      */
-    public abstract int setAssign(Object[] key, Collection<Variable.Assignment> assign);
+    public int setAssign(Object[] key, Collection<Variable.Assignment> assign) {
+        return setAssign(getIndex(key), assign);
+    }
+    
     
     /**
      * Retrieve a collection of assignments from the single entry.
@@ -1374,11 +1584,13 @@ public abstract class AbstractFactor {
     public abstract Set<Variable.Assignment> getAssign(int key_index);
     
     /**
-     * Retrieve a collection of assignments from entry.
-     * @param key key of entry
+     * Retrieve a collection of assignments from the specified entry.
+     * @param key the entry
      * @return set of assignments
      */
-    public abstract Set<Variable.Assignment> getAssign(Object[] key);
+    public Set<Variable.Assignment> getAssign(Object[] key) {
+        return getAssign(getIndex(key));
+    }
     
     /**
      * Tag the entry with an assignment.
@@ -1394,7 +1606,9 @@ public abstract class AbstractFactor {
      * @param assign assignment
      * @return index of entry
      */
-    public abstract int addAssign(Object[] key, Variable.Assignment assign);
+    public int addAssign(Object[] key, Variable.Assignment assign) {
+        return addAssign(getIndex(key), assign);
+    }
     
     /**
      * Retrieve the distribution of the specified non-enumerable variable.
@@ -1419,7 +1633,10 @@ public abstract class AbstractFactor {
      * @param nvar non-enumerable variable
      * @return probability distribution for variable
      */
-    public abstract Distrib getDistrib(Object[] key, Variable nvar);
+    public Distrib getDistrib(Object[] key, Variable nvar) {
+        int index = getIndex(key);
+        return this.getDistrib(index, nvar);
+    }
     
    /**
      * Set the conditional distribution of a non-enumerable variable. 
@@ -1438,7 +1655,13 @@ public abstract class AbstractFactor {
      * @param d the distribution that applies to the non-enumerable variable
      * @return the index of the entry
      */
-    public abstract int setDistrib(Object[] key, Variable nonenum, Distrib d);
+    public int setDistrib(Object[] key, Variable nonenum, Distrib d) {
+        if (this.getSize() == 1)
+            throw new AbstractFactorRuntimeException("Invalid key: no variables");
+        int index = getIndex(key);
+        return setDistrib(index, nonenum, d);
+    }
+
 
     /**
      * Set the distribution of a non-enumerable variable for a factor without enumerable variables. 
@@ -1543,32 +1766,86 @@ public abstract class AbstractFactor {
                 }
                 
             }
-            //dfs[i].display();
         }
         return dfs;
     }
 
-    protected static AbstractFactor productPool(AbstractFactor[] dfs) {
-        if (dfs.length > 1) {
-            AbstractFactor f = dfs[0];
-            long totalTime = 0;
-            for (int i = 1; i < dfs.length; i++) {
-                long startTime;
-                long endTime;
-                startTime = System.nanoTime();
-                AbstractFactor f1 = f;
-                AbstractFactor f2 = dfs[i];
-                f = AbstractFactor.getProduct(f1, f2);
-                endTime = System.nanoTime();
-                if (testProductIntegrity(i, f1, f2, f) == false)
+    protected static AbstractFactor getProduct(FactorProductTree node) {
+        if (node.getFactor() != null)
+            return node.getFactor();
+        AbstractFactor X = getProduct(node.x);
+        AbstractFactor Y = getProduct(node.y);
+        long startTime = System.nanoTime();
+        AbstractFactor f = AbstractFactor.getProduct(X, Y);
+        long endTime = System.nanoTime();
+        for (int j = 0; j < 20; j ++) {
+            if (testProductIntegrity(j, X, Y, f) == false)
+                System.err.println("Test failed");
+        }
+        int overlap = getOverlap(X, Y);
+        int minevars = Math.min(X.nEVars, Y.nEVars);
+        int maxevars = Math.max(Y.nEVars, Y.nEVars);
+        System.out.println(maxevars + "\t" + minevars + "\t" + overlap + "\t" + (minevars == 0 ? 0.0 : overlap / (float)minevars) + "\t" + getComplexity(X, Y, false) + "\t" + getComplexity(X, Y, true) + "\t" + (endTime - startTime) / 100000.0);
+        node.setFactor(f);
+        return f;
+    }
+    
+    protected static AbstractFactor getProduct(AbstractFactor[] factors) {
+        if (factors.length == 0)
+            return null;
+        AbstractFactor R = factors[0];
+        for (int i = 1; i < factors.length; i ++) {
+            AbstractFactor X = R;
+            AbstractFactor Y = factors[i];
+            long startTime = System.nanoTime();
+            R = AbstractFactor.getProduct(X, Y);
+            long endTime = System.nanoTime();
+            for (int j = 0; j < 20; j ++) {
+                if (testProductIntegrity(j, X, Y, R) == false)
                     System.err.println("Test failed");
-                System.out.println(f1.nEVars + "\t" + f1.nNVars + "\t" + f2.nEVars + "\t" + f2.nNVars + "\t" + getOverlap(f1, f2) + "\t" + getComplexity(f1, f2, true) + "\t" + (endTime - startTime) / 100000.0);
-                totalTime += (endTime - startTime) / 100000.0;
             }
-            System.out.println("\t\t\t\t\t\t" + totalTime);
+            int overlap = getOverlap(X, Y);
+            int minevars = Math.min(X.nEVars, Y.nEVars);
+            int maxevars = Math.max(Y.nEVars, Y.nEVars);
+            System.out.println(maxevars + "\t" + minevars + "\t" + overlap + "\t" + (minevars == 0 ? 0.0 : overlap / (float)minevars) + "\t" + getComplexity(X, Y, false) + "\t" + getComplexity(X, Y, true) + "\t" + (endTime - startTime) / 100000.0);
+        }
+        return R;
+    }
+    
+    
+    /** Calculate products linearly, don't consider order */
+    static final int POOL_OPTION_LINEAR = 0; 
+    /** Calculate products according to binary tree, optimised to minimise computational cost */
+    static final int POOL_OPTION_TREE = 1; 
+    
+    protected static AbstractFactor productPool(AbstractFactor[] dfs, int option) {
+        if (dfs.length == 0)
+            return null;
+        if (dfs.length == 1)
+            return dfs[0];
+        AbstractFactor f = null;
+        long startTime = System.nanoTime();
+        switch (option) {
+            case POOL_OPTION_LINEAR:
+                f = AbstractFactor.getProduct(dfs);
+                break;
+            case POOL_OPTION_TREE:
+                FactorProductTree tree = AbstractFactor.getProductTree(dfs);
+                f = AbstractFactor.getProduct(tree);
+                break;
+        }
+        long endTime = System.nanoTime();
+        System.out.println("\t\t\t\t\t\t\t" + (endTime - startTime) / 100000.0);
+        if (f.nEVars > 0) {
+            Random rand = new Random(endTime);
+            int n = rand.nextInt(f.nEVars);
+            Variable[] sumout = new Variable[n];
+            for (int i = 0; i < n; i ++)
+                sumout[i] = f.evars[rand.nextInt(n)];
+            AbstractFactor.getMargin(f, sumout);
             return f;
-        } 
-        return null;
+        }
+        return f;
     }
 
     protected static boolean testProductIntegrity(long seed, AbstractFactor X, AbstractFactor Y, AbstractFactor PROD) {
@@ -1622,12 +1899,29 @@ public abstract class AbstractFactor {
     }
     
     public static void main(String[] args) {
-        Random random = new Random(1);
-        System.out.println("X/enum\tX/non\tY/enum\tY/non\tOverlap\tProduct\tTime (ms)");
+        System.out.println("maxEV\tminEV\tOverlap\tContain\tProduct\tPJoin\tTime (ms)");
         for (long seed = 0; seed < 200; seed++) {
             Variable[] vars = getVariablePool(seed, 10);
             AbstractFactor[] dfs = getFactorPool(seed, vars, 8);
-            productPool(dfs);
+            AbstractFactor f1 = productPool(dfs, POOL_OPTION_LINEAR);
+            AbstractFactor f2 = productPool(dfs, POOL_OPTION_TREE);
+            if (f1 == null && f2 == null)
+                continue;
+            if (f1.getSize() != f2.getSize())
+                System.err.println("Invalid product size");
+            if (f1.getSize() == 1) {
+                if (f1.getValue() < f2.getValue() * 0.999 || f1.getValue() > f2.getValue() *1.001) {
+                    System.err.println("Invalid atomic product: " + f1.getValue() + " v " + f2.getValue());
+                    System.exit(1);
+                }
+            } else {
+                for (int i = 0; i < f1.getSize(); i ++) {
+                    if (f1.getValue(i) < f2.getValue(i) * 0.999 || f1.getValue(i) > f2.getValue(i) *1.001) {
+                        System.err.println("Invalid product: " + f1.getValue(i) + " v " + f2.getValue(i));
+                        System.exit(1);
+                    }
+                }
+            }                    
         }
     }
     
