@@ -67,12 +67,7 @@ public class DenseFactor extends AbstractFactor {
      * Construct a new table with the specified variables.
      * Enumerable variables will form keys to index the entries, 
      * non-enumerables will be associated in the form of their densities with
-     * each entry. The order in which the variables are given is significant.
-     * The internal order between enumerable variables is maintained, and can
-     * impact on the efficiency of various operations including product.
-     * As a rule, expect that presenting variables in the same order between
-     * different tables will be beneficial.
-     * The order of non-enumerable variables plays no role, however.
+     * each entry. 
      * 
      * @param useVariables variables, either enumerable or non-enumerable, 
      * potentially unsorted and redundant
@@ -144,30 +139,6 @@ public class DenseFactor extends AbstractFactor {
     }
     
     /**
-     * Retrieve the value of the entry identified by the instantiated key
-     *
-     * @param key the entry
-     * @return the value of the entry
-     */
-    @Override
-    public double getValue(Object[] key) {
-        int index = getIndex(key);
-        return getValue(index);
-    }
-
-    /**
-     * Retrieve the value of the entry identified by the instantiated key
-     *
-     * @param key the entry
-     * @return the value of the entry
-     */
-    @Override
-    public double getJDF(Object[] key) {
-        int index = getIndex(key);
-        return getValue(index);
-    }
-
-    /**
      * Set the only value associated with a table without enumerable variables.
      * @param value
      * @return 
@@ -205,25 +176,6 @@ public class DenseFactor extends AbstractFactor {
         return key_index;
     }
 
-
-    /**
-     * Associate the specified key with the given value.
-     * @param key
-     * @param value
-     * @return the index at which the value was stored
-     */
-    @Override
-    public int setValue(Object[] key, double value) {
-        if (getSize() == 1)
-            throw new DenseFactorRuntimeException("Invalid key: no variables");
-        int index = this.getIndex(key);
-        if (value != 0 && map[index] == 0)
-            occupied ++;
-        else if (value == 0 && map[index] !=0)
-            occupied --;
-        map[index] = value;
-        return index;
-    }
 
     /**
      * Find out how many entries that occupied.
@@ -264,21 +216,6 @@ public class DenseFactor extends AbstractFactor {
 
 
     /**
-     * Associate the specified key with the given JDF.
-     * @param key
-     * @param value JDF
-     * @return the index at which the JDF was stored
-     */
-    @Override
-    public int setJDF(Object[] key, JDF value) {
-        if (getSize() == 1)
-            throw new DenseFactorRuntimeException("Invalid key: no variables");
-        int index = this.getIndex(key);
-        jdf[index] = value;
-        return index;
-    }
-
-    /**
      * Activate tracing of implied assignments.
      * @param status true if activated, false otherwise
      */
@@ -313,16 +250,6 @@ public class DenseFactor extends AbstractFactor {
     }
 
     /**
-     * Retrieve a collection of assignments from the specified entry.
-     * @param key the entry
-     * @return set of assignments
-     */
-    @Override
-    public Set<Variable.Assignment> getAssign(Object[] key) {
-        return assigned[getIndex(key)];
-    }
-
-    /**
      * Retrieve a collection of assignments from the single entry.
      * @return set of assignments
      */
@@ -341,11 +268,9 @@ public class DenseFactor extends AbstractFactor {
     @Override
     public int setAssign(Collection<Variable.Assignment> assign) {
         if (!isTraced()) 
-            throw new DenseFactorRuntimeException("Invalid key index: outside map");
+            throw new DenseFactorRuntimeException("Tracing is not enabled");
         if (this.getSize() != 1)
-            throw new DenseFactorRuntimeException("Invalid key index: no variables");
-        if (assigned[0] == null)
-            assigned[0] = new HashSet<>();
+            throw new DenseFactorRuntimeException("This table must be accessed with a enumerable variable key");
         assigned[0].addAll(assign);
         return 0;
     }
@@ -362,21 +287,8 @@ public class DenseFactor extends AbstractFactor {
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
         if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
-        if (assigned[key_index] == null)
-            assigned[key_index] = new HashSet<>();
         assigned[key_index].addAll(assign);
         return key_index;
-    }
-    
-    /**
-     * Associate the entry with a collection of assignments.
-     * @param key key for entry
-     * @param assign assignment
-     * @return index of entry
-     */
-    @Override
-    public int setAssign(Object[] key, Collection<Variable.Assignment> assign) {
-        return setAssign(this.getIndex(key), assign);
     }
     
     /**
@@ -395,17 +307,6 @@ public class DenseFactor extends AbstractFactor {
             assigned[key_index] = new HashSet<>();
         assigned[key_index].add(assign);
         return key_index;
-    }
-    
-    /**
-     * Tag the entry with an assignment.
-     * @param key key for entry
-     * @param assign assignment
-     * @return index of entry
-     */
-    @Override
-    public int addAssign(Object[] key, Variable.Assignment assign) {
-        return addAssign(this.getIndex(key), assign);
     }
     
     /**
@@ -434,19 +335,6 @@ public class DenseFactor extends AbstractFactor {
         return this.jdf[index].getDistrib(nvar);
     }
     
-    /**
-     * Retrieve the distribution of the specified non-enumerable variable, 
-     * conditioned on a particular instantiation of the enumerable variables in the table.
-     * @param key the key of the table, containing the instantiation
-     * @param nvar non-enumerable variable
-     * @return probability distribution for variable
-     */
-    @Override
-    public Distrib getDistrib(Object[] key, Variable nvar) {
-        int index = this.getIndex(key);
-        return this.getDistrib(index, nvar);
-    }
-    
    /**
      * Set the conditional distribution of a non-enumerable variable. 
      * Use with care as the method may not do all integrity checks.
@@ -461,21 +349,6 @@ public class DenseFactor extends AbstractFactor {
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
         this.jdf[key_index].setDistrib(d, nonenum);
         return key_index; // 
-    }
-
-    /**
-     * Set the conditional distribution of a non-enumerable variable. 
-     * @param key the key identifying the setting of the enumerable variables
-     * @param nonenum the non-enumerable variable to be set
-     * @param d the distribution that applies to the non-enumerable variable
-     * @return the index of the entry
-     */
-    @Override
-    public int setDistrib(Object[] key, Variable nonenum, Distrib d) {
-        if (this.getSize() == 1)
-            throw new DenseFactorRuntimeException("Invalid key: no variables");
-        int index = this.getIndex(key);
-        return setDistrib(index, nonenum, d);
     }
 
     /**
