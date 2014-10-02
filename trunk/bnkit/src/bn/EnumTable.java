@@ -455,6 +455,76 @@ public class EnumTable<E> {
         return EnumTable.getKey(this.parents, evid);
     }
 
+    /**
+     * Create indices that allow quick cross-referencing between this table's variables and a specified list.
+     * The parameters need to be allocated as they are filled "in place."
+     * @param xcross indices to go from X to Y, i.e. at [x] you find y (or -1 if no mapping)
+     * @param yvars variables in a table Y
+     * @param ycross indices to go from Y to X, i.e. at [y] you find x (or -1 if no mapping)
+     * @return number of positions that overlap
+     */
+    public  int crossReference(int[] xcross, Variable[] yvars, int[] ycross) {
+        Variable[] xvars = pararr;
+        if (xcross != null && ycross != null) {
+            if (xvars.length != xcross.length || yvars.length != ycross.length) {
+                throw new RuntimeException("Lists must be equal");
+            }
+            int noverlap = 0; // number of overlapping variables
+            for (int j = 0; j < yvars.length; j++) {
+                ycross[j] = -1; // Assume Yj does not exist in X
+            }
+            for (int i = 0; i < xvars.length; i++) {
+                xcross[i] = -1; // Assume Xi does not exist in Y
+                for (int j = 0; j < yvars.length; j++) {
+                    if (xvars[i].equals(yvars[j])) {
+                        // this variable Xi is at Yj
+                        xcross[i] = j;
+                        ycross[j] = i;
+                        noverlap++;
+                        break;
+                    }
+                }
+            }
+            return noverlap;
+        } else if (xcross != null) {
+            // ycross == null
+            if (xvars.length != xcross.length) {
+                throw new RuntimeException("X Lists must be equal");
+            }
+            int noverlap = 0; // number of overlapping variables
+            for (int i = 0; i < xvars.length; i++) {
+                xcross[i] = -1; // Assume Xi does not exist in Y
+                for (int j = 0; j < yvars.length; j++) {
+                    if (xvars[i].equals(yvars[j])) {
+                        // this variable Xi is at Yj
+                        xcross[i] = j;
+                        noverlap++;
+                        break;
+                    }
+                }
+            }
+            return noverlap;
+        } else if (ycross != null) {
+            // xcross == null
+            if (yvars.length != ycross.length) {
+                throw new RuntimeException("Y Lists must be equal");
+            }
+            int noverlap = 0; // number of overlapping variables
+            for (int i = 0; i < yvars.length; i++) {
+                ycross[i] = -1; // Assume Yi does not exist in X
+                for (int j = 0; j < xvars.length; j++) {
+                    if (yvars[i].equals(xvars[j])) {
+                        // this variable Yi is at Xj
+                        ycross[i] = j;
+                        noverlap++;
+                        break;
+                    }
+                }
+            }
+            return noverlap;
+        }
+        return 0;
+    }
 
     public void display() {
         System.out.print("Idx ");

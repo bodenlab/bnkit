@@ -66,6 +66,8 @@ public abstract class AbstractFactor {
     protected final int[] period;
     protected final int[] step;
     protected final int[] domsize; // size of domain
+    
+    public boolean evidenced = false;
 
     /**
      * Construct a new table without any variables. 
@@ -1123,6 +1125,23 @@ public abstract class AbstractFactor {
         return Y;
     }
 
+    public static AbstractFactor getNormal(AbstractFactor X) {
+        DenseFactor Y = new DenseFactor(concat(X.evars, X.nvars));
+        if (X.hasEnumVars()) {
+            double sum = X.getSum();
+            for (int i = 0; i < X.getSize(); i ++) {
+                Y.setValue(i, X.getValue(i) / sum);
+                if (X.isJDF())
+                    Y.setJDF(i, X.getJDF(i));
+            }
+        } else {
+            Y.setValue(X.getValue());
+            if (X.isJDF())
+                Y.setJDF(X.getJDF());
+        }
+        return Y;
+    }
+
     /**
      * Get a key from a partial assignment of variables defined for the table.
      * @param vararr variables in order
@@ -1522,7 +1541,7 @@ public abstract class AbstractFactor {
         if (getSize() == 1)
             throw new AbstractFactorRuntimeException("Invalid key: no variables");
         int index = getIndex(key);
-        return setValue(index);
+        return setValue(index, value);
     }
 
 

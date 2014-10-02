@@ -18,6 +18,7 @@
 package bn;
 
 import bn.factor.AbstractFactor;
+import bn.factor.DenseFactor;
 import java.io.Serializable;
 import java.util.*;
 
@@ -249,9 +250,75 @@ public class GDT implements BNode, Serializable {
 
     @Override
     public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
-        throw new RuntimeException("Not yet implemented.");
+        List<EnumVariable> parents = this.getParents();
+        Variable myvar = this.getVariable();
+        // get value of this node if any assigned
+        Object varinstance = relevant.get(myvar); 
+        if (parents != null) { // there are parent variables
+            Object[] searchcpt = new Object[parents.size()];
+            List<Variable> fvars = new ArrayList<>(parents.size() + 1); // factor variables
+            List<EnumVariable> sumout = new ArrayList<>();  // irrelevant variables to be summed out later
+            for (int i = 0; i < parents.size(); i++) {
+                EnumVariable parent = parents.get(i);
+                // If parent is evidenced it will not be included in factor table; 
+                // Record irrelevant parents to sum out: removed later through marginalization
+                if (!relevant.containsKey(parent)) 
+                    sumout.add(parent);
+                else
+                    searchcpt[i] = relevant.get(parent);
+                if (searchcpt[i] == null) // new factor will include this variable
+                    fvars.add(parent);
+            }
+            if (varinstance == null) {
+                fvars.add(myvar);
+            }
+            Variable[] vars_arr = new Variable[fvars.size()];
+            fvars.toArray(vars_arr);
+            AbstractFactor ft = new DenseFactor(vars_arr);
+            EnumVariable[] evars = ft.getEnumVars(); // the order may have changed
+            int[] xcross = new int[parents.size()];
+            int[] ycross = new int[evars.length];
+            table.crossReference(xcross, evars, ycross);
+            // set factor to be "evidenced" is there was an evidence used
+            if (varinstance != null) {
+                ft.evidenced = true;
+            } else {
+                for (Object instcpt : searchcpt) {
+                    if (instcpt != null) {
+                        ft.evidenced = true;
+                        break;
+                    }
+                }
+            }
+            int[] indices = table.getIndices(searchcpt);
+            Object[] fkey = new Object[evars.length];
+            for (int index : indices) {
+                GaussianDistrib d = table.getValue(index);
+                if (d != null) { // there is a distribution associated with this entry in the CPT
+                    Object[] cptkey = table.getKey(index); // work out the condition for this entry
+                    for (int i = 0; i < cptkey.length; i++)
+                        fkey[xcross[i]] = cptkey[i];
+                    if (varinstance != null) { // the variable for this CPT is instantiated
+                        ft.setValue(fkey, d.get(varinstance));
+                    } else { // the variable for this CPT is NOT instantiated so we put it in the JDF
+                        ft.setValue(fkey, 1.0);
+                        ft.setDistrib(fkey, myvar, d);
+                    }
+                } 
+            }
+            if (!sumout.isEmpty()) {
+                Variable[] sumout_arr = new Variable[sumout.size()];
+                sumout.toArray(sumout_arr);
+            	ft = DenseFactor.getMargin(ft, sumout_arr);
+            }
+            return ft;
+        } else { // no parents, just a prior
+            if (varinstance != null) // instantiated prior is not possible to factorise
+                return null;
+            throw new RuntimeException("GDTs can not be factorised unless it has enumerable parent variables");
+        }
     }
-
+    
     /**
      * Get the conditional probability of the variable (represented by this GDT)
      * when set to a specified value.

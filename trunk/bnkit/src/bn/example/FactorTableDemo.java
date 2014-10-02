@@ -23,6 +23,7 @@ import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.alg.QueryResult;
+import bn.factor.AbstractFactor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -103,27 +104,27 @@ public class FactorTableDemo {
         // We assume that all nodes are involved in the inference, though that is not always going to be true.
         // In fact, BNet has a method for creating a new BNet instance that does not contain nodes that are
         // irrelevant to a particular query.
-        Factor ft_b = b.makeFactor(evidence);
+        AbstractFactor ft_b = b.makeDenseFactor(evidence);
         System.out.println("Factor B");
         ft_b.display();
         
-        Factor ft_e = e.makeFactor(evidence);
+        AbstractFactor ft_e = e.makeDenseFactor(evidence);
         System.out.println("Factor E");
         ft_e.display();
         
-        Factor ft_a = a.makeFactor(evidence);
+        AbstractFactor ft_a = a.makeDenseFactor(evidence);
         System.out.println("Factor A");
         ft_a.display();
         
-        Factor ft_j = j.makeFactor(evidence);
+        AbstractFactor ft_j = j.makeDenseFactor(evidence);
         System.out.println("Factor J");
         ft_j.display();
         
-        Factor ft_m = m.makeFactor(evidence);
+        AbstractFactor ft_m = m.makeDenseFactor(evidence);
         System.out.println("Factor M");
         ft_m.display();
         
-        Factor ft_s = s.makeFactor(evidence);
+        AbstractFactor ft_s = s.makeDenseFactor(evidence);
         System.out.println("Factor S");
         ft_s.display();
         
@@ -135,34 +136,34 @@ public class FactorTableDemo {
         // of operations that are required. Smaller, overlapping FTs give smaller 
         // products. We thus combine those that have variables in common. The topological order
         // may also be very helpful to use. See Dechter's paper.
-        Factor ft = Factor.product(ft_b, ft_e);
+        AbstractFactor ft = AbstractFactor.getProduct(ft_b, ft_e);
         System.out.println("Factor B * E");
         ft.display();
 
-        ft = Factor.product(ft, ft_s);
+        ft = AbstractFactor.getProduct(ft, ft_s);
         System.out.println("Factor (B * E) * S");
         ft.display();
 
-        ft = Factor.product(ft, ft_a);
+        ft = AbstractFactor.getProduct(ft, ft_a);
         System.out.println("Factor (B * E) * A");
         ft.display();
 
-        ft = Factor.product(ft, ft_j);
+        ft = AbstractFactor.getProduct(ft, ft_j);
         System.out.println("Factor ((B * E) * A) * J");
         ft.display();
 
-        ft = Factor.product(ft, ft_m);
+        ft = AbstractFactor.getProduct(ft, ft_m);
         System.out.println("Factor (((B * E) * A) * J) * M)");
         ft.display();
 
         // Next we sum-out variables that have not been specified/instantiated or are part of the query.
         // Note that we could have done this earlier, and this would have resulted in smaller products.
         // Variable elimination also optimises when variables are summed-out.
-        ft = ft.marginalize(new EnumVariable[] {A, E});
-        ft.displaySampled();
+        ft = AbstractFactor.getMargin(ft, new EnumVariable[] {A, E});
+        ft.display();
 
         // Normalise the FT
-        ft.normalize();
+        ft = AbstractFactor.getNormal(ft);
         
         System.out.println("Factor (((B * E) * A) * J) * M) - (A, E)");
         ft.display();
