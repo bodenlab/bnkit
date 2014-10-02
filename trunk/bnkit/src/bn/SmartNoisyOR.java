@@ -640,11 +640,11 @@ public class SmartNoisyOR implements BNode, Serializable{
             	else {
             		//set to a non positive value of the parent
             		List<EnumVariable> parents = this.table.parents;
-					EnumVariable par = parents.get(i-1);
+					EnumVariable par = parents.get(i);
             		Object [] values = par.getDomain().getValues();
             		Object lab = null;
 					for (Object v : values) {
-						if (!v.equals(this.plabels.get(i-1))) {
+						if (!v.equals(this.plabels.get(i))) {
 							lab = v; break;
 						}
 					}
