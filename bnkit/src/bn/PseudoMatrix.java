@@ -28,8 +28,8 @@ public class PseudoMatrix {
      * Create a PseudoMatrix
      * @param values
      */
-    public PseudoMatrix(ArrayList<Double> values){
-        this.matrix = new ArrayList(values);
+    public PseudoMatrix(ArrayList<ArrayList<Double>> values) {
+    	matrix = values;
     }
 
     public ArrayList<ArrayList<Double>> getValues(){
