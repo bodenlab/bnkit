@@ -132,6 +132,31 @@ public class SampleTrace {
         return f;
     }
     
+//    /**
+//     * Construct a factor from a CountTable for any number of enumerable variables, 
+//     * and a SampleTable for any number of non-enumerable variables CONDITIONED on the 
+//     * former enumerable variables.
+//     * @param counts
+//     * @param nonEnumSamples 
+//     */
+//    private factor.AbstractFactor makeFactor(CountTable counts, Map<BNode, SampleTable> nonEnumSamples) {
+//        Factor f = new Factor(qvars);
+//        for (int index = 0; index < counts.table.getSize(); index ++) {
+//            double value = counts.get(index);
+//            f.setFactor(index, value);
+//            JDF jdf = new JDF(nonEnumVars);
+//            f.setJDF(index, jdf);
+//            for (Entry<BNode, SampleTable> sample : nonEnumSamples.entrySet()) {
+//                BNode node = sample.getKey();
+//                Variable var = node.getVariable();
+//                SampleTable table = sample.getValue();
+//                Distrib d = node.makeDistrib(table.getAll(index));
+//                jdf.setDistrib(d, var);
+//            }
+//        }
+//        return f;
+//    }
+    
     /**
      * Construct a factor from a map of SampleTables (one for each non-enumerable variable) 
      * @param nonEnumSamples 

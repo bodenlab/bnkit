@@ -202,11 +202,6 @@ public class SubstNode implements BNode, TiedNode {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
-    @Override
-    public Factor makeFactor(BNet bn) {
-        throw new UnsupportedOperationException("Not supported."); //To change body of generated methods, choose Tools | Templates.
-    }
-
     /**
      * Make a Factor out of this node. If a variable is instantiated it will
      * be factored out.
@@ -318,6 +313,11 @@ public class SubstNode implements BNode, TiedNode {
                 return ft;
             }
         }
+    }
+
+    @Override
+    public Factor makeDenseFactor(Map<Variable, Object> relevant) {
+        throw new RuntimeException("Not yet implemented.");
     }
 
     @Override

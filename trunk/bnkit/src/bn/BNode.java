@@ -163,18 +163,20 @@ public interface BNode {
     public Distrib makeDistrib(Collection<Sample> samples);
     
     /**
-     * Make BNode into a Factor
-     * @deprecated avoid reference to BNet, other makeFactor replaces this
-     */
-    public Factor makeFactor(BNet bn);
-    
-    /**
      * Make BNode into a Factor.
      * The method reduces the factor so that only nominated nodes are included.
      * @param rel relevant variables with evidence if available
      * @return factor from BNode, taking evidence and (ir)relevance of parent variables into account
      */
     public Factor makeFactor(Map<Variable, Object> rel);
+
+    /**
+     * Make BNode into a Factor.
+     * The method reduces the factor so that only nominated nodes are included.
+     * @param rel relevant variables with evidence if available
+     * @return factor from BNode, taking evidence and (ir)relevance of parent variables into account
+     */
+    public Factor makeDenseFactor(Map<Variable, Object> rel);
 
     /**
      * Method used to modify the CPT/CDT to be modified (EM uses this).
