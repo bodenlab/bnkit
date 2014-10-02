@@ -27,7 +27,9 @@ import bn.JDF;
 import bn.JPT;
 import bn.MixtureDistrib;
 import bn.Variable;
+import bn.factor.AbstractFactor;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -95,6 +97,64 @@ public class CGTable implements QueryResult {
             }
         } else { // no enumerable variables
             atomicFactor = f.getFactor();
+            factorTable = null;
+            densityTable = null;
+            if (hasNonEnum) {
+                JDF f_jdf = f.getJDF();
+                JDF cg_jdf = new JDF(nvars);
+                for (Variable nvar : nvars) {
+                    Distrib fd = f_jdf.getDistrib(nvar);
+                    try {
+                        MixtureDistrib md = (MixtureDistrib) fd;
+                        cg_jdf.setDistrib(md, nvar);
+                    } catch (ClassCastException e) {
+                        cg_jdf.setDistrib(fd, nvar);
+                    }
+                }
+                atomicDensity = cg_jdf;
+            } else
+                atomicDensity = null;
+        }
+    } 
+    
+    public CGTable(AbstractFactor f) {
+        evars = Arrays.asList(f.getEnumVars());
+        nvars = Arrays.asList(f.getNonEnumVars());
+        boolean hasNonEnum = f.isJDF();
+        if (f.hasEnumVars()) {
+            atomicDensity = null;
+            if (hasNonEnum) {
+                densityTable = new EnumTable<>(evars);
+            } else
+                densityTable = null;
+            factorTable = new EnumTable(evars);
+            atomicFactor = null;
+            double sum = f.getSum();
+            for (int i = 0; i < f.getSize(); i ++) {
+                int key_index = i;
+                double p = f.getValue(i) / sum;
+                if (p == 0)
+                	continue;
+                factorTable.setValue(key_index, p);
+                if (hasNonEnum) {
+                    JDF f_jdf = f.getJDF(key_index);
+                    JDF cg_jdf = new JDF(nvars);
+                    for (Variable nvar : nvars) {
+                        Distrib fd = f_jdf.getDistrib(nvar);
+                        try {
+                            MixtureDistrib md = (MixtureDistrib) fd;
+                            cg_jdf.setDistrib(md.getNormalizedClone(), nvar);
+                        } catch (ClassCastException e) {
+                            cg_jdf.setDistrib(fd, nvar);
+                        }
+                    }
+                    densityTable.setValue(key_index, cg_jdf);
+                }
+                
+                // TODO: Assigned values from MPE handled here
+            }
+        } else { // no enumerable variables
+            atomicFactor = f.getValue();
             factorTable = null;
             densityTable = null;
             if (hasNonEnum) {

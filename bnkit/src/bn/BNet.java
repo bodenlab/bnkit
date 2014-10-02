@@ -836,68 +836,6 @@ public class BNet implements Serializable {
             return result;
         }
     }
-    
-    /**
-     * Given the Markov Blanket network of a query, 
-     * return a sample from the distribution of P(X|mb(X))
-     * 
-     * @param mbNodes
-     * @param query 
-     * @return sample from distribution
-     */
-    public Object getMBProbOld(Set<BNode> mbNodes, BNode query) {  	
-    	// Store the instance incase the map is empty and you have to reset the node
-    	Object qInstance = query.getInstance();
-    	query.resetInstance();
-    	// Store all factor tables for query to iterate over to find product
-    	Set<Factor> fTables = new HashSet<>();
-    	//Query node not included in set, used for initial factor table in product
-    	for (BNode node : mbNodes){
-            if (!node.getName().equals(query.getName())){
-                Factor fact = node.makeFactor(this); //FIXME - step which takes most CPU time, gets called a lot
-                //instantiated priors cannot be used to factorise
-                if (fact != null ){
-                    fTables.add(fact);
-                }
-            }
-    	}
-    	
-    	//Get the factor table for the query and make it the product start point
-    	Factor ft = query.makeFactor(this);
-    	//For each factor table, add it to the product
-    	for (Factor factor : fTables) {
-            ft = Factor.product(ft, factor); 
-    	} 	
-    	
-    	//The sampling algorithm currently only looks at single queries.
-    	//Either the result will be atomic or it will be a discrete node
-    	if (ft.isAtomic()) {
-            Distrib d = ft.getDistrib(query.getVariable());
-            Object result = d.sample();
-            return result;
-    	}
-    	
-    	//FIXME How to get distribution for discrete query from factor table?
-    	//Two choices for method currently
-    	
-//    	Double[] d = (Double[]) values.toArray(new Double[values.size()]);
-//    	double[] data = new double[d.length];
-//    	for (int i = 0; i < d.length; i++){
-//    		double res = (double)(d[i]);
-//    		data[i] = res;
-//    	}
-//		Distrib dist = new EnumDistrib((Enumerable)query.getVariable().getDomain(), data);
-//    	Object end = dist.sample(); 
-
-    	Map<Object, Double> nFt = new HashMap<>();
-    	for (Map.Entry<Integer, Double> entry : ft.getMapEntries()) {
-            nFt.put((Object)entry.getKey(), entry.getValue());
-    	}
-    	Distrib dist = new EnumDistrib(nFt, (Enumerable)query.getVariable().getDomain());
-        Object end = dist.sample();
-        	
-        return end;   		    	
-    }
      
     /**
      * Utility function to create an array from a set of String.

@@ -243,104 +243,6 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     public Distrib makeDistrib(Collection<Sample> samples) {
         throw new UnsupportedOperationException("Not supported yet."); 
     }
-
-
-    /**
-     * Make a Factor out of this CPT. If a variable is instantiated it will
-     * be factored out.
-     *
-     * @param bn the BNet instance that can be used to check the status of nodes
-     * so that factoring can be done (instantiation of variables are done for a
-     * BNet node).
-     * @return factor of CPT wrt instantiation of bn
-     * @deprecated use other makeFactor, this class should avoid using BNet
-     */
-    @Override
-    public Factor makeFactor(BNet bn) {
-        List<EnumVariable> vars_old = this.getParents();
-        EnumVariable myvar = this.getVariable();
-        Object varinstance = null;
-        BNode cnode = bn.getNode(myvar);
-        if (cnode != null) {
-            varinstance = cnode.getInstance();
-        }
-        Enumerable dom = myvar.getDomain();
-        if (vars_old != null) { // there are parent variables
-            Object[] searchkey = new Object[vars_old.size()];
-            List<Variable> vars_new = new ArrayList<>(vars_old.size() + 1);
-            for (int i = 0; i < vars_old.size(); i++) {
-                EnumVariable parent = vars_old.get(i);
-                BNode pnode = bn.getNode(parent);
-                if (pnode != null) {
-                    searchkey[i] = pnode.getInstance();
-                }
-                if (searchkey[i] == null) {
-                    vars_new.add(parent);
-                }
-            }
-            if (varinstance == null) {
-                vars_new.add(myvar);
-            }
-            Factor ft = new Factor(vars_new);
-            if (varinstance != null) {
-                ft.evidenced = true;
-            } else {
-                for (Object searchkey1 : searchkey) {
-                    if (searchkey != null) {
-                        ft.evidenced = true;
-                        break;
-                    }
-                }
-            }
-            int[] indices = table.getIndices(searchkey);
-            Object[] newkey = new Object[vars_new.size()];
-            for (int index : indices) {
-                EnumDistrib d = table.getValue(index);
-                if (d != null) {
-                    Object[] key = table.getKey(index);
-                    int newcnt = 0;
-                    for (int i = 0; i < key.length; i++) {
-                        if (searchkey[i] == null) {
-                            newkey[newcnt++] = key[i];
-                        }
-                    }
-                    if (varinstance != null) { // the variable for this CPT is instantiated
-                        if (newkey.length == 0) // atomic FactorTable
-                            ft.setFactor(null, d.get(varinstance));
-                        else
-                            ft.addFactor(newkey, d.get(varinstance));
-                    } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
-                        for (int j = 0; j < dom.size(); j++) {
-                            newkey[newkey.length - 1] = dom.get(j);
-                            Double p = d.get(j);
-                            if (p != null) {
-                                ft.addFactor(newkey, p);
-                            }
-                        }
-                    }
-                } else { // this entry is null
-                    //
-                }
-            }
-            return ft;
-        } else { // no parents, just a prior
-            if (varinstance != null) { // instantiated prior
-                Factor ft = new Factor();
-                ft.setFactor(this.prior.get(varinstance));
-                return ft;
-            }
-            List<Variable> vars_new = new ArrayList<>(1);
-            vars_new.add(myvar);
-            Factor ft = new Factor(vars_new);
-            Object[] newkey = new Object[1];
-            EnumDistrib d = this.prior;
-            for (int j = 0; j < dom.size(); j++) {
-                newkey[0] = dom.get(j);
-                ft.addFactor(newkey, d.get(j));
-            }
-            return ft;
-        }
-    }
     
     /**
      * Make a Factor out of this CPT. If a variable is instantiated it will
@@ -439,6 +341,18 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             }
             return ft;
         }
+    }
+    /**
+     * Make a Factor out of this CPT. If a variable is instantiated it will
+     * be factored out.
+     * If a parent is not relevant, it will not be included in the factor
+     *
+     * @param relevant only include relevant nodes, with instantiations if available
+     * @return factor of CPT considering if parents are relevant (rel)
+     */
+    @Override
+    public Factor makeDenseFactor(Map<Variable, Object> relevant) {
+        throw new RuntimeException("Not yet implemented.");
     }
     
     /**

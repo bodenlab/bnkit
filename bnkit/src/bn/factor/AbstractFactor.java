@@ -324,21 +324,14 @@ public abstract class AbstractFactor {
         // this will always be N - 1 products/internal nodes (where N is the number of factors)
         FactorProductTree node = null;
         for (int rank = 0; rank < N - 1; rank ++) {
-//            int lowest = Integer.MAX_VALUE;
-            int lowest = Integer.MIN_VALUE;
+            int lowest = Integer.MAX_VALUE;
             int a = -1, b = -1;
             for (int i = 0; i < fpool.size(); i ++) {
                 EnumVariable[] evars_i = fpool.get(i).getEnumVars();
                 for (int j = i + 1; j < fpool.size(); j ++) {
                     EnumVariable[] evars_j = fpool.get(j).getEnumVars();
-                    FactorProduct key = new FactorProduct(evars_i, evars_j);
-                    Integer cost = cmplx.get(key);
-                    if (cost == null) {
-                        cost = getComplexity(evars_i, evars_j, false);
-                        cmplx.put(key, cost);
-                    }
-//                    if (cost < lowest) {
-                    if (cost > lowest) {
+                    Integer cost = getComplexity(evars_i, evars_j, true); // this is quick so no real need to cache these numbers
+                    if (cost < lowest) {
                         a = i; 
                         b = j;
                         lowest = cost;
@@ -986,7 +979,7 @@ public abstract class AbstractFactor {
         }
         AbstractFactor Y = new DenseFactor(yvars);
         Object[] xkey_search = new Object[X.nEVars];
-        for (int y = 0; y < Y.getSize(); y++) {
+        for (int y = 0; y < Y.getSize(); y++) { // FIXME: not effective for sparse factors
             Object[] ykey = Y.getKey(y);
             for (int i = 0; i < xkeyidx.length; i++) {
                 xkey_search[xkeyidx[i]] = ykey[i];
@@ -1167,6 +1160,20 @@ public abstract class AbstractFactor {
     }
 
     /**
+     * Calculate the sum of factors
+     * @return the sum
+     */
+    public double getSum() {
+        double sum =0;
+        if (!hasEnumVars())
+            return getValue();
+        for (int i = 0; i < getSize(); i ++) {
+            sum += getValue(i);
+        }
+        return sum;
+    }
+    
+    /**
      * Copy over all non-null values from source to target key.
      *
      * @param target
@@ -1223,6 +1230,14 @@ public abstract class AbstractFactor {
     public EnumVariable[] getEnumVars() {
         return evars;
     }
+    
+    /**
+     * Find out if there are enumerable variables defining the table.
+     * @return true if enumerable variables define the table, false otherwise
+     */
+    public boolean hasEnumVars() {
+        return nEVars > 0;
+    }
 
     /**
      * Get the non-enumerable variables of the table.
@@ -1230,6 +1245,14 @@ public abstract class AbstractFactor {
      */
     public Variable[] getNonEnumVars() {
         return nvars;
+    }
+
+    /**
+     * Find out if there are non-enumerable variables defining the table.
+     * @return true if non-enumerable variables define the table, false if not
+     */
+    public boolean hasNonEnumVars() {
+        return nNVars > 0;
     }
 
     /**
@@ -1842,7 +1865,10 @@ public abstract class AbstractFactor {
             Variable[] sumout = new Variable[n];
             for (int i = 0; i < n; i ++)
                 sumout[i] = f.evars[rand.nextInt(n)];
-            AbstractFactor.getMargin(f, sumout);
+            if (rand.nextBoolean())
+                AbstractFactor.getMargin(f, sumout);
+            else
+                AbstractFactor.getMaxMargin(f, sumout);
             return f;
         }
         return f;

@@ -7,6 +7,7 @@
 package bn.example;
 
 import bn.BNet;
+import bn.BNode;
 import bn.CPT;
 import bn.GDT;
 import bn.Continuous;
@@ -22,6 +23,11 @@ import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.alg.QueryResult;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  *
@@ -86,31 +92,38 @@ public class FactorTableDemo {
         // Variable elimination works by factorising CPTs, and then by performing products and variable sum-outs in
         // an order that heuristically is computationally efficient.
         
+        Map<Variable, Object> evidence = new HashMap<>(); // evidence
+        for (BNode node : bn.getOrdered()) {
+            Variable var = node.getVariable();
+            Object val = node.getInstance(); // will be null if not instantiated
+            evidence.put(var, val);
+        }
+
         // First we make each CPT into a FactorTable, considering variables that are instantiated.
         // We assume that all nodes are involved in the inference, though that is not always going to be true.
         // In fact, BNet has a method for creating a new BNet instance that does not contain nodes that are
         // irrelevant to a particular query.
-        Factor ft_b = b.makeFactor(bn);
+        Factor ft_b = b.makeFactor(evidence);
         System.out.println("Factor B");
         ft_b.display();
         
-        Factor ft_e = e.makeFactor(bn);
+        Factor ft_e = e.makeFactor(evidence);
         System.out.println("Factor E");
         ft_e.display();
         
-        Factor ft_a = a.makeFactor(bn);
+        Factor ft_a = a.makeFactor(evidence);
         System.out.println("Factor A");
         ft_a.display();
         
-        Factor ft_j = j.makeFactor(bn);
+        Factor ft_j = j.makeFactor(evidence);
         System.out.println("Factor J");
         ft_j.display();
         
-        Factor ft_m = m.makeFactor(bn);
+        Factor ft_m = m.makeFactor(evidence);
         System.out.println("Factor M");
         ft_m.display();
         
-        Factor ft_s = s.makeFactor(bn);
+        Factor ft_s = s.makeFactor(evidence);
         System.out.println("Factor S");
         ft_s.display();
         
