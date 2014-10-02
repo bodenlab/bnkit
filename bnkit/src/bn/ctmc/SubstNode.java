@@ -20,6 +20,7 @@ import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.ctmc.matrix.JTT;
+import bn.factor.AbstractFactor;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -316,7 +317,7 @@ public class SubstNode implements BNode, TiedNode {
     }
 
     @Override
-    public Factor makeDenseFactor(Map<Variable, Object> relevant) {
+    public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
         throw new RuntimeException("Not yet implemented.");
     }
 

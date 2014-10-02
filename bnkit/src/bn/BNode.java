@@ -18,6 +18,7 @@
 
 package bn;
 
+import bn.factor.AbstractFactor;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -176,7 +177,7 @@ public interface BNode {
      * @param rel relevant variables with evidence if available
      * @return factor from BNode, taking evidence and (ir)relevance of parent variables into account
      */
-    public Factor makeDenseFactor(Map<Variable, Object> rel);
+    public AbstractFactor makeDenseFactor(Map<Variable, Object> rel);
 
     /**
      * Method used to modify the CPT/CDT to be modified (EM uses this).
