@@ -18,6 +18,7 @@
 package bn;
 
 import bn.factor.AbstractFactor;
+import bn.factor.DenseFactor;
 import java.io.Serializable;
 import java.util.*;
 import java.util.Map.Entry;
@@ -353,7 +354,97 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      */
     @Override
     public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
-        throw new RuntimeException("Not yet implemented.");
+        List<EnumVariable> parents = this.getParents();
+        EnumVariable myvar = this.getVariable();
+        // get value of this node if any assigned
+        Object varinstance = relevant.get(myvar); 
+        Enumerable dom = myvar.getDomain();
+        if (parents != null) { // there are parent variables
+            Object[] searchcpt = new Object[parents.size()];
+            List<Variable> fvars = new ArrayList<>(parents.size() + 1); // factor variables
+            List<EnumVariable> sumout = new ArrayList<>();  // irrelevant variables to be summed out later
+            for (int i = 0; i < parents.size(); i++) {
+                EnumVariable parent = parents.get(i);
+                // If parent is evidenced it will not be included in factor table; 
+                // Record irrelevant parents to sum out: removed later through marginalization
+                if (!relevant.containsKey(parent)) 
+                    sumout.add(parent);
+                else
+                    searchcpt[i] = relevant.get(parent);
+                if (searchcpt[i] == null) // new factor will include this variable
+                    fvars.add(parent);
+            }
+            if (varinstance == null) {
+                fvars.add(myvar);
+            }
+            Variable[] vars_arr = new Variable[fvars.size()];
+            fvars.toArray(vars_arr);
+            AbstractFactor ft = new DenseFactor(vars_arr);
+            EnumVariable[] evars = ft.getEnumVars(); // the order may have changed
+            int[] xcross = new int[parents.size()];
+            int[] ycross = new int[evars.length];
+            table.crossReference(xcross, evars, ycross);
+            int missing = -1; // the position of *myvar* in the new factor (if applicable)
+            for (int i = 0; i < ycross.length; i ++)
+                if (ycross[i] == -1) {
+                    missing = i;
+                    break;
+                }
+            // set factor to be "evidenced" is there was an evidence used
+            if (varinstance != null) {
+                ft.evidenced = true;
+            } else {
+                for (Object instcpt : searchcpt) {
+                    if (instcpt != null) {
+                        ft.evidenced = true;
+                        break;
+                    }
+                }
+            }
+            int[] indices = table.getIndices(searchcpt);
+            Object[] fkey = new Object[evars.length];
+            for (int index : indices) {
+                EnumDistrib d = table.getValue(index);
+                if (d != null) { // there is a distribution associated with this entry in the CPT
+                    Object[] cptkey = table.getKey(index); // work out the condition for this entry
+                    for (int i = 0; i < cptkey.length; i++)
+                        fkey[xcross[i]] = cptkey[i];
+                    if (varinstance != null) { // the variable for this CPT is instantiated
+                        if (fkey.length == 0) // atomic factor
+                            ft.setValue(d.get(varinstance));
+                        else
+                            ft.setValue(fkey, d.get(varinstance));
+                    } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
+                        for (int j = 0; j < dom.size(); j++) {
+                            fkey[missing] = dom.get(j);
+                            Double p = d.get(j);
+                            ft.setValue(fkey, p);
+                        }
+                    }
+                } 
+            }
+            if (!sumout.isEmpty()) {
+                Variable[] sumout_arr = new Variable[sumout.size()];
+                sumout.toArray(sumout_arr);
+            	ft = DenseFactor.getMargin(ft, sumout_arr);
+            }
+            return ft;
+        } else { // no parents, just a prior
+            if (varinstance != null) { // instantiated prior
+                AbstractFactor ft = new DenseFactor();
+                ft.setValue(this.prior.get(varinstance));
+                return ft;
+            }
+            AbstractFactor ft = new DenseFactor(myvar);
+            Object[] newkey = new Object[1];
+            EnumDistrib d = this.prior;
+            for (int j = 0; j < dom.size(); j++) {
+                newkey[0] = dom.get(j);
+                Double p = d.get(j);
+                ft.setValue(newkey, p);
+            }
+            return ft;
+        }
     }
     
     /**
@@ -403,8 +494,8 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     /**
      * Get the conditional probability of the variable (represented by this CPT)
      *
-     * @param key parent key (condition); if null the CPT is assumed to be a
-     * prior.
+     * @param key parent cptkey (condition); if null the CPT is assumed to be a
+ prior.
      * @return the probability of the variable
      */
     @Override
@@ -421,8 +512,8 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     /**
      * Get the conditional probability of the variable (represented by this CPT)
      *
-     * @param key parent key (condition); if null the CPT is assumed to be a
-     * prior.
+     * @param key parent cptkey (condition); if null the CPT is assumed to be a
+ prior.
      * @return the probability of the variable
      */
     @Override
@@ -466,7 +557,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      * Set entry (or entries) of the CPT to the specified probability value
      * (variable is true).
      *
-     * @param key the boolean key (probabilistic condition)
+     * @param key the boolean cptkey (probabilistic condition)
      * @param prob the probability value (must be >=0 and <=1)
      */
     public void put(Object[] key, EnumDistrib prob) {
@@ -484,7 +575,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      * (variable is true).
      *
      * @param prob the probability value (must be >=0 and <=1)
-     * @param key the key (the condition)
+     * @param key the cptkey (the condition)
      */
     public void put(EnumDistrib prob, Object... key) {
         if (key == null) {
@@ -786,7 +877,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                 EnumDistrib d = table.map.get(new Integer(i));
                 if (d != null) {
                     double[] distrib = d.get();
-                    sbuf.append(i).append(": ");	// use index as key because values above can be of different non-printable types
+                    sbuf.append(i).append(": ");	// use index as cptkey because values above can be of different non-printable types
                     for (int j = 0; j < distrib.length; j++) {
                         sbuf.append("").append(distrib[j]);
                         if (j < distrib.length - 1) {
@@ -794,7 +885,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                         }
                     }
                     sbuf.append("; (");
-                    // If we want to *see* the key, may not work well for some non-printable types
+                    // If we want to *see* the cptkey, may not work well for some non-printable types
                     Object[] key = table.getKey(i);
                     for (int j = 0; j < key.length; j++) {
                         if (j < key.length - 1) {

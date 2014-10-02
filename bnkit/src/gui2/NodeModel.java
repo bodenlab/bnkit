@@ -30,10 +30,6 @@ import java.util.List;
 
 public class NodeModel {
 
-    public Factor makeFactor(BNet bn) {
-        return bnode.makeFactor(bn);
-    }
-
     public void countInstance(Object[] key, Object value) {
         bnode.countInstance(key, value);
     }
