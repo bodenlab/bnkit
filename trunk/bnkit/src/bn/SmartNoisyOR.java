@@ -17,6 +17,7 @@
  */
 package bn;
 
+import bn.factor.AbstractFactor;
 import java.io.Serializable;
 import java.util.*;
 import java.util.Map.Entry;
@@ -408,7 +409,7 @@ public class SmartNoisyOR implements BNode, Serializable{
     }
 
     @Override
-    public Factor makeDenseFactor(Map<Variable, Object> relevant) {
+    public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
         throw new RuntimeException("Not yet implemented.");
     }
 
