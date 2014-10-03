@@ -223,6 +223,8 @@ public class DenseFactor extends AbstractFactor {
     public void setTraced(boolean status) {
         if (status) {
             this.assigned = new Set[this.getSize()];
+            for (int i = 0; i < this.assigned.length; i ++) 
+                this.assigned[i] = new HashSet();
         } else {
             this.assigned = null;
         }

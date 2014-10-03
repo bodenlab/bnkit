@@ -690,9 +690,13 @@ public abstract class AbstractFactor {
                         dt.setJDF(idx, Y.getJDF(y));
                     }
                     if (X.isTraced()) {
+                        if (!dt.isTraced())
+                            dt.setTraced(true);
                         dt.setAssign(idx, X.getAssign(x));
                     }
                     if (Y.isTraced()) {
+                        if (!dt.isTraced())
+                            dt.setTraced(true);
                         dt.setAssign(idx, Y.getAssign(y));
                     }
                 }
@@ -1221,6 +1225,21 @@ public abstract class AbstractFactor {
     }
 
     /**
+     * Check if factor is defined by the specified variable.
+     * @param var variable
+     * @return true if in factor (enumerable or non-enumerable), false otherwise
+     */
+    public boolean hasVariable(Variable var) {
+        for (int i = 0; i < nEVars; i ++)
+            if (evars[i].equals(var))
+                return true;
+        for (int i = 0; i < nNVars; i ++)
+            if (nvars[i].equals(var))
+                return true;
+        return false;
+    }
+    
+    /**
      * Get the theoretical number of entries in this table. Note this number is
      * always equal to the actual number of entries, but some may never have been explicitly
      * set to a value.
@@ -1247,7 +1266,9 @@ public abstract class AbstractFactor {
      * @return the variables in original order.
      */
     public EnumVariable[] getEnumVars() {
-        return evars;
+        if (nEVars > 0)
+            return evars;
+        return new EnumVariable[0];
     }
     
     /**
@@ -1263,7 +1284,9 @@ public abstract class AbstractFactor {
      * @return the variables in original order.
      */
     public Variable[] getNonEnumVars() {
-        return nvars;
+        if (nNVars > 0)
+            return nvars;
+        return new Variable[0];
     }
 
     /**
@@ -1812,11 +1835,11 @@ public abstract class AbstractFactor {
         return dfs;
     }
 
-    protected static AbstractFactor getProduct(FactorProductTree node) {
+    protected static AbstractFactor getProductBenchmarked(FactorProductTree node) {
         if (node.getFactor() != null)
             return node.getFactor();
-        AbstractFactor X = getProduct(node.x);
-        AbstractFactor Y = getProduct(node.y);
+        AbstractFactor X = getProductBenchmarked(node.x);
+        AbstractFactor Y = getProductBenchmarked(node.y);
         long startTime = System.nanoTime();
         AbstractFactor f = AbstractFactor.getProduct(X, Y);
         long endTime = System.nanoTime();
@@ -1832,7 +1855,7 @@ public abstract class AbstractFactor {
         return f;
     }
     
-    protected static AbstractFactor getProduct(AbstractFactor[] factors) {
+    protected static AbstractFactor getProductBenchmarked(AbstractFactor[] factors) {
         if (factors.length == 0)
             return null;
         AbstractFactor R = factors[0];
@@ -1854,6 +1877,18 @@ public abstract class AbstractFactor {
         return R;
     }
     
+    public static AbstractFactor getProduct(AbstractFactor[] factors) {
+        if (factors.length == 0)
+            return null;
+        AbstractFactor R = factors[0];
+        for (int i = 1; i < factors.length; i ++) {
+            AbstractFactor X = R;
+            AbstractFactor Y = factors[i];
+            R = AbstractFactor.getProduct(X, Y);
+        }
+        return R;
+    }
+    
     
     /** Calculate products linearly, don't consider order */
     static final int POOL_OPTION_LINEAR = 0; 
@@ -1869,11 +1904,11 @@ public abstract class AbstractFactor {
         long startTime = System.nanoTime();
         switch (option) {
             case POOL_OPTION_LINEAR:
-                f = AbstractFactor.getProduct(dfs);
+                f = AbstractFactor.getProductBenchmarked(dfs);
                 break;
             case POOL_OPTION_TREE:
                 FactorProductTree tree = AbstractFactor.getProductTree(dfs);
-                f = AbstractFactor.getProduct(tree);
+                f = AbstractFactor.getProductBenchmarked(tree);
                 break;
         }
         long endTime = System.nanoTime();

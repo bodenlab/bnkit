@@ -15,6 +15,7 @@ import bn.alg.ApproxInference;
 import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
+import bn.alg.VarElim;
 import bn.file.BNBuf;
 
 /**
@@ -64,7 +65,7 @@ public class SimpleExample {
             //e.setInstance(false);
 
             System.out.println("Variable elimination--------------");
-            CGVarElim ve = new CGVarElim();
+            VarElim ve = new VarElim();
             ve.instantiate(bn);
             
             Query q = ve.makeQuery(B);

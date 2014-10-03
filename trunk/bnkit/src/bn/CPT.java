@@ -407,8 +407,10 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                 EnumDistrib d = table.getValue(index);
                 if (d != null) { // there is a distribution associated with this entry in the CPT
                     Object[] cptkey = table.getKey(index); // work out the condition for this entry
-                    for (int i = 0; i < cptkey.length; i++)
-                        fkey[xcross[i]] = cptkey[i];
+                    for (int i = 0; i < cptkey.length; i++) {
+                        if (xcross[i] != -1) 
+                            fkey[xcross[i]] = cptkey[i];
+                    }
                     if (varinstance != null) { // the variable for this CPT is instantiated
                         if (fkey.length == 0) // atomic factor
                             ft.setValue(d.get(varinstance));

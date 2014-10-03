@@ -23,6 +23,8 @@ import bn.EnumVariable;
 import bn.Factor;
 import bn.JPT;
 import bn.Variable;
+import bn.factor.AbstractFactor;
+import bn.factor.AbstractFactor.FactorProductTree;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,10 +35,13 @@ import java.util.Map;
 
 /**
  * Exact inference in Bayesian network by variable elimination, more
- * specifically a variant of "Bucket Elimination" that involves conditional Gaussians. 
+ * specifically a variant of "Bucket Elimination" that involves conditional non-enumerable 
+ * variables, including Gaussians. 
+ * 
  * Implementation of belief updating in accordance with the method described in 
  * Dechter, R. Bucket Elimination: A Unifying Framework for Probabilistic Inference, 
  * in Uncertainty in Artificial Intelligence, 1998.
+ * 
  * The idea of conditional Gaussians is discussed in Lauritzen SL and Jensen F, 
  * Stable local computation with conditional Gaussian distributions, Statistics and
  * Computing 2001 11:191-203.
@@ -72,7 +77,7 @@ public class VarElim implements Inference {
     public Query makeQuery(Variable... qvars) {
 	// Find out which variables in the BN that will be summed out and organise them into "buckets".
         // They will be listed in "topological order" (parents before children) as per heuristics given in Dechter.
-        // Each sumout variable will be assigned a bucket.
+        // Each margin variable will be assigned a bucket.
         List<Variable> Q = new ArrayList<>(); // Query, all nodes identified by user of this function
         List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
         List<Variable> X = new ArrayList<>(); // Un-instantiated but relevant nodes (not d-separated from any query node), to-be summed out
@@ -105,7 +110,7 @@ public class VarElim implements Inference {
     public Query makeMPE(Variable... qvars) {
 	// Find out which variables in the BN that will be max:ed out and organise them into "buckets".
         // They will be listed in "topological order" (parents before children) as per heuristics given in Dechter.
-        // Each sumout variable will be assigned a bucket.
+        // Each margin variable will be assigned a bucket.
         List<Variable> Q = new ArrayList<>(); // Query
         List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
@@ -161,12 +166,12 @@ public class VarElim implements Inference {
             Variable var = e.getKey();
             Object val = e.getValue();
             BNode node = bn.getNode(var);
-            Factor ft = node.makeFactor(q.getRelevant()); // forces new makeFactor method to be used on only relevant nodes
+            AbstractFactor ft = node.makeDenseFactor(q.getRelevant()); // forces new makeFactor method to be used on only relevant nodes
 //            Factor ft = node.makeFactor(bn);
 //            System.out.println(node.toString());
 //            ft.display();
             boolean added = false;
-            if (ft.isAtomic()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
+            if (!ft.hasEnumVars()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
                 buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
                 added = true;
                 continue;
@@ -219,36 +224,41 @@ public class VarElim implements Inference {
         // Create a factor of each bucket, by performing factor products and marginalisation as appropriate
         for (int i = nBuckets - 1; i >= 0; i--) {
             Bucket b = buckets.get(i);
-            boolean ignore = true; //  It is safe to ignore buckets with no evidence and no newly computed factor (function of other factors)
-            for (Factor ft : b.factors) {
-                if (ft.function || ft.evidenced || i == 0) {
-                    ignore = false;
-                    break;
-                }
-            }
+//            boolean ignore = true; //  It is safe to ignore buckets with no evidence and no newly computed factor (function of other factors)
+//            for (AbstractFactor ft : b.factors) {
+//                if (ft.function || ft.evidenced || i == 0) {
+//                    ignore = false;
+//                    break;
+//                }
+//            }
             int nFactors = b.factors.size();
-            if (nFactors > 0 && !ignore) {
-                List<Factor> fts = new ArrayList<>(b.factors);
-                // The order in which FTs are multiplied can have big influence on efficiency, the strategy below is naive
-                Collections.sort(fts, new FTCompare()); // sort the factors in order of variable-count (smaller-to-greater)				
-                Factor result = fts.get(0); // perform products in that order
-                for (int j = 1; j < nFactors; j++) {
-                    result = Factor.product(result, fts.get(j));
+//            if (nFactors > 0 && !ignore) {
+            if (nFactors > 0) {
+                // Perform product of all factors in bucket
+                AbstractFactor result = null;
+                if (nFactors == 1) {
+                    result = b.factors.get(0);
+                } else if (nFactors == 2) { 
+                    result = AbstractFactor.getProduct(b.factors.get(0), b.factors.get(1));
+                } else {
+                    AbstractFactor[] fs = new AbstractFactor[b.factors.size()];
+                    b.factors.toArray(fs);
+                    result = AbstractFactor.getProduct(fs);
                 }
                 if (i > 0) { // not the last bucket, so normal operation 
                     // The code below assumes that all buckets except the first have only enumerable variables to be summed out
                     // If continuous variables are unspecified (X) they should have been placed in the first bucket.
                     // If they need summing out, it needs to be done later.
                     try {
-                        List<EnumVariable> evars = new ArrayList<>(b.vars.size());
-                        for (Variable bvar : b.vars) 
-                            evars.add((EnumVariable)bvar);
+                        Variable[] margin = new Variable[b.vars.size()];
+                        for (int j = 0; j < margin.length; j ++) 
+                            margin[j] = b.vars.get(j);
                         if (q.getStatus() == STATUS_MPE)
-                            result = result.maximize(evars);      // max-out variables of bucket
+                            result = AbstractFactor.getMaxMargin(result, margin);      // max-out variables of bucket
                         else
-                            result = result.marginalize(evars);   // sum-out variables of bucket
+                            result = AbstractFactor.getMargin(result, margin);   // sum-out variables of bucket
                             
-                        if (result.isAtomic())          // if no enumerable variables, we may still have non-enumerables
+                        if (!result.hasEnumVars())          // if no enumerable variables, we may still have non-enumerables
                             buckets.get(0).put(result); // so we put the factor in the first bucket
                         else {                          // there are enumerables so...
                             for (int jj = i - 1; jj >= 0; jj--) { // find a new bucket for the result factor
@@ -267,9 +277,7 @@ public class VarElim implements Inference {
                     // instead we should extract query results from the final factor, including a JPT.
                     // If Q is only a non-enumerable variable or list there-of, we will not be able to create a JPT.
                     // The first section below is just making sure that the variables are presented in the same order as that in the query
-                    
-                    //return extractResult(result, q.Q);
-                    return new CGTable(result.rehash(q.Q));
+                    return new CGTable(result);
                 }
             }
         }
@@ -329,9 +337,9 @@ public class VarElim implements Inference {
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
         for (BNode node : bn.getNodes()) {
             // node is converted into a factor, all nodes are considered relevant
-            Factor ft = node.makeFactor(R); // Factor ft = node.makeFactor(bn, true);
+            AbstractFactor ft = node.makeDenseFactor(R); // Factor ft = node.makeFactor(bn, true);
             boolean added = false;
-            if (ft.isAtomic()) { // this happen if the FT has no variables
+            if (!ft.hasEnumVars()) { // this happen if the FT has no variables
                 buckets.get(0).put(ft);
                 added = true;
                 continue;
@@ -368,31 +376,36 @@ public class VarElim implements Inference {
         // Create a factor of each bucket, by performing factor products and marginalisation as appropriate
         for (int i = nBuckets - 1; i >= 0; i--) {
             Bucket b = buckets.get(i);
-            boolean ignore = true; //  It is safe to ignore buckets with no evidence and no newly computed factor (function of other factors)
-            for (Factor ft : b.factors) {
-                if (ft.function || ft.evidenced || i == 0) {
-                    ignore = false;
-                    break;
-                }
-            }
+//            boolean ignore = true; //  It is safe to ignore buckets with no evidence and no newly computed factor (function of other factors)
+//            for (Factor ft : b.factors) {
+//                if (ft.function || ft.evidenced || i == 0) {
+//                    ignore = false;
+//                    break;
+//                }
+//            }
             int nFactors = b.factors.size();
-            if (nFactors > 0 && !ignore) {
-                List<Factor> fts = new ArrayList<>(b.factors);
-                // The order in which FTs are multiplied can have big influence on efficiency, the strategy below is naive
-                Collections.sort(fts, new FTCompare()); // sort the factors in order of variable-count (smaller-to-greater)				
-                Factor result = fts.get(0); // perform products in that order
-                for (int j = 1; j < nFactors; j++) {
-                    result = Factor.product(result, fts.get(j));
+//            if (nFactors > 0 && !ignore) {
+            if (nFactors > 0) {
+                // Perform product of all factors in bucket
+                AbstractFactor result = null;
+                if (nFactors == 1) {
+                    result = b.factors.get(0);
+                } else if (nFactors == 2) { 
+                    result = AbstractFactor.getProduct(b.factors.get(0), b.factors.get(1));
+                } else {
+                    AbstractFactor[] fs = new AbstractFactor[b.factors.size()];
+                    b.factors.toArray(fs);
+                    result = AbstractFactor.getProduct(fs);
                 }
                 if (i > 0) { // not the last bucket, so normal operation 
                     // The code below assumes that all buckets except the first have only enumerable variables to be summed out
                     // If continuous variables are unspecified (X) they should have been placed in the first bucket.
                     // If they need summing out, it needs to be done later.
                     try {
-                        List<EnumVariable> evars = new ArrayList<>(b.vars.size());
-                        for (Variable bvar : b.vars) 
-                            evars.add((EnumVariable)bvar);
-                        result = result.marginalize(evars);   // sum-out variables of bucket
+                        Variable[] margin = new Variable[b.vars.size()];
+                        for (int j = 0; j < margin.length; j ++) 
+                            margin[j] = b.vars.get(j);
+                        result = AbstractFactor.getMargin(result, margin);   // sum-out variables of bucket
                         for (int jj = i - 1; jj >= 0; jj--) { // find a new bucket for the result factor
                             Bucket b2 = buckets.get(jj);      // FIXME: problem if FT is atomic (ie no variables)
                             if (b2.match(result)) {
@@ -467,8 +480,10 @@ public class VarElim implements Inference {
             for (Variable v:Q)
                 sbuf.append(v.getName()).append(",");
             sbuf.append("|E:");
-            for (Map.Entry<Variable, Object> v:E.entrySet())
-                sbuf.append(v.getKey().toString()).append("=").append(v.getValue().toString()).append(",");
+            for (Map.Entry<Variable, Object> v:E.entrySet()) {
+                if (v.getValue() != null)
+                    sbuf.append(v.getKey().toString()).append("=").append(v.getValue().toString()).append(",");
+            }
             sbuf.append("|X:");
             for (Variable v:X)
                 sbuf.append(v.getName()).append(",");
@@ -485,7 +500,7 @@ public class VarElim implements Inference {
      */
     public class Bucket {
 
-        List<Factor> factors;
+        List<AbstractFactor> factors;
         List<Variable> vars = new ArrayList<>();
 
         /**
@@ -516,10 +531,8 @@ public class VarElim implements Inference {
          * @return true if the bucket can be used to process the factor table,
          * false otherwise
          */
-        boolean match(Factor f) {
-            List<EnumVariable> fvars = f.getEnumVariables();
-            List<Variable> nvars = f.getNonEnumVariables();
-            for (EnumVariable fvar : fvars) {
+        boolean match(AbstractFactor f) {
+            for (EnumVariable fvar : f.getEnumVars()) {
                 if (vars.contains(fvar)) 
                     return true;
             }
@@ -532,20 +545,18 @@ public class VarElim implements Inference {
         }
 
         boolean hasFactorWith(Variable var) {
-            for (Factor ft : factors) {
-                if (ft.getEnumVariables().contains(var)) 
-                    return true;
-                if (ft.getNonEnumVariables().contains(var))
+            for (AbstractFactor ft : factors) {
+                if (ft.hasVariable(var)) 
                     return true;
             }
             return false;
         }
 
-        void put(Factor f) {
+        void put(AbstractFactor f) {
             factors.add(f);
         }
 
-        List<Factor> get() {
+        List<AbstractFactor> get() {
             return factors;
         }
     }

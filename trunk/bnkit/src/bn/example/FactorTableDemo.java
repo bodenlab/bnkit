@@ -10,24 +10,17 @@ import bn.BNet;
 import bn.BNode;
 import bn.CPT;
 import bn.GDT;
-import bn.Continuous;
 import bn.EnumDistrib;
 import bn.EnumVariable;
 import bn.Enumerable;
-import bn.Factor;
 import bn.GaussianDistrib;
-import bn.JPT;
 import bn.Predef;
 import bn.Variable;
 import bn.alg.CGTable;
-import bn.alg.CGVarElim;
 import bn.alg.Query;
-import bn.alg.QueryResult;
+import bn.alg.VarElim;
 import bn.factor.AbstractFactor;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -168,7 +161,7 @@ public class FactorTableDemo {
         System.out.println("Factor (((B * E) * A) * J) * M) - (A, E)");
         ft.display();
 
-        CGVarElim ve = new CGVarElim();
+        VarElim ve = new VarElim();
         ve.instantiate(bn);
         Query q = ve.makeQuery(B);
         CGTable qr = (CGTable) ve.infer(q);

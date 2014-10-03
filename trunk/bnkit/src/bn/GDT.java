@@ -296,8 +296,10 @@ public class GDT implements BNode, Serializable {
                 GaussianDistrib d = table.getValue(index);
                 if (d != null) { // there is a distribution associated with this entry in the CPT
                     Object[] cptkey = table.getKey(index); // work out the condition for this entry
-                    for (int i = 0; i < cptkey.length; i++)
-                        fkey[xcross[i]] = cptkey[i];
+                    for (int i = 0; i < cptkey.length; i++) {
+                        if (xcross[i] != -1)
+                            fkey[xcross[i]] = cptkey[i];
+                    }
                     if (varinstance != null) { // the variable for this CPT is instantiated
                         ft.setValue(fkey, d.get(varinstance));
                     } else { // the variable for this CPT is NOT instantiated so we put it in the JDF
