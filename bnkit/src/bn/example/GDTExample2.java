@@ -34,6 +34,7 @@ import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.alg.QueryResult;
+import bn.alg.VarElim;
 
 /**
  *
@@ -127,7 +128,7 @@ public class GDTExample2 {
         // Variable elimination works by factorising CPTs, and then by performing products and variable sum-outs in
         // an order that heuristically is computationally efficient.
         
-        CGVarElim ve0 = new CGVarElim();
+        VarElim ve0 = new VarElim();
         ve0.instantiate(bn);
         Query q0 = ve0.makeQuery(new Variable[] {M,E,N,R,S});
         //Query q = ve1.makeQuery(new Variable[] {S});

@@ -18,7 +18,6 @@
 package bn.example;
 import bn. *;
 import bn.alg.*;
-import java.util.Map;
 
 /**
  *
@@ -48,10 +47,11 @@ public class Gender {
         BNet bn = new BNet();
         bn.add(g,h,w);
         h.setInstance(175.0);
-        //CGVarElim inf = new CGVarElim();
-        ApproxInference inf = new ApproxInference();
-        inf.setIterations(2000);
+        CGVarElim inf = new CGVarElim();
         inf.instantiate(bn);
+        //ApproxInference inf = new ApproxInference();
+        //inf.setIterations(2000);
+        //inf.instantiate(bn);
         Query q = inf.makeQuery(G,W);
         CGTable r = (CGTable) inf.infer(q);
         r.display();

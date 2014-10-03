@@ -118,8 +118,10 @@ public class CGTable implements QueryResult {
     } 
     
     public CGTable(AbstractFactor f) {
-        evars = Arrays.asList(f.getEnumVars());
-        nvars = Arrays.asList(f.getNonEnumVars());
+        EnumVariable[] evars_arr = f.getEnumVars();
+        evars = Arrays.asList(evars_arr);
+        Variable[] nvars_arr = f.getNonEnumVars() ;
+        nvars = Arrays.asList(nvars_arr);
         boolean hasNonEnum = f.isJDF();
         if (f.hasEnumVars()) {
             atomicDensity = null;
@@ -131,6 +133,7 @@ public class CGTable implements QueryResult {
             atomicFactor = null;
             double sum = f.getSum();
             for (int i = 0; i < f.getSize(); i ++) {
+                Object[] fkey = f.getKey(i);
                 int key_index = i;
                 double p = f.getValue(i) / sum;
                 if (p == 0)
