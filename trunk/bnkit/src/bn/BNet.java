@@ -268,6 +268,14 @@ public class BNet implements Serializable {
     }
 
     /**
+     * Force set the compiled status of the network
+     * @param bool
+     */
+    public void setCompiled(Boolean bool){
+        this.compiled = bool;
+    }
+
+    /**
      * Retrieve the root nodes of the BN, i.e. the nodes with no parents. Useful
      * to know if traversing the network structure.
      *
