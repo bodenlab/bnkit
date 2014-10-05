@@ -24,7 +24,8 @@ import bn.Factor;
 import bn.JPT;
 import bn.Variable;
 import bn.factor.AbstractFactor;
-import bn.factor.AbstractFactor.FactorProductTree;
+import bn.factor.Factorize;
+import bn.factor.Factorize.FactorProductTree;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -82,7 +83,7 @@ public class VarElim implements Inference {
         List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
         List<Variable> X = new ArrayList<>(); // Un-instantiated but relevant nodes (not d-separated from any query node), to-be summed out
         Q.addAll(Arrays.asList(qvars));
-        List<BNode> rnl = bn.getDconnected(qvars); //relevant ordered node list, based on the concept of D-separation
+        List<BNode> rnl = bn.getDconnected(qvars); //relevant *ordered* node list, based on the concept of D-separation, and topological ordering
         for (BNode node : rnl) {
             Variable var = node.getVariable();
             Object val = node.getInstance();
@@ -100,11 +101,10 @@ public class VarElim implements Inference {
      * of inference of the most probable explanation. 
      * There are three types of variables (given the BN): 
      *  1. Assignment variables E--which have been assigned values via the BN 
-     *  2. Query variables Q--for which the most probable setting is sought
-     *  3. Other variables X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
-     *  Note that inference should return a JPT with variables in the *same* order 
-     *  as that specified by Q.
-     * @param qvars variables to include in query
+     *  2. Query variables Q--typically empty set, but if not, these are not maxed-out but inferred
+     *  3. Other variables X--which will be maxed out during inference P(Q|E) = MAX_X P(Q|E,X).
+     * Most probable assignments to X can be accessed via CGTable.getMPE
+     * @param qvars variables to include in query, can be empty
      */
     @SuppressWarnings("rawtypes")
     public Query makeMPE(Variable... qvars) {
@@ -116,7 +116,7 @@ public class VarElim implements Inference {
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
         Q.addAll(Arrays.asList(qvars));
 //        BNet qbn = bn.getRelevant(qvars);
-        List<BNode> rnl = bn.getDconnected(qvars); //relevant ordered node list
+        List<BNode> rnl = bn.getOrdered(); // with MPE all nodes are relevant by definition // getDconnected(qvars); //relevant ordered node list
         //BNet qbn = bn;
         for (BNode node : rnl) {
             Variable var = node.getVariable();
@@ -152,7 +152,7 @@ public class VarElim implements Inference {
         List<Bucket> buckets = new ArrayList<>();
         Bucket first_bucket = new Bucket(q.Q);
         buckets.add(first_bucket);
-        for (Variable x : q.X) {
+        for (Variable x : q.X) { // the list of unspecified variables appear in a topological order
             // only create buckets for enumerable variables
             try {
                 buckets.add(new Bucket((EnumVariable)x));
@@ -162,14 +162,9 @@ public class VarElim implements Inference {
         }        
         int nBuckets = buckets.size();
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
-        for (Map.Entry<Variable, Object> e : q.getRelevant().entrySet()) {
-            Variable var = e.getKey();
-            Object val = e.getValue();
+        for (Variable var : q.getRelevant().keySet()) {
             BNode node = bn.getNode(var);
             AbstractFactor ft = node.makeDenseFactor(q.getRelevant()); // forces new makeFactor method to be used on only relevant nodes
-//            Factor ft = node.makeFactor(bn);
-//            System.out.println(node.toString());
-//            ft.display();
             boolean added = false;
             if (!ft.hasEnumVars()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
                 buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
@@ -239,11 +234,11 @@ public class VarElim implements Inference {
                 if (nFactors == 1) {
                     result = b.factors.get(0);
                 } else if (nFactors == 2) { 
-                    result = AbstractFactor.getProduct(b.factors.get(0), b.factors.get(1));
+                    result = Factorize.getProduct(b.factors.get(0), b.factors.get(1));
                 } else {
                     AbstractFactor[] fs = new AbstractFactor[b.factors.size()];
                     b.factors.toArray(fs);
-                    result = AbstractFactor.getProduct(fs);
+                    result = Factorize.getProduct(fs);
                 }
                 if (i > 0) { // not the last bucket, so normal operation 
                     // The code below assumes that all buckets except the first have only enumerable variables to be summed out
@@ -254,9 +249,9 @@ public class VarElim implements Inference {
                         for (int j = 0; j < margin.length; j ++) 
                             margin[j] = b.vars.get(j);
                         if (q.getStatus() == STATUS_MPE)
-                            result = AbstractFactor.getMaxMargin(result, margin);      // max-out variables of bucket
+                            result = Factorize.getMaxMargin(result, margin);      // max-out variables of bucket
                         else
-                            result = AbstractFactor.getMargin(result, margin);   // sum-out variables of bucket
+                            result = Factorize.getMargin(result, margin);   // sum-out variables of bucket
                             
                         if (!result.hasEnumVars())          // if no enumerable variables, we may still have non-enumerables
                             buckets.get(0).put(result); // so we put the factor in the first bucket
@@ -277,7 +272,7 @@ public class VarElim implements Inference {
                     // instead we should extract query results from the final factor, including a JPT.
                     // If Q is only a non-enumerable variable or list there-of, we will not be able to create a JPT.
                     // The first section below is just making sure that the variables are presented in the same order as that in the query
-                    return new CGTable(result);
+                    return new CGTable(result, q.Q);
                 }
             }
         }
@@ -324,8 +319,8 @@ public class VarElim implements Inference {
                 X.add(var);
         }
         List<Bucket> buckets = new ArrayList<>();
-        for (Variable x : X) {
-            // only create buckets for enumerable, unspecified variables to-be summed-out
+        for (Variable x : X) { 
+            // only create buckets for enumerable, unspecified variables to-be marginalised-out
             try {
                 buckets.add(new Bucket((EnumVariable)x));
             } catch (ClassCastException e) {
@@ -391,11 +386,11 @@ public class VarElim implements Inference {
                 if (nFactors == 1) {
                     result = b.factors.get(0);
                 } else if (nFactors == 2) { 
-                    result = AbstractFactor.getProduct(b.factors.get(0), b.factors.get(1));
+                    result = Factorize.getProduct(b.factors.get(0), b.factors.get(1));
                 } else {
                     AbstractFactor[] fs = new AbstractFactor[b.factors.size()];
                     b.factors.toArray(fs);
-                    result = AbstractFactor.getProduct(fs);
+                    result = Factorize.getProduct(fs);
                 }
                 if (i > 0) { // not the last bucket, so normal operation 
                     // The code below assumes that all buckets except the first have only enumerable variables to be summed out
@@ -405,7 +400,7 @@ public class VarElim implements Inference {
                         Variable[] margin = new Variable[b.vars.size()];
                         for (int j = 0; j < margin.length; j ++) 
                             margin[j] = b.vars.get(j);
-                        result = AbstractFactor.getMargin(result, margin);   // sum-out variables of bucket
+                        result = Factorize.getMargin(result, margin);   // sum-out variables of bucket
                         for (int jj = i - 1; jj >= 0; jj--) { // find a new bucket for the result factor
                             Bucket b2 = buckets.get(jj);      // FIXME: problem if FT is atomic (ie no variables)
                             if (b2.match(result)) {

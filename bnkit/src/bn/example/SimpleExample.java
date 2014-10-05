@@ -8,12 +8,10 @@ import bn.CPT;
 import bn.EnumDistrib;
 import bn.EnumVariable;
 import bn.Enumerable;
-import bn.JPT;
 import bn.Predef;
 import bn.Variable.Assignment;
 import bn.alg.ApproxInference;
 import bn.alg.CGTable;
-import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.file.BNBuf;
@@ -87,7 +85,7 @@ public class SimpleExample {
             r0 = (CGTable)ve.infer(q);
             r0.display();
 
-            Query q_mpe = ve.makeMPE(J,M,E);
+            Query q_mpe = ve.makeMPE();
             System.out.println("Query is \'" + q_mpe + "\'");
             CGTable r1 = (CGTable)ve.infer(q_mpe); 
             Assignment[] assign = r1.getMPE();
