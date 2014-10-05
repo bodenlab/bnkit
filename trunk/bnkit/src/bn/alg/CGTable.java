@@ -28,12 +28,15 @@ import bn.JPT;
 import bn.MixtureDistrib;
 import bn.Variable;
 import bn.factor.AbstractFactor;
+import bn.factor.Factorize;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Conditional Gaussian Table.
@@ -55,11 +58,13 @@ public class CGTable implements QueryResult {
    
     private final EnumTable<Double> factorTable;  // the factors for each permutation of the enumerable variables
     private final EnumTable<JDF> densityTable;    // the densities for each permutation of the enumerables
+    private final EnumTable<Set<Variable.Assignment>> assignTable;    // the traced assignments for each permutation of the enumerables
     private final List<EnumVariable> evars;       // all enumerable variables associated with this factor table
     private final List<Variable> nvars;           // all non-enumerable variables
     
     private final Double atomicFactor;    // if there are no enumerable variables, here's where the constant factor is
     private final JDF    atomicDensity;   // if there are no enumerable but some non-enumerable variables, here's where the only joint density is stored
+    private final Set<Variable.Assignment>    atomicAssign;   // if there are no enumerable but some non-enumerable variables, here's where the only assignment set is stored
     
     public CGTable(Factor f) {
         evars = f.getEnumVariables();
@@ -115,31 +120,55 @@ public class CGTable implements QueryResult {
             } else
                 atomicDensity = null;
         }
+        assignTable = null; // not used for this constructor, requires AbstractFactor
+        atomicAssign = null;
     } 
     
-    public CGTable(AbstractFactor f) {
+    public CGTable(AbstractFactor f, List<Variable> qvars) {
+        evars = new ArrayList<>();
+        nvars = new ArrayList<>();
+        for (Variable var : qvars) {
+            try {
+                EnumVariable evar = (EnumVariable) var;
+                evars.add(evar);
+            } catch (ClassCastException e) {
+                nvars.add(var);
+            }
+        }
+        EnumVariable[] q_evars_arr = new EnumVariable[evars.size()];
+        evars.toArray(q_evars_arr);
         EnumVariable[] evars_arr = f.getEnumVars();
-        evars = Arrays.asList(evars_arr);
         Variable[] nvars_arr = f.getNonEnumVars() ;
-        nvars = Arrays.asList(nvars_arr);
-        boolean hasNonEnum = f.isJDF();
+        int[] fcross2q = new int[evars_arr.length]; // factor index to query
+        int[] qcross2f = new int[evars_arr.length]; // query index to factor
+        Factorize.getCrossref(evars_arr, fcross2q, q_evars_arr, qcross2f);
         if (f.hasEnumVars()) {
             atomicDensity = null;
-            if (hasNonEnum) {
+            if (f.hasNonEnumVars()) {
                 densityTable = new EnumTable<>(evars);
             } else
                 densityTable = null;
-            factorTable = new EnumTable(evars);
+            if (f.isTraced()) {
+                assignTable = new EnumTable<>(evars);
+                atomicAssign = null;
+            } else {
+                assignTable = null;
+                atomicAssign = null;
+            }
+            factorTable = new EnumTable<>(evars);
             atomicFactor = null;
             double sum = f.getSum();
             for (int i = 0; i < f.getSize(); i ++) {
                 Object[] fkey = f.getKey(i);
-                int key_index = i;
+                Object[] qkey = new Object[fkey.length];
+                for (int j = 0; j < fkey.length; j ++) 
+                    qkey[fcross2q[j]] = fkey[j];
+                int key_index = EnumTable.getIndex(qkey, q_evars_arr);
                 double p = f.getValue(i) / sum;
                 if (p == 0)
-                	continue;
+                    continue;
                 factorTable.setValue(key_index, p);
-                if (hasNonEnum) {
+                if (f.hasNonEnumVars()) {
                     JDF f_jdf = f.getJDF(key_index);
                     JDF cg_jdf = new JDF(nvars);
                     for (Variable nvar : nvars) {
@@ -153,14 +182,18 @@ public class CGTable implements QueryResult {
                     }
                     densityTable.setValue(key_index, cg_jdf);
                 }
-                
-                // TODO: Assigned values from MPE handled here
+                if (f.isTraced()) {
+                    Set<Variable.Assignment> a = f.getAssign(i);
+                    if (a != null)
+                        assignTable.setValue(key_index, a);
+                }
             }
         } else { // no enumerable variables
             atomicFactor = f.getValue();
             factorTable = null;
             densityTable = null;
-            if (hasNonEnum) {
+            assignTable = null;
+            if (f.hasNonEnumVars()) {
                 JDF f_jdf = f.getJDF();
                 JDF cg_jdf = new JDF(nvars);
                 for (Variable nvar : nvars) {
@@ -173,10 +206,18 @@ public class CGTable implements QueryResult {
                     }
                 }
                 atomicDensity = cg_jdf;
-            } else
+            } else 
                 atomicDensity = null;
+            if (f.isTraced()) {
+                Set<Variable.Assignment> a = f.getAssign();
+                if (a != null)
+                    atomicAssign = a;
+                else
+                    atomicAssign = null;
+            } else
+                atomicAssign = null;
         }
-    } 
+    }
 
     /**
      * Find if factor indexes enumerable variables.
@@ -840,34 +881,67 @@ public class CGTable implements QueryResult {
      * @return the most probable assignment of query variables
      */
     public Variable.Assignment[] getMPE() {
-        Variable.Assignment[] assign = new Variable.Assignment[evars.size() + nvars.size()];
-        int mostProbKey = 0;
-        double mostProbValue = -1;
-        if (this.isAtomic()) {
-	        for (int i = 0; i < nvars.size(); i ++){
-	            assign[i] = Variable.assign(nvars.get(i), atomicDensity.getDistrib(nvars.get(i)));
-	        }
-	        return assign;
-        } else {
-	        for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) {
-	            if (entry.getValue() > mostProbValue) {
-	                mostProbKey = entry.getKey();
-	                mostProbValue = entry.getValue();
-	            }
-	        }
-        }
-        //values.length will be no. enumVars
-        Object[] values = factorTable.getKey(mostProbKey);
-        //add all enum assignments to list
-        for (int i = 0; i < values.length; i ++)
-            assign[i] = Variable.assign(evars.get(i), values[i]);
-        //add all nonEnum assignments to list
-        if (nvars.size() > 0) {
-            JDF jdf = densityTable.getValue(mostProbKey);
-            for (int i = 0; i < nvars.size(); i ++){
-                assign[i + values.length] = Variable.assign(nvars.get(i), jdf.getDistrib(nvars.get(i)));
+        
+        if (assignTable == null && atomicAssign == null) { // old version of MPE
+            Variable.Assignment[] assign = new Variable.Assignment[evars.size() + nvars.size()];
+            int mostProbKey = 0;
+            double mostProbValue = -1;
+            if (this.isAtomic()) {
+                    for (int i = 0; i < nvars.size(); i ++){
+                        assign[i] = Variable.assign(nvars.get(i), atomicDensity.getDistrib(nvars.get(i)));
+                    }
+                    return assign;
+            } else {
+                    for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) {
+                        if (entry.getValue() > mostProbValue) {
+                            mostProbKey = entry.getKey();
+                            mostProbValue = entry.getValue();
+                        }
+                    }
             }
+            //values.length will be no. enumVars
+            Object[] values = factorTable.getKey(mostProbKey);
+            //add all enum assignments to list
+            for (int i = 0; i < values.length; i ++)
+                assign[i] = Variable.assign(evars.get(i), values[i]);
+            //add all nonEnum assignments to list
+            if (nvars.size() > 0) {
+                JDF jdf = densityTable.getValue(mostProbKey);
+                for (int i = 0; i < nvars.size(); i ++){
+                    assign[i + values.length] = Variable.assign(nvars.get(i), jdf.getDistrib(nvars.get(i)));
+                }
+            }
+            return assign;
+        } else { // new version based on AbstractFactor
+            Set<Variable.Assignment> result = new HashSet<>();
+
+            if (this.isAtomic()) {
+                result.addAll(atomicAssign);
+                if (this.hasNonEnumVariables() && atomicDensity != null) {
+                    for (int i = 0; i < nvars.size(); i ++)
+                        result.add(Variable.assign(nvars.get(i), atomicDensity.getDistrib(nvars.get(i))));
+                }
+            } else {
+                int mostProbKey = 0;
+                double mostProbValue = -1;
+                for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) {
+                    if (entry.getValue() > mostProbValue) {
+                        mostProbKey = entry.getKey();
+                        mostProbValue = entry.getValue();
+                    }
+                }
+                result.addAll(assignTable.getValue(mostProbKey));
+                if (this.hasNonEnumVariables()) {
+                    JDF jdf = densityTable.getValue(mostProbKey);
+                    if (jdf != null) {
+                        for (int i = 0; i < nvars.size(); i ++)
+                            result.add(Variable.assign(nvars.get(i), jdf.getDistrib(nvars.get(i))));
+                    }
+                }
+            }
+            Variable.Assignment[] assign = new Variable.Assignment[result.size()];
+            result.toArray(assign);
+            return assign;
         }
-        return assign;
     }
 }

@@ -268,11 +268,13 @@ public class DenseFactor extends AbstractFactor {
      * @return index of entry
      */
     @Override
-    public int setAssign(Collection<Variable.Assignment> assign) {
+    public int addAssign(Collection<Variable.Assignment> assign) {
         if (!isTraced()) 
             throw new DenseFactorRuntimeException("Tracing is not enabled");
         if (this.getSize() != 1)
             throw new DenseFactorRuntimeException("This table must be accessed with a enumerable variable key");
+        if (assigned[0] == null)
+            assigned[0] = new HashSet<>();
         assigned[0].addAll(assign);
         return 0;
     }
@@ -284,13 +286,32 @@ public class DenseFactor extends AbstractFactor {
      * @return index of entry
      */
     @Override
-    public int setAssign(int key_index, Collection<Variable.Assignment> assign) {
+    public int addAssign(int key_index, Collection<Variable.Assignment> assign) {
         if (!isTraced()) 
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
         if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
+        if (assigned[key_index] == null)
+            assigned[key_index] = new HashSet<>();
         assigned[key_index].addAll(assign);
         return key_index;
+    }
+    
+    /**
+     * Tag the sole entry with an assignment.
+     * @param assign assignment
+     * @return index of entry
+     */
+    @Override
+    public int addAssign(Variable.Assignment assign) {
+        if (!isTraced()) 
+            throw new DenseFactorRuntimeException("Invalid key index: outside map");
+        if (this.getSize() != 1)
+            throw new DenseFactorRuntimeException("This table must be accessed with a enumerable variable key");
+        if (assigned[0] == null)
+            assigned[0] = new HashSet<>();
+        assigned[0].add(assign);
+        return 0;
     }
     
     /**
@@ -439,7 +460,7 @@ public class DenseFactor extends AbstractFactor {
         long seed = 1;
         java.util.Random random = new java.util.Random(seed);
 
-        DenseFactor.VERBOSE = false;
+        Factorize.VERBOSE = false;
         EnumVariable x1 = Predef.Boolean("X1");
         EnumVariable x2 = Predef.AminoAcid("AA1");
         EnumVariable y1 = Predef.Number(2);
@@ -457,7 +478,7 @@ public class DenseFactor extends AbstractFactor {
         }
         dt0.display();
     
-        AbstractFactor mt0 = AbstractFactor.getMargin(dt0, y1, x1);
+        AbstractFactor mt0 = Factorize.getMargin(dt0, y1, x1);
         mt0.display();
         
         AbstractFactor dt1 = new DenseFactor(y1,x1, r2);
@@ -467,68 +488,68 @@ public class DenseFactor extends AbstractFactor {
         }
         dt1.display();
         
-        AbstractFactor mt1 = AbstractFactor.getMargin(dt1, x1);
+        AbstractFactor mt1 = Factorize.getMargin(dt1, x1);
         mt1.display();
-        AbstractFactor xt1 = AbstractFactor.getMaxMargin(dt1, x1);
+        AbstractFactor xt1 = Factorize.getMaxMargin(dt1, x1);
         xt1.display();
         
         
-        AbstractFactor.getProduct(dt0, dt1);
+        Factorize.getProduct(dt0, dt1);
         
         AbstractFactor dt2 = new DenseFactor(x2,y2,z1,x1);
         for (int key_index = 0; key_index < dt2.getSize(); key_index ++)
             if (random.nextInt(100) > 20)
                 dt2.setValue(key_index, random.nextDouble());
-        AbstractFactor mt2 = AbstractFactor.getMargin(dt2, x2, y2);
+        AbstractFactor mt2 = Factorize.getMargin(dt2, x2, y2);
         mt2.display();
         
-        AbstractFactor.getProduct(mt2, mt0);
+        Factorize.getProduct(mt2, mt0);
 
         AbstractFactor dt3 = new DenseFactor(z1,x2,z2);
         for (int key_index = 0; key_index < dt3.getSize(); key_index ++)
             dt3.setValue(key_index, random.nextDouble());
-        AbstractFactor dt4 = AbstractFactor.getProduct(dt2, dt1);
-        AbstractFactor dt5 = AbstractFactor.getProduct(dt4, mt0);
-        AbstractFactor dt6 = AbstractFactor.getProduct(dt3, dt5);
+        AbstractFactor dt4 = Factorize.getProduct(dt2, dt1);
+        AbstractFactor dt5 = Factorize.getProduct(dt4, mt0);
+        AbstractFactor dt6 = Factorize.getProduct(dt3, dt5);
 
         long startTime, endTime;
 
         startTime = System.nanoTime();
-        AbstractFactor.getProduct(dt0, dt1);
+        Factorize.getProduct(dt0, dt1);
         endTime = System.nanoTime();
         System.out.println((endTime - startTime)/100000.0 + "ms");
-        System.out.println(getOverlap(dt0, dt1) + " : " + getComplexity(dt0, dt1, true) + "\t" + getComplexity(dt0, dt1, false) + " : " + dt0.getSize() + " v " + dt1.getSize());
+        System.out.println(Factorize.getOverlap(dt0, dt1) + " : " + Factorize.getComplexity(dt0, dt1, true) + "\t" + Factorize.getComplexity(dt0, dt1, false) + " : " + dt0.getSize() + " v " + dt1.getSize());
 
         
         startTime = System.nanoTime();
-        AbstractFactor.getProduct(dt1, dt0);
+        Factorize.getProduct(dt1, dt0);
         endTime = System.nanoTime();
         System.out.println((endTime - startTime)/100000.0 + "ms");
-        System.out.println(getOverlap(dt1, dt0) + " : " + getComplexity(dt1, dt0, true) + "\t" + getComplexity(dt1, dt0, false) + " : " + dt1.getSize() + " v " + dt0.getSize());
+        System.out.println(Factorize.getOverlap(dt1, dt0) + " : " + Factorize.getComplexity(dt1, dt0, true) + "\t" + Factorize.getComplexity(dt1, dt0, false) + " : " + dt1.getSize() + " v " + dt0.getSize());
 
         startTime = System.nanoTime();
-        AbstractFactor.getProduct(mt1, dt2);
+        Factorize.getProduct(mt1, dt2);
         endTime = System.nanoTime();
         System.out.println((endTime - startTime)/100000.0 + "ms");
-        System.out.println(getOverlap(mt1, dt2) + " : " + getComplexity(mt1, dt2, true) + "\t" + getComplexity(mt1, dt2, false) + " : " + mt1.getSize() + " v " + dt2.getSize());
+        System.out.println(Factorize.getOverlap(mt1, dt2) + " : " + Factorize.getComplexity(mt1, dt2, true) + "\t" + Factorize.getComplexity(mt1, dt2, false) + " : " + mt1.getSize() + " v " + dt2.getSize());
 
         startTime = System.nanoTime();
-        AbstractFactor.getProduct(dt3, dt4);
+        Factorize.getProduct(dt3, dt4);
         endTime = System.nanoTime();
         System.out.println((endTime - startTime)/100000.0 + "ms");
-        System.out.println(getOverlap(dt3, dt4) + " : " + getComplexity(dt3, dt4, true) + "\t" + getComplexity(dt3, dt4, false) + " : " + dt3.getSize() + " v " + dt4.getSize());
+        System.out.println(Factorize.getOverlap(dt3, dt4) + " : " + Factorize.getComplexity(dt3, dt4, true) + "\t" + Factorize.getComplexity(dt3, dt4, false) + " : " + dt3.getSize() + " v " + dt4.getSize());
 
         startTime = System.nanoTime();
-        AbstractFactor.getProduct(dt5, dt6);
+        Factorize.getProduct(dt5, dt6);
         endTime = System.nanoTime();
         System.out.println((endTime - startTime)/100000.0 + "ms");
-        System.out.println(getOverlap(dt5, dt6) + " : " + getComplexity(dt5, dt6, true) + "\t" + getComplexity(dt5, dt6, false) + " : " + dt5.getSize() + " v " + dt6.getSize());
+        System.out.println(Factorize.getOverlap(dt5, dt6) + " : " + Factorize.getComplexity(dt5, dt6, true) + "\t" + Factorize.getComplexity(dt5, dt6, false) + " : " + dt5.getSize() + " v " + dt6.getSize());
 
         startTime = System.nanoTime();
-        AbstractFactor.getProduct(dt0, dt0);
+        Factorize.getProduct(dt0, dt0);
         endTime = System.nanoTime();
         System.out.println((endTime - startTime)/100000.0 + "ms");
-        System.out.println(getOverlap(dt0, dt0) + " : " + getComplexity(dt0, dt0, true) + "\t" + getComplexity(dt0, dt0, false) + " : " + dt0.getSize() + " v " + dt0.getSize());
+        System.out.println(Factorize.getOverlap(dt0, dt0) + " : " + Factorize.getComplexity(dt0, dt0, true) + "\t" + Factorize.getComplexity(dt0, dt0, false) + " : " + dt0.getSize() + " v " + dt0.getSize());
     }
 }
 

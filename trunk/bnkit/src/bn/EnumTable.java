@@ -169,6 +169,31 @@ public class EnumTable<E> {
     }
 
     /**
+     * Retrieve the index for the specified key
+     *
+     * @param key the values by which the index is identified (order the same as
+     * when constructing the factor table)
+     * @param vars enumerable variables on which to base the index (order is significant)
+     * @return the index for the instantiated key
+     */
+    public static int getIndex(Object[] key, EnumVariable[] vars) {
+        int sum = 0;
+        if (key.length != vars.length) {
+            throw new EnumTableRuntimeException("Invalid key: length is " + key.length + " not " + vars.length);
+        }
+        int prod = 1;
+        for (int i = vars.length - 1; i >= 0; i --) {
+            int step = prod;
+            int domsize = vars[i].size();
+            prod *= domsize;
+            if (!vars[i].getDomain().isValid(key[i]))
+                throw new EnumTableRuntimeException("Invalid key");
+            sum += (vars[i].getIndex(key[i]) * step);
+        }
+        return sum;
+    }
+
+    /**
      * Instantiate the key for the specified index. The variables in the factor
      * table must be Enumerable.
      *

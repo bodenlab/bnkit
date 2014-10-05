@@ -51,14 +51,14 @@ public class GDTExample2 {
         // Define variables
         EnumVariable B = Predef.Boolean("Burglary");
         EnumVariable E = Predef.Boolean("Earthquake");
-        Variable S     = Predef.Real("Seismic");
-        Variable R     = Predef.Real("Rumble");
         EnumVariable A = Predef.Boolean("Alarm");
-        Variable N     = Predef.Real("Noise");
-//        EnumVariable N = Predef.Boolean("Noise");
         EnumVariable C = Predef.Boolean("Concert");
         EnumVariable J = Predef.Boolean("John calls");
         EnumVariable M = Predef.Boolean("Mary calls");
+        Variable S     = Predef.Real("Seismic");
+        Variable R     = Predef.Real("Rumble");
+        Variable N     = Predef.Real("Noise");
+//        EnumVariable N = Predef.Boolean("Noise");
 
         // Define nodes (connecting the variables into an acyclic graph, i.e. the structure)
         CPT b = new CPT(B);
@@ -122,17 +122,27 @@ public class GDTExample2 {
         //m.setInstance(true);
         c.setInstance(false);
         //n.setInstance(100.0);
-        //s.setInstance(6.5);
+        s.setInstance(6.5);
         //r.setInstance(0.55);
         
         // Variable elimination works by factorising CPTs, and then by performing products and variable sum-outs in
         // an order that heuristically is computationally efficient.
         
+        long startTime = System.nanoTime();
         VarElim ve0 = new VarElim();
         ve0.instantiate(bn);
-        Query q0 = ve0.makeQuery(new Variable[] {M,E,N,R,S});
+        Query q0 = ve0.makeQuery(new Variable[] {E, N, M});
+        CGTable qr0 = null;
+        for (int i = 0; i < 100; i ++)
+            qr0 = (CGTable) ve0.infer(q0);
+        long endTime = System.nanoTime();
+        System.out.println("\t\t\t\t\t\t\t" + (endTime - startTime) / 100000.0);
+        qr0.display();
+        qr0.displaySampled();
+
+        q0 = ve0.makeQuery(new Variable[] {M,E,N,R,S});
         //Query q = ve1.makeQuery(new Variable[] {S});
-        CGTable qr0 = (CGTable) ve0.infer(q0);
+        qr0 = (CGTable) ve0.infer(q0);
         qr0.display();
         qr0.displaySampled();
         Distrib d0 = qr0.query(R);

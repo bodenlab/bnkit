@@ -175,7 +175,7 @@ public class SparseFactor extends AbstractFactor {
     }
 
     @Override
-    public int setAssign(Collection<Variable.Assignment> assign) {
+    public int addAssign(Collection<Variable.Assignment> assign) {
         if (!isTraced()) 
             throw new SparseFactorRuntimeException("Tracing is not enabled");
         if (this.getSize() != 1)
@@ -185,7 +185,7 @@ public class SparseFactor extends AbstractFactor {
     }
 
     @Override
-    public int setAssign(int key_index, Collection<Variable.Assignment> assign) {
+    public int addAssign(int key_index, Collection<Variable.Assignment> assign) {
         if (!isTraced()) 
             throw new SparseFactorRuntimeException("Tracing is not enabled");
         if (this.getSize() != 1)
@@ -206,6 +206,16 @@ public class SparseFactor extends AbstractFactor {
         if (key_index >= getSize() || key_index < 0 || getSize() == 1)
             throw new SparseFactorRuntimeException("Invalid key index: outside map");
         return ass.getValue(key_index);
+    }
+
+    @Override
+    public int addAssign(Variable.Assignment assign) {
+        if (!isTraced()) 
+            throw new SparseFactorRuntimeException("Invalid key index: outside map");
+        if (getSize() == 1)
+            throw new SparseFactorRuntimeException("Table has variables that must be used to index access");
+        ass_atomic.add(assign);
+        return 0;
     }
 
     @Override

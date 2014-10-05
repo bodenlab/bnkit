@@ -20,6 +20,7 @@ import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.factor.AbstractFactor;
+import bn.factor.Factorize;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -129,34 +130,34 @@ public class FactorTableDemo {
         // of operations that are required. Smaller, overlapping FTs give smaller 
         // products. We thus combine those that have variables in common. The topological order
         // may also be very helpful to use. See Dechter's paper.
-        AbstractFactor ft = AbstractFactor.getProduct(ft_b, ft_e);
+        AbstractFactor ft = Factorize.getProduct(ft_b, ft_e);
         System.out.println("Factor B * E");
         ft.display();
 
-        ft = AbstractFactor.getProduct(ft, ft_s);
+        ft = Factorize.getProduct(ft, ft_s);
         System.out.println("Factor (B * E) * S");
         ft.display();
 
-        ft = AbstractFactor.getProduct(ft, ft_a);
+        ft = Factorize.getProduct(ft, ft_a);
         System.out.println("Factor (B * E) * A");
         ft.display();
 
-        ft = AbstractFactor.getProduct(ft, ft_j);
+        ft = Factorize.getProduct(ft, ft_j);
         System.out.println("Factor ((B * E) * A) * J");
         ft.display();
 
-        ft = AbstractFactor.getProduct(ft, ft_m);
+        ft = Factorize.getProduct(ft, ft_m);
         System.out.println("Factor (((B * E) * A) * J) * M)");
         ft.display();
 
         // Next we sum-out variables that have not been specified/instantiated or are part of the query.
         // Note that we could have done this earlier, and this would have resulted in smaller products.
         // Variable elimination also optimises when variables are summed-out.
-        ft = AbstractFactor.getMargin(ft, new EnumVariable[] {A, E});
+        ft = Factorize.getMargin(ft, new EnumVariable[] {A, E});
         ft.display();
 
         // Normalise the FT
-        ft = AbstractFactor.getNormal(ft);
+        ft = Factorize.getNormal(ft);
         
         System.out.println("Factor (((B * E) * A) * J) * M) - (A, E)");
         ft.display();

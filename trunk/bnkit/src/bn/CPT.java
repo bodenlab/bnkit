@@ -19,6 +19,7 @@ package bn;
 
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
+import bn.factor.Factorize;
 import java.io.Serializable;
 import java.util.*;
 import java.util.Map.Entry;
@@ -428,7 +429,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             if (!sumout.isEmpty()) {
                 Variable[] sumout_arr = new Variable[sumout.size()];
                 sumout.toArray(sumout_arr);
-            	ft = DenseFactor.getMargin(ft, sumout_arr);
+            	ft = Factorize.getMargin(ft, sumout_arr);
             }
             return ft;
         } else { // no parents, just a prior
