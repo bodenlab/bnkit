@@ -302,10 +302,18 @@ public class GDT implements BNode, Serializable {
                             fkey[xcross[i]] = cptkey[i];
                     }
                     if (varinstance != null) { // the variable for this CPT is instantiated
-                        ft.setValue(fkey, d.get(varinstance));
+                        if (fkey.length == 0) // and the parents are too
+                            ft.setValue(d.get(varinstance));
+                        else
+                            ft.setValue(fkey, d.get(varinstance));
                     } else { // the variable for this CPT is NOT instantiated so we put it in the JDF
-                        ft.setValue(fkey, 1.0);
-                        ft.setDistrib(fkey, myvar, d);
+                        if (fkey.length == 0) { // but the parents are instantiated
+                            ft.setValue(1.0);
+                            ft.setDistrib(myvar, d);
+                        } else {
+                            ft.setValue(fkey, 1.0);
+                            ft.setDistrib(fkey, myvar, d);
+                        }
                     }
                 } 
             }
