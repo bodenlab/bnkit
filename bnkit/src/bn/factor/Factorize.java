@@ -1089,7 +1089,7 @@ public class Factorize {
      * @return a normalised copy of the provided factor
      */
     public static AbstractFactor getNormal(AbstractFactor X) {
-        DenseFactor Y = new DenseFactor(getConcat(X.evars, X.nvars));
+        AbstractFactor Y = new DenseFactor(getConcat(X.evars, X.nvars));
         if (X.hasEnumVars()) {
             double sum = X.getSum();
             for (int i = 0; i < X.getSize(); i++) {
@@ -1369,31 +1369,33 @@ public class Factorize {
 
     public static void main(String[] args) {
         System.out.println("maxEV\tminEV\tOverlap\tContain\tProduct\tPJoin\tTime (ms)");
-        for (long seed = 0; seed < 1; seed++) {
+        for (long seed = 0; seed < 200; seed++) {
             Variable[] vars = getVariablePool(seed, 10);
-            testCrossRef(seed, vars);
-            /*
+            // testCrossRef(seed, vars);
+            
             AbstractFactor[] dfs = getFactorPool(seed, vars, 8);
             AbstractFactor f1 = productPool(dfs, POOL_OPTION_LINEAR);
             AbstractFactor f2 = productPool(dfs, POOL_OPTION_TREE);
-            if (f1 == null && f2 == null)
-            continue;
-            if (f1.getSize() != f2.getSize())
-            System.err.println("Invalid product size");
+            if (f1 == null && f2 == null) {
+                continue;
+            }
+            if (f1.getSize() != f2.getSize()) {
+                System.err.println("Invalid product size");
+            }
             if (f1.getSize() == 1) {
-            if (f1.getValue() < f2.getValue() * 0.999 || f1.getValue() > f2.getValue() *1.001) {
-            System.err.println("Invalid atomic product: " + f1.getValue() + " v " + f2.getValue());
-            System.exit(1);
-            }
+                if (f1.getValue() < f2.getValue() * 0.999 || f1.getValue() > f2.getValue() * 1.001) {
+                    System.err.println("Invalid atomic product: " + f1.getValue() + " v " + f2.getValue());
+                    System.exit(1);
+                }
             } else {
-            for (int i = 0; i < f1.getSize(); i ++) {
-            if (f1.getValue(i) < f2.getValue(i) * 0.999 || f1.getValue(i) > f2.getValue(i) *1.001) {
-            System.err.println("Invalid product: " + f1.getValue(i) + " v " + f2.getValue(i));
-            System.exit(1);
+                for (int i = 0; i < f1.getSize(); i++) {
+                    if (f1.getValue(i) < f2.getValue(i) * 0.999 || f1.getValue(i) > f2.getValue(i) * 1.001) {
+                        System.err.println("Invalid product: " + f1.getValue(i) + " v " + f2.getValue(i));
+                        System.exit(1);
+                    }
+                }
             }
-            }
-            }
-             */
+
         }
     }
 
