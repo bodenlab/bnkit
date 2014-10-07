@@ -18,6 +18,9 @@
 package bn;
 
 import bn.factor.AbstractFactor;
+import bn.factor.DenseFactor;
+import bn.factor.Factorize;
+
 import java.io.Serializable;
 import java.util.*;
 import java.util.Map.Entry;
@@ -408,9 +411,122 @@ public class SmartNoisyOR implements BNode, Serializable{
         }
     }
 
+    /**
+     * Make a Factor out of this SmartNoisyOR. If a variable is instantiated it will
+     * be factored out.
+     * If a parent is not relevant, it will not be included in the factor
+     *
+     * @param relevant only include relevant nodes, with instantiations if available
+     * @return factor of SmartNoisyOR considering if parents are relevant (rel)
+     */
     @Override
     public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
-        throw new RuntimeException("Not yet implemented.");
+        List<EnumVariable> parents = this.getParents();
+        EnumVariable myvar = this.getVariable();
+        // get value of this node if any assigned
+        Object varinstance = relevant.get(myvar); 
+        Enumerable dom = myvar.getDomain();
+        if (parents != null) { // there are parent variables
+            Object[] searchcpt = new Object[parents.size()];
+            List<Variable> fvars = new ArrayList<>(parents.size() + 1); // factor variables
+            List<EnumVariable> sumout = new ArrayList<>();  // irrelevant variables to be summed out later
+            for (int i = 0; i < parents.size(); i++) {
+                EnumVariable parent = parents.get(i);
+                // If parent is evidenced it will not be included in factor table; 
+                // Record irrelevant parents to sum out: removed later through marginalization
+                if (!relevant.containsKey(parent)) 
+                    sumout.add(parent);
+                else
+                    searchcpt[i] = relevant.get(parent);
+                if (searchcpt[i] == null) // new factor will include this variable
+                    fvars.add(parent);
+            }
+            if (varinstance == null) {
+                fvars.add(myvar);
+            }
+            Variable[] vars_arr = new Variable[fvars.size()];
+            fvars.toArray(vars_arr);
+            AbstractFactor ft = new DenseFactor(vars_arr);
+            EnumVariable[] evars = ft.getEnumVars(); // the order may have changed
+            int[] xcross = new int[parents.size()];
+            int[] ycross = new int[evars.length];
+            table.crossReference(xcross, evars, ycross);
+            int missing = -1; // the position of *myvar* in the new factor (if applicable)
+            for (int i = 0; i < ycross.length; i ++)
+                if (ycross[i] == -1) {
+                    missing = i;
+                    break;
+                }
+            // set factor to be "evidenced" is there was an evidence used
+            if (varinstance != null) {
+                ft.evidenced = true;
+            } else {
+                for (Object instcpt : searchcpt) {
+                    if (instcpt != null) {
+                        ft.evidenced = true;
+                        break;
+                    }
+                }
+            }
+            int[] indices = table.getIndices(searchcpt);
+            Object[] fkey = new Object[evars.length];
+            for (int index : indices) {
+                EnumDistrib d = table.getValue(index);
+                //if distribution is null, will need to calculate it
+                Object[] orkey = table.getKey(index);
+                int nkey = 0;
+                for (int i=0; i<orkey.length; i++) {
+                	if (orkey[i] != null) {
+                		if (orkey[i].equals(this.plabels.get(i))) {
+                			nkey++;}
+                	}
+                }
+                if (nkey > 1) {
+                	insert(orkey);
+                }
+                
+                if (d != null) { // there is a distribution associated with this entry in the CPT
+                    Object[] cptkey = table.getKey(index); // work out the condition for this entry
+                    for (int i = 0; i < cptkey.length; i++) {
+                        if (xcross[i] != -1) 
+                            fkey[xcross[i]] = cptkey[i];
+                    }
+                    if (varinstance != null) { // the variable for this CPT is instantiated
+                        if (fkey.length == 0) // atomic factor
+                            ft.setValue(d.get(varinstance));
+                        else
+                            ft.setValue(fkey, d.get(varinstance));
+                    } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
+                        for (int j = 0; j < dom.size(); j++) {
+                            fkey[missing] = dom.get(j);
+                            Double p = d.get(j);
+                            ft.setValue(fkey, p);
+                        }
+                    }
+                } 
+            }
+            if (!sumout.isEmpty()) {
+                Variable[] sumout_arr = new Variable[sumout.size()];
+                sumout.toArray(sumout_arr);
+            	ft = Factorize.getMargin(ft, sumout_arr);
+            }
+            return ft;
+        } else { // no parents, just a prior
+            if (varinstance != null) { // instantiated prior
+                AbstractFactor ft = new DenseFactor();
+                ft.setValue(this.prior.get(varinstance));
+                return ft;
+            }
+            AbstractFactor ft = new DenseFactor(myvar);
+            Object[] newkey = new Object[1];
+            EnumDistrib d = this.prior;
+            for (int j = 0; j < dom.size(); j++) {
+                newkey[0] = dom.get(j);
+                Double p = d.get(j);
+                ft.setValue(newkey, p);
+            }
+            return ft;
+        }
     }
 
     /**
