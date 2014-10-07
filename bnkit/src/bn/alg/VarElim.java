@@ -182,7 +182,7 @@ public class VarElim implements Inference {
             }
             if (!added) { // if not added as per sum-out variable 
                 // FT is somehow corrupt, e.g. no variables
-                throw new CGVarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
+                throw new VarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
             }
         }
         // Purge buckets, merge sum-out variables
@@ -205,7 +205,7 @@ public class VarElim implements Inference {
                                 b2.vars.add(sumout);
                             }
                         } catch (IndexOutOfBoundsException e) {
-                            throw new CGVarElimRuntimeException("Bucket elimination failed during purging and merging: Variable is " + sumout.getName());
+                            throw new VarElimRuntimeException("Bucket elimination failed during purging and merging: Variable is " + sumout.getName());
                         }
                     }
                 }
@@ -265,7 +265,7 @@ public class VarElim implements Inference {
                             }
                         }
                     } catch (ClassCastException e) {
-                        throw new CGVarElimRuntimeException("Cannot marginalize or maximize-out continuous variables");
+                        throw new VarElimRuntimeException("Cannot marginalize or maximize-out continuous variables");
                     }
                 } else {    
                     // This is the final (first) bucket so we should not marginalize/maximize out query variables (and non-enumerables), 
@@ -276,7 +276,7 @@ public class VarElim implements Inference {
                 }
             }
         }
-        throw new CGVarElimRuntimeException("Variable elimination failed");
+        throw new VarElimRuntimeException("Variable elimination failed");
     }
     
     @SuppressWarnings("rawtypes")
@@ -409,7 +409,7 @@ public class VarElim implements Inference {
                             }
                         }
                     } catch (ClassCastException e) {
-                        throw new CGVarElimRuntimeException("Cannot marginalize continuous variables");
+                        throw new VarElimRuntimeException("Cannot marginalize continuous variables");
                     }
                 } else {    
                     // This is the final (first) bucket 
@@ -421,7 +421,7 @@ public class VarElim implements Inference {
                 }
             }
         }
-        throw new CGVarElimRuntimeException("Exited variable elimination prematurely");
+        throw new VarElimRuntimeException("Exited variable elimination prematurely");
     }
     
     public class FTCompare implements Comparator<Factor> {
@@ -556,10 +556,10 @@ public class VarElim implements Inference {
         }
     }
     
-    public class CGVarElimRuntimeException extends RuntimeException {
+    public class VarElimRuntimeException extends RuntimeException {
         private static final long serialVersionUID = 1L;
 
-        public CGVarElimRuntimeException(String message) {
+        public VarElimRuntimeException(String message) {
             super(message);
         }
     }
