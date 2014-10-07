@@ -164,6 +164,8 @@ public abstract class AbstractFactor {
         for (int i = 0; i < nNVars; i ++)
             sb.append(nvars[i].getName() + ((i == nNVars - 1)?(""):(",")));
         sb.append(")");
+        if (!hasEnumVars())
+            sb.append("=" + this.getValue());
         return sb.toString();
     }
     

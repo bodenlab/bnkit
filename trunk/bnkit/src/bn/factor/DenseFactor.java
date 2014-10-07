@@ -60,6 +60,7 @@ public class DenseFactor extends AbstractFactor {
     public DenseFactor() {
         super();
         this.map = new double[1];
+        this.map[0] = 1.0;
     }
 
     
@@ -78,8 +79,10 @@ public class DenseFactor extends AbstractFactor {
         // for all factor values
         if (this.nEVars > 0)
             this.map = new double[getSize()];
-        else // sometimes there are no enumerable variables, so need only one entry
+        else { // sometimes there are no enumerable variables, so need only one entry
             this.map = new double[1];
+            this.map[0] = 1.0;
+        }
         // if one or more non-enumerable variables, we allocate a matching map for JDFs
         if (this.nNVars > 0) {
             this.jdf = new JDF[this.map.length];
