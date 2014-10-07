@@ -190,7 +190,10 @@ public class SparseFactor extends AbstractFactor {
             throw new SparseFactorRuntimeException("Tracing is not enabled");
         if (this.getSize() != 1)
             throw new SparseFactorRuntimeException("This table must be accessed with a enumerable variable key");
-        ass.getValue(key_index).addAll(assign);
+        Set<Variable.Assignment> a = ass.getValue(key_index);
+        if (a == null)
+            a = new HashSet<>();
+        a.addAll(assign);
         return key_index;
     }
 
@@ -224,8 +227,11 @@ public class SparseFactor extends AbstractFactor {
             throw new SparseFactorRuntimeException("Invalid key index: outside map");
         if (key_index >= getSize() || key_index < 0 || getSize() == 1)
             throw new SparseFactorRuntimeException("Invalid key index: outside map");
-        ass.getValue(key_index).add(assign);
-        return key_index;
+        Set<Variable.Assignment> a = ass.getValue(key_index);
+        if (a == null)
+            a = new HashSet<>();
+        a.add(assign);
+        return ass.setValue(key_index, a);
     }
 
     @Override
