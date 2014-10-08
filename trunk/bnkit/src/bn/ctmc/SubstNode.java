@@ -19,8 +19,11 @@ import bn.*;
 import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
+import bn.alg.VarElim;
 import bn.ctmc.matrix.JTT;
 import bn.factor.AbstractFactor;
+import bn.factor.DenseFactor;
+import bn.factor.Factorize;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -318,7 +321,103 @@ public class SubstNode implements BNode, TiedNode {
 
     @Override
     public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
-        throw new RuntimeException("Not yet implemented.");
+        EnumVariable myvar = var;
+        EnumVariable mypar = parent; // parent variable, if any
+        // get value of this node, if any assigned
+        Object varinstance = relevant.get(myvar);
+        if (mypar != null) { // there is a parent variable
+            // three possibilities:
+            // 1. neither node variable or parent variable are instantiated, in which case, the parent is either
+            //      a. relevant to the query, or
+            //      b. irrelevant and needs to be marginalised subsequently
+            // 2. node variable is instantiated, not parent, in which case, the parent is either
+            //      a. relevant to the query, or
+            //      b. irrelevant and needs to be marginalised subsequently
+            // 3. parent variable is instantiated, not node variable
+
+            // Check if parent variable is relevant
+            boolean parent_is_relevant = relevant.containsKey(mypar);
+            // get value of the parent node, if any assigned
+            Object parinstance = relevant.get(mypar);
+            
+            // option 1
+            if (varinstance == null && parinstance == null) { 
+                if (parent_is_relevant) {
+                    AbstractFactor ft = new DenseFactor(new Variable[] {mypar, myvar});
+                    EnumVariable[] evars = ft.getEnumVars();
+                    boolean cond_first = mypar.equals(evars[0]); // check if the condition is listed as first variable in factor
+                    // F(X, Y) from P(X | Y)
+                    for (Object X : values) {
+                        for (Object Y : values) {
+                            if (cond_first)
+                                ft.setValue(new Object[] {Y, X}, model.getProb(X, Y, time));
+                            else
+                                ft.setValue(new Object[] {X, Y}, model.getProb(X, Y, time));
+                        }
+                    }
+                    return ft;
+                } else { // parent is NOT relevant
+                    AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
+                    // F(X) from P(X | Y)
+                    for (Object X : values) {
+                        double sum = 0;
+                        for (Object Y : values) {
+                            sum += model.getProb(X, Y, time);
+                        }
+                        ft.setValue(new Object[] {X}, sum);
+                    }
+                    return ft;
+                }
+            } 
+            // option 2
+            else if (varinstance != null && parinstance == null) {
+                if (parent_is_relevant) {
+                    AbstractFactor ft = new DenseFactor(new Variable[] {mypar});
+                    ft.evidenced = true;
+                    // F(Y) from P(X = x| Y)
+                    Object X = varinstance;
+                    for (Object Y : values) {
+                        ft.setValue(new Object[] {Y}, model.getProb(X, Y, time));
+                    }
+                    return ft;
+                } else { // parent is NOT relevant
+                    AbstractFactor ft = new DenseFactor();
+                    ft.evidenced = true;
+                    // F() from P(X = x| Y) and Y is irrelevant to query
+                    Object X = varinstance;
+                    double sum = 0;
+                    for (Object Y : values) {
+                        sum += model.getProb(X, Y, time);
+                    }
+                    ft.setValue(sum);
+                    return ft;
+                }
+            } 
+            // option 3
+            else if (varinstance == null && parinstance != null) {
+                AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
+                ft.evidenced = true;
+                // F(X) from P(X | Y)
+                Object Y = parinstance;
+                for (Object X : values) {
+                    ft.setValue(new Object[] {X}, model.getProb(X, Y, time));
+                }
+                return ft;
+            }
+            throw new RuntimeException("Invalid setting");
+        } else { // no parents, just a prior
+            if (varinstance != null) { // instantiated prior
+                AbstractFactor ft = new DenseFactor();
+                ft.setValue(model.getProb(varinstance));
+                return ft;
+            } else { // not instantiated
+                AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
+                for (Object X : values) {
+                    ft.setValue(new Object[] {X}, model.getProb(X));
+                }
+                return ft;
+            }
+        }
     }
 
     @Override
@@ -410,7 +509,7 @@ public class SubstNode implements BNode, TiedNode {
         sn3x.setInstance('Q');
         sn4x.setInstance('A');
         sn6x.setInstance('R');
-        sn7x.setInstance('K');
+        sn7x.setInstance('Q');
         sn3y.setInstance('L');
         sn4y.setInstance('K');
         sn6y.setInstance('K');
@@ -421,12 +520,13 @@ public class SubstNode implements BNode, TiedNode {
         //sn3.print();
         
         // Use variable elimination to perform inference in the tree
-        CGVarElim ve = new CGVarElim();
+        VarElim ve = new VarElim();
         ve.instantiate(bn);
         
         // construct a query, this one to determine the "most probable explanation" (MPE) to the observations above
         // where each variable is assigned a value
-        Query q = ve.makeMPE(r1, x1, y1); // we only look at three
+//        Query q = ve.makeMPE(r1, x1, y1); // we only look at three
+        Query q = ve.makeMPE(); // we only look at three
         CGTable qr = (CGTable) ve.infer(q);
         Variable.Assignment[] assigned = qr.getMPE();
         for (Variable.Assignment a : assigned) {
