@@ -24,7 +24,7 @@ import bn.EnumTable;
 import bn.EnumVariable;
 import bn.JDF;
 import bn.Variable;
-import bn.alg.CGVarElim.CGVarElimRuntimeException;
+import bn.alg.VarElim.VarElimRuntimeException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -61,7 +61,7 @@ public class EM extends LearningAlg {
      * @param bn
      */
     public EM(BNet bn) {
-        this(bn, new CGVarElim());
+        this(bn, new VarElim());
     }
 
     /**
@@ -71,7 +71,7 @@ public class EM extends LearningAlg {
      * Note that smaller value leads to longer convergence times but closer 
      * to optimal solutions.
      */
-    public double EM_CONVERGENCE_CRITERION = 0.005; // e.g: at LL=-904, improvement needs to be above 0.045 for training to continue
+    public double EM_CONVERGENCE_CRITERION = 0.00005; //
 
 
     /**
@@ -99,7 +99,7 @@ public class EM extends LearningAlg {
     public int EM_OPTION = 1;
 
     public void setConvergeCrit(double value){
-        this.EM_CONVERGENCE_CRITERION = (value > 0.0) ? value : 0.005;
+        this.EM_CONVERGENCE_CRITERION = (value > 0.0) ? value : 0.00005;
     }
 
     /**
@@ -168,42 +168,42 @@ public class EM extends LearningAlg {
 
         // start training (keep going until convergence or stop criterion is met)
         while (round < EM_MAX_ROUNDS && !EM_TERMINATE) {
-        	round++;
+            round++;
 
-        	double log_likelihood = 0;
-        	// the set of nodes to be updated:
-        	Map<BNode, Object[]> updateMap = new HashMap<>();
-        	Map<BNode, Object[]> update = Collections.synchronizedMap(updateMap); //THREAD SAFE MAP
-        	// for each sample with observations...
-        	for (int i = 0; i < values.length; i++) {
-        		// set variables and keys according to observations
-        		for (int j = 0; j < vars.length; j++) {
-        			BNode instantiate_me = bn.getNode(vars[j]);
-        			if (instantiate_me == null) {
-        				throw new EMRuntimeException("Variable \"" + vars[i].getName() + "\" is not part of Bayesian network");
-        			}
-        			if (values[i][j] != null) { // check so that the observation is not null
-        				// the node is instantiated to the value in the data set
-        				instantiate_me.setInstance(values[i][j]);
-        				//Has evidence so needs to be updated
-        				update.put(instantiate_me, null);
-        				List<EnumVariable> parents = instantiate_me.getParents();	// if no, determine which are the parents of the node
-        				if (parents != null) {
-        					for (EnumVariable parent : parents) {		// go through the parents and add them to the update set
-        						update.put(bn.getNode(parent), null);	
-        					}
-        				}
-        				Set<String> children = bn.getChildren(instantiate_me);	// if no, determine which are the parents of the node
-        				if (children != null) {
-        					for (String child : children) {		// go through the children and add them to the update set
-        						BNode c = bn.getNode(child);
-        						update.put(c, null);	
-        					}
-        				}
-        			} else { // the observation is null
-        				// the node is reset, i.e. un-instantiated 
-        				instantiate_me.resetInstance();
-        			}
+            double log_likelihood = 0;
+            // the set of nodes to be updated:
+            Map<BNode, Object[]> updateMap = new HashMap<>();
+            Map<BNode, Object[]> update = Collections.synchronizedMap(updateMap); //THREAD SAFE MAP
+            // for each sample with observations...
+            for (int i = 0; i < values.length; i++) {
+                // set variables and keys according to observations
+                for (int j = 0; j < vars.length; j++) {
+                    BNode instantiate_me = bn.getNode(vars[j]);
+                    if (instantiate_me == null) {
+                        throw new EMRuntimeException("Variable \"" + vars[i].getName() + "\" is not part of Bayesian network");
+                    }
+                    if (values[i][j] != null) { // check so that the observation is not null
+                        // the node is instantiated to the value in the data set
+                        instantiate_me.setInstance(values[i][j]);
+                        //Has evidence so needs to be updated
+                        update.put(instantiate_me, null);
+                        List<EnumVariable> parents = instantiate_me.getParents();	// if no, determine which are the parents of the node
+                        if (parents != null) {
+                            for (EnumVariable parent : parents) {		// go through the parents and add them to the update set
+                                update.put(bn.getNode(parent), null);
+                            }
+                        }
+                        Set<String> children = bn.getChildren(instantiate_me);	// if no, determine which are the parents of the node
+                        if (children != null) {
+                            for (String child : children) {		// go through the children and add them to the update set
+                                BNode c = bn.getNode(child);
+                                update.put(c, null);
+                            }
+                        }
+                    } else { // the observation is null
+                        // the node is reset, i.e. un-instantiated 
+                        instantiate_me.resetInstance();
+                    }
                 }
 
                 /*
@@ -228,7 +228,7 @@ public class EM extends LearningAlg {
                 switch (EM_OPTION) {
                 case 1: 
 
-                    // Principal way 1: go through each of the BN nodes... pose of query for, and update each...
+                    // Principal way 1: go through each of the BN nodes... pose a query for, and update each...
 
                     for (BNode node : update.keySet()) {
 
@@ -314,7 +314,7 @@ public class EM extends LearningAlg {
                                             }
                                         }
                                     }
-                                } catch (CGVarElimRuntimeException e) {
+                                } catch (RuntimeException e) {
                                     throw new EMRuntimeException("Failed query for sample #" + (i + 1) + " and node " + node.getName() + ": " + e.getMessage());
                                 }
                             } else { // all variables are instantiated, no need to do inference
@@ -420,7 +420,7 @@ public class EM extends LearningAlg {
                                         }
                                     }
                                 }
-                            } catch (CGVarElimRuntimeException e) {
+                            } catch (RuntimeException e) {
                                 throw new EMRuntimeException("Failed query for sample #" + (i + 1) + ": " + e.getMessage());
                             }
                         } else { // nothing needs to be inferred
@@ -479,7 +479,7 @@ public class EM extends LearningAlg {
                             instantiate_me.resetInstance();
                         }
                     }
-                    log_likelihood += Math.log(((CGVarElim) inf).likelihood());
+                    log_likelihood += Math.log(((VarElim) inf).likelihood());
                     if (Double.isInfinite(log_likelihood)) {
                         System.err.println("Log-likelihood is infinite: " + log_likelihood);
                     }
@@ -488,6 +488,7 @@ public class EM extends LearningAlg {
 
             if (round % 10 == 0) { // & round %50 == 0
                 // summarise progress
+                double sd_LL = 0;
                 // copy previous LL (log-likelihood of data)
                 if (round <= 50) {
                     for (int i = 0; i < last_LL.length - 1; i++) {
@@ -505,7 +506,7 @@ public class EM extends LearningAlg {
                     for (int j = 0; j < last_LL.length; j++) {
                     	sdl_LL[j] = (last_LL[j] - mean_LL)*(last_LL[j] - mean_LL);
                     }
-                    double sd_LL = sdl_LL[0] / sdl_LL.length;
+                    sd_LL = sdl_LL[0] / sdl_LL.length;
                     for (int i = 0; i < last_LL.length - 1; i++) {
                         sdl_LL[i] = sdl_LL[i + 1];
                         sd_LL += (sdl_LL[i] / sdl_LL.length);
@@ -518,8 +519,10 @@ public class EM extends LearningAlg {
                     }
                 }
 
-                if (EM_PRINT_STATUS) {
-                    System.err.println("Completed " + round + " round(s), L=" + log_likelihood);
+                if (EM_PRINT_STATUS || EM_TERMINATE) {
+                    System.err.println("Completed " + round + " round(s), L = " + log_likelihood);
+                    if (EM_TERMINATE)
+                        System.err.println("SD(L) = " + sd_LL);
                 }
             }
         }
@@ -657,7 +660,7 @@ public class EM extends LearningAlg {
                                 }
                             }
                         }
-                    } catch (CGVarElimRuntimeException e) {
+                    } catch (RuntimeException e) {
                         throw new EMRuntimeException("Failed query for sample #" + (i + 1) + " and node " + node.getName() + ": " + e.getMessage());
                     }
                 } else { // all variables are instantiated, no need to do inference

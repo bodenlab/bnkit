@@ -18,6 +18,8 @@
 package bn;
 
 import bn.factor.AbstractFactor;
+import bn.factor.DenseFactor;
+import bn.factor.Factorize;
 import java.io.Serializable;
 import java.util.*;
 
@@ -170,10 +172,94 @@ public class DirDT implements BNode, TiedNode, Serializable {
             throw new RuntimeException("DirDT can not be factorised unless it has enumerable parent variables");
         }
     }
-    
+    /**
+     * Make factor out of this DirDT.
+     * This method will deconstruct the condition, accounting for which variables that are relevant 
+     * (as nominated by the caller of this function, e.g. inference algorithm) and those that are
+     * instantiated. Instantiated and irrelevant variables are removed before the factor is returned.
+     * @param relevant a map containing all relevant variables as keys, and values which are non-null if the variable
+     * is instantiated
+     * @return the factor
+     */
     @Override
     public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
-        throw new RuntimeException("Not yet implemented.");
+        List<EnumVariable> parents = this.getParents();
+        Variable myvar = this.getVariable();
+        // get value of this node if any assigned
+        Object varinstance = relevant.get(myvar); 
+        if (parents != null) { // there are parent variables
+            Object[] searchcpt = new Object[parents.size()];
+            List<Variable> fvars = new ArrayList<>(parents.size() + 1); // factor variables
+            List<EnumVariable> sumout = new ArrayList<>();  // irrelevant variables to be summed out later
+            for (int i = 0; i < parents.size(); i++) {
+                EnumVariable parent = parents.get(i);
+                // If parent is evidenced it will not be included in factor table; 
+                // Record irrelevant parents to sum out: removed later through marginalization
+                if (!relevant.containsKey(parent)) 
+                    sumout.add(parent);
+                else
+                    searchcpt[i] = relevant.get(parent);
+                if (searchcpt[i] == null) // new factor will include this variable
+                    fvars.add(parent);
+            }
+            if (varinstance == null) {
+                fvars.add(myvar); // add to factor, but note this is a non-enumerable variable so handled differently inside
+            }
+            Variable[] vars_arr = new Variable[fvars.size()];
+            fvars.toArray(vars_arr);
+            AbstractFactor ft = new DenseFactor(vars_arr);
+            EnumVariable[] evars = ft.getEnumVars(); // the order may have changed; excludes non-enums
+            int[] xcross = new int[parents.size()];
+            int[] ycross = new int[evars.length];
+            table.crossReference(xcross, evars, ycross);
+            // set factor to be "evidenced" is there was an evidence used
+            if (varinstance != null) {
+                ft.evidenced = true;
+            } else {
+                for (Object instcpt : searchcpt) {
+                    if (instcpt != null) {
+                        ft.evidenced = true;
+                        break;
+                    }
+                }
+            }
+            int[] indices = table.getIndices(searchcpt);
+            Object[] fkey = new Object[evars.length];
+            for (int index : indices) {
+                DirichletDistrib d = table.getValue(index);
+                if (d != null) { // there is a distribution associated with this entry in the CPT
+                    Object[] cptkey = table.getKey(index); // work out the condition for this entry
+                    for (int i = 0; i < cptkey.length; i++) {
+                        if (xcross[i] != -1)
+                            fkey[xcross[i]] = cptkey[i];
+                    }
+                    if (varinstance != null) { // the variable for this DirDT is instantiated
+                        if (fkey.length == 0) // and the parents are too
+                            ft.setValue(d.get(varinstance));
+                        else
+                            ft.setValue(fkey, d.get(varinstance));
+                    } else { // the variable for this DirDT is NOT instantiated so we put it in the JDF
+                        if (fkey.length == 0) { // but the parents are instantiated
+                            ft.setValue(1.0); 
+                            ft.setDistrib(myvar, d);
+                        } else {
+                            ft.setValue(fkey, 1.0);
+                            ft.setDistrib(fkey, myvar, d);
+                        }
+                    }
+                } 
+            }
+            if (!sumout.isEmpty()) {
+                Variable[] sumout_arr = new Variable[sumout.size()];
+                sumout.toArray(sumout_arr);
+            	ft = Factorize.getMargin(ft, sumout_arr);
+            }
+            return ft;
+        } else { // no parents, just a prior
+            if (varinstance != null) // instantiated prior is not possible to factorise
+                return null;
+            throw new RuntimeException("DirDTs can not be factorised unless it has enumerable parent variables");
+        }
     }
 
     /**
