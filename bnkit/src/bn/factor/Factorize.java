@@ -944,7 +944,7 @@ public class Factorize {
             getCrossref(Y.evars, ycross2x, X.evars, null);
             Object[] xkey_search = new Object[X.nEVars];
             for (int y = 0; y < Y.getSize(); y++) {
-                // FIXME: loop's not efficient for sparse factors
+                // FIXME: loop's not efficient for sparse factors, start with X, be selective about Y?
                 Object[] ykey = Y.getKey(y);
                 for (int i = 0; i < ykey.length; i++) {
                     xkey_search[ycross2x[i]] = ykey[i];
@@ -1051,6 +1051,7 @@ public class Factorize {
             getCrossref(Y.evars, ycross2x, X.evars, xcross2y);
             Object[] xkey_search = new Object[X.nEVars];
             for (int y = 0; y < Y.getSize(); y++) {
+                // FIXME: loop's not efficient for sparse factors
                 Object[] ykey = Y.getKey(y);
                 for (int i = 0; i < ykey.length; i++) {
                     xkey_search[ycross2x[i]] = ykey[i];

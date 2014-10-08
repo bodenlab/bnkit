@@ -47,7 +47,7 @@ public class DirDTExample {
         BNet bn = new BNet();
         bn.add(g,c,s);
         c.setInstance(new EnumDistrib(colours, new double[] {0.3, 0.3, 0.4})); // primarily blue, so probably male...
-        CGVarElim inf = new CGVarElim();
+        VarElim inf = new VarElim();
         inf.instantiate(bn);
         Query q = inf.makeQuery(G,S);
         CGTable r = (CGTable) inf.infer(q);
