@@ -17,7 +17,6 @@
  */
 package dat;
 
-import bn.Predef;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -296,7 +295,7 @@ public class EnumTable<E> {
                 break;
             }
         }
-        List<E> values = new ArrayList<E>();
+        List<E> values = new ArrayList<>();
         if (allWildcards) {
             values.addAll(map.values());
         } else {
@@ -354,7 +353,7 @@ public class EnumTable<E> {
 //            return ret;
             return getIndices();
         }
-        List<Integer> indices = new ArrayList<Integer>();
+        List<Integer> indices = new ArrayList<>();
         for (Map.Entry<Integer, E> entry : map.entrySet()) {
             if (isMatch(key, entry.getKey())) {
                 indices.add(entry.getKey());
@@ -428,7 +427,7 @@ public class EnumTable<E> {
         int[] arr = new int[all.size()];
         int i = 0;
         for (Integer y : all) 
-            arr[i ++] = y.intValue();
+            arr[i ++] = y;
         return arr;
     }
     
@@ -566,8 +565,8 @@ public class EnumTable<E> {
             System.out.print(String.format("%3d ", i));
             Object[] key = this.getKey(i);
             Object val = this.getValue(i);
-            for (int j = 0; j < key.length; j++) {
-                System.out.print(String.format(" %-10s ", key[j].toString()));
+            for (Object key1 : key) {
+                System.out.print(String.format(" %-10s ", key1.toString()));
             }
             if (val != null) {
                 System.out.println(String.format(" %5s", this.getValue(i).toString()));
@@ -580,6 +579,7 @@ public class EnumTable<E> {
 
     /**
      * Get a key from a partial assignment of variables defined for the table.
+     * @param <T>
      * @param vars variables in order
      * @param evid the evidence
      * @return the key that encodes the values for the provided variables
@@ -594,15 +594,15 @@ public class EnumTable<E> {
                     if (var_index >= 0)
                         key[var_index] = e.val;
                 } catch (ClassCastException exception) {
-                    ; // ignore non-enumerable variables
+                    // ignore non-enumerable variables
                 }
             }
         } else { // evidence is longer than key, so let's iterate over key
             for (int i = 0; i < key.length; i ++) {
                 Variable var = vars.get(i);
-                for (int j = 0; j < evid.length; j ++) {
-                    if (evid[j].var.equals(var)) {
-                        key[i] = evid[j].val;
+                for (Variable.Assignment evid1 : evid) {
+                    if (evid1.var.equals(var)) {
+                        key[i] = evid1.val;
                         break;
                     }
                 }
@@ -627,29 +627,6 @@ public class EnumTable<E> {
         return target;
     }
     
-    public static void main(String[] args) {
-        EnumTable<Character> t = new EnumTable<>(Predef.Boolean(),Predef.Nominal("S1","S2","S3"),Predef.Number(4));
-        t.display();
-        int[] idx = t.getTheoreticalIndices(new Object[] {true,"S2",2});
-        if (idx != null) {
-            for (int i = 0; i <idx.length; i++)
-                System.out.println(idx[i]);
-        }
-        t = new EnumTable<>(Predef.Boolean(),Predef.Nominal("S1","S2","S3"),Predef.Number(4));
-        t.display();
-        idx = t.getTheoreticalIndices(new Object[] {null,"S2",null});
-        if (idx != null) {
-            for (int i = 0; i <idx.length; i++)
-                System.out.println(idx[i]);
-        }
-        t = new EnumTable<>(Predef.Boolean(),Predef.Nominal("S1","S2","S3"),Predef.Boolean(),Predef.Number(4),Predef.Nominal("A","B"));
-        t.display();
-        idx = t.getTheoreticalIndices(new Object[] {false,null,null,3,"B"});
-        if (idx != null) {
-            for (int i = 0; i <idx.length; i++)
-                System.out.println(idx[i]);
-        }
-    }
 }
 
 class EnumTableRuntimeException extends RuntimeException {
