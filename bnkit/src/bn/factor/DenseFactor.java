@@ -18,11 +18,11 @@
 package bn.factor;
 
 import bn.Distrib;
-import bn.EnumVariable;
-import bn.GaussianDistrib;
+import dat.EnumVariable;
+import bn.prob.GaussianDistrib;
 import bn.JDF;
 import bn.Predef;
-import bn.Variable;
+import dat.Variable;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;

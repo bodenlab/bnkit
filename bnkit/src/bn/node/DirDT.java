@@ -15,8 +15,20 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package bn;
+package bn.node;
 
+import bn.BNode;
+import bn.Distrib;
+import bn.EnumDistrib;
+import bn.Factor;
+import bn.Sample;
+import bn.SampleTable;
+import bn.TiedNode;
+import dat.EnumVariable;
+import dat.Variable;
+import dat.EnumTable;
+import dat.Enumerable;
+import bn.prob.DirichletDistrib;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
@@ -87,7 +99,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
             return this.getDistrib();
         try {
             return this.table.getValue(key);
-        } catch (EnumTableRuntimeException e) {
+        } catch (RuntimeException e) {
             throw new RuntimeException("Evaluation of DirDT " + this.toString() + " failed since condition was not fully specified: " + e.getMessage());
         }
     }
@@ -486,7 +498,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
      */
     @Override
     public void maximizeInstance() {
-        if (count.table.map.isEmpty()) {
+        if (count.isEmpty()) {
             return;
         }
         Enumerable e = this.var.getDomain().getDomain();
@@ -510,7 +522,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
             }
         }
         
-        count.table.setEmpty();
+        count.setEmpty();
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 

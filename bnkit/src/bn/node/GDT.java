@@ -15,8 +15,19 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package bn;
+package bn.node;
 
+import bn.BNode;
+import bn.Distrib;
+import bn.Factor;
+import bn.Predef;
+import bn.Sample;
+import bn.SampleTable;
+import dat.Continuous;
+import dat.EnumVariable;
+import dat.Variable;
+import dat.EnumTable;
+import bn.prob.GaussianDistrib;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
@@ -117,7 +128,7 @@ public class GDT implements BNode, Serializable {
             return this.getDistrib();
         try {
             return this.table.getValue(key);
-        } catch (EnumTableRuntimeException e) {
+        } catch (RuntimeException e) {
             throw new RuntimeException("Evaluation of GDT " + this.toString() + " failed since condition was not fully specified: " + e.getMessage());
         }
     }
@@ -615,7 +626,7 @@ public class GDT implements BNode, Serializable {
         int number = 0;
         if (countDistrib == null)
             return 0;
-        for (List<Sample<Distrib>> samplesDistrib : countDistrib.table.getValues()) {
+        for (List<Sample<Distrib>> samplesDistrib : countDistrib.getTable().getValues()) {
             number += samplesDistrib.size();
         }
         return number;
@@ -625,7 +636,7 @@ public class GDT implements BNode, Serializable {
         int number = 0;
         if (countDouble == null)
             return 0;
-        for (List<Sample<Double>> samplesDouble : countDouble.table.getValues()) {
+        for (List<Sample<Double>> samplesDouble : countDouble.getTable().getValues()) {
             number += samplesDouble.size();
         }
         return number;
@@ -787,7 +798,7 @@ public class GDT implements BNode, Serializable {
             }
         } else {
             for (int i = 0; i < table.getSize(); i++) {
-                GaussianDistrib d = table.map.get(new Integer(i));
+                GaussianDistrib d = table.getValue(i);
                 if (d != null) {
                     sbuf.append(i).append(": ");	// use index as key because values above can be of different non-printable types
                     sbuf.append("").append(d.getMean()).append(", ").append(d.getVariance()).append("; (");
@@ -860,12 +871,13 @@ public class GDT implements BNode, Serializable {
     }
 
     public boolean isRelevant() {
-		return relevant;
-	}
+        return relevant;
+    }
 
-	public void setRelevant(boolean relevant) {
-		this.relevant = relevant;
-	}
+    public void setRelevant(boolean relevant) {
+        this.relevant = relevant;
+    }
+    
     /**
      * @param args
      */

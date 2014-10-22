@@ -17,6 +17,12 @@
  */
 
 package bn.example;
+import bn.node.CPT;
+import bn.node.DirDT;
+import dat.EnumVariable;
+import dat.Variable;
+import dat.Enumerable;
+import bn.prob.DirichletDistrib;
 import bn. *;
 import bn.alg.*;
 

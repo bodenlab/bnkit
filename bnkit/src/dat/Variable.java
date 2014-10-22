@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package bn;
+package dat;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,7 +50,7 @@ public class Variable<E extends Domain> implements Comparable {
      * @param domain the domain of the variable
      * @param name the name of the variable
      */
-    protected Variable(E domain, String name) {
+    public Variable(E domain, String name) {
         this.domain = domain;
         Variable.pool.put(this, Variable.pool.size());
         this.canonicalIndex = Variable.pool.get(this);
@@ -61,7 +61,7 @@ public class Variable<E extends Domain> implements Comparable {
      * Constructor intended for subclasses.
      * @param domain the domain of the variable
      */
-    protected Variable(E domain) {
+    public Variable(E domain) {
         this.domain = domain;
         Variable.pool.put(this, Variable.pool.size());
         this.canonicalIndex = Variable.pool.get(this);

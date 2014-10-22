@@ -4,12 +4,12 @@
 package bn.example;
 
 import bn.BNet;
-import bn.CPT;
+import bn.node.CPT;
 import bn.EnumDistrib;
-import bn.EnumVariable;
-import bn.Enumerable;
+import dat.EnumVariable;
+import dat.Enumerable;
 import bn.Predef;
-import bn.Variable.Assignment;
+import dat.Variable.Assignment;
 import bn.alg.ApproxInference;
 import bn.alg.CGTable;
 import bn.alg.Query;

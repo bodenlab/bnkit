@@ -17,6 +17,8 @@
  */
 package bn;
 
+import dat.EnumVariable;
+import dat.EnumTable;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;

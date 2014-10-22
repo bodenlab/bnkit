@@ -18,17 +18,17 @@
 package bn.example;
 
 import bn.BNet;
-import bn.CPT;
+import bn.node.CPT;
 import bn.Distrib;
 import bn.EnumDistrib;
-import bn.EnumVariable;
-import bn.Enumerable;
-import bn.GDT;
-import bn.GaussianDistrib;
+import dat.EnumVariable;
+import dat.Enumerable;
+import bn.node.GDT;
+import bn.prob.GaussianDistrib;
 import bn.JPT;
 import bn.Predef;
-import bn.Variable;
-import bn.Variable.Assignment;
+import dat.Variable;
+import dat.Variable.Assignment;
 import bn.alg.ApproxInference;
 import bn.alg.CGTable;
 import bn.alg.CGVarElim;

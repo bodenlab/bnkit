@@ -1,5 +1,6 @@
-package bn;
+package bn.prob;
 
+import bn.Distrib;
 import java.io.Serializable;
 import java.util.Random;
 

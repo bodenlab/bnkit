@@ -17,6 +17,9 @@
  */
 package bn;
 
+import dat.EnumVariable;
+import dat.Variable;
+import dat.EnumTable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -487,7 +490,7 @@ public class Factor {
     	if (factorTable == null){
             return Collections.EMPTY_SET;
     	} else {
-            return factorTable.map.entrySet();
+            return factorTable.getMapEntries();
     	}
     }
     
@@ -535,7 +538,7 @@ public class Factor {
      **/
     public Collection<Double> getFactors() {
         if (factorTable != null) {
-            return factorTable.map.values();
+            return factorTable.getValues();
         } else {
             return Collections.singletonList(atomicFactor);
         }
@@ -613,11 +616,11 @@ public class Factor {
     synchronized public int addFactor(int index, double value) {
         normalized = false;
         if (factorTable != null) {
-            Double prev = factorTable.map.get(index);
+            Double prev = factorTable.getValue(index);
             if (prev == null) {
-                factorTable.map.put(index, value);
+                factorTable.setValue(index, value);
             } else {
-                factorTable.map.put(index, prev + value);
+                factorTable.setValue(index, prev + value);
             }
             return index;
         } else if (atomicFactor != null) {
@@ -667,10 +670,10 @@ public class Factor {
             return;
         if (factorTable != null) {
             double sum = 0.0;
-            for (Map.Entry<Integer, Double> entry : factorTable.map.entrySet()) {
+            for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) {
                 sum += entry.getValue();
             }
-            for (Map.Entry<Integer, Double> entry : factorTable.map.entrySet()) {
+            for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) {
                 factorTable.setValue(entry.getKey(), entry.getValue() / sum);
             }
         }
@@ -684,7 +687,7 @@ public class Factor {
     public double getSum() {
         if (factorTable != null) {
             double sum = 0.0;
-            for (Map.Entry<Integer, Double> entry : factorTable.map.entrySet()) 
+            for (Map.Entry<Integer, Double> entry : factorTable.getMapEntries()) 
                 sum += entry.getValue().doubleValue();
             return sum;
         } else {
@@ -773,8 +776,8 @@ public class Factor {
             int nVars = factorTable.nParents;
             List<Variable> newvars = new ArrayList<>(nVars - varsToSumOut.size());
             for (int i = 0; i < nVars; i++) {
-                if (!varsToSumOut.contains(factorTable.parents.get(i))) {
-                    newvars.add(factorTable.parents.get(i));
+                if (!varsToSumOut.contains(factorTable.getParents().get(i))) {
+                    newvars.add(factorTable.getParents().get(i));
                 }
             }
             double sum = 0; // sum for normalising weight of distributions for non-enumerables
@@ -785,8 +788,8 @@ public class Factor {
             }
             ft = new Factor(newvars);
             for (Map.Entry<Integer, Double> entry : this.getMapEntries()) {
-                int oldindex = entry.getKey().intValue();
-                double weight = entry.getValue().doubleValue(); // NOT normalized
+                int oldindex = entry.getKey();
+                double weight = entry.getValue(); // NOT normalized
                 int newindex = factorTable.maskIndex(oldindex, varsToSumOut);
                 ft.addFactor(newindex, weight);
                 for (Variable nonenum : this.getNonEnumVariables()) {
@@ -842,8 +845,8 @@ public class Factor {
             int nVars = factorTable.nParents;
             List<Variable> newvars = new ArrayList<>(nVars - varsToMaxOut.size());
             for (int i = 0; i < nVars; i++) {
-                if (!varsToMaxOut.contains(factorTable.parents.get(i))) {
-                    newvars.add(factorTable.parents.get(i));
+                if (!varsToMaxOut.contains(factorTable.getParents().get(i))) {
+                    newvars.add(factorTable.getParents().get(i));
                 }
             }
             double sum = 0; // sum for normalising weight of distributions for non-enumerables
@@ -977,7 +980,7 @@ public class Factor {
         for (int i = 0; i < ft2.factorTable.nParents; i++) {
             boolean match = false;
             for (int j = 0; j < ft1.factorTable.nParents; j++) {
-                if (ft1.factorTable.parents.get(j) == ft2.factorTable.parents.get(i)) {
+                if (ft1.factorTable.getParents().get(j) == ft2.factorTable.getParents().get(i)) {
                     overlap.put(j, i); // link index in ft1 to index in ft2, resulting index in ft3 is the same as in ft1
                     match = true;
                     break;
@@ -985,7 +988,7 @@ public class Factor {
             }
             if (!match) {
                 // ft2.parent[i] did not match any var in ft1
-                unique_ft2.add(ft2.factorTable.parents.get(i));
+                unique_ft2.add(ft2.factorTable.getParents().get(i));
                 unique_ft2_idx.add(i);
             }
         }
@@ -1098,10 +1101,6 @@ public class Factor {
         EnumVariable v2 = Predef.Number(4);
         EnumVariable v3 = Predef.Nominal(new String[]{"Yes", "No", "Maybe"});
 
-        System.out.println(EnumVariable.pool.get(v1));
-        System.out.println(EnumVariable.pool.get(v2));
-        System.out.println(EnumVariable.pool.get(v3));
-
         Factor ft3 = new Factor(new EnumVariable[]{v1, v2, v3});
         ft3.setFactor(new Object[]{true, 1, "No"}, 0.05);
         ft3.setFactor(new Object[]{true, 0, "No"}, 0.02);
@@ -1122,7 +1121,7 @@ public class Factor {
     @Override
     public String toString() {
         StringBuilder sbuf = new StringBuilder("F(");
-        for (Variable v : factorTable.parents) {
+        for (Variable v : factorTable.getParents()) {
             sbuf.append(v.toString()).append(";");
         }
         sbuf.append(";");
@@ -1141,7 +1140,7 @@ public class Factor {
     public void display() {
         System.out.print("Idx ");
         for (int j = 0; j < factorTable.nParents; j++)
-            System.out.print(String.format("[%10s]", constantLength(factorTable.parents.get(j).toString(), 10)));
+            System.out.print(String.format("[%10s]", constantLength(factorTable.getParents().get(j).toString(), 10)));
         List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
         for (Variable nonenum : nonenums) 
             System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));
@@ -1167,7 +1166,7 @@ public class Factor {
     public void displaySampled() {
         System.out.print("Idx ");
         for (int j = 0; j < factorTable.nParents; j++)
-            System.out.print(String.format("[%10s]", constantLength(factorTable.parents.get(j).toString(), 10)));
+            System.out.print(String.format("[%10s]", constantLength(factorTable.getParents().get(j).toString(), 10)));
         List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
         for (Variable nonenum : nonenums) 
             System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));

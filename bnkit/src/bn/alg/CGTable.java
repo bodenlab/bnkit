@@ -20,13 +20,13 @@ package bn.alg;
 
 import bn.Distrib;
 import bn.EnumDistrib;
-import bn.EnumTable;
-import bn.EnumVariable;
+import dat.EnumTable;
+import dat.EnumVariable;
 import bn.Factor;
 import bn.JDF;
 import bn.JPT;
-import bn.MixtureDistrib;
-import bn.Variable;
+import bn.prob.MixtureDistrib;
+import dat.Variable;
 import bn.factor.AbstractFactor;
 import bn.factor.Factorize;
 import java.util.ArrayList;

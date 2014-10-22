@@ -17,6 +17,9 @@
  */
 package bn.ctmc;
 
+import dat.EnumVariable;
+import dat.Variable;
+import dat.EnumTable;
 import bn.*;
 import bn.alg.CGTable;
 import bn.alg.Query;

@@ -8,7 +8,7 @@ package gui;
 
 import bn.BNode;
 import bn.Predef;
-import bn.Variable;
+import dat.Variable;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.layout.mxCompactTreeLayout;
 import com.mxgraph.layout.mxGraphLayout;

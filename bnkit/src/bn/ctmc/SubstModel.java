@@ -19,9 +19,9 @@
 package bn.ctmc;
 
 import bn.EnumDistrib;
-import bn.EnumTable;
-import bn.EnumVariable;
-import bn.Enumerable;
+import dat.EnumTable;
+import dat.EnumVariable;
+import dat.Enumerable;
 import bn.ctmc.matrix.*;
 import bn.math.Matrix.Exp;
 

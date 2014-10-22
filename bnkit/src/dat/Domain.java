@@ -15,25 +15,20 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-package bn;
+package dat;
 
 /**
- * Continuous domain definition. 
- * For checking validity of values for variables that belong to this domain.
+ * Interface for classes that implement type checking of variables
  * @author mikael
  */
-public class ContVector implements Domain {
+public interface Domain {
 
-    public boolean isValid(Object value) {
-        try {
-            Iterable iter = (Iterable)value;
-            for (Object elem : iter) {
-                Double x = (Double) value;
-            }
-            return true;
-        } catch (ClassCastException e) {
-            return false;
-        }
-    }
+    /**
+     * Check if the specified value is valid for the domain
+     *
+     * @param value
+     * @return true if valid, false otherwise
+     */
+    public boolean isValid(Object value);
+
 }

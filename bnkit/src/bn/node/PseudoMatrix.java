@@ -1,4 +1,4 @@
-package bn;
+package bn.node;
 
 import java.io.*;
 import java.util.ArrayList;

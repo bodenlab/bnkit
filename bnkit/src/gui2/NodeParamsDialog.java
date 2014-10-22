@@ -6,9 +6,9 @@
 package gui2;
 
 import bn.EnumDistrib;
-import bn.EnumTable;
-import bn.EnumVariable;
-import bn.Enumerable;
+import dat.EnumTable;
+import dat.EnumVariable;
+import dat.Enumerable;
 import java.util.List;
 import javax.swing.table.AbstractTableModel;
 

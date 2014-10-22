@@ -18,12 +18,12 @@
 package bn.factor;
 
 import bn.Distrib;
-import bn.EnumTable;
-import bn.EnumVariable;
-import bn.GaussianDistrib;
+import dat.EnumTable;
+import dat.EnumVariable;
+import bn.prob.GaussianDistrib;
 import bn.JDF;
 import bn.Predef;
-import bn.Variable;
+import dat.Variable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;

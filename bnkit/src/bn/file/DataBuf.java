@@ -17,6 +17,7 @@
  */
 package bn.file;
 
+import dat.Variable;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;

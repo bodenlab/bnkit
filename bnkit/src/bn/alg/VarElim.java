@@ -19,10 +19,10 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
-import bn.EnumVariable;
+import dat.EnumVariable;
 import bn.Factor;
 import bn.JPT;
-import bn.Variable;
+import dat.Variable;
 import bn.factor.AbstractFactor;
 import bn.factor.Factorize;
 import bn.factor.Factorize.FactorProductTree;

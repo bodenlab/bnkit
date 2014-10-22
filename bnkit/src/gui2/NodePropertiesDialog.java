@@ -6,9 +6,9 @@
 package gui2;
 
 import bn.BNet;
-import bn.Enumerable;
+import dat.Enumerable;
 import bn.Predef;
-import bn.Variable;
+import dat.Variable;
 import com.mxgraph.model.mxCell;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;

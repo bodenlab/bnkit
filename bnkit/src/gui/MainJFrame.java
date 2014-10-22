@@ -7,9 +7,9 @@
 package gui;
 
 import bn.BNode;
-import bn.EnumVariable;
+import dat.EnumVariable;
 import bn.Predef;
-import bn.Variable;
+import dat.Variable;
 import com.mxgraph.view.mxGraph;
 import java.awt.Dimension;
 import java.io.File;

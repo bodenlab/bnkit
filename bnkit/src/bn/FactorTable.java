@@ -17,6 +17,10 @@
  */
 package bn;
 
+import dat.EnumVariable;
+import dat.Variable;
+import dat.EnumTable;
+import bn.prob.MixtureDistrib;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -341,7 +345,7 @@ public class FactorTable {
     	if (enumTable == null){
     		return Collections.EMPTY_SET;
     	} else {
-    		return enumTable.map.entrySet();
+    		return enumTable.getMapEntries();
     	}
     }
     
@@ -355,7 +359,7 @@ public class FactorTable {
     
     public Collection<Double> getValues() {
         if (enumTable != null) {
-            return enumTable.map.values();
+            return enumTable.getValues();
         } else {
             ArrayList<Double> v = new ArrayList<>();
             v.add(atomic);
@@ -414,11 +418,11 @@ public class FactorTable {
     public int addValue(int index, double value) {
         normalized = false;
         if (enumTable != null) {
-            Double prev = enumTable.map.get(index);
+            Double prev = enumTable.getValue(index);
             if (prev == null) {
-                enumTable.map.put(index, value);
+                enumTable.setValue(index, value);
             } else {
-                enumTable.map.put(index, prev + value);
+                enumTable.setValue(index, prev + value);
             }
             return index;
         } else {
@@ -450,10 +454,10 @@ public class FactorTable {
             return;
         if (enumTable != null) {
             double sum = 0.0;
-            for (Map.Entry<Integer, Double> entry : enumTable.map.entrySet()) {
+            for (Map.Entry<Integer, Double> entry : enumTable.getMapEntries()) {
                 sum += entry.getValue();
             }
-            for (Map.Entry<Integer, Double> entry : enumTable.map.entrySet()) {
+            for (Map.Entry<Integer, Double> entry : enumTable.getMapEntries()) {
                 enumTable.setValue(entry.getKey(), entry.getValue() / sum);
             }
         }
@@ -463,11 +467,11 @@ public class FactorTable {
     public double getSum() {
         if (enumTable != null) {
             double sum = 0.0;
-            for (Map.Entry<Integer, Double> entry : enumTable.map.entrySet()) 
-                sum += entry.getValue().doubleValue();
+            for (Map.Entry<Integer, Double> entry : enumTable.getMapEntries()) 
+                sum += entry.getValue();
             return sum;
         } else {
-            return atomic.doubleValue();
+            return atomic;
         }
     }
     
@@ -489,8 +493,8 @@ public class FactorTable {
             int nParents = enumTable.nParents;
             Collection<EnumVariable> newparents = new ArrayList<>(nParents - parentsToSumOut.size());
             for (int i = 0; i < nParents; i++) {
-                if (!parentsToSumOut.contains(enumTable.parents.get(i))) {
-                    newparents.add(enumTable.parents.get(i));
+                if (!parentsToSumOut.contains(enumTable.getParents().get(i))) {
+                    newparents.add(enumTable.getParents().get(i));
                 }
             }
             double sum = getSum();
@@ -499,9 +503,9 @@ public class FactorTable {
                 ft = new FactorTable(newparents);
             else
                 ft = new FactorTable(newparents, this.getNonEnumVariables());
-            for (Map.Entry<Integer, Double> entry : enumTable.map.entrySet()) {
-                int oldindex = entry.getKey().intValue();
-                double weight = entry.getValue().doubleValue(); // NOT normalized
+            for (Map.Entry<Integer, Double> entry : enumTable.getMapEntries()) {
+                int oldindex = entry.getKey();
+                double weight = entry.getValue(); // NOT normalized
                 int newindex = enumTable.maskIndex(oldindex, parentsToSumOut);
                 ft.addValue(newindex, weight);
                 for (Variable nonenum : this.getNonEnumVariables())
@@ -616,7 +620,7 @@ public class FactorTable {
         for (int i = 0; i < ft2.enumTable.nParents; i++) {
             boolean match = false;
             for (int j = 0; j < ft1.enumTable.nParents; j++) {
-                if (ft1.enumTable.parents.get(j) == ft2.enumTable.parents.get(i)) {
+                if (ft1.enumTable.getParents().get(j) == ft2.enumTable.getParents().get(i)) {
                     overlap.put(j, i); // link index in ft1 to index in ft2, resulting index in ft3 is the same as in ft1
                     match = true;
                     break;
@@ -624,13 +628,13 @@ public class FactorTable {
             }
             if (!match) {
                 // ft2.parent[i] did not match any var in ft1
-                unique_ft2.add(ft2.enumTable.parents.get(i));
+                unique_ft2.add(ft2.enumTable.getParents().get(i));
                 unique_ft2_idx.add(i);
             }
         }
         Collection<EnumVariable> newparents = new ArrayList<>(ft1.enumTable.nParents);
         for (int i = 0; i < ft1.enumTable.nParents; i++) {
-            newparents.add(ft1.enumTable.parents.get(i));
+            newparents.add(ft1.enumTable.getParents().get(i));
         }
         newparents.addAll(unique_ft2);
         Collection<Variable> newNonEnumParents = new ArrayList<>(ft1.getNonEnumVariables());
@@ -650,8 +654,8 @@ public class FactorTable {
                 {
                     continue; // ... so we abort as there is no point in doing any more calculcations
                 }
-                int ft1_index = entry1.getKey().intValue();
-                int ft2_index = entry2.getKey().intValue();
+                int ft1_index = entry1.getKey();
+                int ft2_index = entry2.getKey();
                 Object[] ft1_key = ft1.enumTable.getKey(ft1_index);
                 Object[] ft2_key = ft2.enumTable.getKey(ft2_index);
                 boolean match = true;
@@ -756,10 +760,6 @@ public class FactorTable {
         EnumVariable v2 = Predef.Number(4);
         EnumVariable v3 = Predef.Nominal(new String[]{"Yes", "No", "Maybe"});
 
-        System.out.println(EnumVariable.pool.get(v1));
-        System.out.println(EnumVariable.pool.get(v2));
-        System.out.println(EnumVariable.pool.get(v3));
-
         FactorTable ft3 = new FactorTable(new EnumVariable[]{v1, v2, v3});
         ft3.setValue(new Object[]{true, 1, "No"}, 0.05);
         ft3.setValue(new Object[]{true, 0, "No"}, 0.02);
@@ -780,7 +780,7 @@ public class FactorTable {
     @Override
     public String toString() {
         StringBuilder sbuf = new StringBuilder("F(");
-        for (Variable v : enumTable.parents) {
+        for (Variable v : enumTable.getParents()) {
             sbuf.append(v.toString()).append(";");
         }
         sbuf.append(";");
@@ -799,7 +799,7 @@ public class FactorTable {
     public void display() {
         System.out.print("Idx ");
         for (int j = 0; j < enumTable.nParents; j++)
-            System.out.print(String.format("[%10s]", constantLength(enumTable.parents.get(j).toString(), 10)));
+            System.out.print(String.format("[%10s]", constantLength(enumTable.getParents().get(j).toString(), 10)));
         List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
         for (Variable nonenum : nonenums) 
             System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));
@@ -825,7 +825,7 @@ public class FactorTable {
     public void displaySampled() {
         System.out.print("Idx ");
         for (int j = 0; j < enumTable.nParents; j++)
-            System.out.print(String.format("[%10s]", constantLength(enumTable.parents.get(j).toString(), 10)));
+            System.out.print(String.format("[%10s]", constantLength(enumTable.getParents().get(j).toString(), 10)));
         List<Variable> nonenums = new ArrayList<>(this.getNonEnumVariables());
         for (Variable nonenum : nonenums) 
             System.out.print(String.format("[%10s]", constantLength(nonenum.toString(), 10)));

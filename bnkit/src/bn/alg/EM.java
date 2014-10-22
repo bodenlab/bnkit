@@ -20,10 +20,10 @@ package bn.alg;
 import bn.BNet;
 import bn.BNode;
 import bn.Distrib;
-import bn.EnumTable;
-import bn.EnumVariable;
+import dat.EnumTable;
+import dat.EnumVariable;
 import bn.JDF;
-import bn.Variable;
+import dat.Variable;
 import bn.alg.VarElim.VarElimRuntimeException;
 
 import java.util.ArrayList;
