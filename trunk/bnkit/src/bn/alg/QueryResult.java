@@ -18,9 +18,9 @@
 package bn.alg;
 
 import bn.Distrib;
-import bn.EnumTable;
+import dat.EnumTable;
 import bn.JPT;
-import bn.Variable;
+import dat.Variable;
 import java.util.Map;
 
 /**

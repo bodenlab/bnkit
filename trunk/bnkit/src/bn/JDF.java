@@ -18,6 +18,9 @@
 
 package bn;
 
+import dat.Variable;
+import bn.prob.MixtureDistrib;
+import bn.prob.GaussianDistrib;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;

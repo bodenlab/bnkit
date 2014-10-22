@@ -15,8 +15,12 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package bn;
+package bn.node;
 
+import bn.CountTable;
+import bn.JPT;
+import dat.EnumVariable;
+import dat.Enumerable;
 import java.io.Serializable;
 import java.util.*;
 import java.util.Map.Entry;
@@ -188,7 +192,7 @@ public class CPTPseudo extends CPT{
             return;
         }
         CountTable count = this.getCount();
-        if (this.getCount().table.map.isEmpty()) {
+        if (this.getCount().table.isEmpty()) {
             //        System.out.println();
             //CPTPseudo specific. Here the count table is initialized with pseudo counts
             //Domain lengths determine the matrix[i][j]...up to user to supply correctly formatted pseudo matrix
@@ -256,7 +260,7 @@ public class CPTPseudo extends CPT{
     @Override
     public void countInstance(Object[] key, Object value) {
         CountTable count = this.getCount();
-        if (count.table.map.isEmpty()) { // create count table if none exists
+        if (count.table.isEmpty()) { // create count table if none exists
             //CPTPseudo specific. Here the count table is initialized with pseudo counts
             //Domain lengths determine the matrix[i][j]...up to user to supply correctly formatted pseudo matrix
             Integer p_idx = getMainParentIndex();

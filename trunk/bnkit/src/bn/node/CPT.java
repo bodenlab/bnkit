@@ -15,8 +15,21 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package bn;
+package bn.node;
 
+import bn.BNode;
+import bn.CountTable;
+import bn.Distrib;
+import bn.EnumDistrib;
+import bn.Factor;
+import bn.JPT;
+import bn.Predef;
+import bn.Sample;
+import bn.TiedNode;
+import dat.EnumVariable;
+import dat.Variable;
+import dat.EnumTable;
+import dat.Enumerable;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
@@ -237,7 +250,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             return this.getDistrib();
         try {
             return this.table.getValue(key);
-        } catch (EnumTableRuntimeException e) {
+        } catch (RuntimeException e) {
             throw new RuntimeException("Evaluation of CPT " + this.toString() + " failed since condition was not fully specified: " + e.getMessage());
         }
     }
@@ -753,7 +766,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      */
     @Override
     public void maximizeInstance() {
-        if (count.table.map.isEmpty()) {
+        if (count.table.isEmpty()) {
             return;
         }
         if (table != null) { // there are parents in the CPT
@@ -877,7 +890,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             }
         } else {
             for (int i = 0; i < table.getSize(); i++) {
-                EnumDistrib d = table.map.get(new Integer(i));
+                EnumDistrib d = table.getValue(i);
                 if (d != null) {
                     double[] distrib = d.get();
                     sbuf.append(i).append(": ");	// use index as cptkey because values above can be of different non-printable types

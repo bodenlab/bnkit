@@ -19,10 +19,10 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
-import bn.EnumVariable;
+import dat.EnumVariable;
 import bn.Factor;
 import bn.JPT;
-import bn.Variable;
+import dat.Variable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

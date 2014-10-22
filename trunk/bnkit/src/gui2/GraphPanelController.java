@@ -8,7 +8,7 @@ package gui2;
 
 import bn.BNode;
 import bn.Predef;
-import bn.Variable;
+import dat.Variable;
 import com.mxgraph.model.mxCell;
 import com.mxgraph.model.mxIGraphModel;
 import com.mxgraph.swing.handler.mxRubberband;

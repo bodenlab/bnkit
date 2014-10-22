@@ -7,20 +7,19 @@ import java.util.Map;
 
 import bn.BNet;
 import bn.BNode;
-import bn.CPT;
+import bn.node.CPT;
 import bn.Distrib;
 import bn.EnumDistrib;
-import bn.EnumTable;
-import bn.EnumVariable;
-import bn.Enumerable;
+import dat.EnumTable;
+import dat.EnumVariable;
+import dat.Enumerable;
 import bn.JPT;
 import bn.Predef;
-import bn.alg.ApproxInferCont;
 import bn.alg.CGTable;
 import bn.alg.CGVarElim;
 import bn.alg.Query;
 import bn.alg.QueryResult;
-import bn.Variable;
+import dat.Variable;
 import bn.file.BNBuf;
 import bn.file.DataBuf;
 

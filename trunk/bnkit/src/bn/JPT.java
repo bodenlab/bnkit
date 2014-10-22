@@ -17,6 +17,8 @@
  */
 package bn;
 
+import dat.EnumVariable;
+import dat.EnumTable;
 import java.util.List;
 import java.util.Map;
 
@@ -39,10 +41,10 @@ public class JPT {
     public JPT(EnumTable<Double> counts) {
         table = new EnumTable<>(counts.getParents());
         double sum = 0.0;
-        for (Map.Entry<Integer, Double> entry : counts.map.entrySet()) {
+        for (Map.Entry<Integer, Double> entry : counts.getMapEntries()) {
             sum += entry.getValue();
         }
-        for (Map.Entry<Integer, Double> entry : counts.map.entrySet()) {
+        for (Map.Entry<Integer, Double> entry : counts.getMapEntries()) {
             table.setValue(entry.getKey(), entry.getValue() / sum);
         }
     }
@@ -78,7 +80,7 @@ public class JPT {
         if (y == null) {
             return 0.0;
         } else {
-            return y.doubleValue();
+            return y;
         }
     }
 
@@ -104,7 +106,7 @@ public class JPT {
         double sum = 0.0;
         for (Double y : all) {
             if (y != null) {
-                sum += y.doubleValue();
+                sum += y;
             }
         }
         return sum;
@@ -124,7 +126,7 @@ public class JPT {
      * @return variables
      */
     public List<EnumVariable> getParents() {
-        return table.parents;
+        return table.getParents();
     }
 
     /**

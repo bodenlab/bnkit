@@ -18,9 +18,9 @@
 package bn.factor;
 
 import bn.Distrib;
-import bn.EnumTable;
+import dat.EnumTable;
 import bn.JDF;
-import bn.Variable;
+import dat.Variable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;

@@ -7,9 +7,9 @@
 package gui;
 
 import bn.BNode;
-import bn.EnumTable;
-import bn.EnumVariable;
-import bn.Variable;
+import dat.EnumTable;
+import dat.EnumVariable;
+import dat.Variable;
 import java.util.List;
 import javax.swing.table.AbstractTableModel;
 

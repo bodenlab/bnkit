@@ -1,6 +1,8 @@
 package bn;
 
-import bn.Variable.Assignment;
+import dat.EnumVariable;
+import dat.Variable;
+import dat.Variable.Assignment;
 import bn.alg.ApproxInference;
 import java.util.ArrayList;
 import java.util.Collection;

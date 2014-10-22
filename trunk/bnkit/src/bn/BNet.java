@@ -18,6 +18,9 @@
 
 package bn;
 
+import dat.EnumVariable;
+import dat.Variable;
+import dat.Enumerable;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -777,11 +780,12 @@ public class BNet implements Serializable {
             EnumVariable evar = (EnumVariable) query.getVariable();
             Enumerable edom = evar.getDomain();
             double[] dist = new double[edom.size()];
+            Object[] values = edom.getValues();
             // FIXME: Some unnecessary re-calculation below
-            for (int i = 0; i < edom.values.length; i ++) {
+            for (int i = 0; i < values.length; i ++) {
                 Object[] key = this.getEvidenceKey(query);
-                dist[i] = query.get(key, edom.values[i]);
-                query.setInstance(edom.values[i]);
+                dist[i] = query.get(key, values[i]);
+                query.setInstance(values[i]);
         	// Query node not included in set, used for initial factor table in product
                 Set<BNode> children = par2ch.get(query);
                 if (children != null) {
@@ -821,11 +825,12 @@ public class BNet implements Serializable {
             EnumVariable evar = (EnumVariable) query.getVariable();
             Enumerable edom = evar.getDomain();
             double[] dist = new double[edom.size()];
+            Object[] values = edom.getValues();
             // FIXME: Some unnecessary re-calculation below
-            for (int i = 0; i < edom.values.length; i ++) {
+            for (int i = 0; i < values.length; i ++) {
                 Object[] key = this.getEvidenceKey(query);
-                dist[i] = query.get(key, edom.values[i]);
-                query.setInstance(edom.values[i]);
+                dist[i] = query.get(key, values[i]);
+                query.setInstance(values[i]);
         	// Query node not included in set, used for initial factor table in product
         	for (BNode node : mbNodes) {
                     key = this.getEvidenceKey(node);

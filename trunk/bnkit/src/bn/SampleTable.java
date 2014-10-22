@@ -17,6 +17,8 @@
  */
 package bn;
 
+import dat.EnumVariable;
+import dat.EnumTable;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -128,6 +130,10 @@ public class SampleTable<T> implements Serializable {
         throw new RuntimeException("Invalid call to SampleTable: has key, but none given");
     }
 
+    public EnumTable<List<Sample<T>>> getTable() {
+        return table;
+    }
+    
     /**
      * Set the complete sequence of observations, erasing any previous.
      *
@@ -210,6 +216,19 @@ public class SampleTable<T> implements Serializable {
         count(value, 1.0);
     }
     
+    public boolean isEmpty() {
+        if (list != null)
+            return list.isEmpty();
+        else
+            return table.isEmpty();
+    }
+    
+    public void setEmpty() {
+        if (list != null)
+            list.clear();
+        else
+            table.setEmpty();
+    }
     
     public void display() {
         if (table != null)

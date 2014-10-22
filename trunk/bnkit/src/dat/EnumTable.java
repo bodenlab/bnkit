@@ -15,8 +15,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package bn;
+package dat;
 
+import bn.Predef;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -34,7 +35,7 @@ import java.util.Set;
 public class EnumTable<E> {
 
     protected final Map<Integer, E> map;
-    protected final int nParents;
+    public final int nParents;
     protected final List<EnumVariable> parents;
     protected final EnumVariable[] pararr;
     protected final int[] period;
@@ -84,6 +85,10 @@ public class EnumTable<E> {
         return dup;
     }
 
+    public boolean isEmpty() {
+        return map.isEmpty();
+    }
+    
     public void setEmpty() {
         this.map.clear();
     }

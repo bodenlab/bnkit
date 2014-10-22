@@ -18,10 +18,10 @@
 package bn.example;
 
 import bn.BNet;
-import bn.CPT;
+import bn.node.CPT;
 import bn.EnumDistrib;
-import bn.EnumVariable;
-import bn.Enumerable;
+import dat.EnumVariable;
+import dat.Enumerable;
 import bn.JPT;
 import bn.Predef;
 import bn.alg.ApproxInference;

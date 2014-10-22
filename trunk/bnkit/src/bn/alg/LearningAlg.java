@@ -19,7 +19,7 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
-import bn.Variable;
+import dat.Variable;
 import java.util.List;
 
 /**

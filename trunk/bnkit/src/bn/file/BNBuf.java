@@ -17,6 +17,7 @@
  */
 package bn.file;
 
+import dat.Variable;
 import bn.*;
 import bn.alg.CGVarElim;
 

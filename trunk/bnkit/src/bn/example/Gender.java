@@ -16,6 +16,12 @@
  */
 
 package bn.example;
+import bn.node.CPT;
+import bn.node.GDT;
+import dat.EnumVariable;
+import dat.Variable;
+import dat.Enumerable;
+import bn.prob.GaussianDistrib;
 import bn. *;
 import bn.alg.*;
 

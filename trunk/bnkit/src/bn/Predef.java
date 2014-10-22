@@ -17,6 +17,13 @@
  */
 package bn;
 
+import bn.node.CPT;
+import bn.node.GDT;
+import dat.Continuous;
+import dat.Domain;
+import dat.EnumVariable;
+import dat.Variable;
+import dat.Enumerable;
 import gui2.NodeModel;
 import java.util.ArrayList;
 import java.util.List;
@@ -267,7 +274,8 @@ public class Predef {
 
     public static Variable<Continuous> Real(String name) {
         Continuous domain = new Continuous();
-        Variable<Continuous> var = new Variable<>(domain, name);
+        Variable<Continuous> var;
+        var = new Variable<>(domain, name);
         var.setPredef("Real");
         return var;
     }

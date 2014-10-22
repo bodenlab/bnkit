@@ -18,6 +18,9 @@
 
 package bn;
 
+import dat.EnumVariable;
+import dat.Variable;
+import dat.EnumTable;
 import bn.factor.AbstractFactor;
 import java.util.Collection;
 import java.util.List;

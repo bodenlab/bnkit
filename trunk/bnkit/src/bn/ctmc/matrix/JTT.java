@@ -17,7 +17,7 @@
 
 package bn.ctmc.matrix;
 
-import bn.Enumerable;
+import dat.Enumerable;
 import bn.ctmc.SubstModel;
 
 /**

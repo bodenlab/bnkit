@@ -1,5 +1,9 @@
-package bn;
+package bn.prob;
 
+import bn.Distrib;
+import dat.Domain;
+import bn.EnumDistrib;
+import dat.Enumerable;
 import java.io.Serializable;
 import java.util.Arrays;
 
@@ -695,7 +699,7 @@ public class DirichletDistrib implements Distrib, Serializable {
         EnumDistrib[] dd = new EnumDistrib[dna.length];
         for (int j = 0; j < dna.length; j ++) {
             dd[j] = new EnumDistrib(Enumerable.nacid);
-            for (Object sym : Enumerable.nacid.values) {
+            for (Object sym : Enumerable.nacid.getValues()) {
                 int cnt = 0;
                 for (int i = 0; i < dna[j].length(); i ++)
                     cnt += (dna[j].charAt(i) == (Character)sym ? 1 : 0);

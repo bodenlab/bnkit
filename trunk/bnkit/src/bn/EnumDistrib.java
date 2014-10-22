@@ -17,6 +17,8 @@
  */
 package bn;
 
+import dat.Domain;
+import dat.Enumerable;
 import java.util.Map;
 import java.util.Random;
 

@@ -18,7 +18,7 @@
 package bn.alg;
 
 import bn.BNet;
-import bn.Variable;
+import dat.Variable;
 
 /**
  * Interface for inference engines.

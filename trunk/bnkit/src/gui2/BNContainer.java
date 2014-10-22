@@ -7,9 +7,9 @@ package gui2;
 
 import bn.BNet;
 import bn.BNode;
-import bn.EnumVariable;
+import dat.EnumVariable;
 import bn.Predef;
-import bn.Variable;
+import dat.Variable;
 import bn.file.BNBuf;
 import java.util.ArrayList;
 import java.util.HashMap;

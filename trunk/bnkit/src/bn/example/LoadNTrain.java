@@ -2,7 +2,6 @@
  * 
  */
 package bn.example;
-import bn.alg.ApproxInferCont;
 import bn.alg.LearningAlg;
 import bn.alg.EM;
 
