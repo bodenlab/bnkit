@@ -98,12 +98,16 @@ public class VarElim implements Inference {
     
     /**
      * Construct the data structure for the specified variables in preparation
-     * of inference of the most probable explanation. 
+     * of inference of the most probable explanation (also known as MAP query).
      * There are three types of variables (given the BN): 
      *  1. Assignment variables E--which have been assigned values via the BN 
      *  2. Query variables Q--typically empty set, but if not, these are not maxed-out but inferred
      *  3. Other variables X--which will be maxed out during inference P(Q|E) = MAX_X P(Q|E,X).
-     * Most probable assignments to X can be accessed via CGTable.getMPE
+     * Most probable assignments to X can be accessed via CGTable.getMPE.
+     * TODO: Investigate if "hybrid" queries, known as marginal MAP (see Koller and Friedman, p. 27) can fit
+     * as a variant query under this or if a new query form needs to be implemented. 
+     * Marginal MAP means that variables are either "summed out" (if they are not relevant) or 
+     * "maxed out" (if assigned values to form part of a diagnosis).
      * @param qvars variables to include in query, can be empty
      */
     @SuppressWarnings("rawtypes")
