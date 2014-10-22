@@ -20,7 +20,7 @@ package bn.alg;
 import bn.BNet;
 import bn.BNode;
 import dat.EnumVariable;
-import bn.Factor;
+import bn.factor.Factor;
 import bn.JPT;
 import dat.Variable;
 import java.util.ArrayList;

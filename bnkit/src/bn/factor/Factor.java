@@ -15,8 +15,11 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package bn;
+package bn.factor;
 
+import bn.Distrib;
+import bn.JDF;
+import bn.Predef;
 import dat.EnumVariable;
 import dat.Variable;
 import dat.EnumTable;
