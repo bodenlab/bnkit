@@ -20,7 +20,7 @@ package bn.node;
 import bn.BNode;
 import bn.Distrib;
 import bn.EnumDistrib;
-import bn.Factor;
+import bn.factor.Factor;
 import bn.Sample;
 import bn.SampleTable;
 import bn.TiedNode;

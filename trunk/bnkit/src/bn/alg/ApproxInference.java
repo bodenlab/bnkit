@@ -4,7 +4,7 @@ import bn.BNet;
 import bn.BNode;
 import bn.Distrib;
 import dat.EnumTable;
-import bn.Factor;
+import bn.factor.Factor;
 import bn.JPT;
 import bn.SampleTrace;
 import dat.Variable;

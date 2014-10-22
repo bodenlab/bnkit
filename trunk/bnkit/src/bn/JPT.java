@@ -17,6 +17,7 @@
  */
 package bn;
 
+import bn.factor.FactorTable;
 import dat.EnumVariable;
 import dat.EnumTable;
 import java.util.List;

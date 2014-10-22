@@ -19,7 +19,7 @@ package bn.node;
 
 import bn.BNode;
 import bn.Distrib;
-import bn.Factor;
+import bn.factor.Factor;
 import bn.Predef;
 import bn.Sample;
 import bn.SampleTable;

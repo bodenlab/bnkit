@@ -21,7 +21,7 @@ import bn.BNode;
 import bn.CountTable;
 import bn.Distrib;
 import bn.EnumDistrib;
-import bn.Factor;
+import bn.factor.Factor;
 import bn.JPT;
 import bn.Predef;
 import bn.Sample;

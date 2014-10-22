@@ -22,7 +22,7 @@ import bn.Distrib;
 import bn.EnumDistrib;
 import dat.EnumTable;
 import dat.EnumVariable;
-import bn.Factor;
+import bn.factor.Factor;
 import bn.JDF;
 import bn.JPT;
 import bn.prob.MixtureDistrib;

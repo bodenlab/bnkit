@@ -1,5 +1,6 @@
 package bn;
 
+import bn.factor.Factor;
 import dat.EnumVariable;
 import dat.Variable;
 import dat.Variable.Assignment;

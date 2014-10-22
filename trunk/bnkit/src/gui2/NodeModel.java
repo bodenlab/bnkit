@@ -13,7 +13,7 @@ import dat.Continuous;
 import bn.Distrib;
 import dat.EnumTable;
 import dat.EnumVariable;
-import bn.Factor;
+import bn.factor.Factor;
 import bn.node.GDT;
 import bn.SampleTable.*;
 import dat.Variable;

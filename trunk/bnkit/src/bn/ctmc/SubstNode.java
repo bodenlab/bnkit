@@ -17,6 +17,7 @@
  */
 package bn.ctmc;
 
+import bn.factor.Factor;
 import dat.EnumVariable;
 import dat.Variable;
 import dat.EnumTable;
