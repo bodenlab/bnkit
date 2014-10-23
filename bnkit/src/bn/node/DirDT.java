@@ -491,10 +491,11 @@ public class DirDT implements BNode, TiedNode, Serializable {
 
     /**
      * Find the best parameter setting for the observed data.
-     * Note that this uses observed Double:s which are looked at directly, and 
-     * observed Distrib:s which are used to stochastically generate samples. 
-     * We cannot use distributions directly since they can be of any kind, as 
-     * long as defined over a single continuous variable.
+     * This uses a method to find the ML estimate for the Dirichlet from
+     * a set of EnumDistribs, counted in countInstance.
+     * The current version weights observations using sampling.
+     * Set resolution to a smaller value for big data sets (minimum 1), 
+     * greater value for higher precision (less stochasticity).
      */
     @Override
     public void maximizeInstance() {
@@ -505,6 +506,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
         Enumerable e = this.var.getDomain().getDomain();
         for (int index = 0; index < this.table.getSize(); index ++) {
             List<Sample<EnumDistrib>> samples = count.get(index);
+            // figure out which resolution that should be used
+            int resolution = 20;
             if (samples != null) {
                 DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
                 List<EnumDistrib> select = new ArrayList<>();
@@ -513,8 +516,10 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     EnumDistrib d = (EnumDistrib)sample.instance;
                     // should be using prob more effectively, but not so yet...
                     double prob = sample.prob;
-                    if (rand.nextDouble() <= prob)
-                        select.add(d);
+                    for (int k = 0; k < resolution; k ++) {
+                        if (rand.nextDouble() <= prob)
+                            select.add(d);
+                    }
                 }
                 EnumDistrib[] dists = new EnumDistrib[select.size()];
                 select.toArray(dists);
