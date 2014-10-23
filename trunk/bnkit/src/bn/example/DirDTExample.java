@@ -89,13 +89,13 @@ public class DirDTExample {
         Object[][] data = new Object[200][3]; // data set
         for (int i = 0; i < 200; i ++) {
             if (i % 2 == 0) { // even so male
-                data[i][0] = null;
+                if (i % 20 == 0) data[i][0] = "Male";
                 EnumDistrib e1 = (EnumDistrib)colours_male.sample();
                 data[i][1] = e1;
                 EnumDistrib e2 = (EnumDistrib)sports_male.sample();
                 data[i][2] = e2;
             } else { // female
-                data[i][0] = null;
+                if (i % 20 == 1) data[i][0] = "Female";
                 EnumDistrib e1 = (EnumDistrib)colours_female.sample();
                 data[i][1] = e1;
                 EnumDistrib e2 = (EnumDistrib)sports_female.sample();
