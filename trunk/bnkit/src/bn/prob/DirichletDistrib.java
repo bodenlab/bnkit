@@ -658,59 +658,62 @@ public class DirichletDistrib implements Distrib, Serializable {
 
     
     public static void main(String[] args) {
-        java.util.Random rand = new java.util.Random();
-//        Enumerable dom = new Enumerable(2);
-//        EnumDistrib[] samples = {
-//            new EnumDistrib(dom, 0.3, 0.7),
-//            new EnumDistrib(dom, 0.2, 0.8),
-//            new EnumDistrib(dom, 0.1, 0.9),
-//            new EnumDistrib(dom, 0.4, 0.6)};
-//        double[] ss = DirichletDistrib.getSufficientStatistic(samples, 2);
-//        double[] alpha = DirichletDistrib.findDirichletPriors(new double[] {.5, 0.5}, ss);
-//        DirichletDistrib d = new DirichletDistrib(dom, alpha);
-        
+        java.util.Random rand = new java.util.Random(1);
+        Enumerable dom = new Enumerable(2);
+        EnumDistrib[] samples = {
+            new EnumDistrib(dom, 0.3, 0.7),
+            new EnumDistrib(dom, 0.2, 0.8),
+            new EnumDistrib(dom, 0.1, 0.9),
+            new EnumDistrib(dom, 0.2, 0.8),
+            new EnumDistrib(dom, 0.1, 0.9),
+            new EnumDistrib(dom, 0.4, 0.6),
+        };
+        double[] ss = DirichletDistrib.getSufficientStatistic(samples, 2);
+        double[] alpha = DirichletDistrib.findPrior(new double[] {.5, 0.5}, ss);
+        DirichletDistrib d = new DirichletDistrib(dom, alpha);
+        System.out.println(d);
 
-        int N = 10;
-        int K = 3;
-        Enumerable dom = new Enumerable(K);
-        DirichletDistrib d0 = new DirichletDistrib(dom, 12, 2, 15);
-        System.out.println(d0);
-        int[][] counts = new int[N][K];
-        EnumDistrib[] samples = new EnumDistrib[N];
-        for (int i = 0; i < N; i ++) {
-            EnumDistrib d = (EnumDistrib) d0.sample();
-            samples[i] = d;
-            double p = d0.get(d);
-            System.out.println(i + ": " + d + " p = " + String.format("%4.2f;", p));
-        }
-        double[] ss = DirichletDistrib.getSufficientStatistic(samples, K);
-        double[] alpha = DirichletDistrib.findPrior(new double[] {0.33,0.33,0.33}, ss);
-        d0.setPrior(alpha);
-        System.out.println("Dirichlet Alpha: " + d0);
-        for (int i = 0; i < 30; i ++) {
-            EnumDistrib d = (EnumDistrib) d0.sample();
-            double p = d0.get(d);
-            System.out.println(i + ": " + d + " p = " + String.format("%4.2f;", p));
-        }
+//        int N = 10;
+//        int K = 3;
+//        Enumerable dom = new Enumerable(K);
+//        DirichletDistrib d0 = new DirichletDistrib(dom, 12, 2, 15);
+//        System.out.println(d0);
+//        int[][] counts = new int[N][K];
+//        EnumDistrib[] samples = new EnumDistrib[N];
+//        for (int i = 0; i < N; i ++) {
+//            EnumDistrib d = (EnumDistrib) d0.sample();
+//            samples[i] = d;
+//            double p = d0.get(d);
+//            System.out.println(i + ": " + d + " p = " + String.format("%4.2f;", p));
+//        }
+//        double[] ss = DirichletDistrib.getSufficientStatistic(samples, K);
+//        double[] alpha = DirichletDistrib.findPrior(new double[] {0.33,0.33,0.33}, ss);
+//        d0.setPrior(alpha);
+//        System.out.println("Dirichlet Alpha: " + d0);
+//        for (int i = 0; i < 30; i ++) {
+//            EnumDistrib d = (EnumDistrib) d0.sample();
+//            double p = d0.get(d);
+//            System.out.println(i + ": " + d + " p = " + String.format("%4.2f;", p));
+//        }
         System.out.println("Final loss = " +DirichletDistrib.getTotalLoss(alpha, ss));
         System.out.println("Best loss = " + DirichletDistrib.getTotalLoss(new double[] {1,2}, ss));
         
-        DirichletDistrib d1 = new DirichletDistrib(Enumerable.nacid, 1.0);
-        EnumDistrib[] dd = new EnumDistrib[dna.length];
-        for (int j = 0; j < dna.length; j ++) {
-            dd[j] = new EnumDistrib(Enumerable.nacid);
-            for (Object sym : Enumerable.nacid.getValues()) {
-                int cnt = 0;
-                for (int i = 0; i < dna[j].length(); i ++)
-                    cnt += (dna[j].charAt(i) == (Character)sym ? 1 : 0);
-                dd[j].set(sym, (double) cnt / dna[j].length());
-            }
-            System.out.println(dd[j]);
-        }
-        d1.setPrior(dd);
-        System.out.println(d1);
-        for (int j = 0; j < 10; j ++)
-            System.out.println(d1.sample());
+//        DirichletDistrib d1 = new DirichletDistrib(Enumerable.nacid, 1.0);
+//        EnumDistrib[] dd = new EnumDistrib[dna.length];
+//        for (int j = 0; j < dna.length; j ++) {
+//            dd[j] = new EnumDistrib(Enumerable.nacid);
+//            for (Object sym : Enumerable.nacid.getValues()) {
+//                int cnt = 0;
+//                for (int i = 0; i < dna[j].length(); i ++)
+//                    cnt += (dna[j].charAt(i) == (Character)sym ? 1 : 0);
+//                dd[j].set(sym, (double) cnt / dna[j].length());
+//            }
+//            System.out.println(dd[j]);
+//        }
+//        d1.setPrior(dd);
+//        System.out.println(d1);
+//        for (int j = 0; j < 10; j ++)
+//            System.out.println(d1.sample());
     }
 
     static String[] dna = {

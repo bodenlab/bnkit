@@ -86,8 +86,8 @@ public class DirDTExample {
         DirichletDistrib sports_male = new DirichletDistrib(sports,  new double[] {2.0, 5.0, 5.0});
         DirichletDistrib sports_female = new DirichletDistrib(sports,  new double[] {9.0, 4.0, 3.0});
 
-        Object[][] data = new Object[100][3]; // data set
-        for (int i = 0; i < 100; i ++) {
+        Object[][] data = new Object[200][3]; // data set
+        for (int i = 0; i < 200; i ++) {
             if (i % 2 == 0) { // even so male
                 data[i][0] = null;
                 EnumDistrib e1 = (EnumDistrib)colours_male.sample();
@@ -112,7 +112,7 @@ public class DirDTExample {
         EM em = new EM(bn);
         em.EM_MAX_ROUNDS = 1;
         em.EM_PRINT_STATUS = false;
-        for (int round = 0; round < 100; round ++) {
+        for (int round = 0; round < 20; round ++) {
             em.train(data, new Variable[] {G, C, S}, 0);
             c.setInstance(new EnumDistrib(colours, new double[] {0.3, 0.3, 0.4})); // primarily blue, but the gender node is latent...
             inf = new VarElim();
