@@ -506,9 +506,25 @@ public class DirDT implements BNode, TiedNode, Serializable {
         Enumerable e = this.var.getDomain().getDomain();
         for (int index = 0; index < this.table.getSize(); index ++) {
             List<Sample<EnumDistrib>> samples = count.get(index);
-            // figure out which resolution that should be used
-            int resolution = 20;
             if (samples != null) {
+                // figure out which sampling resolution that should be used
+                int[] resolutions = new int[] {1, 5, 20}; // try these resolutions
+                double[] cost = new double[] {1.0, 1.1, 1.2}; // how much each resolution "costs"
+                double[] err = new double[resolutions.length];
+                for (Sample<EnumDistrib> sample : samples) {
+                    for (int j = 0; j < err.length; j ++) {
+                        double prod = sample.prob * resolutions[j];
+                        err[j] += Math.abs((int)prod - prod) * cost[j];
+                    }
+                }
+                int best = 0;
+                for (int j = 1; j < err.length; j ++) {
+                    if (err[j] < err[best])
+                        best = j;
+                }
+                int resolution = resolutions[best];
+                // System.err.println("picked resolution " + resolution + " at err = " + err[best]);
+                // do the calculations
                 DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
                 List<EnumDistrib> select = new ArrayList<>();
                 for (int j = 0; j < samples.size(); j ++) {
