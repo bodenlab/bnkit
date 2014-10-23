@@ -25,6 +25,8 @@ import dat.Enumerable;
 import bn.prob.DirichletDistrib;
 import bn. *;
 import bn.alg.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  *
@@ -77,5 +79,51 @@ public class DirDTExample {
         System.out.println();
         Distrib d2 = r.query(G);
         System.out.println("Prob of gender: " + d2);
+        
+        // re-training
+        DirichletDistrib colours_male = new DirichletDistrib(colours, new double[] {3.0, 5.0, 7.0});
+        DirichletDistrib colours_female = new DirichletDistrib(colours, new double[] {7.0, 2.0, 3.0});
+        DirichletDistrib sports_male = new DirichletDistrib(sports,  new double[] {2.0, 5.0, 5.0});
+        DirichletDistrib sports_female = new DirichletDistrib(sports,  new double[] {9.0, 4.0, 3.0});
+
+        Object[][] data = new Object[100][3]; // data set
+        for (int i = 0; i < 100; i ++) {
+            if (i % 2 == 0) { // even so male
+                data[i][0] = null;
+                EnumDistrib e1 = (EnumDistrib)colours_male.sample();
+                data[i][1] = e1;
+                EnumDistrib e2 = (EnumDistrib)sports_male.sample();
+                data[i][2] = e2;
+            } else { // female
+                data[i][0] = null;
+                EnumDistrib e1 = (EnumDistrib)colours_female.sample();
+                data[i][1] = e1;
+                EnumDistrib e2 = (EnumDistrib)sports_female.sample();
+                data[i][2] = e2;
+            }
+        }
+
+        g.put(new EnumDistrib(new Enumerable(new String[] {"Male", "Female"}), 0.25, 0.75));
+        c.put(new DirichletDistrib(colours, 1), "Male");
+        c.put(new DirichletDistrib(colours, 1), "Female");
+        s.put(new DirichletDistrib(sports,  1), "Male");
+        s.put(new DirichletDistrib(sports,  1), "Female");
+
+        EM em = new EM(bn);
+        em.EM_MAX_ROUNDS = 1;
+        em.EM_PRINT_STATUS = false;
+        for (int round = 0; round < 100; round ++) {
+            em.train(data, new Variable[] {G, C, S}, 0);
+            c.setInstance(new EnumDistrib(colours, new double[] {0.3, 0.3, 0.4})); // primarily blue, but the gender node is latent...
+            inf = new VarElim();
+            inf.instantiate(bn);
+            q = inf.makeQuery(G,S);
+            r = (CGTable) inf.infer(q);
+            d2 = r.query(G);
+            System.out.println("Prob of gender: " + d2);
+        }
+        r.display();
+        d1 = r.query(S);
+        System.out.println("Prob of sports: " + d1);
     }
 }

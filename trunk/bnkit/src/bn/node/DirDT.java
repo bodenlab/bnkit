@@ -501,29 +501,30 @@ public class DirDT implements BNode, TiedNode, Serializable {
         if (count.isEmpty()) {
             return;
         }
+        Random rand = new Random();
         Enumerable e = this.var.getDomain().getDomain();
         for (int index = 0; index < this.table.getSize(); index ++) {
             List<Sample<EnumDistrib>> samples = count.get(index);
             if (samples != null) {
-                EnumDistrib[] dists = new EnumDistrib[samples.size()];
                 DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
+                List<EnumDistrib> select = new ArrayList<>();
                 for (int j = 0; j < samples.size(); j ++) {
                     Sample<EnumDistrib> sample = samples.get(j);
                     EnumDistrib d = (EnumDistrib)sample.instance;
-                    dists[j] = d;
-                    // should be using prob, but not so yet...
+                    // should be using prob more effectively, but not so yet...
                     double prob = sample.prob;
+                    if (rand.nextDouble() <= prob)
+                        select.add(d);
                 }
-                // FIXME: alpha values should account for probability of this distribution
-                double[] alphas = dd.findPrior(dists);
+                EnumDistrib[] dists = new EnumDistrib[select.size()];
+                select.toArray(dists);
+                dd.setPrior(dists);
                 this.put(index, dd);
             } else { // no counts
                 this.table.removeValue(index);
             }
         }
-        
         count.setEmpty();
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override

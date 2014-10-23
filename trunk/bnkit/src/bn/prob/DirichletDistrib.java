@@ -117,7 +117,7 @@ public class DirichletDistrib implements Distrib, Serializable {
         prob /= normalize(alpha);
         return prob;
     }
-	
+
     /**
      * Returns an enumerable sampled from this distribution.
      * @return an enumerable distribution, chosen in proportion to its probability
