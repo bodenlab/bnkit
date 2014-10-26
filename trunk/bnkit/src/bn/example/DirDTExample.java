@@ -89,13 +89,13 @@ public class DirDTExample {
         Object[][] data = new Object[200][3]; // data set
         for (int i = 0; i < 200; i ++) {
             if (i % 2 == 0) { // even so male
-                if (i % 20 == 0) data[i][0] = "Male";
+                //if (i % 20 == 0) data[i][0] = "Male";
                 EnumDistrib e1 = (EnumDistrib)colours_male.sample();
                 data[i][1] = e1;
                 EnumDistrib e2 = (EnumDistrib)sports_male.sample();
                 data[i][2] = e2;
             } else { // female
-                if (i % 20 == 1) data[i][0] = "Female";
+                //if (i % 20 == 1) data[i][0] = "Female";
                 EnumDistrib e1 = (EnumDistrib)colours_female.sample();
                 data[i][1] = e1;
                 EnumDistrib e2 = (EnumDistrib)sports_female.sample();
@@ -103,27 +103,40 @@ public class DirDTExample {
             }
         }
 
-        g.put(new EnumDistrib(new Enumerable(new String[] {"Male", "Female"}), 0.25, 0.75));
-        c.put(new DirichletDistrib(colours, 1), "Male");
-        c.put(new DirichletDistrib(colours, 1), "Female");
-        s.put(new DirichletDistrib(sports,  1), "Male");
-        s.put(new DirichletDistrib(sports,  1), "Female");
+        EnumVariable G2 = Predef.Number(10, "Cluster");
+        Enumerable colours2 = new Enumerable(new String[] {"Pink", "Green", "Blue"});
+        Enumerable sports2 = new Enumerable(new String[] {"Netball", "Soccer", "Rugby"});
+        Variable C2     = Predef.Distrib(colours, "Colours");
+        Variable S2     = Predef.Distrib(sports,  "Sports");
 
-        EM em = new EM(bn);
+        // Define nodes (connecting the variables into an acyclic graph, i.e. the structure)
+        CPT g2 = new CPT(G2);
+        DirDT c2 = new DirDT(C2,    G2);
+        DirDT s2 = new DirDT(S2,    G2);
+//        g2.put(new EnumDistrib(new Enumerable(new String[] {"Male", "Female"}), 0.25, 0.75));
+//        c2.put(new DirichletDistrib(colours, 1), "Male");
+//        c2.put(new DirichletDistrib(colours, 1), "Female");
+//        s2.put(new DirichletDistrib(sports,  1), "Male");
+//        s2.put(new DirichletDistrib(sports,  1), "Female");
+
+        BNet bn2 = new BNet();
+        bn2.add(g2,c2,s2);
+
+        EM em = new EM(bn2);
         em.EM_MAX_ROUNDS = 1;
         em.EM_PRINT_STATUS = false;
-        for (int round = 0; round < 20; round ++) {
-            em.train(data, new Variable[] {G, C, S}, 0);
-            c.setInstance(new EnumDistrib(colours, new double[] {0.3, 0.3, 0.4})); // primarily blue, but the gender node is latent...
+        for (int round = 0; round < 5; round ++) {
+            em.train(data, new Variable[] {G2, C2, S2}, 0);
+            c2.setInstance(new EnumDistrib(colours, new double[] {0.3, 0.3, 0.4})); // primarily blue, but the gender node is latent...
             inf = new VarElim();
-            inf.instantiate(bn);
-            q = inf.makeQuery(G,S);
+            inf.instantiate(bn2);
+            q = inf.makeQuery(G2,S2);
             r = (CGTable) inf.infer(q);
-            d2 = r.query(G);
-            System.out.println("Prob of gender: " + d2);
+            d2 = r.query(G2);
+            System.out.println("Prob of cluster: " + d2);
         }
         r.display();
-        d1 = r.query(S);
+        d1 = r.query(S2);
         System.out.println("Prob of sports: " + d1);
     }
 }

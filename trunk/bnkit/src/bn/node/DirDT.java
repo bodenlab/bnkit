@@ -480,12 +480,12 @@ public class DirDT implements BNode, TiedNode, Serializable {
         Random rand = new Random(seed);
         if (table == null) {
             if (prior == null)
-                prior = new DirichletDistrib((Enumerable)prior.getDomain(), (1+rand.nextGaussian()));
+                prior = new DirichletDistrib((Enumerable)prior.getDomain(), (1+Math.abs(rand.nextGaussian())));
         } else {
             int nrows = table.getSize();
             for (int i = 0; i < nrows; i++) {
                 if (!table.hasValue(i))
-                    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                    table.setValue(i, new DirichletDistrib((Enumerable)this.var.getDomain().getDomain(), (1+Math.abs(rand.nextGaussian()))));
             }
         }
     }
@@ -506,7 +506,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
         Random rand = new Random();
         Enumerable e = this.var.getDomain().getDomain();
         for (int index = 0; index < this.table.getSize(); index ++) {
-            List<Sample<EnumDistrib>> samples = count.get(index);
+            List<Sample<EnumDistrib>> samples = count.getAll(index);
             if (samples != null) {
                 DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
                 List<EnumDistrib> select = new ArrayList<>();
@@ -546,7 +546,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     attempt += 1;
                 }
                 if (attempt == 5) { // five attempts
-                    System.err.println("Unable to set " + this);
+                    //System.err.println("Unable to set " + this);
                 } else {
                     EnumDistrib[] dists = new EnumDistrib[select.size()];
                     select.toArray(dists);
