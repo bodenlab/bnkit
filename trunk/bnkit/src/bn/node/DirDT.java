@@ -261,6 +261,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     }
                 } 
             }
+            // ft = Factorize.getNormal(ft);
             if (!sumout.isEmpty()) {
                 Variable[] sumout_arr = new Variable[sumout.size()];
                 sumout.toArray(sumout_arr);
@@ -507,6 +508,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
         for (int index = 0; index < this.table.getSize(); index ++) {
             List<Sample<EnumDistrib>> samples = count.get(index);
             if (samples != null) {
+                DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
+                List<EnumDistrib> select = new ArrayList<>();
                 // figure out which sampling resolution that should be used
                 int[] resolutions = new int[] {1, 5, 20}; // try these resolutions
                 double[] cost = new double[] {1.0, 1.1, 1.2}; // how much each resolution "costs"
@@ -523,24 +526,33 @@ public class DirDT implements BNode, TiedNode, Serializable {
                         best = j;
                 }
                 int resolution = resolutions[best];
-                // System.err.println("picked resolution " + resolution + " at err = " + err[best]);
-                // do the calculations
-                DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
-                List<EnumDistrib> select = new ArrayList<>();
-                for (int j = 0; j < samples.size(); j ++) {
-                    Sample<EnumDistrib> sample = samples.get(j);
-                    EnumDistrib d = (EnumDistrib)sample.instance;
-                    // should be using prob more effectively, but not so yet...
-                    double prob = sample.prob;
-                    for (int k = 0; k < resolution; k ++) {
-                        if (rand.nextDouble() <= prob)
-                            select.add(d);
+                int attempt = 0;
+                while (select.size() == 0 && attempt < 5) { // there is at least one sample, so some "resolution" should result in a selection
+                    if (attempt > 0) { // re-try, so double resolution
+                        resolution *= 2; 
                     }
+                    // System.err.println("picked resolution " + resolution + " at err = " + err[best]);
+                    // do the calculations
+                    for (int j = 0; j < samples.size(); j ++) {
+                        Sample<EnumDistrib> sample = samples.get(j);
+                        EnumDistrib d = (EnumDistrib)sample.instance;
+                        // should be using prob more effectively, but not so yet...
+                        double prob = sample.prob;
+                        for (int k = 0; k < resolution; k ++) {
+                            if (rand.nextDouble() <= prob)
+                                select.add(d);
+                        }
+                    }
+                    attempt += 1;
                 }
-                EnumDistrib[] dists = new EnumDistrib[select.size()];
-                select.toArray(dists);
-                dd.setPrior(dists);
-                this.put(index, dd);
+                if (attempt == 5) { // five attempts
+                    System.err.println("Unable to set " + this);
+                } else {
+                    EnumDistrib[] dists = new EnumDistrib[select.size()];
+                    select.toArray(dists);
+                    dd.setPrior(dists);
+                    this.put(index, dd);
+                }
             } else { // no counts
                 this.table.removeValue(index);
             }

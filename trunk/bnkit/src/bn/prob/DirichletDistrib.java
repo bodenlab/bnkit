@@ -108,14 +108,23 @@ public class DirichletDistrib implements Distrib, Serializable {
     public double get(Object dist) {
         EnumDistrib d = (EnumDistrib) dist;
         double[] pdist = d.get();
-        double prob = 1.0;
+//        double prob = 1.0;
+//        for (int i = 0; i < pdist.length; i++) {
+//            double count_term = alpha[i];
+//            double x = pdist[i];
+//            prob *= Math.pow(x, count_term - 1);
+//        }
+//        prob /= normalize(alpha);
+//        return prob;
+
+        // for longer distributions, this must be done in log space
+        double logp = 0.0;
         for (int i = 0; i < pdist.length; i++) {
-            double count_term = alpha[i];
-            double x = pdist[i];
-            prob *= Math.pow(x, count_term - 1);
+            logp += Math.log(Math.pow(pdist[i], alpha[i] - 1));
         }
-        prob /= normalize(alpha);
-        return prob;
+        double lnormalpha = lnormalize(alpha);
+        logp -= lnormalpha;
+        return Math.exp(logp);
     }
 
     /**
@@ -155,6 +164,25 @@ public class DirichletDistrib implements Distrib, Serializable {
         denom = GammaDistrib.gamma(denom);
         return numer / denom;
     }
+    
+    /**
+     * Computes the log of the normalization constant for a Dirichlet distribution with
+     * the given parameters.
+     * @param a list of parameters of a Dirichlet distribution
+     * @return the log of the normalization constant for such a distribution
+     */
+    public static final double lnormalize(double[] params) {
+        double denom = 0.0;
+        double lnumer = 0.0;
+        for (double param: params) {
+            lnumer += GammaDistrib.lgamma(param);
+            denom += param;
+        }
+        double ldenom = GammaDistrib.lgamma(denom);
+        double logret = lnumer - denom;
+        return logret;
+    }
+    
     
     /**
      * String representation of the Dirichlet distribution, containing alpha values.
