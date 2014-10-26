@@ -17,6 +17,8 @@
  */
 package dat;
 
+import dat.file.FastaReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,14 +29,31 @@ import java.util.List;
  */
 public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
 
+    String name;
+    
     public EnumSeq(E elementType) {
         super(elementType);
     }
     
-    public static <T extends Enumerable> List<EnumSeq<T>> loadFasta(String filename) {
+    public void setName(String name) {
+        this.name = name;
+    }
+    
+    public String getName() {
+        return name;
+    }
+    
+    public static <T extends Enumerable> List<EnumSeq<T>> loadFasta(String filename, T elementType) throws IOException {
         List<EnumSeq<T>> seqs = new ArrayList<>();
-        // ... TODO
-        
+        FastaReader r = new FastaReader(filename, elementType);
+        EnumSeq[] rseqs = r.load();
+        for (EnumSeq rseq : rseqs) {
+            try {
+                seqs.add((EnumSeq<T>) rseq);
+            }catch (ClassCastException e) {
+            }
+        }
+        r.close();
         return seqs;
     }
     
@@ -51,10 +70,10 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
         public boolean isValid(Object value) {
             try {
                 Object[] myarr = (Object[]) value;
-                for (Object myarr1 : myarr) {
-                    if (myarr1 == null)
+                for (Object ch : myarr) {
+                    if (ch == null)
                         continue;
-                    if (!elementType.isValid(myarr1)) 
+                    if (!elementType.isValid(ch)) 
                         return false;
                 }
             } catch (ClassCastException e) {
@@ -73,4 +92,13 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
 
     public static Gappy<Enumerable> aacid_gapseq = new Gappy<>(Enumerable.aacid);
     public static Gappy<Enumerable> nacid_gapseq = new Gappy<>(Enumerable.nacid);
+
+    public static class Alignment<E extends Enumerable> {
+        
+        public Alignment(List<EnumSeq.Gappy<E>> aseqs) {
+            
+        }
+        
+    }
+    
 }
