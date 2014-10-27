@@ -122,10 +122,16 @@ public class DirDTExample {
         BNet bn2 = new BNet();
         bn2.add(g2,c2,s2);
 
+        for (int index = 0; index < G2.size(); index ++) {
+            c2.put(index, new DirichletDistrib(colours2, ((EnumDistrib)data[index*16][1]).get()));
+            s2.put(index, new DirichletDistrib(colours2, ((EnumDistrib)data[index*16][2]).get()));
+        }
+        
         EM em = new EM(bn2);
-        em.EM_MAX_ROUNDS = 1;
+        s2.print();
+        em.EM_MAX_ROUNDS = 10;
         em.EM_PRINT_STATUS = false;
-        for (int round = 0; round < 5; round ++) {
+        for (int round = 0; round < 1; round ++) {
             em.train(data, new Variable[] {G2, C2, S2}, 0);
             c2.setInstance(new EnumDistrib(colours, new double[] {0.3, 0.3, 0.4})); // primarily blue, but the gender node is latent...
             inf = new VarElim();
@@ -135,6 +141,7 @@ public class DirDTExample {
             d2 = r.query(G2);
             System.out.println("Prob of cluster: " + d2);
         }
+        s2.print();
         r.display();
         d1 = r.query(S2);
         System.out.println("Prob of sports: " + d1);

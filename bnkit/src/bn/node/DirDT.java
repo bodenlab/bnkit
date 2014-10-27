@@ -261,7 +261,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     }
                 } 
             }
-            // ft = Factorize.getNormal(ft);
+            //ft = Factorize.getNormal(ft);
             if (!sumout.isEmpty()) {
                 Variable[] sumout_arr = new Variable[sumout.size()];
                 sumout.toArray(sumout_arr);
@@ -488,6 +488,87 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     table.setValue(i, new DirichletDistrib((Enumerable)this.var.getDomain().getDomain(), (1+Math.abs(rand.nextGaussian()))));
             }
         }
+    }
+
+    private class DnIpair { 
+        Double p;
+        Integer i;
+        DnIpair(Double p, Integer i) { this.p = p; this.i = i; }
+    }
+    
+    /**
+     * Find the best parameter setting for the observed data.
+     * This uses a method to find the ML estimate for the Dirichlet from
+     * a set of EnumDistribs, counted in countInstance.
+     * The current version weights observations using sampling.
+     * Set resolution to a smaller value for big data sets (minimum 1), 
+     * greater value for higher precision (less stochasticity).
+     */
+    //@Override
+    public void maximizeInstance_kmeans() {
+        if (count.isEmpty()) {
+            return;
+        }
+        Random rand = new Random();
+        Enumerable e = this.var.getDomain().getDomain();
+        EnumTable<List<Sample<EnumDistrib>>> samples = count.getTable();
+        if (samples != null) {
+            Map<EnumDistrib, DnIpair> sample2index = new HashMap<>(); 
+            for (Map.Entry<Integer, List<Sample<EnumDistrib>>> entry : samples.getMapEntries()) {
+                int index = entry.getKey();
+                for (Sample<EnumDistrib> sample : entry.getValue()) {
+                    double p = sample.prob;
+                    EnumDistrib ed = sample.instance;
+                    DnIpair prev = sample2index.get(sample.instance);
+                    if (prev != null) { // found the sample already associated with an index, re-consider?
+                        if (prev.p < p) {
+                            sample2index.put(ed, new DnIpair(p, index));
+                        }
+                    } else 
+                        sample2index.put(ed, new DnIpair(p, index));
+                }
+            }
+            List[] select = new ArrayList[this.table.getSize()];
+            for (int index = 0; index < this.table.getSize(); index ++)
+                select[index] = new ArrayList();
+            int cnt = sample2index.size();
+            for (Map.Entry<EnumDistrib, DnIpair> entry : sample2index.entrySet()) {
+                EnumDistrib ed = entry.getKey();
+                int i = entry.getValue().i;
+                select[i].add(ed);
+            }
+            for (int index = 0; index < this.table.getSize(); index ++) {
+                List selected = select[index];
+                if (selected.isEmpty()) {
+                    for (int attempt = 0; attempt < cnt / this.table.getSize() * 2; attempt ++) {
+                        EnumDistrib stash = null;
+                        int pick = rand.nextInt(cnt);
+                        int accum = 0;
+                        for (int j = 0; j < select.length; j ++) {
+                            if (pick < accum + select[j].size()) {
+                                stash = (EnumDistrib)select[j].remove(pick - accum);
+                                selected.add(stash);
+                                break;
+                            } 
+                            accum += select[j].size();
+                        }
+                    }
+                }
+            }
+            for (int index = 0; index < this.table.getSize(); index ++) {
+                List selected = select[index];
+                DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
+                if (selected.size() > 0) {
+                    EnumDistrib[] dists = new EnumDistrib[selected.size()];
+                    selected.toArray(dists);
+                    dd.setPrior(dists);
+                } else {
+                    System.err.println("Cannot happen");
+                }
+                this.put(index, dd);
+            }
+        }
+        count.setEmpty();
     }
 
     /**
