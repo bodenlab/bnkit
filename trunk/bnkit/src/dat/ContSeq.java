@@ -19,11 +19,14 @@
 package dat;
 
 /**
- * Continuous domain definition. 
+ * Domain definition for a real vector--a sequence of continuous elements. 
  * For checking validity of values for variables that belong to this domain.
- * @author mikael
  */
-public class ContVector implements Domain {
+public class ContSeq extends SeqDomain<Continuous> {
+
+    public ContSeq(Continuous elementType) {
+        super(elementType);
+    }
 
     public boolean isValid(Object value) {
         try {
