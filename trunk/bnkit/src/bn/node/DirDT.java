@@ -500,9 +500,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
      * Find the best parameter setting for the observed data.
      * This uses a method to find the ML estimate for the Dirichlet from
      * a set of EnumDistribs, counted in countInstance.
-     * The current version weights observations using sampling.
-     * Set resolution to a smaller value for big data sets (minimum 1), 
-     * greater value for higher precision (less stochasticity).
+     * The current version doe not weight samples but collects them similar to
+     * how k-means operate.
      */
     //@Override
     public void maximizeInstance_kmeans() {
