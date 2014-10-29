@@ -287,8 +287,8 @@ public class EnumDistrib implements Distrib, Domain {
         return d;
     }
 
-    public static EnumDistrib random(Enumerable discrete) {
-        Random rand = new Random();
+    public static EnumDistrib random(Enumerable discrete, long seed) {
+        Random rand = new Random(seed);
         EnumDistrib d = new EnumDistrib(discrete);
         double sum = 0.0;
         for (int i = 0; i < d.distrib.length; i++) {
@@ -302,6 +302,20 @@ public class EnumDistrib implements Distrib, Domain {
         return d;
     }
 
+    public static EnumDistrib random(Enumerable discrete) {
+        Random rand = new Random();
+        return random(discrete, rand.nextInt());
+    }
+
+    public double getEntropy() {
+        if (!isNormalised()) 
+            normalise();
+        double sum = 0;
+        for (double p : distrib)
+            sum += p * Math.log(p);
+        return -sum;
+    }
+    
     @Override
     public boolean isValid(Object value) {
         try {
