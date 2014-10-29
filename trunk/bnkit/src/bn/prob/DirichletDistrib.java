@@ -5,7 +5,9 @@ import dat.Domain;
 import bn.EnumDistrib;
 import dat.Enumerable;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Implementation of Dirichlet distribution.
@@ -42,6 +44,22 @@ public class DirichletDistrib implements Distrib, Serializable {
     }
 
     /**
+     * Construct a Dirichlet distribution using the provided enumerable distribution
+     * (as location/centre of mass) and the sum of alphas (as concentration around location).
+     * @param location the location (or centre) of mass, j.e. expected value of this Dirichlet distrib
+     * @param alpha_sum the sum of alpha values which indicates the concentration around location
+     */
+    public DirichletDistrib(EnumDistrib location, double alpha_sum) {
+        this.domain = location.getDomain();
+        this.alpha = new double[domain.size()];
+        for (int i = 0; i < alpha.length; i++) 
+            alpha[i] = location.get(i) * alpha_sum;
+        gammas = new GammaDistrib[alpha.length];
+        for (int i = 0; i < gammas.length; i++) 
+            gammas[i] = new GammaDistrib(alpha[i], 1);
+    }
+
+    /**
      * Construct a Dirichlet distribution with the given domain and
      * "alpha" parameter values.
      * @param domain the domain over which this distribution can generate distributions
@@ -60,8 +78,9 @@ public class DirichletDistrib implements Distrib, Serializable {
     
     /** 
      * Construct a Dirichlet distribution based on a magnitude and a multinomial
-     * @param m The magnitude of the Dirichlet: sum_i alpha_i
-     * @param p A probability distribution: p_i = alpha_i / m
+     * @param domain the enumerable domain 
+     * @param m The concentration or magnitude of the Dirichlet: sum_i alpha_i
+     * @param p The location of mass j.e. expected probability distribution: p_i = alpha_i / m
      */
     public DirichletDistrib(Enumerable domain, double[] p, double m) {
         if (domain.size() != p.length)
@@ -70,6 +89,17 @@ public class DirichletDistrib implements Distrib, Serializable {
         this.alpha = new double[p.length];
         for (int i = 0; i < p.length; i ++)
             this.alpha[i] = p[i] * m;
+    }
+    
+    /**
+     * Return sum of alpha (a*).
+     * @return sum of alphas
+     */
+    public double getSum() {
+        double sum = 0;
+        for (double a : alpha)
+            sum += a;
+        return sum;
     }
     
     /**
@@ -83,19 +113,6 @@ public class DirichletDistrib implements Distrib, Serializable {
         }
     }
     
-    /**
-     * Find and set the optimal alpha parameters for a Dirichlet based on given instances of enumerable distribution.
-     * @param dists array of enumerable distributions compatible with this Dirichlet
-     */
-    public void setPrior(EnumDistrib[] dists) {
-        if (dists.length > 0) {
-            double[] ss = DirichletDistrib.getSufficientStatistic(dists, alpha.length);
-            setPrior(DirichletDistrib.findPrior(alpha, ss));
-            return;
-        }
-        throw new RuntimeException("Invalid data for estimation of Dirichlet");
-    }
-    
     public Domain getDomain() {
         return domain;
     }
@@ -105,18 +122,18 @@ public class DirichletDistrib implements Distrib, Serializable {
      * @param dist an enumerable distribution
      * @return the probability
      */
+    @Override
     public double get(Object dist) {
         EnumDistrib d = (EnumDistrib) dist;
         double[] pdist = d.get();
 //        double prob = 1.0;
-//        for (int i = 0; i < pdist.length; i++) {
-//            double count_term = alpha[i];
-//            double x = pdist[i];
+//        for (int j = 0; j < pdist.length; j++) {
+//            double count_term = alpha[j];
+//            double x = pdist[j];
 //            prob *= Math.pow(x, count_term - 1);
 //        }
 //        prob /= normalize(alpha);
 //        return prob;
-
         // for longer distributions, this must be done in log space
         double logp = 0.0;
         for (int i = 0; i < pdist.length; i++) {
@@ -151,7 +168,7 @@ public class DirichletDistrib implements Distrib, Serializable {
     /**
      * Computes the normalization constant for a Dirichlet distribution with
      * the given parameters.
-     * @param a list of parameters of a Dirichlet distribution
+     * @param params list of parameters of a Dirichlet distribution
      * @return the normalization constant for such a distribution
      */
     public static final double normalize(double[] params) {
@@ -168,7 +185,7 @@ public class DirichletDistrib implements Distrib, Serializable {
     /**
      * Computes the log of the normalization constant for a Dirichlet distribution with
      * the given parameters.
-     * @param a list of parameters of a Dirichlet distribution
+     * @param params a list of parameters of a Dirichlet distribution
      * @return the log of the normalization constant for such a distribution
      */
     public static final double lnormalize(double[] params) {
@@ -188,6 +205,7 @@ public class DirichletDistrib implements Distrib, Serializable {
      * String representation of the Dirichlet distribution, containing alpha values.
      * @return string representation of object
      */
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < alpha.length; i ++) {
@@ -200,179 +218,251 @@ public class DirichletDistrib implements Distrib, Serializable {
     }
     
     /**
-     * Retrieve the number of documents that contain exactly a specified number of 
-     * occurrences of a specified word
-     * @param counts the word count matrix [document][word]
-     * @param word the word identifier [0..m]
-     * @param nOccur the number of occurrences of the word we are looking for
-     * @return the number of matching documents
+     * Get the log likelihood of a single histogram of counts.
+     * @param count the histogram
+     * @return the log likelihood assigned to by this Dirichlet
      */
-    private static int getObservations(int[][] counts, int word, int nOccur) {
-        int nDoc = 0;
-        for (int doc = 0; doc < counts.length; doc ++) {
-            if (counts[doc][word] == nOccur)
-                nDoc ++;
-        }
-        return nDoc;
-    }
-    
-    /**
-     * Retrieve the document count histogram for a specified word (indexed by absolute word count)
-     * @param counts the word count matrix [document][word]
-     * @param word the word identifier [0..m]
-     * @return the numbers of matching documents as an array indexed by each word count
-     */
-    private static int[] getHistogram(int[][] counts, int word) {
-        int maxWordCount = 0;
-        for (int doc = 0; doc < counts.length; doc ++) {
-            if (counts[doc][word] > maxWordCount)
-                maxWordCount = counts[doc][word];
-        }
-        int[] ret = new int[maxWordCount + 1];
-        for (int wcnt = 0; wcnt < ret.length; wcnt ++) {
-            int nDoc = 0;
-            for (int doc = 0; doc < counts.length; doc ++) {
-                if (counts[doc][word] == wcnt)
-                    nDoc ++;
-            }
-            ret[wcnt] = nDoc;
-        }
-        return ret;
-    }
-    
-    /**
-     * Retrieve the number of documents that are a specified number of (counted) words long.
-     * Example, getObservationLengths(counts, 20) is the number of documents that are exactly 20 tokens long.	 
-     * @return the number of matching documents
-     */
-    private static int getObservationLengths(int[][] counts, int nWords) {
-        int nDoc = 0;
-        for (int[] count : counts) {
-            int wSum = 0;
-            for (int word = 0; word < count.length; word ++) {
-                wSum += count[word];
-            }
-            if (wSum == nWords)
-                nDoc ++;
-        }
-        return nDoc;
-    }
-    
-    /**
-     * Retrieve the maximum number of words in a document.
-     * Example, getObservationLengths(counts, 20) is the number of documents that are exactly 20 tokens long.	 
-     * @return the number of matching documents
-     */
-    private static int getMaxObservations(int[][] counts) {
-        int wMax = 0;
-        for (int[] count : counts) {
-            int wSum = 0;
-            for (int word = 0; word < count.length; word ++) {
-                wSum += count[word];
-            }
-            if (wSum > wMax)
-                wMax = wSum;
-        }
-        return wMax;
-    }
-    
-    /*
-    The following method findDirichletFromCounts is based on the method 
-    cc.mallet.types.Dirichlet#learnParameters, found in MALLET.
-    This software is copyright (C) 2002 Univ. of Massachusetts Amherst, Computer Science Dept.
-    "MALLET" (MAchine Learning for LanguagE Toolkit).
-    http://www.cs.umass.edu/~mccallum/mallet
-    This software is provided under the terms of the Common Public License,
-    version 1.0, as published by http://www.opensource.org.	For further
-    information, see the file `LICENSE' available with the MALLET software distribution. 
-    */
-    
-    /** 
-     * Learn Dirichlet parameters using frequency histograms.
-     * Currently this implementation has issues, including 
-     * inefficiencies, convergence criterion, and finding negative priors.
-     * @param counts An array of count histograms.
-     * @param alphaStart initial alpha values
-     * @return the new alpha values
-     */ 
-    public double[] findPriorFromCounts(int[][] counts, double[] alphaStart) {
-        return findPriorFromCounts(counts, alphaStart, 1.00001, 1.0, 200);
+    public double logLikelihood(int[] count) {
+        double alpha_star = getSum();
+        int c_star = 0;
+        for (int c : count)
+            c_star += c;
+        double ll = GammaDistrib.lgamma(alpha_star) - GammaDistrib.lgamma(alpha_star + c_star);
+        for (int j = 0; j < alpha.length; j ++) 
+            ll += (GammaDistrib.lgamma(alpha[j] + count[j]) - GammaDistrib.lgamma(alpha[j]));
+        return ll;
     }
 
-    /** 
-     * Learn Dirichlet parameters using frequency histograms
+    /**
+     * Get the log likelihood of a single histogram of counts.
+     * @param count the histogram
+     * @param q the location or centre of the probability mass of the Dirichlet
+     * @param alpha_star the sum of alpha
+     * @return the log likelihood assigned to by this Dirichlet
+     */
+    public static double logLikelihood(int[] count, double[] q, double alpha_star) {
+        int c_star = 0;
+        for (int c : count)
+            c_star += c;
+        double ll = GammaDistrib.lgamma(alpha_star) - GammaDistrib.lgamma(alpha_star + c_star);
+        for (int j = 0; j < q.length; j ++) 
+            ll += (GammaDistrib.lgamma(alpha_star * q[j] + count[j]) - GammaDistrib.lgamma(alpha_star * q[j]));
+        return ll;
+    }
+    
+    /**
+     * Get the log likelihood of multiple histograms of counts
+     * @param counts the histograms
+     * @return the log likelihood of the histograms assigned to by this Dirichlet
+     */
+    public double logLikelihood(int[][] counts) {
+        double sum = 0;
+        for (int[] count : counts)
+            sum += logLikelihood(count);
+        return sum;
+    }
+    
+    /**
+     * Get the log likelihood of multiple histograms of counts.
      * 
-     * @param counts An array of count histograms. <code>observations[10][3]</code> could be the number of documents that contain exactly 3 tokens of word type 10.
-     * @param alphaStart initial alpha values
-     * @param shape Gamma prior E(X) = shape * scale, var(X) = shape * scale<sup>2</sup>
-     * @param scale 
-     * @param numIterations 200 to 1000 generally insures convergence, but 1-5 is often enough to step in the right direction
-     * @return the new alpha values
-     */ 
-    public static double[] findPriorFromCounts(int[][] counts, double[] alphaStart, double shape, double scale, int numIterations) {
-        double parametersSum = 0;
-        //	Initialize the parameters
-        double[] alpha = new double[alphaStart.length];
-        for (int k=0; k < alphaStart.length; k++) {
-            parametersSum += alphaStart[k];
+     * Some of the code below is based on the Gibbs sampling approach reported on in 
+     * XUGANG YE, YI-KUO YU and STEPHEN F. ALTSCHUL
+     * On the Inference of Dirichlet Mixture Priors for Protein Sequence Comparison
+     * JOURNAL OF COMPUTATIONAL BIOLOGY Volume 18, Number 8, 2011
+     * Pp. 941–954 DOI: 10.1089/cmb.2011.0040
+     * 
+     * @param counts the histograms
+     * @param q the location or centre of the probability mass of the Dirichlet
+     * @param alpha_star the sum of alpha
+     * @return the log likelihood of the histograms assigned to by the Dirichlet specified by q and alpha_star
+     */
+    public static double logLikelihood(int[][] counts, double[] q, double alpha_star) {
+        double sum = 0;
+        for (int[] count : counts)
+            sum += logLikelihood(count, q, alpha_star);
+        return sum;
+    }
+    
+    public static double logLikelihood_1stDerivative(int[][] counts, double[] q, double alpha_star) {
+        double sum = 0;
+        for (int[] count : counts) {
+            int c_star = 0;
+            for (int c : count)
+                c_star += c;
+            double inner = GammaDistrib.digamma(alpha_star) - GammaDistrib.digamma(alpha_star + c_star);
+            for (int j = 0; j < count.length; j ++) 
+                inner += q[j] * (GammaDistrib.digamma(q[j] * alpha_star + count[j]) - GammaDistrib.digamma(q[j] * alpha_star));
+            sum += inner;
         }
-        double oldParametersK;
-        double currentDigamma;
-        double denominator;
+        return sum;
+    }
+    
+    public static double logLikelihood_2ndDerivative(int[][] counts, double[] q, double alpha_star) {
+        double sum = 0;
+        for (int[] count : counts) {
+            int c_star = 0;
+            for (int c : count)
+                c_star += c;
+            double inner = GammaDistrib.trigamma(alpha_star) - GammaDistrib.trigamma(alpha_star + c_star);
+            for (int j = 0; j < count.length; j ++) 
+                inner += q[j] * q[j] * (GammaDistrib.trigamma(q[j] * alpha_star + count[j]) - GammaDistrib.trigamma(q[j] * alpha_star));
+            sum += inner;
+        }
+        return sum;
+    }
+    
+    public static double getAlphaSum_byNewton(int[][] counts, double[] q) {
+        double x0 = 1.0; // make an informed choice?
+        double eps = 0.000001; // zero for practical purposes
+        double fprime = logLikelihood_1stDerivative(counts, q, x0);
+        while (fprime > eps) {
+            double fdblprime = logLikelihood_2ndDerivative(counts, q, x0);
+            double x = x0 - fprime / fdblprime;
+            x0 = x;
+            fprime = logLikelihood_1stDerivative(counts, q, x);
+        }
+        return x0;
+    }
+    
+    public static double DL(int[][] data, EnumDistrib m, DirichletDistrib[] dds) {
+        double outer = 0;
+        for (int k = 0; k < data.length; k ++) {
+            double inner = 0;
+            for (int i = 0; i < dds.length; i ++) { 
+                inner += (m.get(i) * Math.exp(dds[i].logLikelihood(data[k])));
+            }
+            outer += Math.log(inner);
+        }
+        return -outer;
+    }
+    
+    
+    public static void main(String[] args) {
+        java.util.Random rand = new java.util.Random(1);
+        DirichletDistrib dd = null;
+        int nbins = 9;
+        EnumDistrib[] eds = new EnumDistrib[nbins];
+        for (int i = 0; i < eds.length; i ++) {
+            eds[i] = EnumDistrib.random(Enumerable.nacid, rand.nextInt());
+            System.out.println("D"+ i + " = " + eds[i]);
+        }
+        int N = 2000;
+        int[][] data = generateData(eds, N, 1);
+        for (int i = 0; i < N; i ++) {
+            System.out.print("[" + i + "]\t= \t");
+            for (int j = 0; j < data[i].length; j ++) 
+                System.out.print(data[i][j] + "\t");
+            System.out.println(" C = " + component[i]);
+        }
+        
+        List[] bins = new ArrayList[nbins]; // hold components here
+        DirichletDistrib[] dds = new DirichletDistrib[nbins];
+        for (int i = 0; i < dds.length; i ++) {
+            dds[i] = new DirichletDistrib(EnumDistrib.random(Enumerable.nacid, rand.nextInt()), 1);
+            dds[i] = new DirichletDistrib(eds[i], 10);
+        }
+        EnumDistrib m = EnumDistrib.random(new Enumerable(nbins), rand.nextInt()); // mixing weights, add to 1
+        m.setSeed(rand.nextInt());
+        EnumDistrib p = EnumDistrib.random(new Enumerable(nbins), rand.nextInt()); // probability that sample belongs to bin
+        p.setSeed(rand.nextInt());
 
-        int nWords = counts[0].length;
-        int nonZeroLimit;
-        int[] nonZeroLimits = new int[nWords];
-        Arrays.fill(nonZeroLimits, -1);
-
-        // The histogram arrays go up to the size of the largest document,
-        //	but the non-zero values will almost always cluster in the low end.
-        //	We avoid looping over empty arrays by saving the index of the largest
-        //	non-zero value.
-        int[] histogram;
-        for (int w = 0; w < nWords; w ++) {
-            histogram = getHistogram(counts, w);
-            int sum = 0;
-            for (int cnt = 0; cnt < histogram.length; cnt++) {
-                sum += histogram[cnt];
-                if (histogram[cnt] > 0) {
-                    nonZeroLimits[w] = cnt;
+        double dl_best = DL(data, m, dds);
+        System.out.println("M = " + m);
+        System.out.println("P = " + p);
+        System.out.println("DL_best = " + dl_best);
+        int no_update = 0;
+        for (int round = 0; round < 100 && no_update < 20; round ++) {
+            for (int i = 0; i < nbins; i ++)
+                bins[i] = new ArrayList(); // start with empty bins
+            int ncorrect = 0;
+            for (int k = 0; k < N; k ++) {
+                for (int i = 0; i < nbins; i ++) {
+                    double prob = (m.get(i) * Math.exp(dds[i].logLikelihood(data[k])));
+                    p.set(i, prob);
                 }
+                int bin = (Integer)p.sample();
+                if (bin == component[k])
+                    ncorrect ++;
+//                System.out.println("P(" + k + ")\t= " + p + " picked " + bin + (bin == component[k]? "\t*": "\t "));
+                bins[bin].add(data[k]);
             }
-        }
-        for (int iteration=0; iteration<numIterations; iteration++) {
-            // Calculate the denominator
-            denominator = 0;
-            currentDigamma = 0;
-            // Iterate over the histogram:
-            int wMax = getMaxObservations(counts);
-            for (int i = 1; i < wMax; i ++) {
-                currentDigamma += 1 / (parametersSum + i - 1);
-                denominator += getObservationLengths(counts, i) * currentDigamma;
-            }
-            // Bayesian estimation Part I
-            denominator -= 1/scale;
-            // Calculate the individual parameters
-            parametersSum = 0;
-            for (int k=0; k<alpha.length; k++) {
-                // What's the largest non-zero element in the histogram?
-                nonZeroLimit = nonZeroLimits[k];
-                oldParametersK = alpha[k];
-                alpha[k] = 0;
-                currentDigamma = 0;
-                histogram = getHistogram(counts, k); // the number of a counts for word k (index by word count)
-                for (int i=1; i <= nonZeroLimit; i++) {
-                    currentDigamma += 1 / (oldParametersK + i - 1);
-                    alpha[k] += histogram[i] * currentDigamma;
+            System.out.println("Correct = " + ncorrect);
+            
+            for (int i = 0; i < nbins; i ++) {
+                double[] location = new double[dds[i].domain.size()];
+                double total = 0;
+                int[][] hists = new int[bins[i].size()][];
+                for (int j = 0; j < bins[i].size(); j ++) {
+                    int[] hist = (int[])bins[i].get(j);
+                    hists[j] = hist;
+                    for (int jj = 0; jj < location.length; jj ++) {
+                        location[jj] += hist[jj];
+                        total += hist[jj];
+                    }
                 }
-                // Bayesian estimation part II
-                alpha[k] = (oldParametersK * alpha[k] + shape) / denominator;
-                parametersSum += alpha[k];
+                for (int jj = 0; jj < location.length; jj ++) 
+                    location[jj] /= total;
+                double alpha_star = getAlphaSum_byNewton(hists, location);
+                for (int jj = 0; jj < location.length; jj ++) 
+                    location[jj] *= alpha_star;
+                dds[i].setPrior(location); // just q, ignores a* (concentration)
+                
+                m.set(i, bins[i].size() / (double)N);
             }
+            //System.out.println("M = " + m);
+            
+            double dl_cur = DL(data, m, dds);
+            if (dl_cur < dl_best) {
+                dl_best = dl_cur;
+                no_update = 0;
+            } else
+                no_update ++;
+                
+            //System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
         }
-        return alpha;
+        System.out.println("M = " + m);
     }
 
+    
+    static int[] component = null;
+    
+    public static int[][] generateData(EnumDistrib[] components, int n, long seed) {
+        java.util.Random rand = new java.util.Random(seed);
+        int[][] data = new int[n][];
+        component = new int[n];
+        for (int i = 0; i < n; i ++) {
+            int bin = rand.nextInt(components.length);
+            component[i] = bin;
+            int nsample = 10 + rand.nextInt(50); // max 60 values are drawn
+            data[i] = new int[components[bin].getDomain().size()];
+            for (int j = 0; j < nsample; j ++)
+                data[i][components[bin].getDomain().getIndex(components[bin].sample())] += 1;
+        }
+        return data;
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /*
     The code below is based on Python code for MLE of Dirichlet copyright Max Sklar.
     // Source: https://github.com/maxsklar/research/tree/master/2014_05_Dirichlet/python
@@ -390,11 +480,26 @@ public class DirichletDistrib implements Distrib, Serializable {
     See the License for the specific language governing permissions and
     limitations under the License.
     */
+    
+    /**
+     * Find and set the optimal alpha parameters for a Dirichlet based on given instances of enumerable distribution.
+     * @param dists array of enumerable distributions compatible with this Dirichlet
+     */
+    public void setPrior(EnumDistrib[] dists) {
+        if (dists.length > 0) {
+            double[] ss = DirichletDistrib.getSufficientStatistic(dists, alpha.length);
+            setPrior(DirichletDistrib.findPrior(alpha, ss));
+            return;
+        }
+        throw new RuntimeException("Invalid data for estimation of Dirichlet");
+    }
+
     /**
      * Find the "sufficient statistic" for a group of multinomials.
      * Essentially, it's the average of the log probabilities.
      * @param multinomials instances of enumerable distributions
      * @param k number of values in distribution
+     * @return 
      */ 
     public static double[] getSufficientStatistic(EnumDistrib[] multinomials, int k) {
         int N = multinomials.length;
@@ -676,8 +781,7 @@ public class DirichletDistrib implements Distrib, Serializable {
                 return trialPriors;
             }
             currentLoss = loss;
-            for (int a = 0; a < currentPriors.length; a ++)
-                currentPriors[a] = trialPriors[a];
+            System.arraycopy(trialPriors, 0, currentPriors, 0, currentPriors.length);
         }
         // Reached max iterations
         // System.out.println("Exited after " + count + " rounds with loss = " + currentLoss);
@@ -685,7 +789,7 @@ public class DirichletDistrib implements Distrib, Serializable {
     }
 
     
-    public static void main(String[] args) {
+    public static void main0(String[] args) {
         java.util.Random rand = new java.util.Random(1);
         Enumerable dom = new Enumerable(2);
         EnumDistrib[] samples = {
@@ -708,20 +812,20 @@ public class DirichletDistrib implements Distrib, Serializable {
 //        System.out.println(d0);
 //        int[][] counts = new int[N][K];
 //        EnumDistrib[] samples = new EnumDistrib[N];
-//        for (int i = 0; i < N; i ++) {
+//        for (int j = 0; j < N; j ++) {
 //            EnumDistrib d = (EnumDistrib) d0.sample();
-//            samples[i] = d;
+//            samples[j] = d;
 //            double p = d0.get(d);
-//            System.out.println(i + ": " + d + " p = " + String.format("%4.2f;", p));
+//            System.out.println(j + ": " + d + " p = " + String.format("%4.2f;", p));
 //        }
 //        double[] ss = DirichletDistrib.getSufficientStatistic(samples, K);
 //        double[] alpha = DirichletDistrib.findPrior(new double[] {0.33,0.33,0.33}, ss);
 //        d0.setPrior(alpha);
 //        System.out.println("Dirichlet Alpha: " + d0);
-//        for (int i = 0; i < 30; i ++) {
+//        for (int j = 0; j < 30; j ++) {
 //            EnumDistrib d = (EnumDistrib) d0.sample();
 //            double p = d0.get(d);
-//            System.out.println(i + ": " + d + " p = " + String.format("%4.2f;", p));
+//            System.out.println(j + ": " + d + " p = " + String.format("%4.2f;", p));
 //        }
         System.out.println("Final loss = " +DirichletDistrib.getTotalLoss(alpha, ss));
         System.out.println("Best loss = " + DirichletDistrib.getTotalLoss(new double[] {1,2}, ss));
@@ -732,8 +836,8 @@ public class DirichletDistrib implements Distrib, Serializable {
 //            dd[j] = new EnumDistrib(Enumerable.nacid);
 //            for (Object sym : Enumerable.nacid.getValues()) {
 //                int cnt = 0;
-//                for (int i = 0; i < dna[j].length(); i ++)
-//                    cnt += (dna[j].charAt(i) == (Character)sym ? 1 : 0);
+//                for (int j = 0; j < dna[j].length(); j ++)
+//                    cnt += (dna[j].charAt(j) == (Character)sym ? 1 : 0);
 //                dd[j].set(sym, (double) cnt / dna[j].length());
 //            }
 //            System.out.println(dd[j]);
@@ -744,7 +848,8 @@ public class DirichletDistrib implements Distrib, Serializable {
 //            System.out.println(d1.sample());
     }
 
-    static String[] dna = {
+    static String[] dna2 = {
+            "AAAAAAAAAACCCCCCCCCCGGGGGGGGGGTTTTTTTTTTAAAAAAACCCCCCCGGGGGGGTTTTTTTAC",
             "TTCGGCACGAGTCTCGGGCGGGAGAAGAAGAAGAATTAGTAAAGTGTGATCATAATGTCTGCTAGCGGCG",
             "GCACCGGAGATGAAGATAAGAAGCCTAATGATCAGATGGTTCATATCAATCTCAAGGTTAAGGGTCAGGA",
             "TGGGAATGAAGTTTTTTTCAGGATCAAACGTAGCACACAGATGCGCAAGCTCATGAATGCTTATTGTGAC",
@@ -752,6 +857,13 @@ public class DirichletDistrib implements Distrib, Serializable {
             "CTGATGAGCTGGAGATGGAGGAGGGTGATGAAATCGATGCAATGCTACATCAAACTGGAGGCAGTTGCTG",
             "CACTTGTTTCTCTAATTTTTAACTTGGTTTATGTTAGTAGATTGTTTAGGGTAATACTTTCAACTCCCTC",
             "ATCTGCTCTAAGATGGGTAAATTTATGAATGTTTAGTTTTCAGTATTAGATGATGACACTACTAAATGGT",
-            "TCAATTTTCATGGCATTTGTAAAAGTTTACTCTTAATATGGTTAAAAA"};
+            "TCAATTTTCATGGCATTTGTAAAAGTTTACTCTTAATATGGTTAAAAAGATGATGACACTACTAAATGGT"};
+    
+    static String[] dna = {
+            "ACGTACGTACGTACGTACGTACGTACGTA",
+            "AAGTAAGTAAGTAAGTAAGTAAGTAAGTC",
+            "AACTAACTAACTAACTAACTAACTAACTG",
+            "AACGAACGAACGAACGAACGAACGAACGT",
+            "CCGTCCGTCCGTCCGTCCGTCCGTCCGTA"};
     
 }
