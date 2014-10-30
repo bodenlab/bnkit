@@ -18,6 +18,7 @@
 
 package bn;
 
+import bn.prob.EnumDistrib;
 import dat.EnumVariable;
 import dat.Variable;
 import dat.Enumerable;

@@ -9,7 +9,7 @@ import bn.BNet;
 import bn.BNode;
 import bn.node.CPT;
 import bn.Distrib;
-import bn.EnumDistrib;
+import bn.prob.EnumDistrib;
 import dat.EnumTable;
 import dat.EnumVariable;
 import dat.Enumerable;

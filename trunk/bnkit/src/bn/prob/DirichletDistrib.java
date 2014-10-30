@@ -2,12 +2,19 @@ package bn.prob;
 
 import bn.Distrib;
 import dat.Domain;
-import bn.EnumDistrib;
 import dat.Enumerable;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Implementation of Dirichlet distribution.
@@ -312,14 +319,17 @@ public class DirichletDistrib implements Distrib, Serializable {
     }
     
     public static double getAlphaSum_byNewton(int[][] counts, double[] q) {
-        double x0 = 1.0; // make an informed choice?
+        double x0  = 1.0; // make an informed choice? See eq 12 in Ye et al (2011).
         double eps = 0.000001; // zero for practical purposes
+        int maxrounds = 1000;
         double fprime = logLikelihood_1stDerivative(counts, q, x0);
-        while (fprime > eps) {
+        int round = 0;
+        while (fprime > eps && round < maxrounds) {
             double fdblprime = logLikelihood_2ndDerivative(counts, q, x0);
             double x = x0 - fprime / fdblprime;
             x0 = x;
             fprime = logLikelihood_1stDerivative(counts, q, x);
+            round ++;
         }
         return x0;
     }
@@ -327,7 +337,7 @@ public class DirichletDistrib implements Distrib, Serializable {
     public static double DL(int[][] data, EnumDistrib m, DirichletDistrib[] dds) {
         double outer = 0;
         for (int k = 0; k < data.length; k ++) {
-            double inner = 0;
+            double inner = 0.001;
             for (int i = 0; i < dds.length; i ++) { 
                 inner += (m.get(i) * Math.exp(dds[i].logLikelihood(data[k])));
             }
@@ -338,28 +348,39 @@ public class DirichletDistrib implements Distrib, Serializable {
     
     
     public static void main(String[] args) {
-        java.util.Random rand = new java.util.Random(1);
-        DirichletDistrib dd = null;
+        
         int nbins = 9;
-        EnumDistrib[] eds = new EnumDistrib[nbins];
-        for (int i = 0; i < eds.length; i ++) {
-            eds[i] = EnumDistrib.random(Enumerable.nacid, rand.nextInt());
-            System.out.println("D"+ i + " = " + eds[i]);
-        }
-        int N = 2000;
-        int[][] data = generateData(eds, N, 1);
+        long seed = 1;
+        String filename = "/Users/mikael/Desktop/mm10_Mixed_NfiX_segmented_500.out";
+        
+        java.util.Random rand = new java.util.Random(seed);
+
+        //int N = 2000;
+        //int[][] data = generateData(eds, N, 1);
+        int[][] data = loadData(filename);
+        int N = data.length;
+        int nseg = 0;
         for (int i = 0; i < N; i ++) {
+            if (i == 0) 
+                nseg = data[i].length;
+            else if (nseg != data[i].length)
+                throw new RuntimeException("Error in data: invalid item at data point " + (i + 1));
             System.out.print("[" + i + "]\t= \t");
             for (int j = 0; j < data[i].length; j ++) 
                 System.out.print(data[i][j] + "\t");
-            System.out.println(" C = " + component[i]);
+            //System.out.println(" C = " + component[i]);
+        }
+        EnumDistrib[] eds = new EnumDistrib[nbins];
+        for (int i = 0; i < eds.length; i ++) {
+            eds[i] = EnumDistrib.random(new Enumerable(nseg), rand.nextInt());
         }
         
         List[] bins = new ArrayList[nbins]; // hold components here
         DirichletDistrib[] dds = new DirichletDistrib[nbins];
         for (int i = 0; i < dds.length; i ++) {
-            dds[i] = new DirichletDistrib(EnumDistrib.random(Enumerable.nacid, rand.nextInt()), 1);
-            dds[i] = new DirichletDistrib(eds[i], 10);
+            dds[i] = new DirichletDistrib(EnumDistrib.random(new Enumerable(nseg), rand.nextInt()), 10);
+            // dds[i] = new DirichletDistrib(eds[i], 10);
+            System.out.println("D"+ i + " = " + dds[i]);
         }
         EnumDistrib m = EnumDistrib.random(new Enumerable(nbins), rand.nextInt()); // mixing weights, add to 1
         m.setSeed(rand.nextInt());
@@ -376,17 +397,22 @@ public class DirichletDistrib implements Distrib, Serializable {
                 bins[i] = new ArrayList(); // start with empty bins
             int ncorrect = 0;
             for (int k = 0; k < N; k ++) {
-                for (int i = 0; i < nbins; i ++) {
-                    double prob = (m.get(i) * Math.exp(dds[i].logLikelihood(data[k])));
-                    p.set(i, prob);
+                try {
+                    double[] logprob = new double[nbins];
+                    for (int i = 0; i < nbins; i ++) {
+                        logprob[i] = (Math.log(m.get(i)) + dds[i].logLikelihood(data[k]));
+                    }
+                    p.set(EnumDistrib.log2Prob(logprob));
+                    int bin = (Integer)p.sample();
+                    //if (bin == component[k])
+                    //    ncorrect ++;
+                    // System.out.println("P(" + k + ")\t= " + p + " picked " + bin); // + (bin == component[k]? "\t*": "\t "));
+                    bins[bin].add(data[k]);
+                } catch (RuntimeException ex0) {
+                    System.err.println("Problem with data point k = " + k);
                 }
-                int bin = (Integer)p.sample();
-                if (bin == component[k])
-                    ncorrect ++;
-//                System.out.println("P(" + k + ")\t= " + p + " picked " + bin + (bin == component[k]? "\t*": "\t "));
-                bins[bin].add(data[k]);
             }
-            System.out.println("Correct = " + ncorrect);
+            //System.out.println("Correct = " + ncorrect);
             
             for (int i = 0; i < nbins; i ++) {
                 double[] location = new double[dds[i].domain.size()];
@@ -418,9 +444,57 @@ public class DirichletDistrib implements Distrib, Serializable {
             } else
                 no_update ++;
                 
-            //System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
+            System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
         }
         System.out.println("M = " + m);
+        
+        // Save results
+        
+        for (int i = 0; i < nbins; i++)
+            bins[i] = new ArrayList(); // start with empty bins
+        for (int k = 0; k < N; k++) {
+            try {
+                double[] logprob = new double[nbins];
+                int best = 0;
+                for (int i = 0; i < nbins; i++) {
+                    logprob[i] = (Math.log(m.get(i)) + dds[i].logLikelihood(data[k]));
+                    if (i > 0 && logprob[i] > logprob[best])
+                        best = i;
+                }
+                p.set(EnumDistrib.log2Prob(logprob));
+                int bin = best;
+                //if (bin == component[k])
+                //    ncorrect ++;
+                //System.out.println("P(" + k + ")\t= " + p + " picked " + bin); // + (bin == component[k]? "\t*": "\t "));
+                bins[bin].add(k);
+            } catch (RuntimeException ex0) {
+                System.err.println("Problem with data point k = " + k);
+            }
+        }
+        for (int i = 0; i < dds.length; i ++) {
+            System.out.println("D"+ i + " = " + dds[i]);
+        }
+
+        for (int i = 0; i < nbins; i ++) {
+            try {
+                BufferedWriter bw = new BufferedWriter(new FileWriter(filename + "_bin_" + i + ".out"));
+                for (int a = 0; a < bins[i].size(); a ++) {
+                    int k = (Integer)bins[i].get(a);
+                    bw.write(k + "\t");
+                    for (int j = 0; j < data[k].length; j ++)
+                        bw.write(data[k][j] + "\t");
+                    bw.write(k + "\t");
+                    EnumDistrib d = new EnumDistrib(new Enumerable(nseg), data[k]);
+                    for (int j = 0; j < d.getDomain().size(); j ++)
+                        bw.write(d.get(j) + "\t");
+                    bw.newLine();
+                }
+                bw.close();
+            } catch (IOException ex) {
+                Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+
     }
 
     
@@ -441,7 +515,38 @@ public class DirichletDistrib implements Distrib, Serializable {
         return data;
     }
     
-    
+    public static int[][] loadData(String filename) {
+        BufferedReader br = null;
+        int[][] data = null;
+        try {
+            br = new BufferedReader(new FileReader(filename));
+            String line = br.readLine();
+            List<int[]> alldata = new ArrayList<>();
+            while (line != null) {
+                String[] tokens = line.split("\t");
+                int[] values = new int[tokens.length];
+                try {
+                    for (int i = 0; i < tokens.length; i ++) {
+                        values[i] = Integer.valueOf(tokens[i]);
+                    }
+                } catch (NumberFormatException ex2) {
+                    System.err.println("Ignored: " + line);
+                }
+                alldata.add(values);
+                line = br.readLine();
+            }
+            data = new int[alldata.size()][];
+            for (int k = 0; k < data.length; k ++) {
+                data[k] = new int[alldata.get(k).length];
+                for (int j = 0; j < data[k].length; j ++) 
+                    data[k][j] = alldata.get(k)[j];
+            }
+            br.close();
+        } catch (IOException ex) {
+            Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return data;
+    }
     
     
     
