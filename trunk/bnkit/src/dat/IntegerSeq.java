@@ -61,4 +61,13 @@ public class IntegerSeq extends SeqDomain<Continuous> {
             values[i] = (Integer)arr[i];
         return values;
     }
+    
+    public static IntegerSeq intSeq(int[] hist) {
+        IntegerSeq is = new IntegerSeq(new Continuous());
+        Object[] arr = new Object[hist.length];
+        for (int i = 0; i < arr.length; i ++)
+            arr[i] = hist[i];
+        is.set(arr);
+        return is;
+    }
 }

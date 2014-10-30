@@ -593,22 +593,11 @@ public class DirDT implements BNode, TiedNode, Serializable {
                 if (selected.size() > 0) {
                     IntegerSeq[] dists = new IntegerSeq[selected.size()];
                     selected.toArray(dists);
-                    double[] location = new double[e.size()];
-                    double total = 0;
-                    double[][] hists = new double[selected.size()][location.length];
+                    int[][] hists = new int[selected.size()][];
                     for (int j = 0; j < hists.length; j ++) {
-                        int[] hist = IntegerSeq.intArray(((IntegerSeq)selected.get(j)).get());
-                        for (int jj = 0; jj < location.length; jj ++) {
-                            hists[j][jj] = hist[jj];
-                            location[jj] += hist[jj];
-                            total += hist[jj];
-                        }
+                        hists[j] = IntegerSeq.intArray(((IntegerSeq)selected.get(j)).get());
                     }
-                    for (int jj = 0; jj < location.length; jj ++) 
-                        location[jj] /= total;
-                    double alpha_star = DirichletDistrib.getAlphaSum_byNewton(hists, location);
-                    for (int jj = 0; jj < location.length; jj ++) 
-                        location[jj] *= alpha_star;
+                    double[] location = DirichletDistrib.getAlpha(hists);
                     DirichletDistrib dd = new DirichletDistrib(e, location);
                     table.setValue(index, dd);
                 } else {
@@ -634,52 +623,18 @@ public class DirDT implements BNode, TiedNode, Serializable {
         for (int index = 0; index < this.table.getSize(); index ++) {
             List<Sample<IntegerSeq>> samples = count.getAll(index);
             if (samples != null) {
-                List<IntegerSeq> select = new ArrayList<>();
-                // figure out which sampling resolution that should be used
-                int[] resolutions = new int[] {1, 5, 20}; // try these resolutions
-                double[] cost = new double[] {1.0, 1.1, 1.2}; // how much each resolution "costs"
-                double[] err = new double[resolutions.length];
-                for (Sample<IntegerSeq> sample : samples) {
-                    for (int j = 0; j < err.length; j ++) {
-                        double prod = sample.prob * resolutions[j];
-                        err[j] += Math.abs((int)prod - prod) * cost[j];
-                    }
+                int[][] hists = new int[samples.size()][];
+                double[] probs = new double[samples.size()];
+                // do the calculations
+                for (int j = 0; j < samples.size(); j ++) {
+                    Sample<IntegerSeq> sample = samples.get(j);
+                    IntegerSeq d = (IntegerSeq)sample.instance;
+                    probs[j] = sample.prob;
+                    hists[j] = IntegerSeq.intArray(sample.instance.get());
                 }
-                int best = 0;
-                for (int j = 1; j < err.length; j ++) {
-                    if (err[j] < err[best])
-                        best = j;
-                }
-                int resolution = resolutions[best];
-                int attempt = 0;
-                while (select.size() == 0 && attempt < 5) { // there is at least one sample, so some "resolution" should result in a selection
-                    if (attempt > 0) { // re-try, so double resolution
-                        resolution *= 2; 
-                    }
-                    // System.err.println("picked resolution " + resolution + " at err = " + err[best]);
-                    // do the calculations
-                    for (int j = 0; j < samples.size(); j ++) {
-                        Sample<IntegerSeq> sample = samples.get(j);
-                        IntegerSeq d = (IntegerSeq)sample.instance;
-                        // should be using prob more effectively, but not so yet...
-                        double prob = sample.prob;
-                        for (int k = 0; k < resolution; k ++) {
-                            if (rand.nextDouble() <= prob)
-                                select.add(d);
-                        }
-                    }
-                    attempt += 1;
-                }
-                if (attempt == 5) { // five attempts
-                    //System.err.println("Unable to set " + this);
-                } else {
-                    IntegerSeq[] dists = new IntegerSeq[select.size()];
-                    select.toArray(dists);
-                    // dd.setPrior(dists);
-                                    DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
-
-                    this.put(index, dd);
-                }
+                double[] alpha = DirichletDistrib.getAlpha(hists, probs);
+                DirichletDistrib dd = new DirichletDistrib(e, alpha);
+                this.put(index, dd);
             } else { // no counts
                 this.table.removeValue(index);
             }

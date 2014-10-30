@@ -290,45 +290,45 @@ public class DirichletDistrib implements Distrib, Serializable {
         return sum;
     }
     
-    public static double logLikelihood_1stDerivative(double[][] counts, double[] q, double alpha_star) {
+    public static double logLikelihood_1stDerivative(double[][] counts, double[] p, double[] q, double alpha_star) {
         double sum = 0;
-        for (double[] count : counts) {
+        for (int k = 0; k < counts.length; k ++) {
             int c_star = 0;
-            for (double c : count)
+            for (double c : counts[k])
                 c_star += c;
             double inner = GammaDistrib.digamma(alpha_star) - GammaDistrib.digamma(alpha_star + c_star);
-            for (int j = 0; j < count.length; j ++) 
-                inner += q[j] * (GammaDistrib.digamma(q[j] * alpha_star + count[j]) - GammaDistrib.digamma(q[j] * alpha_star));
-            sum += inner;
+            for (int j = 0; j < counts[k].length; j ++) 
+                inner += q[j] * (GammaDistrib.digamma(q[j] * alpha_star + counts[k][j]) - GammaDistrib.digamma(q[j] * alpha_star));
+            sum += (inner * p[k]);
         }
         return sum;
     }
     
-    public static double logLikelihood_2ndDerivative(double[][] counts, double[] q, double alpha_star) {
+    public static double logLikelihood_2ndDerivative(double[][] counts, double[] p, double[] q, double alpha_star) {
         double sum = 0;
-        for (double[] count : counts) {
+        for (int k = 0; k < counts.length; k ++) {
             int c_star = 0;
-            for (double c : count)
+            for (double c : counts[k])
                 c_star += c;
             double inner = GammaDistrib.trigamma(alpha_star) - GammaDistrib.trigamma(alpha_star + c_star);
-            for (int j = 0; j < count.length; j ++) 
-                inner += q[j] * q[j] * (GammaDistrib.trigamma(q[j] * alpha_star + count[j]) - GammaDistrib.trigamma(q[j] * alpha_star));
-            sum += inner;
+            for (int j = 0; j < counts[k].length; j ++) 
+                inner += q[j] * q[j] * (GammaDistrib.trigamma(q[j] * alpha_star + counts[k][j]) - GammaDistrib.trigamma(q[j] * alpha_star));
+            sum += (inner * p[k]);
         }
         return sum;
     }
     
-    public static double getAlphaSum_byNewton(double[][] counts, double[] q) {
+    public static double getAlphaSum_byNewton(double[][] counts, double[] p, double[] q) {
         double x0  = 1.0; // make an informed choice? See eq 12 in Ye et al (2011).
         double eps = 0.000001; // zero for practical purposes
         int maxrounds = 1000;
-        double fprime = logLikelihood_1stDerivative(counts, q, x0);
+        double fprime = logLikelihood_1stDerivative(counts, p, q, x0);
         int round = 0;
         while (fprime > eps && round < maxrounds) {
-            double fdblprime = logLikelihood_2ndDerivative(counts, q, x0);
+            double fdblprime = logLikelihood_2ndDerivative(counts, p, q, x0);
             double x = x0 - fprime / fdblprime;
             x0 = x;
-            fprime = logLikelihood_1stDerivative(counts, q, x);
+            fprime = logLikelihood_1stDerivative(counts, p, q, x);
             round ++;
         }
         return x0;
@@ -340,7 +340,7 @@ public class DirichletDistrib implements Distrib, Serializable {
      * The method is based on Ye et al (2011), adapted to consider fractions of counts.
      * @param counts an array of histograms
      * @param prob the probabilities, one for each histogram
-     * @return the alpha values as determined from the 
+     * @return the alpha values
      */
     public static double[] getAlpha(int[][] counts, double[] prob) {
         if (counts != null) {
@@ -351,20 +351,33 @@ public class DirichletDistrib implements Distrib, Serializable {
                 for (int j = 0; j < counts.length; j ++) {
                     int[] hist = counts[j];
                     for (int jj = 0; jj < location.length; jj ++) {
-                        hists[j][jj] = hist[jj] * prob[j];
-                        location[jj] += hists[j][jj];
-                        total += hists[j][jj];
+                        hists[j][jj] = hist[jj];
+                        location[jj] += hist[jj] * prob[j];
+                        total += hist[jj] * prob[j];
                     }
                 }
                 for (int jj = 0; jj < location.length; jj ++) 
                     location[jj] /= total;
-                double alpha_star = DirichletDistrib.getAlphaSum_byNewton(hists, location);
+                double alpha_star = DirichletDistrib.getAlphaSum_byNewton(hists, prob, location);
                 for (int jj = 0; jj < location.length; jj ++) 
                     location[jj] *= alpha_star;
+                return location;
             }
         }
-
         return null;
+    }
+    
+    /**
+     * Determine alpha values for a Dirichlet based on a collection of count histograms,
+     * where each histogram is assumed to have been generated by this distribution.
+     * The method is based on Ye et al (2011).
+     * @param counts an array of histograms
+     * @return the alpha values
+     */
+    public static double[] getAlpha(int[][] counts) {
+        double[] p = new double[counts.length];
+        Arrays.fill(p, 1.0);
+        return getAlpha(counts, p);
     }
     
     public static double DL(int[][] data, EnumDistrib m, DirichletDistrib[] dds) {
@@ -448,25 +461,12 @@ public class DirichletDistrib implements Distrib, Serializable {
             //System.out.println("Correct = " + ncorrect);
             
             for (int i = 0; i < nbins; i ++) {
-                double[] location = new double[dds[i].domain.size()];
-                double total = 0;
-                double[][] hists = new double[bins[i].size()][location.length]; // a double version of counts
+                int[][] hists = new int[bins[i].size()][];
                 for (int j = 0; j < bins[i].size(); j ++) {
-                    int[] hist = (int[])bins[i].get(j);
-                    for (int jj = 0; jj < hist.length; jj ++)
-                        hists[j][jj] = (double) hist[jj];
-                    for (int jj = 0; jj < location.length; jj ++) {
-                        location[jj] += hist[jj];
-                        total += hist[jj];
-                    }
+                    hists[j] = (int[])bins[i].get(j);
                 }
-                for (int jj = 0; jj < location.length; jj ++) 
-                    location[jj] /= total;
-                double alpha_star = getAlphaSum_byNewton(hists, location);
-                for (int jj = 0; jj < location.length; jj ++) 
-                    location[jj] *= alpha_star;
-                dds[i].setPrior(location); // just q, ignores a* (concentration)
-                
+                double[] alpha = getAlpha(hists);
+                dds[i].setPrior(alpha); // 
                 m.set(i, bins[i].size() / (double)N);
             }
             //System.out.println("M = " + m);

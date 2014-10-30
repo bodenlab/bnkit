@@ -99,14 +99,14 @@ public class DirDTExample {
                 EnumDistrib e1 = (EnumDistrib)colours_male.sample();
                 IntegerSeq is = new IntegerSeq(new Continuous());
                 int[] arr = new int[3];
-                for (int j = 0; j < rand.nextInt(50); j ++) 
+                for (int j = 0; j < rand.nextInt(100); j ++) 
                     arr[e1.getDomain().getIndex(e1.sample())] ++;
                 is.set(IntegerSeq.objArray(arr));
                 data[i][1] = is;
                 EnumDistrib e2 = (EnumDistrib)sports_male.sample();
                 is = new IntegerSeq(new Continuous());
                 arr = new int[3];
-                for (int j = 0; j < rand.nextInt(50); j ++) 
+                for (int j = 0; j < rand.nextInt(100); j ++) 
                     arr[e2.getDomain().getIndex(e2.sample())] ++;
                 is.set(IntegerSeq.objArray(arr));
                 data[i][2] = is;
@@ -115,14 +115,14 @@ public class DirDTExample {
                 EnumDistrib e1 = (EnumDistrib)colours_female.sample();
                 IntegerSeq is = new IntegerSeq(new Continuous());
                 int[] arr = new int[3];
-                for (int j = 0; j < rand.nextInt(50); j ++) 
+                for (int j = 0; j < rand.nextInt(100); j ++) 
                     arr[e1.getDomain().getIndex(e1.sample())] ++;
                 is.set(IntegerSeq.objArray(arr));
                 data[i][1] = is;
                 EnumDistrib e2 = (EnumDistrib)sports_female.sample();
                 is = new IntegerSeq(new Continuous());
                 arr = new int[3];
-                for (int j = 0; j < rand.nextInt(50); j ++) 
+                for (int j = 0; j < rand.nextInt(100); j ++) 
                     arr[e2.getDomain().getIndex(e2.sample())] ++;
                 is.set(IntegerSeq.objArray(arr));
                 data[i][2] = is;
@@ -161,23 +161,72 @@ public class DirDTExample {
         c2.print();
         s2.randomize(1);
         s2.print();
-        em.EM_MAX_ROUNDS = 100;
-        em.EM_PRINT_STATUS = false;
+        em.EM_MAX_ROUNDS = 5;
+ //       em.EM_PRINT_STATUS = false;
+
         em.train(data, new Variable[] {G2, C2, S2}, 0);
-        System.out.println("After EM");
+
+        System.out.println("After EM (1)");
         g2.print();
         c2.print();
         s2.print();
 
-        c2.setInstance(new EnumDistrib(colours, new double[] {0.3, 0.3, 0.4})); // primarily blue, but the gender node is latent...
+        c2.setInstance(new EnumDistrib(colours, new double[] {0.1, 0.1, 0.8})); // primarily blue
         inf = new VarElim();
         inf.instantiate(bn2);
         q = inf.makeQuery(G2,S2);
+        System.out.println(q);
         r = (CGTable) inf.infer(q);
-        d2 = r.query(G2);
-        System.out.println("Prob of cluster: " + d2);
         r.display();
-        d1 = r.query(S2);
-        System.out.println("Prob of sports: " + d1);
+        c2.setInstance(new EnumDistrib(colours, new double[] {0.8, 0.1, 0.1})); // primarily pink
+        q = inf.makeQuery(G2,S2);
+        System.out.println(q);
+        r = (CGTable) inf.infer(q);
+        r.display();
+
+        em.train(data, new Variable[] {G2, C2, S2}, 0);
+
+        System.out.println("After EM (2)");
+        g2.print();
+        c2.print();
+        s2.print();
+
+        //c2.setInstance(new EnumDistrib(colours, new double[] {0.1, 0.1, 0.8})); // primarily blue
+        c2.setInstance(IntegerSeq.intSeq(new int[] {1,1,8}));
+        inf = new VarElim();
+        inf.instantiate(bn2);
+        q = inf.makeQuery(G2,S2);
+        System.out.println(q);
+        r = (CGTable) inf.infer(q);
+        r.display();
+        //c2.setInstance(new EnumDistrib(colours, new double[] {0.8, 0.1, 0.1})); // primarily pink
+        c2.setInstance(IntegerSeq.intSeq(new int[] {8,1,1}));
+        q = inf.makeQuery(G2,S2);
+        System.out.println(q);
+        r = (CGTable) inf.infer(q);
+        r.display();
+
+        em.EM_MAX_ROUNDS = 1000;
+        em.train(data, new Variable[] {G2, C2, S2}, 0);
+
+        System.out.println("After EM (3)");
+        g2.print();
+        c2.print();
+        s2.print();
+
+        //c2.setInstance(new EnumDistrib(colours, new double[] {0.1, 0.1, 0.8})); // primarily blue
+        c2.setInstance(IntegerSeq.intSeq(new int[] {1,1,8}));
+        inf = new VarElim();
+        inf.instantiate(bn2);
+        q = inf.makeQuery(G2,S2);
+        System.out.println(q);
+        r = (CGTable) inf.infer(q);
+        r.display();
+        //c2.setInstance(new EnumDistrib(colours, new double[] {0.8, 0.1, 0.1})); // primarily pink
+        c2.setInstance(IntegerSeq.intSeq(new int[] {8,1,1}));
+        q = inf.makeQuery(G2,S2);
+        System.out.println(q);
+        r = (CGTable) inf.infer(q);
+        r.display();
     }
 }
