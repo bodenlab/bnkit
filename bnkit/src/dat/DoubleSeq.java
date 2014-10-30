@@ -32,11 +32,19 @@ public class DoubleSeq extends SeqDomain<Continuous> {
         try {
             Iterable iter = (Iterable)value;
             for (Object elem : iter) {
-                Double x = (Double) value;
+                Double x = (Double) elem;
             }
             return true;
-        } catch (ClassCastException e) {
-            return false;
+        } catch (ClassCastException e1) {
+            try {
+                Object[] iter = (Object[])value;
+                for (Object elem : iter) {
+                    Double x = (Double) elem;
+                }            
+                return true;
+            } catch (ClassCastException e2) {
+                return false;
+            }
         }
     }
 }
