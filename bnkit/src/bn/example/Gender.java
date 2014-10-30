@@ -16,6 +16,7 @@
  */
 
 package bn.example;
+import bn.prob.EnumDistrib;
 import bn.node.CPT;
 import bn.node.GDT;
 import dat.EnumVariable;

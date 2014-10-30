@@ -19,7 +19,7 @@
 package bn.alg;
 
 import bn.Distrib;
-import bn.EnumDistrib;
+import bn.prob.EnumDistrib;
 import dat.EnumTable;
 import dat.EnumVariable;
 import bn.factor.Factor;

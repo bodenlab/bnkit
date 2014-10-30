@@ -15,8 +15,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package bn;
+package bn.prob;
 
+import bn.Distrib;
 import dat.Domain;
 import dat.Enumerable;
 import java.util.Map;
@@ -70,6 +71,26 @@ public class EnumDistrib implements Distrib, Domain {
             valid = true;
             normalise();
         }
+    }
+
+    /**
+     * Initialise a probability distribution for a specified (enumerable)
+     * domain.
+     *
+     * @param discrete the categorical domain (that defines enumerable values)
+     * @param count counts of values (will normalise)
+     */
+    public EnumDistrib(Enumerable discrete, int... count) {
+        domain = discrete;
+        if (count.length == discrete.size()) {
+            this.distrib = new double[discrete.size()];
+            for (int i = 0; i < distrib.length; i++) {
+                this.distrib[i] = count[i];
+            }
+            valid = true;
+            normalise();
+        } else
+            throw new RuntimeException("Invalid EnumDistrib");
     }
 
     /**
@@ -326,4 +347,23 @@ public class EnumDistrib implements Distrib, Domain {
         }
     }
 
+    public static double[] log2Prob(double[] logprobs) {
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+        double[] p = new double[logprobs.length];
+        for (int i = 0; i < logprobs.length; i ++) {
+            if (logprobs[i] < min) 
+                min = logprobs[i];
+            if (logprobs[i] > max)
+                max = logprobs[i];
+        }
+        double sum = 0;
+        for (int i = 0; i < logprobs.length; i ++) {
+            p[i] = Math.exp(logprobs[i] - max);
+            sum += p[i];
+        }        
+        for (int i = 0; i < logprobs.length; i ++)
+            p[i] /= sum;
+        return p;
+    }
 }

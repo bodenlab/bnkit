@@ -22,9 +22,9 @@ package dat;
  * Domain definition for a real vector--a sequence of continuous elements. 
  * For checking validity of values for variables that belong to this domain.
  */
-public class ContSeq extends SeqDomain<Continuous> {
+public class IntegerSeq extends SeqDomain<Continuous> {
 
-    public ContSeq(Continuous elementType) {
+    public IntegerSeq(Continuous elementType) {
         super(elementType);
     }
 
@@ -32,7 +32,7 @@ public class ContSeq extends SeqDomain<Continuous> {
         try {
             Iterable iter = (Iterable)value;
             for (Object elem : iter) {
-                Double x = (Double) value;
+                Integer x = (Integer) value;
             }
             return true;
         } catch (ClassCastException e) {

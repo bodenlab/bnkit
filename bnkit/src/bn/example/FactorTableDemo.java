@@ -10,7 +10,7 @@ import bn.BNet;
 import bn.BNode;
 import bn.node.CPT;
 import bn.node.GDT;
-import bn.EnumDistrib;
+import bn.prob.EnumDistrib;
 import dat.EnumVariable;
 import dat.Enumerable;
 import bn.prob.GaussianDistrib;
