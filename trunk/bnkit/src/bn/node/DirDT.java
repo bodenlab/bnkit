@@ -531,8 +531,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
      * The current version doe not weight samples but collects them similar to
      * how k-means operate.
      */
-    @Override
-    public void maximizeInstance() {
+    //@Override
+    public void maximizeInstance_Gibbs() {
         if (count.isEmpty()) {
             return;
         }
@@ -595,11 +595,11 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     selected.toArray(dists);
                     double[] location = new double[e.size()];
                     double total = 0;
-                    int[][] hists = new int[selected.size()][];
+                    double[][] hists = new double[selected.size()][location.length];
                     for (int j = 0; j < hists.length; j ++) {
-                        int[] hist = (int[])selected.get(j);
-                        hists[j] = hist;
+                        int[] hist = IntegerSeq.intArray(((IntegerSeq)selected.get(j)).get());
                         for (int jj = 0; jj < location.length; jj ++) {
+                            hists[j][jj] = hist[jj];
                             location[jj] += hist[jj];
                             total += hist[jj];
                         }
@@ -610,6 +610,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     for (int jj = 0; jj < location.length; jj ++) 
                         location[jj] *= alpha_star;
                     DirichletDistrib dd = new DirichletDistrib(e, location);
+                    table.setValue(index, dd);
                 } else {
                     System.err.println("Cannot happen");
                 }
@@ -622,12 +623,9 @@ public class DirDT implements BNode, TiedNode, Serializable {
      * Find the best parameter setting for the observed data.
      * This uses a method to find the ML estimate for the Dirichlet from
      * a set of EnumDistribs, counted in countInstance.
-     * The current version weights observations using sampling.
-     * Set resolution to a smaller value for big data sets (minimum 1), 
-     * greater value for higher precision (less stochasticity).
      */
-    //@Override
-    public void maximizeInstance_EM() {
+    @Override
+    public void maximizeInstance() {
         if (count.isEmpty()) {
             return;
         }
@@ -636,7 +634,6 @@ public class DirDT implements BNode, TiedNode, Serializable {
         for (int index = 0; index < this.table.getSize(); index ++) {
             List<Sample<IntegerSeq>> samples = count.getAll(index);
             if (samples != null) {
-                DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
                 List<IntegerSeq> select = new ArrayList<>();
                 // figure out which sampling resolution that should be used
                 int[] resolutions = new int[] {1, 5, 20}; // try these resolutions
@@ -679,6 +676,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     IntegerSeq[] dists = new IntegerSeq[select.size()];
                     select.toArray(dists);
                     // dd.setPrior(dists);
+                                    DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
+
                     this.put(index, dd);
                 }
             } else { // no counts

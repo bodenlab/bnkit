@@ -26,8 +26,11 @@ import dat.Enumerable;
 import bn.prob.DirichletDistrib;
 import bn. *;
 import bn.alg.*;
+import dat.Continuous;
+import dat.IntegerSeq;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  *
@@ -37,6 +40,8 @@ public class DirDTExample {
     
     public static void main(String[] args) {
 
+        Random rand = new Random(1);
+        
         // Define variables
         EnumVariable G = Predef.Nominal(new String[] {"Male", "Female"}, "Gender");
         Enumerable colours = new Enumerable(new String[] {"Pink", "Green", "Blue"});
@@ -80,7 +85,7 @@ public class DirDTExample {
         System.out.println();
         Distrib d2 = r.query(G);
         System.out.println("Prob of gender: " + d2);
-        
+                
         // re-training
         DirichletDistrib colours_male = new DirichletDistrib(colours, new double[] {3.0, 5.0, 7.0});
         DirichletDistrib colours_female = new DirichletDistrib(colours, new double[] {7.0, 2.0, 3.0});
@@ -92,15 +97,35 @@ public class DirDTExample {
             if (i % 2 == 0) { // even so male
                 //if (i % 20 == 0) data[i][0] = "Male";
                 EnumDistrib e1 = (EnumDistrib)colours_male.sample();
-                data[i][1] = e1;
+                IntegerSeq is = new IntegerSeq(new Continuous());
+                int[] arr = new int[3];
+                for (int j = 0; j < rand.nextInt(50); j ++) 
+                    arr[e1.getDomain().getIndex(e1.sample())] ++;
+                is.set(IntegerSeq.objArray(arr));
+                data[i][1] = is;
                 EnumDistrib e2 = (EnumDistrib)sports_male.sample();
-                data[i][2] = e2;
+                is = new IntegerSeq(new Continuous());
+                arr = new int[3];
+                for (int j = 0; j < rand.nextInt(50); j ++) 
+                    arr[e2.getDomain().getIndex(e2.sample())] ++;
+                is.set(IntegerSeq.objArray(arr));
+                data[i][2] = is;
             } else { // female
                 //if (i % 20 == 1) data[i][0] = "Female";
                 EnumDistrib e1 = (EnumDistrib)colours_female.sample();
-                data[i][1] = e1;
+                IntegerSeq is = new IntegerSeq(new Continuous());
+                int[] arr = new int[3];
+                for (int j = 0; j < rand.nextInt(50); j ++) 
+                    arr[e1.getDomain().getIndex(e1.sample())] ++;
+                is.set(IntegerSeq.objArray(arr));
+                data[i][1] = is;
                 EnumDistrib e2 = (EnumDistrib)sports_female.sample();
-                data[i][2] = e2;
+                is = new IntegerSeq(new Continuous());
+                arr = new int[3];
+                for (int j = 0; j < rand.nextInt(50); j ++) 
+                    arr[e2.getDomain().getIndex(e2.sample())] ++;
+                is.set(IntegerSeq.objArray(arr));
+                data[i][2] = is;
             }
         }
 
@@ -123,26 +148,34 @@ public class DirDTExample {
         BNet bn2 = new BNet();
         bn2.add(g2,c2,s2);
 
-        for (int index = 0; index < G2.size(); index ++) {
-            c2.put(index, new DirichletDistrib(colours2, ((EnumDistrib)data[index*16][1]).get()));
-            s2.put(index, new DirichletDistrib(colours2, ((EnumDistrib)data[index*16][2]).get()));
-        }
+//        for (int index = 0; index < G2.size(); index ++) {
+//            c2.put(index, new DirichletDistrib(colours2, ((EnumDistrib)data[index*16][1]).get()));
+//            s2.put(index, new DirichletDistrib(colours2, ((EnumDistrib)data[index*16][2]).get()));
+//        }
         
         EM em = new EM(bn2);
+        System.out.println("Before EM");
+        g2.randomize(1);
+        g2.print();
+        c2.randomize(1);
+        c2.print();
+        s2.randomize(1);
         s2.print();
-        em.EM_MAX_ROUNDS = 10;
+        em.EM_MAX_ROUNDS = 100;
         em.EM_PRINT_STATUS = false;
-        for (int round = 0; round < 1; round ++) {
-            em.train(data, new Variable[] {G2, C2, S2}, 0);
-            c2.setInstance(new EnumDistrib(colours, new double[] {0.3, 0.3, 0.4})); // primarily blue, but the gender node is latent...
-            inf = new VarElim();
-            inf.instantiate(bn2);
-            q = inf.makeQuery(G2,S2);
-            r = (CGTable) inf.infer(q);
-            d2 = r.query(G2);
-            System.out.println("Prob of cluster: " + d2);
-        }
+        em.train(data, new Variable[] {G2, C2, S2}, 0);
+        System.out.println("After EM");
+        g2.print();
+        c2.print();
         s2.print();
+
+        c2.setInstance(new EnumDistrib(colours, new double[] {0.3, 0.3, 0.4})); // primarily blue, but the gender node is latent...
+        inf = new VarElim();
+        inf.instantiate(bn2);
+        q = inf.makeQuery(G2,S2);
+        r = (CGTable) inf.infer(q);
+        d2 = r.query(G2);
+        System.out.println("Prob of cluster: " + d2);
         r.display();
         d1 = r.query(S2);
         System.out.println("Prob of sports: " + d1);

@@ -32,16 +32,31 @@ public class IntegerSeq extends SeqDomain<Continuous> {
         try {
             Iterable iter = (Iterable)value;
             for (Object elem : iter) {
-                Integer x = (Integer) value;
+                Integer x = (Integer) elem;
             }
             return true;
-        } catch (ClassCastException e) {
-            return false;
+        } catch (ClassCastException e1) {
+            try {
+                Object[] iter = (Object[])value;
+                for (Object elem : iter) {
+                    Integer x = (Integer) elem;
+                }            
+                return true;
+            } catch (ClassCastException e2) {
+                return false;
+            }
         }
     }
     
     public static int[] intArray(Object[] arr) {
         int[] values = new int[arr.length];
+        for (int i = 0; i < arr.length; i ++)
+            values[i] = (Integer)arr[i];
+        return values;
+    }
+
+    public static Object[] objArray(int[] arr) {
+        Object[] values = new Object[arr.length];
         for (int i = 0; i < arr.length; i ++)
             values[i] = (Integer)arr[i];
         return values;
