@@ -39,4 +39,11 @@ public class IntegerSeq extends SeqDomain<Continuous> {
             return false;
         }
     }
+    
+    public static int[] intArray(Object[] arr) {
+        int[] values = new int[arr.length];
+        for (int i = 0; i < arr.length; i ++)
+            values[i] = (Integer)arr[i];
+        return values;
+    }
 }

@@ -32,6 +32,9 @@ import bn.prob.DirichletDistrib;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
+import static bn.prob.DirichletDistrib.getAlphaSum_byNewton;
+import dat.Domain;
+import dat.IntegerSeq;
 import java.io.Serializable;
 import java.util.*;
 
@@ -51,10 +54,10 @@ public class DirDT implements BNode, TiedNode, Serializable {
     private EnumTable<DirichletDistrib> table = null;
 
     // Parameters used for training. Some of which are allocated prior to training, and then re-used to save time.
-    private SampleTable<EnumDistrib> count = null; // the table that will contain all samples of the type "EnumDistrib" during learning
+    private SampleTable<IntegerSeq> count = null; // the table that will contain all samples of the type "IntegerSeq" during learning
     
     private boolean relevant = false;
-    private EnumDistrib instance = null; // the value this node takes, null if unspecified
+    private Domain instance = null; // the value this node takes, null if unspecified, needs to implement a domain, currently EnumDistrib and IntegerSeq are supported
 
     private DirDT tieSource;
     
@@ -165,7 +168,14 @@ public class DirDT implements BNode, TiedNode, Serializable {
                         }
                     }
                     if (varinstance != null) { // the variable for this DirDT is instantiated
-                        ft.addFactor(newkey, d.get(varinstance));
+                        try {
+                            IntegerSeq iseq = (IntegerSeq) varinstance;
+                            int[] counts = IntegerSeq.intArray(iseq.get());
+                            ft.addFactor(newkey, Math.exp(d.logLikelihood(counts)));
+                        } catch (ClassCastException e) {
+                            // Assume the instance is an EnumDistrib
+                            ft.addFactor(newkey, d.get(varinstance));
+                        }
                     } else { // the variable for this DirDT is NOT instantiated...
                         ft.addFactor(newkey, 1.0);
                         ft.setDistrib(newkey, this.var, d);
@@ -246,10 +256,20 @@ public class DirDT implements BNode, TiedNode, Serializable {
                             fkey[xcross[i]] = cptkey[i];
                     }
                     if (varinstance != null) { // the variable for this DirDT is instantiated
-                        if (fkey.length == 0) // and the parents are too
-                            ft.setValue(d.get(varinstance));
-                        else
-                            ft.setValue(fkey, d.get(varinstance));
+                        try {
+                            IntegerSeq iseq = (IntegerSeq) varinstance;
+                            int[] counts = IntegerSeq.intArray(iseq.get());
+                            if (fkey.length == 0) // and the parents are too
+                                ft.setValue(Math.exp(d.logLikelihood(counts))); // these probs can be very small, may require move to log-space...
+                            else
+                                ft.setValue(fkey, Math.exp(d.logLikelihood(counts)));
+                        } catch (ClassCastException e) {
+                            // Assume the instance is an EnumDistrib
+                            if (fkey.length == 0) // and the parents are too
+                                ft.setValue(d.get(varinstance));
+                            else
+                                ft.setValue(fkey, d.get(varinstance));
+                        }
                     } else { // the variable for this DirDT is NOT instantiated so we put it in the JDF
                         if (fkey.length == 0) { // but the parents are instantiated
                             ft.setValue(1.0); 
@@ -419,8 +439,12 @@ public class DirDT implements BNode, TiedNode, Serializable {
     public void setInstance(Object value) {
         try {
             instance = (EnumDistrib) value;
-        } catch (ClassCastException e) {
-            System.err.println("Invalid setInstance: " + this.getName() + " = " + value);
+        } catch (ClassCastException e1) {
+            try {
+                instance = (IntegerSeq) value;
+            } catch (ClassCastException e2) {
+                System.err.println("Invalid setInstance: " + this.getName() + " = " + value);
+            }
         }
     }
 
@@ -430,7 +454,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
     }
 
     @Override
-    public EnumDistrib getInstance() {
+    public Object getInstance() {
         return instance;
     }
     
@@ -442,7 +466,11 @@ public class DirDT implements BNode, TiedNode, Serializable {
             throw new RuntimeException("DirDT can not be trained as root");
             // same process as for entries with parents, just a single queue of observations...
         } else {
-            count.count(key, (EnumDistrib)value, prob);
+            try {
+                count.count(key, (IntegerSeq)value, prob);
+            } catch (ClassCastException e) {
+                System.err.println("Invalid instance, must implement IntegerSeq: " + this.getName() + " = " + value);
+            }
         }
     }
     
@@ -491,9 +519,9 @@ public class DirDT implements BNode, TiedNode, Serializable {
     }
 
     private class DnIpair { 
-        Double p;
+        Double toss;
         Integer i;
-        DnIpair(Double p, Integer i) { this.p = p; this.i = i; }
+        DnIpair(Double toss, Integer i) { this.toss = toss; this.i = i; }
     }
     
     /**
@@ -503,36 +531,42 @@ public class DirDT implements BNode, TiedNode, Serializable {
      * The current version doe not weight samples but collects them similar to
      * how k-means operate.
      */
-    //@Override
-    public void maximizeInstance_kmeans() {
+    @Override
+    public void maximizeInstance() {
         if (count.isEmpty()) {
             return;
         }
         Random rand = new Random();
         Enumerable e = this.var.getDomain().getDomain();
-        EnumTable<List<Sample<EnumDistrib>>> samples = count.getTable();
+        EnumTable<List<Sample<IntegerSeq>>> samples = count.getTable();
         if (samples != null) {
-            Map<EnumDistrib, DnIpair> sample2index = new HashMap<>(); 
-            for (Map.Entry<Integer, List<Sample<EnumDistrib>>> entry : samples.getMapEntries()) {
+            Map<IntegerSeq, DnIpair> sample2index = new HashMap<>(); 
+            for (Map.Entry<Integer, List<Sample<IntegerSeq>>> entry : samples.getMapEntries()) {
                 int index = entry.getKey();
-                for (Sample<EnumDistrib> sample : entry.getValue()) {
+                for (Sample<IntegerSeq> sample : entry.getValue()) {
                     double p = sample.prob;
-                    EnumDistrib ed = sample.instance;
+                    IntegerSeq ed = sample.instance;
                     DnIpair prev = sample2index.get(sample.instance);
                     if (prev != null) { // found the sample already associated with an index, re-consider?
-                        if (prev.p < p) {
-                            sample2index.put(ed, new DnIpair(p, index));
-                        }
-                    } else 
-                        sample2index.put(ed, new DnIpair(p, index));
+                        if (prev.toss <= p) // pick this one? Yes... so set others to impossible
+                            sample2index.put(ed, new DnIpair(1.0, index));
+                        else 
+                            sample2index.put(ed, new DnIpair(prev.toss - p, index));
+                    } else { // first appearance
+                        double toss = rand.nextDouble(); // the value that will decide which index to use for this sample
+                        if (toss <= p) // use this one, set prob of forthcoming to impossible
+                            sample2index.put(ed, new DnIpair(1.0, index));
+                        else // do not use this index, set the prob of next: toss - toss
+                            sample2index.put(ed, new DnIpair(toss - p, index));
+                    }
                 }
             }
             List[] select = new ArrayList[this.table.getSize()];
             for (int index = 0; index < this.table.getSize(); index ++)
                 select[index] = new ArrayList();
             int cnt = sample2index.size();
-            for (Map.Entry<EnumDistrib, DnIpair> entry : sample2index.entrySet()) {
-                EnumDistrib ed = entry.getKey();
+            for (Map.Entry<IntegerSeq, DnIpair> entry : sample2index.entrySet()) {
+                IntegerSeq ed = entry.getKey();
                 int i = entry.getValue().i;
                 select[i].add(ed);
             }
@@ -540,12 +574,12 @@ public class DirDT implements BNode, TiedNode, Serializable {
                 List selected = select[index];
                 if (selected.isEmpty()) {
                     for (int attempt = 0; attempt < cnt / this.table.getSize() * 2; attempt ++) {
-                        EnumDistrib stash = null;
+                        IntegerSeq stash = null;
                         int pick = rand.nextInt(cnt);
                         int accum = 0;
                         for (int j = 0; j < select.length; j ++) {
                             if (pick < accum + select[j].size()) {
-                                stash = (EnumDistrib)select[j].remove(pick - accum);
+                                stash = (IntegerSeq)select[j].remove(pick - accum);
                                 selected.add(stash);
                                 break;
                             } 
@@ -556,15 +590,29 @@ public class DirDT implements BNode, TiedNode, Serializable {
             }
             for (int index = 0; index < this.table.getSize(); index ++) {
                 List selected = select[index];
-                DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
                 if (selected.size() > 0) {
-                    EnumDistrib[] dists = new EnumDistrib[selected.size()];
+                    IntegerSeq[] dists = new IntegerSeq[selected.size()];
                     selected.toArray(dists);
-                    dd.setPrior(dists);
+                    double[] location = new double[e.size()];
+                    double total = 0;
+                    int[][] hists = new int[selected.size()][];
+                    for (int j = 0; j < hists.length; j ++) {
+                        int[] hist = (int[])selected.get(j);
+                        hists[j] = hist;
+                        for (int jj = 0; jj < location.length; jj ++) {
+                            location[jj] += hist[jj];
+                            total += hist[jj];
+                        }
+                    }
+                    for (int jj = 0; jj < location.length; jj ++) 
+                        location[jj] /= total;
+                    double alpha_star = DirichletDistrib.getAlphaSum_byNewton(hists, location);
+                    for (int jj = 0; jj < location.length; jj ++) 
+                        location[jj] *= alpha_star;
+                    DirichletDistrib dd = new DirichletDistrib(e, location);
                 } else {
                     System.err.println("Cannot happen");
                 }
-                this.put(index, dd);
             }
         }
         count.setEmpty();
@@ -578,23 +626,23 @@ public class DirDT implements BNode, TiedNode, Serializable {
      * Set resolution to a smaller value for big data sets (minimum 1), 
      * greater value for higher precision (less stochasticity).
      */
-    @Override
-    public void maximizeInstance() {
+    //@Override
+    public void maximizeInstance_EM() {
         if (count.isEmpty()) {
             return;
         }
         Random rand = new Random();
         Enumerable e = this.var.getDomain().getDomain();
         for (int index = 0; index < this.table.getSize(); index ++) {
-            List<Sample<EnumDistrib>> samples = count.getAll(index);
+            List<Sample<IntegerSeq>> samples = count.getAll(index);
             if (samples != null) {
                 DirichletDistrib dd = new DirichletDistrib(e, 1.0/e.size());
-                List<EnumDistrib> select = new ArrayList<>();
+                List<IntegerSeq> select = new ArrayList<>();
                 // figure out which sampling resolution that should be used
                 int[] resolutions = new int[] {1, 5, 20}; // try these resolutions
                 double[] cost = new double[] {1.0, 1.1, 1.2}; // how much each resolution "costs"
                 double[] err = new double[resolutions.length];
-                for (Sample<EnumDistrib> sample : samples) {
+                for (Sample<IntegerSeq> sample : samples) {
                     for (int j = 0; j < err.length; j ++) {
                         double prod = sample.prob * resolutions[j];
                         err[j] += Math.abs((int)prod - prod) * cost[j];
@@ -614,8 +662,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     // System.err.println("picked resolution " + resolution + " at err = " + err[best]);
                     // do the calculations
                     for (int j = 0; j < samples.size(); j ++) {
-                        Sample<EnumDistrib> sample = samples.get(j);
-                        EnumDistrib d = (EnumDistrib)sample.instance;
+                        Sample<IntegerSeq> sample = samples.get(j);
+                        IntegerSeq d = (IntegerSeq)sample.instance;
                         // should be using prob more effectively, but not so yet...
                         double prob = sample.prob;
                         for (int k = 0; k < resolution; k ++) {
@@ -628,9 +676,9 @@ public class DirDT implements BNode, TiedNode, Serializable {
                 if (attempt == 5) { // five attempts
                     //System.err.println("Unable to set " + this);
                 } else {
-                    EnumDistrib[] dists = new EnumDistrib[select.size()];
+                    IntegerSeq[] dists = new IntegerSeq[select.size()];
                     select.toArray(dists);
-                    dd.setPrior(dists);
+                    // dd.setPrior(dists);
                     this.put(index, dd);
                 }
             } else { // no counts
