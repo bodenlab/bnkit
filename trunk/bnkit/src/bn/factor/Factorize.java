@@ -576,7 +576,14 @@ public class Factorize {
                         }
                         y = Y.getIndex(ykey);
                     }
-                    dt.setValue(x, X.getValue(x) * Y.getValue(y));
+                    double xval = X.getValue(x);
+                    double yval = Y.getValue(y);
+                    double XY = xval * yval;
+                    if (xval > 0.0 && yval > 0.0 && XY == 0.0)
+                        System.err.println("Numerical precision problem in Factorize.getProduct");
+                    if (Double.isNaN(XY))
+                        System.err.println("Probability is not a number: in Factorize.getProduct");
+                    dt.setValue(x, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(x, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -633,7 +640,10 @@ public class Factorize {
                         continue; // the product will be zero no what
                     }
                     int idx = x;
-                    dt.setValue(idx, xval * yval);
+                    double XY = xval * yval;
+                    if (Double.isNaN(XY))
+                        System.err.println("Probability is not a number: in Factorize.getProduct");
+                    dt.setValue(idx, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -690,7 +700,10 @@ public class Factorize {
                         continue; // the product will be zero no what
                     }
                     int idx = y;
-                    dt.setValue(idx, xval * yval);
+                    double XY = xval * yval;
+                    if (Double.isNaN(XY))
+                        System.err.println("Probability is not a number: in Factorize.getProduct");
+                    dt.setValue(idx, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -745,7 +758,10 @@ public class Factorize {
                     // **************************
                     //     This does NOT work??
                     // **************************
-                    dt.setValue(idx, xval * yval);
+                    double XY = xval * yval;
+                    if (Double.isNaN(XY))
+                        System.err.println("Probability is not a number: in Factorize.getProduct");
+                    dt.setValue(idx, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -805,7 +821,10 @@ public class Factorize {
                         reskey[ycross2dt[i]] = ykey[i];
                     }
                     int idx = dt.getIndex(reskey);
-                    dt.setValue(idx, xval * yval);
+                    double XY = xval * yval;
+                    if (Double.isNaN(XY))
+                        System.err.println("Probability is not a number: in Factorize.getProduct");
+                    dt.setValue(idx, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -836,7 +855,10 @@ public class Factorize {
                             reskey[ycross2dt[i]] = ykey[i];
                         }
                         int idx = dt.getIndex(reskey);
-                        dt.setValue(idx, xval * yval);
+                        double XY = xval * yval;
+                        if (Double.isNaN(XY))
+                            System.err.println("Probability is not a number: in Factorize.getProduct");
+                        dt.setValue(idx, XY);
                         if (X.isJDF() && Y.isJDF()) {
                             dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                         } else if (X.isJDF()) {

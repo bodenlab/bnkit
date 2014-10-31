@@ -165,6 +165,9 @@ public class CGTable implements QueryResult {
                     qkey[fcross2q[j]] = fkey[j];
                 int key_index = EnumTable.getIndex(qkey, q_evars_arr);
                 double p = f.getValue(i) / sum;
+                if (Double.isNaN(p))
+                    System.err.println("Probability is not a number: in CGTable");
+
                 if (p == 0)
                     continue;
                 factorTable.setValue(key_index, p);
