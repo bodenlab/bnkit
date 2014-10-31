@@ -26,11 +26,21 @@ import dat.Enumerable;
 import bn.prob.DirichletDistrib;
 import bn. *;
 import bn.alg.*;
+import static bn.prob.DirichletDistrib.DL;
+import static bn.prob.DirichletDistrib.getAlpha;
+import static bn.prob.DirichletDistrib.loadData;
 import dat.Continuous;
 import dat.IntegerSeq;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -38,7 +48,75 @@ import java.util.Random;
  */
 public class DirDTExample {
     
+    
     public static void main(String[] args) {
+        int ncluster = 9;
+        long seed = 1;
+        String filename = "/Users/mikael/Desktop/mm10_Mixed_NfiX_segmented20_100.out";
+        
+        int[][] data = loadData(filename);
+        int N = data.length;
+        Object[][] data_for_EM = new Object[N][1];
+        int nseg = 0;
+        for (int i = 0; i < N; i ++) {
+            if (i == 0) 
+                nseg = data[i].length;
+            else if (nseg != data[i].length)
+                throw new RuntimeException("Error in data: invalid item at data point " + (i + 1));
+            data_for_EM[i][0] = new IntegerSeq(data[i]);
+        }
+
+        EnumVariable Cluster = Predef.Number(ncluster, "Cluster");
+        Enumerable segments = new Enumerable(nseg);
+        Variable Segment     = Predef.Distrib(segments, "Segments");
+
+        // Define nodes (connecting the variables into an acyclic graph, i.e. the structure)
+        CPT cluster = new CPT(Cluster);
+        DirDT segment = new DirDT(Segment,    Cluster);
+
+        BNet bn = new BNet();
+        bn.add(cluster, segment);
+
+        EM em = new EM(bn);
+        em.setMaxRounds(20);
+        em.train(data_for_EM, new Variable[] {Segment}, seed);
+        
+    }
+    
+    public static int[][] loadData(String filename) {
+        BufferedReader br = null;
+        int[][] data = null;
+        try {
+            br = new BufferedReader(new FileReader(filename));
+            String line = br.readLine();
+            List<int[]> alldata = new ArrayList<>();
+            while (line != null) {
+                String[] tokens = line.split("\t");
+                int[] values = new int[tokens.length];
+                try {
+                    for (int i = 0; i < tokens.length; i ++) {
+                        values[i] = Integer.valueOf(tokens[i]);
+                    }
+                    alldata.add(values);
+                } catch (NumberFormatException ex2) {
+                    System.err.println("Ignored: " + line);
+                }
+                line = br.readLine();
+            }
+            data = new int[alldata.size()][];
+            for (int k = 0; k < data.length; k ++) {
+                data[k] = new int[alldata.get(k).length];
+                for (int j = 0; j < data[k].length; j ++) 
+                    data[k][j] = alldata.get(k)[j];
+            }
+            br.close();
+        } catch (IOException ex) {
+            Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return data;
+    }
+
+        public static void main0(String[] args) {
 
         Random rand = new Random(1);
         
@@ -229,4 +307,5 @@ public class DirDTExample {
         r = (CGTable) inf.infer(q);
         r.display();
     }
+
 }

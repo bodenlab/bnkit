@@ -632,9 +632,13 @@ public class DirDT implements BNode, TiedNode, Serializable {
                     probs[j] = sample.prob;
                     hists[j] = IntegerSeq.intArray(sample.instance.get());
                 }
-                double[] alpha = DirichletDistrib.getAlpha(hists, probs);
-                DirichletDistrib dd = new DirichletDistrib(e, alpha);
-                this.put(index, dd);
+                try {
+                    double[] alpha = DirichletDistrib.getAlpha(hists, probs);
+                    DirichletDistrib dd = new DirichletDistrib(e, alpha);
+                    this.put(index, dd);
+                } catch (StackOverflowError ex) {
+                    System.err.println("Stack overflow in node " + this);
+                }
             } else { // no counts
                 this.table.removeValue(index);
             }

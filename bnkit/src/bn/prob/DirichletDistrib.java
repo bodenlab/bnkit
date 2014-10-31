@@ -290,11 +290,11 @@ public class DirichletDistrib implements Distrib, Serializable {
         return sum;
     }
     
-    public static double logLikelihood_1stDerivative(double[][] counts, double[] p, double[] q, double alpha_star) {
+    public static double logLikelihood_1stDerivative(int[][] counts, double[] p, double[] q, double alpha_star) {
         double sum = 0;
         for (int k = 0; k < counts.length; k ++) {
             int c_star = 0;
-            for (double c : counts[k])
+            for (int c : counts[k])
                 c_star += c;
             double inner = GammaDistrib.digamma(alpha_star) - GammaDistrib.digamma(alpha_star + c_star);
             for (int j = 0; j < counts[k].length; j ++) 
@@ -304,11 +304,11 @@ public class DirichletDistrib implements Distrib, Serializable {
         return sum;
     }
     
-    public static double logLikelihood_2ndDerivative(double[][] counts, double[] p, double[] q, double alpha_star) {
+    public static double logLikelihood_2ndDerivative(int[][] counts, double[] p, double[] q, double alpha_star) {
         double sum = 0;
         for (int k = 0; k < counts.length; k ++) {
             int c_star = 0;
-            for (double c : counts[k])
+            for (int c : counts[k])
                 c_star += c;
             double inner = GammaDistrib.trigamma(alpha_star) - GammaDistrib.trigamma(alpha_star + c_star);
             for (int j = 0; j < counts[k].length; j ++) 
@@ -318,7 +318,7 @@ public class DirichletDistrib implements Distrib, Serializable {
         return sum;
     }
     
-    public static double getAlphaSum_byNewton(double[][] counts, double[] p, double[] q) {
+    public static double getAlphaSum_byNewton(int[][] counts, double[] p, double[] q) {
         double x0  = 1.0; // make an informed choice? See eq 12 in Ye et al (2011).
         double eps = 0.000001; // zero for practical purposes
         int maxrounds = 1000;
@@ -347,7 +347,7 @@ public class DirichletDistrib implements Distrib, Serializable {
             if (counts.length > 0 && counts.length == prob.length) {
                 double[] location = new double[counts[0].length];
                 double total = 0;
-                double[][] hists = new double[counts.length][location.length]; // a double version of counts
+                int[][] hists = new int[counts.length][location.length]; // a double version of counts
                 for (int j = 0; j < counts.length; j ++) {
                     int[] hist = counts[j];
                     for (int jj = 0; jj < location.length; jj ++) {
@@ -563,10 +563,10 @@ public class DirichletDistrib implements Distrib, Serializable {
                     for (int i = 0; i < tokens.length; i ++) {
                         values[i] = Integer.valueOf(tokens[i]);
                     }
+                    alldata.add(values);
                 } catch (NumberFormatException ex2) {
                     System.err.println("Ignored: " + line);
                 }
-                alldata.add(values);
                 line = br.readLine();
             }
             data = new int[alldata.size()][];

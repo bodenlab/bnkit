@@ -69,4 +69,12 @@ public class SeqDomain<E extends Domain> implements Domain {
         System.out.println(seq.isValid(new Character[] {'A','A','A','G','G','Q','T','C','C','C','A','C','T'}));
         
     }
+    
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        for (Object val : get())
+            sb.append("|"+val.toString());
+        sb.append("|");
+        return sb.toString();
+    }
 }

@@ -28,6 +28,14 @@ public class IntegerSeq extends SeqDomain<Continuous> {
         super(elementType);
     }
 
+    public IntegerSeq(int[] hist) {
+        super(new Continuous());
+        Object[] arr = new Object[hist.length];
+        for (int i = 0; i < arr.length; i ++)
+            arr[i] = hist[i];
+        set(arr);
+    }
+    
     public boolean isValid(Object value) {
         try {
             Iterable iter = (Iterable)value;

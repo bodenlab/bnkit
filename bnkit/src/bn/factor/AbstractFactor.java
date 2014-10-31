@@ -827,6 +827,12 @@ public abstract class AbstractFactor {
      */
     public abstract int[] getIndices(Object[] key);
     
+    public boolean isValid() {
+        for (int i =0 ; i < this.getSize(); i ++) 
+            if (Double.isNaN(this.getValue(i)))
+                return false;
+        return true;
+    }
     
 }
 

@@ -265,6 +265,8 @@ public class EM extends LearningAlg {
                                     for (int qr_index : indices) {
                                         Object[] qr_key = qr.getKey(qr_index);
                                         double p = qr.getFactor(qr_index);
+                                        if (Double.isNaN(p))
+                                            System.err.println("Probability is not a number: in EM");
                                         JDF jdf = null;
                                         if (qr.hasNonEnumVariables()) {
                                             jdf = qr.getJDF(qr_index);
