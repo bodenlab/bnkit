@@ -21,6 +21,7 @@ public class AlnReader {
 
     final File file;
     final Enumerable alpha;
+    BufferedReader reader;
 
     /**
      * Construct a reader for Clustal files.
@@ -28,8 +29,9 @@ public class AlnReader {
      * @param filename the name of the file
      * @param alpha the alphabet that the alignment uses
      */
-    public AlnReader(String filename, Enumerable alpha) {
+    public AlnReader(String filename, Enumerable alpha) throws IOException {
         this.file = new File(filename);
+        reader = new BufferedReader(new FileReader(file));
         this.alpha = alpha;
     }
 
@@ -47,9 +49,8 @@ public class AlnReader {
      * @see seq.file.SeqReader#load()
      */
     public EnumSeq.Gappy[] load() throws IOException {
-        Map<String, StringBuffer> seq = new HashMap<String, StringBuffer>();
-        Map<Integer, String> order = new HashMap<Integer, String>();
-        BufferedReader reader = new BufferedReader(new FileReader(file));
+        Map<String, StringBuffer> seq = new HashMap<>();
+        Map<Integer, String> order = new HashMap<>();
         boolean collectNames = true; // true if still finding new line names
         int rowCount = 0;
         int precEmptyLineCount = 0;
@@ -138,11 +139,10 @@ public class AlnReader {
             }
             line = reader.readLine();
         }
-        reader.close();
         EnumSeq.Gappy[] aseqs = new EnumSeq.Gappy[seq.size()];
         String[] names = new String[seq.size()];
         int i = 0;
-        List<Integer> sorted = new ArrayList<Integer>(order.keySet());
+        List<Integer> sorted = new ArrayList<>(order.keySet());
         Collections.sort(sorted);
         for (Integer index : sorted) {
             names[i++] = order.get(index);
@@ -151,66 +151,64 @@ public class AlnReader {
             StringBuffer strbuf = seq.get(names[a]);
             if (strbuf != null) {
                 String syms = strbuf.toString();
-                List<Symbol> symlist = new ArrayList<Symbol>();
+                List<Character> symlist = new ArrayList<>();
                 for (int index = 0; index < strbuf.length(); index++) {
-                    char sym = strbuf.charAt(index);
-                    try {
-                        Symbol symbol = alpha.getSymbol(sym);
-                        if (symbol != null) {
-                            if (!symbol.getLongName().equals("GAP")) {
-                                symlist.add(symbol);
-                            }
-                        } else {
-                            throw new RuntimeException("Invalid symbol \"" + sym + "\" in sequence \"" + names[a] + "\" ID: " + names[a] + " Seq: " + syms);
-                        }
-                    } catch (BioSeqRuntimeException e) {
-                        throw new RuntimeException("Invalid symbol \"" + sym + "\" in sequence \"" + names[a] + "\" ID: " + names[a] + " Seq: " + syms);
-                    }
+                    Character sym = strbuf.charAt(index);
+                    if (sym == '-')
+                        symlist.add(null);
+                    else
+                        symlist.add(sym);
                 }
-                Symbol[] symarr = new Symbol[symlist.size()];
-                for (int index = 0; index < symlist.size(); index++) {
-                    symarr[index] = symlist.get(index);
-                }
-    			// create EditSequence
-                // but first remove the numbering from the name
+                Character[] symarr = new Character[symlist.size()];
+                symlist.toArray(symarr);
+                // remove the numbering from the name
                 int index = names[a].indexOf("\\");
                 String id = names[a];
                 if (index > 0) {
                     id = names[a].substring(0, index);
                 }
-                Sequence sequence = new Sequence(id, alpha, symarr, (Annotation[]) null);
-                aseqs[a] = new EditSequence(sequence);
-                // now figure out where the gaps should be...
-                int from = 0; // relative the start of the list of symbols
-                for (int j = 0; j < syms.length(); j++) {
-                    if (syms.charAt(j) == '-') {
-                        aseqs[a].setGap(from);
-                    } else {
-                        from++;
-                    }
-                }
+                aseqs[a] = new EnumSeq.Gappy<>(alpha);
+                aseqs[a].set(symarr);
+                aseqs[a].setName(id);
             }
         }
         return aseqs;
     }
 
     /**
+     * Closes a file. 
+     * @throws IOException if the file can not be closed
+     */
+    public void close() throws IOException {
+        reader.close();
+    }
+    
+
+    /**
      * @param args
      */
     public static void main(String[] args) {
-        AlnReader aln = new AlnReader(args[0], Enumerable.aacid);
-        EnumSeq.Gappy[] e = aln.load();
-        int nameLen = 0;
-        for (int i = 0; i < e.length; i++) {
-            if (nameLen < e[i].getName().length()) {
-                nameLen = e[i].getName().length();
+        String filename = "/Users/mikael/Desktop/cyp3.aln";
+        if (args.length > 0)
+            filename = args[0];
+        try {
+            AlnReader aln = new AlnReader(filename, Enumerable.aacid);
+            EnumSeq.Gappy[] e = aln.load();
+            int nameLen = 0;
+            for (int i = 0; i < e.length; i++) {
+                if (nameLen < e[i].getName().length()) {
+                    nameLen = e[i].getName().length();
+                }
             }
-        }
 
-        for (int i = 0; i < e.length; i++) {
-            StringBuffer empty = new StringBuffer("                                                       ");
-            empty.setLength(nameLen - e[i].getSequence().getName().length());
-            System.out.println(e[i].getSequence().getName() + empty.toString() + "\t[" + e[i].getSequence().getString().length() + "]\t" + e[i].getString());
+            for (int i = 0; i < e.length; i++) {
+                StringBuffer empty = new StringBuffer("                                                       ");
+                empty.setLength(nameLen - e[i].getName().length());
+                
+                System.out.println(e[i].getName() + empty.toString() + "\t[" + e[i].length() + "]\t" + e[i].toString());
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
         }
 
     }

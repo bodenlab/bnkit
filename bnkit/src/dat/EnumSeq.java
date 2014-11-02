@@ -17,6 +17,7 @@
  */
 package dat;
 
+import dat.file.AlnReader;
 import dat.file.FastaReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,6 +44,18 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
         return name;
     }
     
+    public String toString() {
+        StringBuffer sb = new StringBuffer();
+        Object[] syms = get();
+        for (int i = 0; i < syms.length; i ++) {
+            if (syms[i] == null)
+                sb.append('-');
+            else
+            sb.append(syms[i]);
+        }
+        return sb.toString();
+    }
+    
     public static <T extends Enumerable> List<EnumSeq<T>> loadFasta(String filename, T elementType) throws IOException {
         List<EnumSeq<T>> seqs = new ArrayList<>();
         FastaReader r = new FastaReader(filename, elementType);
@@ -50,7 +63,7 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
         for (EnumSeq rseq : rseqs) {
             try {
                 seqs.add((EnumSeq<T>) rseq);
-            }catch (ClassCastException e) {
+            } catch (ClassCastException e) {
             }
         }
         r.close();
@@ -82,10 +95,17 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
             return true;
         }
 
-        public static <T extends Enumerable> List<EnumSeq.Gappy<T>> loadClustal(String filename) {
+        public static <T extends Enumerable> List<EnumSeq.Gappy<T>> loadClustal(String filename, T elementType) throws IOException {
             List<EnumSeq.Gappy<T>> seqs = new ArrayList<>();
-            // ... TODO
-
+            AlnReader r = new AlnReader(filename, elementType);
+            EnumSeq.Gappy[] rseqs = r.load();
+            for (EnumSeq rseq : rseqs) {
+                try {
+                    seqs.add((EnumSeq.Gappy<T>) rseq);
+                } catch (ClassCastException e) {
+                }
+            }
+            r.close();
             return seqs;
         }
     }
