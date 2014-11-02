@@ -19,6 +19,7 @@ package bn;
 
 import bn.prob.EnumDistrib;
 import bn.node.CPT;
+import bn.node.DirDT;
 import bn.node.GDT;
 import dat.Continuous;
 import dat.Domain;
@@ -42,7 +43,7 @@ public class Predef {
     }
 
     public static boolean isParameterised(String typename) {
-        if (typename.equalsIgnoreCase("String") || (typename.equalsIgnoreCase("Number"))) {
+        if (typename.equalsIgnoreCase("String") || (typename.equalsIgnoreCase("Number")) || typename.equalsIgnoreCase("Distrib")) {
             return true;
         } else {
             return false;
@@ -50,11 +51,11 @@ public class Predef {
     }
 
     public static String[] getVariableTypes() {
-        return new String[]{"Boolean", "String", "Number", "Real", "Amino acid", "Nucleic acid"};
+        return new String[]{"Boolean", "String", "Number", "Real", "Amino acid", "Nucleic acid", "Distrib"};
     }
 
     public static boolean isEnumerable(String typename) {
-        if (typename.equalsIgnoreCase("Real")) {
+        if (typename.equalsIgnoreCase("Real") || typename.equalsIgnoreCase("Distrib")) {
             return false;
         } else {
             return true;
@@ -96,7 +97,20 @@ public class Predef {
         if (typename.equalsIgnoreCase("Real")) {
             return Predef.Real(varname);
         }
-        throw new RuntimeException("Invalid specification of variable");
+        if (typename.equalsIgnoreCase("Distrib")) {
+            String[] values = params.split(";");
+            if (values.length > 1)
+                return Predef.Distrib(values, varname);
+            else if (!isParameterised(values[0]) && isEnumerable(values[0])) {
+                try {
+                    Variable temp = getVariable("temp", values[0], null);
+                    return Predef.Distrib((Enumerable)temp.getDomain(), varname);
+                } catch (RuntimeException ex) {
+                    throw new RuntimeException("Invalid specification of variable: " + varname);
+                }
+            }
+        }
+        throw new RuntimeException("Invalid specification of variable: " + varname);
     }
 
     @SuppressWarnings("rawtypes")
@@ -117,6 +131,12 @@ public class Predef {
                     elist.add((EnumVariable) v);
                 }
                 return new GDT((Variable<Continuous>) var, elist);
+            } else if (type.equalsIgnoreCase("DirDT")) {
+                List<EnumVariable> elist = new ArrayList<>();
+                for (Variable v : parents) {
+                    elist.add((EnumVariable) v);
+                }
+                return new DirDT(var, elist);
             }
             return null;
         } catch (ClassCastException e) {
@@ -293,6 +313,11 @@ public class Predef {
         EnumDistrib domain = new EnumDistrib(dom);
         Variable<EnumDistrib> var = new Variable<>(domain, name);
         var.setPredef("Distrib");
+        StringBuilder sbuf = new StringBuilder("");
+        for (Object v : dom.getValues()) {
+            sbuf.append(v).append(";");
+        }
+        var.setParams(sbuf.toString());
         return var;
     } 
     

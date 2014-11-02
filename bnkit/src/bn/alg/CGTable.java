@@ -125,6 +125,7 @@ public class CGTable implements QueryResult {
     } 
     
     public CGTable(AbstractFactor f, List<Variable> qvars) {
+        f = Factorize.getNormal(f); // normalise to make sure that the factor table is ok to operate on in terms of probability
         evars = new ArrayList<>();
         nvars = new ArrayList<>();
         for (Variable var : qvars) {
@@ -157,17 +158,13 @@ public class CGTable implements QueryResult {
             }
             factorTable = new EnumTable<>(evars);
             atomicFactor = null;
-            double sum = f.getSum();
             for (int i = 0; i < f.getSize(); i ++) {
                 Object[] fkey = f.getKey(i);
                 Object[] qkey = new Object[fkey.length];
                 for (int j = 0; j < fkey.length; j ++) 
                     qkey[fcross2q[j]] = fkey[j];
                 int key_index = EnumTable.getIndex(qkey, q_evars_arr);
-                double p = f.getValue(i) / sum;
-                if (Double.isNaN(p))
-                    System.err.println("Probability is not a number: in CGTable");
-
+                double p = f.getValue(i);
                 if (p == 0)
                     continue;
                 factorTable.setValue(key_index, p);

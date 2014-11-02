@@ -30,14 +30,18 @@ import java.util.Random;
 import java.util.Set;
 
 /**
- * This class is intended to coordinate operations on factors.
+ * This class is intended to coordinate and implement high-level operations on factors.
  * It contains routines for main types of operations, e.g. product and marginalisation.
- * It also contains utility routines for transforming lists of variables etc.
+ * This class also contains (mostly static) utility routines for transforming lists of variables etc.
  * Central coordination of factor operations should enable multi-threading of processes, 
- * e.g. factor products organised into binary trees.
+ * e.g. factor products organised into binary trees, but not yet implemented.
  * @author mikael
  */
 public class Factorize {
+    
+    protected static final double LOG0 = Double.NEGATIVE_INFINITY;
+    protected static boolean isLOG0(double x) { return Double.isInfinite(x); }
+    
     protected static boolean VERBOSE = false;
     /** Calculate products linearly, don't consider order */
     protected static final int POOL_OPTION_LINEAR = 0;
@@ -457,6 +461,9 @@ public class Factorize {
      * The implementation currently identifies different cases some of which can be run efficiently,
      * whilst others require tricky indexing. The method is thus quite long but most of the time only a fraction
      * of the code is actually executed.
+     * 
+     * The product is performed entirely in log space. Underflow issues will only arise in extreme 
+     * situations.
      *
      * TODO: Make informed choices as to what implementation of AbstractFactor should be used.
      * Currently only DenseFactor is used.
@@ -474,7 +481,7 @@ public class Factorize {
             if (X.isTraced() || Y.isTraced()) {
                 dt.setTraced(true);
             }
-            dt.setValue(X.getValue() * Y.getValue());
+            dt.setLogValue(X.getLogValue() + Y.getLogValue());
             if (X.isJDF() && Y.isJDF()) {
                 dt.setJDF(JDF.combine(X.getJDF(), Y.getJDF()));
             } else if (X.isJDF()) {
@@ -496,7 +503,7 @@ public class Factorize {
                 dt.setTraced(true);
             }
             for (int j = 0; j < Y.getSize(); j++) {
-                dt.setValue(j, Y.getValue(j) * X.getValue());
+                dt.setLogValue(j, Y.getLogValue(j) + X.getLogValue());
                 if (X.isJDF() && Y.isJDF()) {
                     dt.setJDF(j, JDF.combine(X.getJDF(), Y.getJDF(j)));
                 } else if (X.isJDF()) {
@@ -519,7 +526,7 @@ public class Factorize {
                 dt.setTraced(true);
             }
             for (int j = 0; j < X.getSize(); j++) {
-                dt.setValue(j, X.getValue(j) * Y.getValue());
+                dt.setLogValue(j, X.getLogValue(j) + Y.getLogValue());
                 if (X.isJDF() && Y.isJDF()) {
                     dt.setJDF(j, JDF.combine(X.getJDF(j), Y.getJDF()));
                 } else if (X.isJDF()) {
@@ -576,14 +583,10 @@ public class Factorize {
                         }
                         y = Y.getIndex(ykey);
                     }
-                    double xval = X.getValue(x);
-                    double yval = Y.getValue(y);
-                    double XY = xval * yval;
-                    if (xval > 0.0 && yval > 0.0 && XY == 0.0)
-                        System.err.println("Numerical precision problem in Factorize.getProduct");
-                    if (Double.isNaN(XY))
-                        System.err.println("Probability is not a number: in Factorize.getProduct");
-                    dt.setValue(x, XY);
+                    double xval = X.getLogValue(x);
+                    double yval = Y.getLogValue(y);
+                    double XY = xval + yval;  // <=== Factor product in log space
+                    dt.setLogValue(x, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(x, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -617,9 +620,9 @@ public class Factorize {
                     dt.setTraced(true);
                 }
                 for (int x = 0; x < X.getSize(); x++) {
-                    double xval = X.getValue(x);
-                    if (xval == 0) {
-                        continue; // no point in continuing since product will always be zero for entries with this x-value
+                    double xval = X.getLogValue(x);
+                    if (isLOG0(xval)) {
+                        continue; // no point in continuing since product will always be log-zero for entries with this x-value
                     }
                     int y; // there can only be one index in Y (if it is contained in X)
                     if (!ordered) {
@@ -635,15 +638,13 @@ public class Factorize {
                         // re-index but ordered, not sure if this is quicker than above... TODO: test
                         y = X.maskIndex(x, notInY);
                     }
-                    double yval = Y.getValue(y);
-                    if (yval == 0) {
+                    double yval = Y.getLogValue(y);
+                    if (isLOG0(yval)) { // <=== Factor check
                         continue; // the product will be zero no what
                     }
                     int idx = x;
-                    double XY = xval * yval;
-                    if (Double.isNaN(XY))
-                        System.err.println("Probability is not a number: in Factorize.getProduct");
-                    dt.setValue(idx, XY);
+                    double XY = xval + yval; // <=== Factor product in log space
+                    dt.setLogValue(idx, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -677,8 +678,8 @@ public class Factorize {
                     dt.setTraced(true);
                 }
                 for (int y = 0; y < Y.getSize(); y++) {
-                    double yval = Y.getValue(y);
-                    if (yval == 0) {
+                    double yval = Y.getLogValue(y);
+                    if (isLOG0(yval)) { // <=== Factor check
                         continue; // no point in continuing since product will always be zero for entries with this x-value
                     }
                     int x; // there can only be one index in X (if it is contained in Y)
@@ -695,15 +696,13 @@ public class Factorize {
                         // re-index but ordered, not sure if this is quicker than above... TODO: test
                         x = Y.maskIndex(y, notInX);
                     }
-                    double xval = X.getValue(x);
-                    if (xval == 0) {
+                    double xval = X.getLogValue(x);
+                    if (isLOG0(xval)) { // <=== Factor check
                         continue; // the product will be zero no what
                     }
                     int idx = y;
-                    double XY = xval * yval;
-                    if (Double.isNaN(XY))
-                        System.err.println("Probability is not a number: in Factorize.getProduct");
-                    dt.setValue(idx, XY);
+                    double XY = xval + yval; // <=== Factor product in log space
+                    dt.setLogValue(idx, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -737,14 +736,14 @@ public class Factorize {
         // 2. two tables have nothing in common
         if (noverlap == 0) {
             for (int x = 0; x < X.getSize(); x++) {
-                double xval = X.getValue(x);
-                if (xval == 0) {
+                double xval = X.getLogValue(x);
+                if (isLOG0(xval)) { // <=== Factor check
                     continue; // no point in continuing since product will always be zero for entries with this x-value
                 }
                 Object[] xkey = X.getKey(x);
                 for (int y = 0; y < Y.getSize(); y++) {
-                    double yval = Y.getValue(y);
-                    if (yval == 0) {
+                    double yval = Y.getLogValue(y);
+                    if (isLOG0(yval)) { // <=== Factor check
                         continue; // the product will be zero no what
                     }
                     Object[] ykey = Y.getKey(y);
@@ -758,10 +757,8 @@ public class Factorize {
                     // **************************
                     //     This does NOT work??
                     // **************************
-                    double XY = xval * yval;
-                    if (Double.isNaN(XY))
-                        System.err.println("Probability is not a number: in Factorize.getProduct");
-                    dt.setValue(idx, XY);
+                    double XY = xval + yval; // <=== Factor product in log space
+                    dt.setLogValue(idx, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -790,8 +787,8 @@ public class Factorize {
         long total0 = 0;
         long total1 = 0;
         for (int x = 0; x < X.getSize(); x++) {
-            double xval = X.getValue(x);
-            if (xval == 0) {
+            double xval = X.getLogValue(x);
+            if (isLOG0(xval)) { // <=== Factor check
                 continue; // no point in continuing since product will always be zero for entries with this x-value
             }
             Object[] xkey = X.getKey(x);
@@ -812,8 +809,8 @@ public class Factorize {
             if (option == 0) {
                 int[] yindices = Y.getIndices(searchkey);
                 for (int y : yindices) {
-                    double yval = Y.getValue(y);
-                    if (yval == 0) {
+                    double yval = Y.getLogValue(y);
+                    if (isLOG0(yval)) { // <=== Factor check
                         continue; // the product will be zero no what
                     }
                     Object[] ykey = Y.getKey(y);
@@ -821,10 +818,8 @@ public class Factorize {
                         reskey[ycross2dt[i]] = ykey[i];
                     }
                     int idx = dt.getIndex(reskey);
-                    double XY = xval * yval;
-                    if (Double.isNaN(XY))
-                        System.err.println("Probability is not a number: in Factorize.getProduct");
-                    dt.setValue(idx, XY);
+                    double XY = xval + yval; // <=== Factor product in log space
+                    dt.setLogValue(idx, XY);
                     if (X.isJDF() && Y.isJDF()) {
                         dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                     } else if (X.isJDF()) {
@@ -846,8 +841,8 @@ public class Factorize {
             } else if (option == 1) {
                 for (int y = 0; y < Y.getSize(); y++) {
                     if (Y.isMatch(searchkey, y)) {
-                        double yval = Y.getValue(y);
-                        if (yval == 0) {
+                        double yval = Y.getLogValue(y);
+                        if (isLOG0(yval)) { // <=== Factor check
                             continue; // the product will be zero no what
                         }
                         Object[] ykey = Y.getKey(y);
@@ -855,10 +850,8 @@ public class Factorize {
                             reskey[ycross2dt[i]] = ykey[i];
                         }
                         int idx = dt.getIndex(reskey);
-                        double XY = xval * yval;
-                        if (Double.isNaN(XY))
-                            System.err.println("Probability is not a number: in Factorize.getProduct");
-                        dt.setValue(idx, XY);
+                        double XY = xval + yval; // <=== Factor product in log space
+                        dt.setLogValue(idx, XY);
                         if (X.isJDF() && Y.isJDF()) {
                             dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                         } else if (X.isJDF()) {
@@ -895,8 +888,27 @@ public class Factorize {
     }
 
     /**
+     * Determine log(x + y) from log(x) and log(y).
+     * While this method does perform exponentiation, it does so by minimising risk of underflow.
+     * @param logx
+     * @param logy
+     * @return the log of a sum
+     */
+    public static double logSumOfLogs(double logx, double logy) {
+        if (isLOG0(logx) && !isLOG0(logy))
+            return logy;
+        else if (!isLOG0(logx) && isLOG0(logy))
+            return logx;
+        if (logx > logy)
+            return logx + Math.log(1.0 + Math.exp(logy - logx));
+        else
+            return logy + Math.log(1.0 + Math.exp(logx - logy));
+    }
+    
+    /**
      * Construct a new table from an existing, by summing-out specified variable/s.
-     *
+     * This operation is performed primarily in log space, and tries to avoid numerical underflow.
+     * 
      * TODO: Make informed choices as to what implementation of AbstractFactor should be used.
      * Currently only DenseFactor is used.
      *
@@ -919,20 +931,24 @@ public class Factorize {
         AbstractFactor Y = new DenseFactor(yvars);
         if (Y.getSize() == 1) {
             // we are creating a factor with no enumerable variables)
-            double sum = 0;
+            double logsum = 1; // cumulative in log space
             JDF first = null;
             JDF subsequent = null;
             JDF mixture = null;
             double prev_weight = 0;
             for (int x = 0; x < X.getSize(); x++) {
-                double xval = X.getValue(x);
-                sum += xval;
+                double xval = X.getLogValue(x);
+                if (logsum > 0)
+                    logsum = xval;
+                else
+                    logsum = logSumOfLogs(logsum, xval); // <=== Factor addition in log space
             }
-            Y.setValue(sum);
+            Y.setLogValue(logsum);  // <=== still in log space
             if (X.isJDF()) {
                 for (int x = 0; x < X.getSize(); x++) {
-                    double nxval = X.getValue(x) / sum; // normalized
-                    if (nxval != 0) {
+                    double lognxval = X.getLogValue(x) - logsum;
+                    if (!isLOG0(lognxval)) {
+                        double nxval = Math.exp(lognxval); // normalization in log space
                         if (first == null) {
                             // this will be true only once, for the first entry that will be collapsed
                             first = X.getJDF(x); // save the JDF for later
@@ -971,21 +987,25 @@ public class Factorize {
                 for (int i = 0; i < ykey.length; i++) {
                     xkey_search[ycross2x[i]] = ykey[i];
                 }
-                double sum = 0;
+                double logsum = 1; // cumulative in log space
                 int[] indices = X.getIndices(xkey_search);
                 JDF first = null;
                 JDF subsequent = null;
                 JDF mixture = null;
                 double prev_weight = 0;
                 for (int x : indices) {
-                    double xval = X.getValue(x);
-                    sum += xval;
+                    double xval = X.getLogValue(x);
+                    if (logsum > 0)
+                        logsum = xval;
+                    else
+                        logsum = logSumOfLogs(logsum, xval); // <=== Factor addition in log space
                 }
-                Y.setValue(y, sum);
+                Y.setLogValue(y, logsum);
                 if (X.isJDF()) {
                     for (int x : indices) {
-                        double nxval = X.getValue(x) / sum; // normalized
-                        if (nxval != 0) {
+                        double lognxval = X.getLogValue(x) - logsum;
+                        if (!isLOG0(lognxval)) {
+                            double nxval = Math.exp(lognxval); // normalization in log space
                             if (first == null) {
                                 // this will be true only once, for the first entry that will be collapsed
                                 first = X.getJDF(x); // save the JDF for later
@@ -1022,6 +1042,8 @@ public class Factorize {
      * Construct a new table from an existing, by maxing-out specified variable/s, and tracing
      * the assignment that provided the maximum value in the resulting table.
      * This code is based on that of getMargin.
+     * 
+     * This operation is performed entirely in log space.
      *
      * @param X existing table
      * @param anyvars variables to max-out
@@ -1047,13 +1069,13 @@ public class Factorize {
             double max = Double.NEGATIVE_INFINITY;
             int maxidx = 0;
             for (int x = 0; x < X.getSize(); x++) {
-                double xval = X.getValue(x);
+                double xval = X.getLogValue(x);
                 if (xval > max) {
                     max = xval;
                     maxidx = x;
                 }
             }
-            Y.setValue(max);
+            Y.setLogValue(max);
             if (Y.isJDF()) {
                 Y.setJDF(X.getJDF(maxidx));
             }
@@ -1082,13 +1104,13 @@ public class Factorize {
                 int maxidx = 0;
                 int[] indices = X.getIndices(xkey_search);
                 for (int x : indices) {
-                    double xval = X.getValue(x);
+                    double xval = X.getLogValue(x);
                     if (xval > max) {
                         max = xval;
                         maxidx = x;
                     }
                 }
-                Y.setValue(y, max);
+                Y.setLogValue(y, max);
                 if (Y.isJDF()) {
                     Y.setJDF(y, X.getJDF(maxidx));
                 }
@@ -1107,22 +1129,45 @@ public class Factorize {
     }
 
     /**
-     * Determine a normalised version of the factor
+     * Determine a normalised version of the factor.
+     * This operation is performed primarily in log space, and is very 
+     * unlikely to cause numerical underflow.
+     * 
      * @param X factor
      * @return a normalised copy of the provided factor
      */
     public static AbstractFactor getNormal(AbstractFactor X) {
         AbstractFactor Y = new DenseFactor(getConcat(X.evars, X.nvars));
         if (X.hasEnumVars()) {
-            double sum = X.getSum();
+            double logmax = Double.NEGATIVE_INFINITY;
+            double logmin = Double.POSITIVE_INFINITY;
             for (int i = 0; i < X.getSize(); i++) {
-                Y.setValue(i, X.getValue(i) / sum);
+                double xval = X.getLogValue(i);
+                if (xval > logmax)
+                    logmax = xval;
+                if (xval < logmin)
+                    logmin = xval;
+            }
+            double sum = 0;
+            double[] yvals = new double[X.getSize()];
+            for (int i = 0; i < X.getSize(); i++) {
+                yvals[i] = X.getLogValue(i) - logmax;
+                if (i == 0)
+                    sum = yvals[i];
+                else
+                    sum = logSumOfLogs(sum, yvals[i]);
+            }
+            if (isLOG0(sum))
+                System.err.println("getNormal fails");
+
+            for (int i = 0; i < X.getSize(); i++) {
+                Y.setLogValue(i, yvals[i] - sum);
                 if (X.isJDF()) {
                     Y.setJDF(i, X.getJDF(i));
                 }
             }
         } else {
-            Y.setValue(X.getValue());
+            Y.setLogValue(X.getLogValue());
             if (X.isJDF()) {
                 Y.setJDF(X.getJDF());
             }
@@ -1220,6 +1265,9 @@ public class Factorize {
         for (int j = 0; j < 20; j++) {
             if (testProductIntegrity(j, X, Y, f) == false) {
                 System.err.println("Test failed");
+                    X.display();
+                    Y.display();
+                    f.display();
             }
         }
         int overlap = getOverlap(X, Y);
@@ -1244,6 +1292,9 @@ public class Factorize {
             for (int j = 0; j < 20; j++) {
                 if (testProductIntegrity(j, X, Y, R) == false) {
                     System.err.println("Test failed");
+                    X.display();
+                    Y.display();
+                    R.display();
                 }
             }
             int overlap = getOverlap(X, Y);
@@ -1347,7 +1398,7 @@ public class Factorize {
             pval = PROD.getValue(p);
         }
         //System.out.print(p + "\t");
-        return xval * yval == pval;
+        return (xval * yval <= pval *1.01 && xval * yval >= pval *0.99);
     }
 
     protected static void testCrossRef(long seed, Variable[] vars) {

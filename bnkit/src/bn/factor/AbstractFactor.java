@@ -20,18 +20,11 @@ package bn.factor;
 import bn.Distrib;
 import dat.EnumTable;
 import dat.EnumVariable;
-import bn.prob.GaussianDistrib;
 import bn.JDF;
-import bn.Predef;
 import dat.Variable;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 
 /**
@@ -42,11 +35,13 @@ import java.util.Set;
  * message-passing in belief propagation. These operations need to be efficient. 
  * 
  * AbstractFactor is an abstract class that defines methods for specific implementations but 
- * implements basic operations that are used externally on factors, including product, and 
- * variable marginalisation (summing-out or maxing-out).
+ * implements basic operations on the data structure that are used externally on factors, incl.
+ * finding indices, or keys. See {@see bn.factor.Factorize} for numerical operations on factors.
  * 
  * The class is sensitive to the order of variables, and exposes the user to some
- * details so caution must be exercised.
+ * details so caution must be exercised. Of specific importance is that the table stores the 
+ * natural logarithm of each factor, so that operations can be performed entirely in log space,
+ * to avoid numerical issues, e.g. underflow.
  * 
  * TODO: Consider improving efficiency further to exploit the fact that now all variables are sorted
  * in the constructor. (Currently, some code does not assume order.)
@@ -56,6 +51,9 @@ import java.util.Set;
  * @author mikael
  */
 public abstract class AbstractFactor {
+
+    protected final static double LOG0 = Double.NEGATIVE_INFINITY;
+    protected static boolean isLOG0(double x) { return Double.isInfinite(x); }
 
     protected final int nEVars; // number of enumerable variables
     protected final int nNVars; // number of non-enumerable variables
@@ -220,6 +218,24 @@ public abstract class AbstractFactor {
         }
         return sum;
     }
+    
+    /**
+     * Calculate the log sum of factors: log(a + b + ... )
+     * @return the sum
+     */
+    public double getLogSum() {
+        double sum = 1;
+        if (!hasEnumVars())
+            return getLogValue();
+        for (int i = 0; i < getSize(); i ++) {
+            if (i == 0)
+                sum = getLogValue(i);
+            else
+                sum = Factorize.logSumOfLogs(sum, getLogValue(i));
+        }
+        return sum;
+    }
+    
     
     /**
      * Copy over all non-null values from source to target key.
@@ -551,7 +567,18 @@ public abstract class AbstractFactor {
      * Retrieve the value of the factor, if table is without enumerable variables.
      * @return the only value of the factor
      */
-    public abstract double getValue();
+    public double getValue() {
+        double y = getLogValue();
+        if (Double.isInfinite(y))
+            return 0;
+        return Math.exp(y);
+    }
+    
+    /**
+     * Retrieve the log value of the factor, if table is without enumerable variables.
+     * @return the only value of the factor
+     */
+    public abstract double getLogValue();
     
     /**
      * Retrieve the JDF of the factor without enumerable variables.
@@ -565,7 +592,20 @@ public abstract class AbstractFactor {
      * @param index the entry
      * @return the value of the entry
      */
-    public abstract double getValue(int index);
+    public double getValue(int index) {
+        double y = getLogValue(index);
+        if (Double.isInfinite(y))
+            return 0;
+        return Math.exp(y);
+    }
+
+    /**
+     * Retrieve the log value of the entry identified by the given index
+     *
+     * @param index the entry
+     * @return the value of the entry
+     */
+    public abstract double getLogValue(int index);
 
     /**
      * Retrieve the JDF
@@ -604,7 +644,18 @@ public abstract class AbstractFactor {
      * @param value
      * @return 
      */
-    public abstract int setValue(double value);
+    public int setValue(double value) {
+        if (value == 0)
+            return setLogValue(LOG0);
+        return setLogValue(Math.log(value));
+    }
+    
+    /**
+     * Set the only value associated with a table without enumerable variables.
+     * @param value
+     * @return 
+     */
+    public abstract int setLogValue(double value);
     
     /**
      * Associate the specified key-index with the given value. Note that using
@@ -615,7 +666,22 @@ public abstract class AbstractFactor {
      * @param value
      * @return the index at which the value was stored
      */
-    public abstract int setValue(int key_index, double value);
+    public int setValue(int key_index, double value) {
+        if (value == 0)
+            return setLogValue(key_index, LOG0);
+        return setLogValue(key_index, Math.log(value));
+    }
+
+    /**
+     * Associate the specified key-index with the given log value. Note that using
+     * getValue and setValue with index is quicker than with key, if more than
+     * one operation is done.
+     *
+     * @param key_index
+     * @param value
+     * @return the index at which the value was stored
+     */
+    public abstract int setLogValue(int key_index, double value);
 
 
     /**
@@ -629,6 +695,19 @@ public abstract class AbstractFactor {
             throw new AbstractFactorRuntimeException("Invalid key: no variables");
         int index = getIndex(key);
         return setValue(index, value);
+    }
+
+    /**
+     * Associate the specified key with the given log value.
+     * @param key
+     * @param value
+     * @return the index at which the value was stored
+     */
+    public int setLogValue(Object[] key, double value) {
+        if (getSize() == 1)
+            throw new AbstractFactorRuntimeException("Invalid key: no variables");
+        int index = getIndex(key);
+        return setLogValue(index, value);
     }
 
 
@@ -826,14 +905,7 @@ public abstract class AbstractFactor {
      * @return an array with all matching indices
      */
     public abstract int[] getIndices(Object[] key);
-    
-    public boolean isValid() {
-        for (int i =0 ; i < this.getSize(); i ++) 
-            if (Double.isNaN(this.getValue(i)))
-                return false;
-        return true;
-    }
-    
+        
 }
 
 class AbstractFactorRuntimeException extends RuntimeException {
