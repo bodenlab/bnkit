@@ -244,8 +244,6 @@ public class VarElim implements Inference {
                     b.factors.toArray(fs);
                     result = Factorize.getProduct(fs);
                 }
-                if (!result.isValid())
-                    System.err.println("Error in factor (1)");
                 if (i > 0) { // not the last bucket, so normal operation 
                     // The code below assumes that all buckets except the first have only enumerable variables to be summed out
                     // If continuous variables are unspecified (X) they should have been placed in the first bucket.
@@ -259,9 +257,6 @@ public class VarElim implements Inference {
                         else
                             result = Factorize.getMargin(result, margin);   // sum-out variables of bucket
                         
-                        if (!result.isValid())
-                            System.err.println("Error in factor (2)");
-
                         if (!result.hasEnumVars())          // if no enumerable variables, we may still have non-enumerables
                             buckets.get(0).put(result); // so we put the factor in the first bucket
                         else {                          // there are enumerables so...
@@ -281,8 +276,6 @@ public class VarElim implements Inference {
                     // instead we should extract query results from the final factor, including a JPT.
                     // If Q is only a non-enumerable variable or list there-of, we will not be able to create a JPT.
                     // The first section below is just making sure that the variables are presented in the same order as that in the query
-                    if (!result.isValid())
-                        System.err.println("Error in factor (3)");
                     return new CGTable(result, q.Q);
                 }
             }
@@ -315,9 +308,9 @@ public class VarElim implements Inference {
      * Determine the probability of the instantiated variables. 
      * This function does not integrate over/marginalize continuous (and other density-based) variables. 
      * Hence, such variables may have influence the result if they are not instantiated.
-     * @return the likelihood of the evidence (instantiated nodes)
+     * @return the log likelihood of the evidence (instantiated nodes)
      */
-    public double likelihood() {
+    public double logLikelihood() {
 	// All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
         // Assignment will be incorporated into the factor when it is constructed.
         List<Variable> X = new ArrayList<>(); // unspecified variables, to-be summed-out
@@ -424,10 +417,7 @@ public class VarElim implements Inference {
                     }
                 } else {    
                     // This is the final (first) bucket 
-                    double sum = result.getSum();
-                    if (sum == 0) {
-                        System.err.println("Likelihood is zero");
-                    }
+                    double sum = result.getLogSum();
                     return sum;
                 }
             }

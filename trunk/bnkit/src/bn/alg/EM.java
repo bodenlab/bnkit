@@ -265,8 +265,6 @@ public class EM extends LearningAlg {
                                     for (int qr_index : indices) {
                                         Object[] qr_key = qr.getKey(qr_index);
                                         double p = qr.getFactor(qr_index);
-                                        if (Double.isNaN(p))
-                                            System.err.println("Probability is not a number: in EM");
                                         JDF jdf = null;
                                         if (qr.hasNonEnumVariables()) {
                                             jdf = qr.getJDF(qr_index);
@@ -481,7 +479,7 @@ public class EM extends LearningAlg {
                             instantiate_me.resetInstance();
                         }
                     }
-                    log_likelihood += Math.log(((VarElim) inf).likelihood());
+                    log_likelihood += ((VarElim) inf).logLikelihood();
                     if (Double.isInfinite(log_likelihood)) {
                         System.err.println("Log-likelihood is infinite: " + log_likelihood);
                     }

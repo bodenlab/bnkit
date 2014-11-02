@@ -79,7 +79,7 @@ public class SparseFactor extends AbstractFactor {
             this.fac = new EnumTable<>(super.getEnumVars());
         else { // sometimes there are no enumerable variables
             this.fac = null;
-            this.fac_atomic = new Double(0);
+            this.fac_atomic = LOG0;
         }
         // if one or more non-enumerable variables, we allocate a matching map for JDFs
         if (this.nNVars > 0 && this.nEVars > 0) 
@@ -90,11 +90,11 @@ public class SparseFactor extends AbstractFactor {
 
 
     @Override
-    public double getValue() {
+    public double getLogValue() {
         if (this.getSize() == 1) {
             Double value = fac_atomic;
             if (value == null)
-                return 0;
+                return LOG0;
             return fac_atomic;
         }
         throw new SparseFactorRuntimeException("This table must be accessed with a enumerable variable key");
@@ -108,12 +108,12 @@ public class SparseFactor extends AbstractFactor {
     }
 
     @Override
-    public double getValue(int index) {
+    public double getLogValue(int index) {
         if (index >= getSize() || index < 0 || this.getSize() == 1)
             throw new SparseFactorRuntimeException("Invalid index");
         Double value = fac.getValue(index);
         if (value == null)
-            return 0;
+            return LOG0;
         return value;
     }
 
@@ -126,7 +126,7 @@ public class SparseFactor extends AbstractFactor {
     }
 
     @Override
-    public int setValue(double value) {
+    public int setLogValue(double value) {
         if (this.getSize() == 1) {
             fac_atomic = value;
             return 0;
@@ -135,10 +135,14 @@ public class SparseFactor extends AbstractFactor {
     }
 
     @Override
-    public int setValue(int key_index, double value) {
+    public int setLogValue(int key_index, double value) {
         if (key_index >= getSize() || key_index < 0 || this.getSize() == 1)
             throw new SparseFactorRuntimeException("Invalid index");
-        return fac.setValue(key_index, value);
+        if (value == LOG0)
+            fac.removeValue(key_index);
+        else 
+            fac.setValue(key_index, value);
+        return key_index;
     }
 
     @Override

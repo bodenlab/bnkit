@@ -260,9 +260,9 @@ public class DirDT implements BNode, TiedNode, Serializable {
                             IntegerSeq iseq = (IntegerSeq) varinstance;
                             int[] counts = IntegerSeq.intArray(iseq.get());
                             if (fkey.length == 0) // and the parents are too
-                                ft.setValue(Math.exp(d.logLikelihood(counts))); // these probs can be very small, may require move to log-space...
+                                ft.setLogValue(d.logLikelihood(counts)); // these probs can be very small, stay in log-space...
                             else
-                                ft.setValue(fkey, Math.exp(d.logLikelihood(counts)));
+                                ft.setLogValue(fkey, d.logLikelihood(counts));
                         } catch (ClassCastException e) {
                             // Assume the instance is an EnumDistrib
                             if (fkey.length == 0) // and the parents are too
@@ -272,10 +272,10 @@ public class DirDT implements BNode, TiedNode, Serializable {
                         }
                     } else { // the variable for this DirDT is NOT instantiated so we put it in the JDF
                         if (fkey.length == 0) { // but the parents are instantiated
-                            ft.setValue(1.0); 
+                            ft.setLogValue(0.0); 
                             ft.setDistrib(myvar, d);
                         } else {
-                            ft.setValue(fkey, 1.0);
+                            ft.setLogValue(fkey, 0.0);
                             ft.setDistrib(fkey, myvar, d);
                         }
                     }
@@ -508,12 +508,12 @@ public class DirDT implements BNode, TiedNode, Serializable {
         Random rand = new Random(seed);
         if (table == null) {
             if (prior == null)
-                prior = new DirichletDistrib((Enumerable)prior.getDomain(), (1+Math.abs(rand.nextGaussian())));
+                prior = new DirichletDistrib((Enumerable)prior.getDomain(), Math.max(1+rand.nextInt(100), 100*Math.abs(rand.nextGaussian())));
         } else {
             int nrows = table.getSize();
             for (int i = 0; i < nrows; i++) {
                 if (!table.hasValue(i))
-                    table.setValue(i, new DirichletDistrib((Enumerable)this.var.getDomain().getDomain(), (1+Math.abs(rand.nextGaussian()))));
+                    table.setValue(i, new DirichletDistrib((Enumerable)this.var.getDomain().getDomain(), Math.max(1+rand.nextInt(100), 100*Math.abs(rand.nextGaussian()))));
             }
         }
     }
@@ -527,9 +527,11 @@ public class DirDT implements BNode, TiedNode, Serializable {
     /**
      * Find the best parameter setting for the observed data.
      * This uses a method to find the ML estimate for the Dirichlet from
-     * a set of EnumDistribs, counted in countInstance.
+     * a set of IntegerSeq, counted in countInstance.
      * The current version doe not weight samples but collects them similar to
      * how k-means operate.
+     * 
+     * Note that this method is NOT used currently.
      */
     //@Override
     public void maximizeInstance_Gibbs() {
@@ -611,7 +613,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
     /**
      * Find the best parameter setting for the observed data.
      * This uses a method to find the ML estimate for the Dirichlet from
-     * a set of EnumDistribs, counted in countInstance.
+     * a set of IntegerSeq, counted in countInstance.
      */
     @Override
     public void maximizeInstance() {
@@ -672,12 +674,91 @@ public class DirDT implements BNode, TiedNode, Serializable {
 
     @Override
     public String getStateAsText() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        StringBuilder sbuf = new StringBuilder("\n");
+        if (isRoot()) {
+            DirichletDistrib d = prior;
+            if (d != null) {
+                double[] alpha = d.getAlpha();
+                for (int a = 0; a < alpha.length; a ++)
+                    sbuf.append(alpha[a]).append((a == alpha.length - 1 ? ";" : ", "));
+                sbuf.append("\n");
+            }
+        } else {
+            for (int i = 0; i < table.getSize(); i++) {
+                DirichletDistrib d = table.getValue(i);
+                if (d != null) {
+                    sbuf.append(i).append(": ");	// use index as key because values above can be of different non-printable types
+                    double[] alpha = d.getAlpha();
+                    for (int a = 0; a < alpha.length; a ++)
+                        sbuf.append(alpha[a]).append((a == alpha.length - 1 ? ";" : ", "));
+                    // If we want to *see* the key, may not work well for some non-printable types
+                    sbuf.append(" (");
+                    Object[] key = table.getKey(i);
+                    for (int j = 0; j < key.length; j++) {
+                        if (j < key.length - 1) {
+                            sbuf.append(key[j]).append(", ");
+                        } else {
+                            sbuf.append(key[j]).append(")\n");
+                        }
+                    }
+                }
+            }
+        }
+        return sbuf.toString();
     }
 
     @Override
     public boolean setState(String dump) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        Enumerable e = this.var.getDomain().getDomain();
+        if (isRoot()) {
+            String[] line = dump.split(";");
+            if (line.length >= 1) {
+                String[] y = line[0].split(",");
+                if (y.length == e.size()) {
+                    double[] alpha = new double[y.length];
+                    try {
+                        for (int i = 0; i < alpha.length; i++) {
+                            alpha[i] = Double.parseDouble(y[i]);
+                        }
+                    } catch (NumberFormatException ex) {
+                        ex.printStackTrace();
+                        return false;
+                    }
+                    this.put(new DirichletDistrib(e, alpha));
+                    return true;
+                }
+            }
+        } else {
+            for (String line : dump.split("\n")) {
+                line = line.trim();
+                // 0: 0.4, 0.6; (true, true)
+                String[] specline = line.split(";");
+                if (specline.length >= 1) {
+                    String[] parts = specline[0].split(":");
+                    if (parts.length >= 2) {
+                        try {
+                            int index = Integer.parseInt(parts[0]);
+                            String[] y = parts[1].split(",");
+                            if (y.length == e.size()) {
+                                double[] alpha = new double[y.length];
+                                try {
+                                    for (int i = 0; i < alpha.length; i++) {
+                                        alpha[i] = Double.parseDouble(y[i]);
+                                    }
+                                } catch (NumberFormatException ex) {
+                                    ex.printStackTrace();
+                                    return false;
+                                }
+                                this.put(table.getKey(index), new DirichletDistrib(e, alpha));
+                            }
+                        } catch (NumberFormatException ex) {
+                            System.err.println("Number format wrong and ignored: " + line);
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public boolean isRelevant() {

@@ -218,6 +218,28 @@ public class EnumDistrib implements Distrib, Domain {
     }
 
     /**
+     * Get the index of the value that is assigned the highest probability
+     * @return the index
+     */
+    public int getMaxIndex() {
+        int max_index = 0;
+        for (int i = 1; i < distrib.length; i++) {
+            if (distrib[max_index] < distrib[i])
+                max_index = i;
+        }
+        return max_index;
+    }
+
+    /**
+     * Get the value that is assigned the highest probability
+     * @return the value
+     */
+    public Object getMax() {
+        int max_index = getMaxIndex();
+        return domain.get(max_index);
+    }
+
+    /**
      * Choose a value from the domain, with a probability based on the
      * distribution.
      *

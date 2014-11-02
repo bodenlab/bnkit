@@ -26,9 +26,7 @@ import dat.Enumerable;
 import bn.prob.DirichletDistrib;
 import bn. *;
 import bn.alg.*;
-import static bn.prob.DirichletDistrib.DL;
-import static bn.prob.DirichletDistrib.getAlpha;
-import static bn.prob.DirichletDistrib.loadData;
+import bn.file.BNBuf;
 import dat.Continuous;
 import dat.IntegerSeq;
 import java.io.BufferedReader;
@@ -48,10 +46,11 @@ import java.util.logging.Logger;
  */
 public class DirDTExample {
     
-    
     public static void main(String[] args) {
         int ncluster = 9;
         long seed = 1;
+        
+        
         String filename = "/Users/mikael/Desktop/mm10_Mixed_NfiX_segmented20_100.out";
         
         int[][] data = loadData(filename);
@@ -66,20 +65,70 @@ public class DirDTExample {
             data_for_EM[i][0] = new IntegerSeq(data[i]);
         }
 
-        EnumVariable Cluster = Predef.Number(ncluster, "Cluster");
-        Enumerable segments = new Enumerable(nseg);
-        Variable Segment     = Predef.Distrib(segments, "Segments");
-
-        // Define nodes (connecting the variables into an acyclic graph, i.e. the structure)
-        CPT cluster = new CPT(Cluster);
-        DirDT segment = new DirDT(Segment,    Cluster);
-
         BNet bn = new BNet();
-        bn.add(cluster, segment);
+        EnumVariable Cluster;
+        Enumerable segments;
+        Variable Segment;
+        // Define nodes (connecting the variables into an acyclic graph, i.e. the structure)
+        CPT cluster;
+        DirDT segment;
+        
+        if (args.length > 0) {
+            bn = BNBuf.load(args[0]);
+            cluster = (CPT)bn.getNode("Cluster");
+            Cluster = cluster.getVariable();
+            segment = (DirDT)bn.getNode("Segments");
+            Segment = segment.getVariable();
+        } else {
+            Cluster = Predef.Number(ncluster, "Cluster");
+            segments = new Enumerable(nseg);
+            Segment = Predef.Distrib(segments, "Segments");
+            cluster = new CPT(Cluster);
+            segment = new DirDT(Segment,    Cluster);
+            bn.add(cluster, segment);
 
-        EM em = new EM(bn);
-        em.setMaxRounds(20);
-        em.train(data_for_EM, new Variable[] {Segment}, seed);
+            EM em = new EM(bn);
+            em.train(data_for_EM, new Variable[] {Segment}, seed);
+            cluster.print();
+            segment.print();
+            BNBuf.save(bn, filename + ".xml");
+        }
+
+        List[] bins = new ArrayList[ncluster];
+        for (int i = 0; i < ncluster; i++)
+            bins[i] = new ArrayList(); // start with empty bins
+
+        VarElim inf = new VarElim();
+        inf.instantiate(bn);
+        for (int i = 0; i < data_for_EM.length; i ++) {
+            segment.setInstance(data_for_EM[i][0]);
+            Query q = inf.makeQuery(Cluster);
+            CGTable r = (CGTable) inf.infer(q);
+            EnumDistrib d = (EnumDistrib)r.query(Cluster);
+            int predicted = d.getMaxIndex();
+            bins[predicted].add(i);
+        }
+
+        for (int i = 0; i < ncluster; i ++) {
+            try {
+                BufferedWriter bw = new BufferedWriter(new FileWriter(filename + "_bin_" + i + ".out"));
+                for (int a = 0; a < bins[i].size(); a ++) {
+                    int k = (Integer)bins[i].get(a);
+                    bw.write(k + "\t");
+                    IntegerSeq is = (IntegerSeq)data_for_EM[k][0];
+                    for (int j = 0; j < is.get().length; j ++)
+                        bw.write(is.get()[j] + "\t");
+                    bw.write(k + "\t");
+                    EnumDistrib d = new EnumDistrib(new Enumerable(nseg), IntegerSeq.intArray(is.get()));
+                    for (int j = 0; j < d.getDomain().size(); j ++)
+                        bw.write(d.get(j) + "\t");
+                    bw.newLine();
+                }
+                bw.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
         
     }
     

@@ -23,6 +23,7 @@ import bn.prob.GaussianDistrib;
 import bn.JDF;
 import bn.Predef;
 import dat.Variable;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
@@ -37,8 +38,11 @@ import java.util.Set;
  * These operations need to be efficient. DenseFactor is efficient when data are dense, 
  * i.e. when almost all possible key combinations are used. However, storage requirements 
  * grow exponentially with number of variables.
+ * 
  * The class is sensitive to the order of variables, and exposes the user to 
- * details so caution must be exercised.
+ * details so caution must be exercised. Of specific importance is that the table stores the 
+ * natural logarithm of each factor, so that operations can be performed entirely in log space,
+ * to avoid numerical issues, e.g. underflow.
  * 
  * TODO: Consider improving efficiency further to exploit the fact that now all variables are sorted
  * in the constructor. (Currently, some code does not assume order.)
@@ -60,7 +64,7 @@ public class DenseFactor extends AbstractFactor {
     public DenseFactor() {
         super();
         this.map = new double[1];
-        this.map[0] = 1.0;
+        // this.map[0] = 1.0; // log(0) = 1
     }
 
     
@@ -77,11 +81,12 @@ public class DenseFactor extends AbstractFactor {
         super(useVariables);
         // most of the time, there would be one or more enumerable variables so allocate a map
         // for all factor values
-        if (this.nEVars > 0)
+        if (this.nEVars > 0) {
             this.map = new double[getSize()];
-        else { // sometimes there are no enumerable variables, so need only one entry
+            Arrays.fill(map, LOG0);
+        } else { // sometimes there are no enumerable variables, so need only one entry
             this.map = new double[1];
-            this.map[0] = 1.0;
+            // this.map[0] = 1.0; // log(0) = 1
         }
         // if one or more non-enumerable variables, we allocate a matching map for JDFs
         if (this.nNVars > 0) {
@@ -93,11 +98,11 @@ public class DenseFactor extends AbstractFactor {
 
     
     /**
-     * Retrieve the value of the factor, if table is without enumerable variables.
+     * Retrieve the log value of the factor, if table is without enumerable variables.
      * @return the only value of the factor
      */
     @Override
-    public double getValue() {
+    public double getLogValue() {
         if (this.getSize() == 1)
             return this.map[0];
         throw new DenseFactorRuntimeException("This table must be accessed with a enumerable variable key");
@@ -121,7 +126,7 @@ public class DenseFactor extends AbstractFactor {
      * @return the value of the entry
      */
     @Override
-    public double getValue(int index) {
+    public double getLogValue(int index) {
         if (index >= getSize() || index < 0 || this.getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid index");
         double value = map[index];
@@ -142,24 +147,24 @@ public class DenseFactor extends AbstractFactor {
     }
     
     /**
-     * Set the only value associated with a table without enumerable variables.
+     * Set the (only) log value associated with a table without enumerable variables.
      * @param value
      * @return 
      */
     @Override
-    public int setValue(double value) {
+    public int setLogValue(double value) {
         if (this.getSize() != 1)
             throw new DenseFactorRuntimeException("Table has variables that must be used to index access");
-        if (value != 0 && map[0] == 0)
+        if (value != LOG0 && map[0] == LOG0)
             occupied ++;
-        else if (value == 0 && map[0] !=0)
+        else if (value == LOG0 && map[0] != LOG0)
             occupied --;
         map[0] = value;
         return 0;
     }
     
     /**
-     * Associate the specified key-index with the given value. Note that using
+     * Associate the specified key-index with the given log value. Note that using
      * getValue and setValue with index is quicker than with key, if more than
      * one operation is done.
      *
@@ -168,12 +173,12 @@ public class DenseFactor extends AbstractFactor {
      * @return the index at which the value was stored
      */
     @Override
-    public int setValue(int key_index, double value) {
+    public int setLogValue(int key_index, double value) {
         if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
-        if (value != 0 && map[key_index] == 0)
+        if (value != LOG0 && map[key_index] == LOG0)
             occupied ++;
-        else if (value == 0 && map[key_index] !=0)
+        else if (value == LOG0 && map[key_index] != LOG0)
             occupied --;
         map[key_index] = value;
         return key_index;
@@ -392,12 +397,11 @@ public class DenseFactor extends AbstractFactor {
     }
 
     /**
-     * Set all entries to 0.
+     * Set all entries to log(0) to indicate that they are empty (represent a probability 0).
      */
     @Override
     public void setEmpty() {
-        for (int i = 0; i < map.length; i ++)
-            map[i] = 0;
+        Arrays.fill(map, LOG0);
         if (isJDF()) {
             for (int i = 0; i < jdf.length; i ++) 
                 this.jdf[i] = new JDF(nvars);
