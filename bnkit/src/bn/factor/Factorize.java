@@ -1138,6 +1138,8 @@ public class Factorize {
      */
     public static AbstractFactor getNormal(AbstractFactor X) {
         AbstractFactor Y = new DenseFactor(getConcat(X.evars, X.nvars));
+        if (X.isTraced())
+            Y.setTraced(true);
         if (X.hasEnumVars()) {
             double logmax = Double.NEGATIVE_INFINITY;
             double logmin = Double.POSITIVE_INFINITY;
@@ -1165,11 +1167,17 @@ public class Factorize {
                 if (X.isJDF()) {
                     Y.setJDF(i, X.getJDF(i));
                 }
+                if (X.isTraced()) {
+                    Y.addAssign(i, X.getAssign(i));
+                }
             }
         } else {
             Y.setLogValue(X.getLogValue());
             if (X.isJDF()) {
                 Y.setJDF(X.getJDF());
+            }
+            if (X.isTraced()) {
+                Y.addAssign(X.getAssign());
             }
         }
         return Y;

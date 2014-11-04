@@ -54,6 +54,23 @@ public class PhyloTree {
     }
     
     /**
+     * Get root node of tree.
+     * @return the root of the tree
+     */
+    public Node getRoot() {
+        return root;
+    }
+    
+    /**
+     * Find the node with the specified content.
+     * @param content content or label
+     * @return matching node, or null if not found
+     */
+    public Node find(Object content) {
+        return root.find(content);
+    }
+    
+    /**
      * Find index of first comma at the current level (non-embedded commas are ignored) or end of string.
      * @param str a Newick string
      * @return index of the first comma or end-of-string
@@ -120,22 +137,18 @@ public class PhyloTree {
      * @param filename name of file
      * @return instance of tree
      */
-    public static PhyloTree loadNewick(String filename) {
-        try {
-            BufferedReader reader = new BufferedReader(new FileReader(filename));
-            StringBuilder sb = new StringBuilder();
-            String line = null;
-            int cnt = 1;
-            while ((line = reader.readLine()) != null)
-                sb.append(line.trim());
-            String newick = sb.toString();
-            Node root = parseNewick(newick);
-            PhyloTree t = new PhyloTree(root);
-            reader.close();
-            return t;
-        } catch (IOException e) {
-            return null;
-        }
+    public static PhyloTree loadNewick(String filename) throws IOException {
+        BufferedReader reader = new BufferedReader(new FileReader(filename));
+        StringBuilder sb = new StringBuilder();
+        String line = null;
+        int cnt = 1;
+        while ((line = reader.readLine()) != null)
+            sb.append(line.trim());
+        String newick = sb.toString();
+        Node root = parseNewick(newick);
+        PhyloTree t = new PhyloTree(root);
+        reader.close();
+        return t;
     }
     
     /**
@@ -154,6 +167,10 @@ public class PhyloTree {
         public Node(Object content) {
             this.content = content;
             this.children = new HashSet<>();
+        }
+        
+        public Object getContent() {
+            return content;
         }
         
         /**
@@ -226,6 +243,8 @@ public class PhyloTree {
          * @return the distance
          */ 
         public double getDistance() {
+            if (this.dist == null)
+                throw new RuntimeException("Node " + this + " with content " + content + " does not have a distance");
             return this.dist;
         }
     }
@@ -235,7 +254,11 @@ public class PhyloTree {
         System.out.println(root);
         root = parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)");
         System.out.println(root);
-        PhyloTree cyp3 = PhyloTree.loadNewick("/Users/mikael/workspace/binf/data/cyp3.newick");
-        System.out.println(cyp3);
+        try {
+            PhyloTree cyp3 = PhyloTree.loadNewick("/Users/mikael/workspace/binf/data/cyp3.newick");
+            System.out.println(cyp3);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
     }
 }

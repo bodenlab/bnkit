@@ -236,7 +236,7 @@ public class Variable<E extends Domain> implements Comparable {
             return map;
         } 
         public String toString() {
-            return var.name + "=" + val.toString();
+            return var.toString() + "=" + val.toString();
         }
     }
 

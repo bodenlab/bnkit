@@ -99,7 +99,7 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
             List<EnumSeq.Gappy<T>> seqs = new ArrayList<>();
             AlnReader r = new AlnReader(filename, elementType);
             EnumSeq.Gappy[] rseqs = r.load();
-            for (EnumSeq rseq : rseqs) {
+            for (EnumSeq.Gappy<T> rseq : rseqs) {
                 try {
                     seqs.add((EnumSeq.Gappy<T>) rseq);
                 } catch (ClassCastException e) {
@@ -108,6 +108,7 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
             r.close();
             return seqs;
         }
+        
     }
 
     public static Gappy<Enumerable> aacid_gapseq = new Gappy<>(Enumerable.aacid);
@@ -115,10 +116,72 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
 
     public static class Alignment<E extends Enumerable> {
         
+        private final List<EnumSeq.Gappy<E>> seqs;
+        private final int width;
+        
+        /**
+         * Create an alignment structure out of aligned, gappy sequences.
+         * @param aseqs 
+         */
         public Alignment(List<EnumSeq.Gappy<E>> aseqs) {
-            
+            this.seqs = aseqs;
+            int w = -1;
+            for (EnumSeq.Gappy<E> seq : aseqs) {
+                if (w < 0)
+                    w = seq.length();
+                else if (w != seq.length())
+                    throw new RuntimeException("Invalid alignment with sequences of different lengths.");
+            }
+            width = w;
         }
         
+        public EnumSeq.Gappy<E> getEnumSeq(int index) {
+            return seqs.get(index);
+        }
+        
+        /**
+         * Get the width of alignment--the number of columns.
+         * @return number of columns
+         */
+        public int getWidth() {
+            return this.width;
+        }
+        
+        /**
+         * Get the height of alignment--the number of sequences.
+         * @return number of sequences
+         */
+        public int getHeight() {
+            return seqs.size();
+        }
+        
+        /**
+         * Get the names of all the sequences in the alignment
+         * @return an array with names
+         */
+        public String[] getNames() {
+            String[] names = new String[seqs.size()];
+            for (int i = 0; i < names.length; i ++) {
+                EnumSeq.Gappy<E> seq = seqs.get(i);
+                names[i] = seq.getName();
+            }
+            return names;
+        }
+        
+        /**
+         * Get the column of enumerable values for a given column, indexed from 0 up to alignment width - 1.
+         * @param col column
+         * @return array of values in column, null representing gap
+         */
+        public Object[] getColumn(int col) {
+            if (col >= 0 && col < this.width) {
+                Object[] syms = new Object[getHeight()];
+                for (int i = 0; i < syms.length; i ++)
+                    syms[i] = seqs.get(i).get()[col];
+                return syms;
+            }
+            return null;
+        }
     }
     
 }
