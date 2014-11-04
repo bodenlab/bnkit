@@ -119,7 +119,7 @@ public class AlnReader {
                                     if (collectNames) { // we're still in the first block so must be a new identifier
                                         count++;
                                         seq.put(strid, new StringBuffer(seqstr));
-                                        order.put(new Integer(count), strid);
+                                        order.put(count, strid);
                                     } else {
                                         throw new RuntimeException("Invalid identifier \"" + strid + "\" on row " + rowCount);
                                     }

@@ -469,7 +469,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      */
     @Override
     public String getName() {
-        return getVariable().getName();
+        return getVariable().toString();
     }
 
     /**

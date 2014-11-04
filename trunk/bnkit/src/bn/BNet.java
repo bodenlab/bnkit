@@ -234,7 +234,7 @@ public class BNet implements Serializable {
                 List<EnumVariable> parvars = node.getParents();
                 if (parvars != null) {
                     for (EnumVariable parent : parvars) {
-                        String pname = parent.getName();
+                        String pname = parent.toString();
                         BNode pnode = nodes.get(pname);
                         if (pnode == null) {
                             throw new BNetRuntimeException("Invalid Bayesian network: node " + pname + " is not a member but referenced by " + node.getName());

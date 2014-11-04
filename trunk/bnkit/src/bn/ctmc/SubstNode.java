@@ -85,7 +85,15 @@ public class SubstNode implements BNode, TiedNode {
     
     @Override
     public String getName() {
-        return var.getName();
+        return getVariable().toString();
+    }
+
+    public String toString() {
+        if (parent == null) {
+            return "SN(" + var.getName() + ")" + (getInstance() == null ? "" : "=" + getInstance());
+        } else {
+            return "SN(" + var.getName() + "|" + parent.getName() + ")" + (getInstance() == null ? "" : "=" + getInstance());
+        }
     }
 
     /**
