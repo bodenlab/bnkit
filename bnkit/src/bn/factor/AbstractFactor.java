@@ -228,10 +228,13 @@ public abstract class AbstractFactor {
         if (!hasEnumVars())
             return getLogValue();
         for (int i = 0; i < getSize(); i ++) {
+        	double logp = getLogValue(i);
+        	if (Double.isNaN(logp))
+        		continue;
             if (i == 0)
-                sum = getLogValue(i);
+                sum = logp;
             else
-                sum = Factorize.logSumOfLogs(sum, getLogValue(i));
+                sum = Factorize.logSumOfLogs(sum, logp);
         }
         return sum;
     }
