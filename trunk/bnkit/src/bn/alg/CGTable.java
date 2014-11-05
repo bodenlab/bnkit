@@ -165,7 +165,7 @@ public class CGTable implements QueryResult {
                     qkey[fcross2q[j]] = fkey[j];
                 int key_index = EnumTable.getIndex(qkey, q_evars_arr);
                 double p = f.getValue(i);
-                if (p == 0)
+                if (p == 0 || Double.isNaN(p))
                     continue;
                 factorTable.setValue(key_index, p);
                 if (f.hasNonEnumVars()) {

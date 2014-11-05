@@ -265,6 +265,8 @@ public class EM extends LearningAlg {
                                     for (int qr_index : indices) {
                                         Object[] qr_key = qr.getKey(qr_index);
                                         double p = qr.getFactor(qr_index);
+                                        if (p == 0 || Double.isNaN(p)) // count is zero (or the log prob was so small that conversion failed)
+                                            continue;
                                         JDF jdf = null;
                                         if (qr.hasNonEnumVariables()) {
                                             jdf = qr.getJDF(qr_index);
