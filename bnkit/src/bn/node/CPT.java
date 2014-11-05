@@ -726,7 +726,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      */
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
-    	if (prob == 0.0) {
+    	if (prob == 0.0 || Double.isNaN(prob)) {
             return;
     	}
         if (key == null) {
