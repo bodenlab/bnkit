@@ -26,7 +26,7 @@ import dat.Domain;
 import dat.EnumVariable;
 import dat.Variable;
 import dat.Enumerable;
-//import gui2.NodeModel;
+import gui2.NodeModel;
 import java.util.ArrayList;
 import java.util.List;
 
