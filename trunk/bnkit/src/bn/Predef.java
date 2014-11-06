@@ -26,7 +26,7 @@ import dat.Domain;
 import dat.EnumVariable;
 import dat.Variable;
 import dat.Enumerable;
-import gui2.NodeModel;
+//import gui2.NodeModel;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -257,6 +257,11 @@ public class Predef {
     public static EnumVariable AminoAcid(String name) {
         EnumVariable var = new EnumVariable(Enumerable.aacid, name);
         var.setPredef("Amino acid");
+        StringBuilder sbuf = new StringBuilder("");
+        for (Object v : Enumerable.aacid.getValues()) {
+            sbuf.append(v).append(";");
+        }
+        var.setParams(sbuf.toString());
         return var;
     }
 
