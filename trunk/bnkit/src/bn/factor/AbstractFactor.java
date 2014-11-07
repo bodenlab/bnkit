@@ -213,10 +213,7 @@ public abstract class AbstractFactor {
         double sum =0;
         if (!hasEnumVars())
             return getValue();
-        for (int i = 0; i < getSize(); i ++) {
-            sum += getValue(i);
-        }
-        return sum;
+        return Math.exp(getLogSum());
     }
     
     /**
@@ -228,9 +225,9 @@ public abstract class AbstractFactor {
         if (!hasEnumVars())
             return getLogValue();
         for (int i = 0; i < getSize(); i ++) {
-        	double logp = getLogValue(i);
-        	if (Double.isNaN(logp))
-        		continue;
+            double logp = getLogValue(i);
+            if (Double.isNaN(logp)) // skip entries that are un-instantiated
+                continue;
             if (i == 0)
                 sum = logp;
             else
@@ -890,7 +887,8 @@ public abstract class AbstractFactor {
     public abstract int setDistrib(Variable nvar, Distrib d);
     
     /**
-     * Find out how many entries that occupied.
+     * Find out how many entries that are occupied.
+     * @return  number of entries that are instantiated
      */
     public abstract int getOccupied();
     

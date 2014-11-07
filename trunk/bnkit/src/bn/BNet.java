@@ -579,6 +579,7 @@ public class BNet implements Serializable {
      *
      * @param query the variables that are in the query
      * @return a new BN with the relevant CPTs only
+     * @deprecated
      */
     public BNet getRelevant(Variable... query) {
         BNet nbn = new BNet();
