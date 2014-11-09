@@ -54,7 +54,7 @@ public class BNet implements Serializable {
     /**
      * All nodes of the BN
      */
-    private final Map<String, BNode> nodes = new HashMap<>();
+    private final Map<String, BNode> nodesByName = new HashMap<>();
     private final Map<Variable, BNode> nodesByVar = new HashMap<>();
 
     /**
@@ -88,123 +88,17 @@ public class BNet implements Serializable {
     public BNet() {
     }
 
-    public Set<String> getTagNames(){
-        return this.tagged.keySet();
-    }
-
-    /**
-     * Get all nodes that have a tag assigned
-     * @return List of tagged nodes
-     */
-    public List<BNode> getTagged(){
-        ArrayList taggedList = new ArrayList();
-        Set<BNode> taggedSet = new HashSet();
-        Iterator it = this.tagged.entrySet().iterator();
-        while (it.hasNext()){
-            Map.Entry<String, Set<BNode>> pairs = (Map.Entry)it.next();
-            for (BNode node : pairs.getValue()){
-                taggedSet.add(node);
-            }
-        }
-        taggedList.addAll(taggedSet);
-        return taggedList;
-    }
-
-    /**
-     * Clear all current tags for all nodes
-     */
-    public void removeAllTags(){
-        this.tagged.clear();
-    }
-
-
-    /**
-     * Return nodes that are in all specified tag groups
-     * @param tags tag names
-     * @return list of nodes
-     */
-    public List<BNode> getTagged(String... tags){
-        ArrayList taggedList = new ArrayList();
-        Set<BNode> taggedSet = new HashSet();
-//        List<BNode> taggedNodes = this.getTagged();
-        for (BNode node : this.nodes.values()){
-            boolean common = false;
-            for (String tag: tags){
-                if (!this.tagged.keySet().contains(tag)){
-                    throw new IllegalArgumentException("Tag " + tag + " does not exist");
-                }
-                if (!this.tagged.get(tag).contains(node)){
-                    common = false;
-                    break;
-                } else{
-                    common = true;
-                }
-            }
-            if (common){
-                taggedSet.add(node);
-            }
-        }
-        taggedList.addAll(taggedSet);
-        return taggedList;
-    }
-
-    /**
-     * Remove a node from a tag group
-     * @param tag
-     * @param node
-     */
-    public void removeTag(String tag, BNode node){
-        this.tagged.get(tag).remove(node);
-    }
-
-    /**
-     * Assign nodes to a specific tag group
-     * @param tag
-     * @param nodes
-     */
-    public void setTags(String tag, BNode... nodes){
-        if (!this.tagged.containsKey(tag)){
-            this.tagged.put(tag, new HashSet<BNode>());
-        }
-        for (BNode node : nodes){
-            this.tagged.get(tag).add(node);
-        }
-    }
-
-    public void setTags(String[] tags, BNode... nodes){
-        for (String tag: tags){
-            this.setTags(tag, nodes);
-        }
-    }
-
-    /**
-     * Get the tag groups in which a node belongs
-     * @param node
-     * @return List of tag groups
-     */
-    public List<String> getTags(BNode node){
-        ArrayList<String> tags = new ArrayList();
-        Iterator it = this.tagged.entrySet().iterator();
-        while (it.hasNext()){
-            Map.Entry<String, Set<BNode>> pairs = (Map.Entry)it.next();
-            if (pairs.getValue().contains(node)){
-                tags.add(pairs.getKey());
-            }
-        }
-        return tags;
-    }
-
     /**
      * Add a node to the BN. All nodes must implement the BNode interface.
      *
      * @param node the node (e.g. a CPT, or GDT)
      */
     public void add(BNode node) {
-        if (nodes.containsKey(node.getName()) || nodesByVar.containsKey(node.getVariable())) {
+        if (nodesByName.containsKey(node.getName()) || nodesByVar.containsKey(node.getVariable())) {
             throw new BNetRuntimeException("Duplicate node names in BNet: " + node.getName());
         }
         compiled = false;
-        nodes.put(node.getName(), node);
+        nodesByName.put(node.getName(), node);
         nodesByVar.put(node.getVariable(), node);
     }
 
@@ -221,6 +115,17 @@ public class BNet implements Serializable {
     }
 
     /**
+     * Removes a node from the BN. 
+     * Note that this does not de-associate the references to other nodes by variables.
+     * @param node 
+     */
+    public void remove(BNode node) {
+        compiled = false;
+        nodesByName.remove(node.getName());
+        nodesByVar.remove(node.getVariable());
+    }
+    
+    /**
      * Compile and finalise the information in the Bayesian network so that
      * inference and other computationally complex processes can be done. (For
      * example: linking ancestors and descendants.) Most (if not all) functions
@@ -229,13 +134,15 @@ public class BNet implements Serializable {
      */
     public void compile() {
         if (!compiled) {
-            for (BNode node : nodes.values()) {
+            ch2par.clear();
+            par2ch.clear();
+            for (BNode node : nodesByName.values()) {
                 Set<BNode> parents = new HashSet<>();
                 List<EnumVariable> parvars = node.getParents();
                 if (parvars != null) {
                     for (EnumVariable parent : parvars) {
                         String pname = parent.toString();
-                        BNode pnode = nodes.get(pname);
+                        BNode pnode = nodesByName.get(pname);
                         if (pnode == null) {
                             throw new BNetRuntimeException("Invalid Bayesian network: node " + pname + " is not a member but referenced by " + node.getName());
                         }
@@ -252,9 +159,10 @@ public class BNet implements Serializable {
             }
             compiled = true; // note: must be declared compiled before full compilation ("ordered" below uses descendant links)
 
+            ordered.clear();
             for (BNode root : getRoots()) {
                 List<BNode> ordered_from_root = new ArrayList<>();
-                if (ordered.contains(root) && ordered.size() == this.nodes.size()) {
+                if (ordered.contains(root) && ordered.size() == this.nodesByName.size()) {
                     continue;
                 }
                 ordered_from_root.add(root);
@@ -287,7 +195,7 @@ public class BNet implements Serializable {
      */
     public Set<BNode> getRoots() {
         Set<BNode> roots = new HashSet<>();
-        for (BNode node : nodes.values()) {
+        for (BNode node : nodesByName.values()) {
             if (node.isRoot()) {
                 roots.add(node);
             }
@@ -301,7 +209,7 @@ public class BNet implements Serializable {
      * @return the nodes
      */
     public Collection<BNode> getNodes() {
-        return nodes.values();
+        return nodesByName.values();
     }
 
     /**
@@ -390,7 +298,7 @@ public class BNet implements Serializable {
      * @param node the node for which all children are sought
      * @return the children nodes
      */
-    public Set<String> getChildren(BNode node) {
+    public Set<String> getChildrenNames(BNode node) {
         if (!compiled) {
             this.compile(); // relies on par2ch: parent to children linking
         }
@@ -403,6 +311,43 @@ public class BNet implements Serializable {
             names.add(n.getName());
         }
         return names;
+    }
+
+    /**
+     * Retrieve all "children" nodes of the specified node. That is all nodes
+     * that are "below" the specified node. Requires the network to be compiled.
+     *
+     * @param node the node for which all children are sought
+     * @return the children nodes
+     */
+    public Set<BNode> getChildren(BNode node) {
+        if (!compiled) {
+            this.compile(); // relies on par2ch: parent to children linking
+        }
+        Set<BNode> children = par2ch.get(node);
+        if (children == null) {
+            return null;
+        }
+        Set<BNode> nodes = new HashSet<>();
+        for (BNode n : children) {
+            nodes.add(n);
+        }
+        return nodes;
+    }
+
+    /**
+     * Check if there are "children" nodes of the specified node. That is nodes
+     * that are "below" the specified node. Requires the network to be compiled.
+     *
+     * @param node the node for which children are sought
+     * @return true if there is at least one child, false otherwise
+     */
+    public boolean hasChildren(BNode node) {
+        if (!compiled) {
+            this.compile(); // relies on par2ch: parent to children linking
+        }
+        Set<BNode> children = par2ch.get(node);
+        return (children != null);
     }
 
     /**
@@ -492,7 +437,7 @@ public class BNet implements Serializable {
      * @return the names of the nodes in the BN
      */
     public Set<String> getNames(){
-        return nodes.keySet();
+        return nodesByName.keySet();
     }
 
     /**
@@ -502,15 +447,15 @@ public class BNet implements Serializable {
      * @return the class instance of the node
      */
     public BNode getNode(String name) {
-        BNode node = nodes.get(name);
+        BNode node = nodesByName.get(name);
         if (node != null) {
             return node;
         } else {
-            for (String nodename : nodes.keySet()) {
+            for (String nodename : nodesByName.keySet()) {
                 String[] parts = nodename.split("\\.");
                 if (parts.length >= 2) {
                     if (parts[0].equals(name)) {
-                        return nodes.get(nodename);
+                        return nodesByName.get(nodename);
                     }
                 }
             }
@@ -588,7 +533,7 @@ public class BNet implements Serializable {
             qset.add(query1.toString());
         }
         // first add all instantiated/evidence variables and queried variables
-        for (BNode node : nodes.values()) {
+        for (BNode node : nodesByName.values()) {
 //            if (node.getInstance() != null || qset.contains(node.getName())) {
         	// query is list of variables and node name and variable name are different
         	if (node.getInstance() != null || qset.contains(node.getVariable().toString())){
@@ -679,17 +624,17 @@ public class BNet implements Serializable {
                             l.add(new NodeDirection(this.getNode(par), "up"));
                         }
                     }
-                    if (this.getChildren(cur.getNode()) != null) {
+                    if (this.getChildrenNames(cur.getNode()) != null) {
                         //find children to be visited from top
-                        for (String c : this.getChildren(cur.getNode())) {
+                        for (String c : this.getChildrenNames(cur.getNode())) {
                             l.add(new NodeDirection(this.getNode(c), "down"));
                         }
                     }
                 } else if (cur.getDirection() == "down") { //trails down through Y
                     if (!z.contains(cur.getNode())) { //downward trails to Y's children are active
-                        if (this.getChildren(cur.getNode()) != null) {
+                        if (this.getChildrenNames(cur.getNode()) != null) {
                             //find children to be visited from top
-                            for (String c : this.getChildren(cur.getNode())) {
+                            for (String c : this.getChildrenNames(cur.getNode())) {
                                 l.add(new NodeDirection(this.getNode(c), "down"));
                             }
                         }
@@ -912,6 +857,114 @@ public class BNet implements Serializable {
     		return false;
     	}
     }
+    
+    public Set<String> getTagNames(){
+        return this.tagged.keySet();
+    }
+
+    /**
+     * Get all nodes that have a tag assigned
+     * @return List of tagged nodes
+     */
+    public List<BNode> getTagged(){
+        ArrayList taggedList = new ArrayList();
+        Set<BNode> taggedSet = new HashSet();
+        Iterator it = this.tagged.entrySet().iterator();
+        while (it.hasNext()){
+            Map.Entry<String, Set<BNode>> pairs = (Map.Entry)it.next();
+            for (BNode node : pairs.getValue()){
+                taggedSet.add(node);
+            }
+        }
+        taggedList.addAll(taggedSet);
+        return taggedList;
+    }
+
+    /**
+     * Clear all current tags for all nodes
+     */
+    public void removeAllTags(){
+        this.tagged.clear();
+    }
+
+
+    /**
+     * Return nodes that are in all specified tag groups
+     * @param tags tag names
+     * @return list of nodes
+     */
+    public List<BNode> getTagged(String... tags){
+        ArrayList taggedList = new ArrayList();
+        Set<BNode> taggedSet = new HashSet();
+//        List<BNode> taggedNodes = this.getTagged();
+        for (BNode node : this.nodesByName.values()){
+            boolean common = false;
+            for (String tag: tags){
+                if (!this.tagged.keySet().contains(tag)){
+                    throw new IllegalArgumentException("Tag " + tag + " does not exist");
+                }
+                if (!this.tagged.get(tag).contains(node)){
+                    common = false;
+                    break;
+                } else{
+                    common = true;
+                }
+            }
+            if (common){
+                taggedSet.add(node);
+            }
+        }
+        taggedList.addAll(taggedSet);
+        return taggedList;
+    }
+
+    /**
+     * Remove a node from a tag group
+     * @param tag
+     * @param node
+     */
+    public void removeTag(String tag, BNode node){
+        this.tagged.get(tag).remove(node);
+    }
+
+    /**
+     * Assign nodes to a specific tag group
+     * @param tag
+     * @param nodes
+     */
+    public void setTags(String tag, BNode... nodes){
+        if (!this.tagged.containsKey(tag)){
+            this.tagged.put(tag, new HashSet<BNode>());
+        }
+        for (BNode node : nodes){
+            this.tagged.get(tag).add(node);
+        }
+    }
+
+    public void setTags(String[] tags, BNode... nodes){
+        for (String tag: tags){
+            this.setTags(tag, nodes);
+        }
+    }
+
+    /**
+     * Get the tag groups in which a node belongs
+     * @param node
+     * @return List of tag groups
+     */
+    public List<String> getTags(BNode node){
+        ArrayList<String> tags = new ArrayList();
+        Iterator it = this.tagged.entrySet().iterator();
+        while (it.hasNext()){
+            Map.Entry<String, Set<BNode>> pairs = (Map.Entry)it.next();
+            if (pairs.getValue().contains(node)){
+                tags.add(pairs.getKey());
+            }
+        }
+        return tags;
+    }
+
+
 }
 
 /**

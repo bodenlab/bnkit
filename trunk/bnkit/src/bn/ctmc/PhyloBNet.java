@@ -109,4 +109,16 @@ public class PhyloBNet {
         }
     }
     
+    public void purgeGaps() {
+        List<BNode> nodes = bn.getOrdered();
+        if (nodes == null)
+            return;
+        for (BNode node : nodes) {
+            if (node.getInstance() == null && !bn.hasChildren(node)) { // here's a leaf node which is not instantiated
+                
+                
+            }
+        }
+    }
+    
 }
