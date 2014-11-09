@@ -193,7 +193,7 @@ public class EM extends LearningAlg {
                                 update.put(bn.getNode(parent), null);
                             }
                         }
-                        Set<String> children = bn.getChildren(instantiate_me);	// if no, determine which are the parents of the node
+                        Set<String> children = bn.getChildrenNames(instantiate_me);	// if no, determine which are the parents of the node
                         if (children != null) {
                             for (String child : children) {		// go through the children and add them to the update set
                                 BNode c = bn.getNode(child);
