@@ -53,6 +53,36 @@ public class PhyloTree {
         return root.toString();
     }
     
+    public Node[] toNodesBreadthFirst() {
+        List<Node> done = new ArrayList<>();
+        List<Node> queue = new ArrayList<>();
+        queue.add(root);
+        expandNodes(done, queue);
+        Node[] arr = new Node[done.size()];
+        done.toArray(arr);
+        return arr;
+    }
+    
+    private void expandNodes(List<Node> done, List<Node> queue) {
+        if (queue.isEmpty())
+            return;
+        Node head = queue.remove(0);
+        Set<Node> children = head.getChildren();
+        for (Node child : children) {
+            done.add(child);
+            queue.add(child);
+        }
+        expandNodes(done, queue);
+    }
+    
+    public String[] toStringsBreadthFirst() {
+        Node[] nodes = toNodesBreadthFirst();
+        String[] arr = new String[nodes.length];
+        for (int i = 0; i < nodes.length; i ++) 
+            arr[i] = nodes[i].content.toString();
+        return arr;
+    }
+    
     /**
      * Get root node of tree.
      * @return the root of the tree

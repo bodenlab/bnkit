@@ -32,7 +32,6 @@ import bn.prob.DirichletDistrib;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
-import static bn.prob.DirichletDistrib.getAlphaSum_byNewton;
 import dat.Domain;
 import dat.IntegerSeq;
 import java.io.Serializable;

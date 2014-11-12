@@ -17,6 +17,9 @@
  */
 package bn;
 
+import bn.ctmc.SubstModel;
+import bn.ctmc.SubstNode;
+import bn.ctmc.matrix.JTT;
 import bn.prob.EnumDistrib;
 import bn.node.CPT;
 import bn.node.DirDT;
@@ -62,6 +65,12 @@ public class Predef {
         }
     }
 
+    /**
+     * This function is used by Jun's GUI.
+     * @param var_type
+     * @return 
+     * @deprecated
+     */
     public static String getBNodeType(String var_type) {
         if (isEnumerable(var_type)) {
             return "CPT";
@@ -137,6 +146,15 @@ public class Predef {
                     elist.add((EnumVariable) v);
                 }
                 return new DirDT(var, elist);
+            } else if (type.equalsIgnoreCase("SubstNode")) {
+                SubstModel model = new JTT(); // default, to be overridden in "dump" field
+                if (parents.size() > 0) {
+                    EnumVariable parent = (EnumVariable)parents.get(0);
+                    double time = 1.0; // default, to be overridden in "dump" field
+                    return new SubstNode((EnumVariable)var, parent, model, time);
+                } else {
+                    return new SubstNode((EnumVariable)var, model);
+                }
             }
             return null;
         } catch (ClassCastException e) {
@@ -144,6 +162,12 @@ public class Predef {
         }
     }
     
+    /**
+     * This function is used by Jun's GUI.
+     * Do not use.
+     * @return 
+     * @deprecated
+     */
     @SuppressWarnings("rawtypes")
     public static NodeModel getNodeModel(Variable var, List<Variable> parents, String type) {
         if (parents == null) {

@@ -136,15 +136,15 @@ public class BNet implements Serializable {
         if (!compiled) {
             ch2par.clear();
             par2ch.clear();
-            for (BNode node : nodesByName.values()) {
+            for (BNode node : nodesByVar.values()) {
                 Set<BNode> parents = new HashSet<>();
                 List<EnumVariable> parvars = node.getParents();
                 if (parvars != null) {
                     for (EnumVariable parent : parvars) {
-                        String pname = parent.toString();
-                        BNode pnode = nodesByName.get(pname);
+                        BNode pnode = nodesByVar.get(parent);
                         if (pnode == null) {
-                            throw new BNetRuntimeException("Invalid Bayesian network: node " + pname + " is not a member but referenced by " + node.getName());
+                            System.err.println("Invalid Bayesian network: node " + parent.getName() + " is not a member but referenced by " + node.getName());
+                            throw new BNetRuntimeException("Invalid Bayesian network: node " + parent.getName() + " is not a member but referenced by " + node.getName());
                         }
                         parents.add(pnode);
                         Set<BNode> children = par2ch.get(pnode);
@@ -162,7 +162,7 @@ public class BNet implements Serializable {
             ordered.clear();
             for (BNode root : getRoots()) {
                 List<BNode> ordered_from_root = new ArrayList<>();
-                if (ordered.contains(root) && ordered.size() == this.nodesByName.size()) {
+                if (ordered.contains(root) && ordered.size() == this.nodesByVar.size()) {
                     continue;
                 }
                 ordered_from_root.add(root);
@@ -219,12 +219,12 @@ public class BNet implements Serializable {
      * @param nodeName the name of the node for which parents are sought
      * @return the parent nodes' names
      */
-    public Set<String> getParents(String nodeName) {
+    public Set<String> getParentsNames(String nodeName) {
         BNode node = this.getNode(nodeName);
         if (node == null) {
             throw new BNetRuntimeException("Node " + nodeName + " does not exist in network");
         }
-        return getParents(node);
+        return BNet.this.getParentsNames(node);
     }
 
     /**
@@ -234,7 +234,7 @@ public class BNet implements Serializable {
      * @param node the node (by reference)
      * @return the parents (by name), null if no parents
      */
-    public Set<String> getParents(BNode node) {
+    public Set<String> getParentsNames(BNode node) {
         List<EnumVariable> parents = node.getParents();
         if (parents == null) {
             return null;
@@ -246,6 +246,45 @@ public class BNet implements Serializable {
         return str;
     }
 
+    /**
+     * Retrieve all parent nodes of a specified node, ie the nodes that are
+     * conditioning the specified node.
+     *
+     * @param node the node (by reference)
+     * @return the parent nodes, null if no parents
+     */
+    public Set<BNode> getParents(BNode node) {
+        if (!compiled) {
+            this.compile(); // relies on ch2par: children-to-parent linking
+        }
+        Set<BNode> parents = ch2par.get(node);
+        return parents;
+    }
+
+    /**
+     * Retrieve all "sibling" nodes of a specified node, ie the nodes that are
+     * conditioned by the same parent/s.
+     *
+     * @param node the node (by reference)
+     * @return Set of sibling nodes, or null if no parents. If no siblings exist, the set is empty; excludes the node that is queried
+     */
+    public Set<BNode> getSiblings(BNode node) {
+        if (!compiled) {
+            this.compile(); // relies on ch2par: children-to-parent linking
+        }
+        Set<BNode> parents = ch2par.get(node);
+        if (parents == null)
+            return null;
+        Set<BNode> children = new HashSet<>();
+        for (BNode p : parents) {
+            Set<BNode> ch = par2ch.get(p);
+            children.addAll(ch);
+        }
+        children.remove(node);
+        return children;
+    }
+
+    
     /**
      * Retrieve all ancestors of a specified node. That is, all nodes that are
      * "above" the specified node.
