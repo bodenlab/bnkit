@@ -26,7 +26,7 @@ import bn.*;
 import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
-import bn.ctmc.matrix.JTT;
+import bn.ctmc.matrix.*;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import java.util.ArrayList;
@@ -44,7 +44,7 @@ public class SubstNode implements BNode, TiedNode {
     private final EnumVariable var;
     private final EnumVariable parent;
     private final List<EnumVariable> parentAsList;
-    private final SubstModel model;
+    private SubstModel model;
     private final Object[] values;
     
     private double time = 1.0;
@@ -134,6 +134,14 @@ public class SubstNode implements BNode, TiedNode {
         return this.parentAsList;
     }
 
+    public double getTime() {
+        return time;
+    }
+    
+    public SubstModel getModel() {
+        return model;
+    }
+    
     @Override
     public EnumTable getTable() {
         throw new UnsupportedOperationException("Not supported."); 
@@ -185,13 +193,45 @@ public class SubstNode implements BNode, TiedNode {
     @Override
     public String getStateAsText() {
         StringBuilder sbuf = new StringBuilder("\n");
-        sbuf.append(time);
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        sbuf.append(time + "; (time)\n");
+        sbuf.append(model.getName() + "; (model)\n");
+        return sbuf.toString();
     }
 
     @Override
     public boolean setState(String dump) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        int row = 1;
+        boolean error = false;
+        for (String line : dump.split("\n")) {
+            String[] specline = line.split(";");
+            switch (row) {
+                case 2:
+                    try {
+                        this.time = Double.parseDouble(specline[0]);
+                    } catch (NumberFormatException e) {
+                        System.err.println("Time incorrect in state for SubstNode: " + this + " ==> " + specline[0]);
+                        error = true;
+                    }
+                    break;
+                case 3:
+                    String modelName = specline[0].trim();
+                    if (modelName.equalsIgnoreCase("JTT"))
+                        this.model = new JTT();
+                    else if (modelName.equalsIgnoreCase("WAG"))
+                        this.model = new WAG();
+                    else if (modelName.equalsIgnoreCase("LG"))
+                        this.model = new LG();
+                    else if (modelName.equalsIgnoreCase("Dayhoff"))
+                        this.model = new Dayhoff();
+                    else {
+                        System.err.println("Model incorrect in state for SubstNode: " + this + " ==> " + specline[0]);
+                        error = true;
+                    }
+                    break;
+            }
+            row ++;
+        }
+        return !error;
     }
 
     @Override
@@ -470,7 +510,7 @@ public class SubstNode implements BNode, TiedNode {
 
     @Override
     public void setTrainable(boolean trainable) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        // no effect
     }
 
     @Override
@@ -480,7 +520,7 @@ public class SubstNode implements BNode, TiedNode {
 
     @Override
     public BNode getTieSource() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return null;
     }
 
     public static void main(String[] args) {
