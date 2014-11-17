@@ -31,6 +31,7 @@ import java.util.List;
 public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
 
     String name;
+    String info;
     
     public EnumSeq(E elementType) {
         super(elementType);
@@ -40,8 +41,16 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
         this.name = name;
     }
     
+    public void setInfo(String info) {
+    	this.info = info;
+    }
+    
     public String getName() {
         return name;
+    }
+    
+    public String getInfo() {
+    	return info;
     }
     
     public String toString() {

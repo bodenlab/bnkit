@@ -22,8 +22,10 @@ import bn.ctmc.SubstNode;
 import bn.ctmc.matrix.JTT;
 import bn.prob.EnumDistrib;
 import bn.node.CPT;
+import bn.node.CPTPseudo;
 import bn.node.DirDT;
 import bn.node.GDT;
+import bn.node.NoisyOR;
 import dat.Continuous;
 import dat.Domain;
 import dat.EnumVariable;
@@ -134,7 +136,13 @@ public class Predef {
                     elist.add((EnumVariable) v);
                 }
                 return new CPT((EnumVariable) var, elist);
-            } else if (type.equalsIgnoreCase("GDT")) {
+            } else if (type.equalsIgnoreCase("CPTPseudo")) {
+                List<EnumVariable> elist = new ArrayList<>();
+                for (Variable v : parents) {
+                    elist.add((EnumVariable) v);
+                }
+                return new CPTPseudo((EnumVariable) var, elist);
+            }else if (type.equalsIgnoreCase("GDT")) {
                 List<EnumVariable> elist = new ArrayList<>();
                 for (Variable v : parents) {
                     elist.add((EnumVariable) v);
