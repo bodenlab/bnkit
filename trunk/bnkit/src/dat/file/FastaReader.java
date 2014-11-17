@@ -113,6 +113,7 @@ public class FastaReader {
                 // find name and collect annotations from first line
                 String first = tok.nextToken();
                 String name = first.substring(1, first.length()); // sequence name
+                String info = seqDef[0];
                 // there's no universal way annotating a FASTA entry, but all info is found on the first line
                 for (int a = 1; tok.hasMoreTokens(); a++) {
                     tok.nextToken(); // currently not used
@@ -145,6 +146,7 @@ public class FastaReader {
                 else
                     seq = new EnumSeq(alphabet);
                 seq.setName(name);
+                seq.setInfo(info);
                 seq.set(arr);
                 return seq;
             } else {
