@@ -410,19 +410,28 @@ public class PhyloTree {
             return backwardParsimony(null, unique);
         }
         
-        protected Object backwardParsimony(Object symbol, Object[] unique) {
-            int best_index = 0;
-            for (int i = 1; i < scores.length; i ++) {
-                if (scores[i] < scores[best_index])
-                    best_index = i;
-            }
-            if (this.children != null) { // recurse into children nodes...
-                for (int c = 0; c < children.size(); c ++) {
-                    Node child = children.get(c);
-                    child.backwardParsimony(unique[best_index], unique);
+        protected Object backwardParsimony(Object parent_symbol, Object[] unique) {
+            int parent_index = 0;
+            if (parent_symbol == null) { // root
+                for (int i = 1; i < scores.length; i ++) {
+                    if (scores[i] < scores[parent_index])
+                        parent_index = i;
+                }
+            } else {
+                for (parent_index = 0; parent_index < unique.length; parent_index ++) {
+                    if (parent_symbol.equals(unique[parent_index]))
+                        break;
                 }
             }
-            return setValue(unique[best_index]);
+            // now we know the index of the parent
+            if (this.children != null) { // recurse into children nodes...
+                for (int c = 0; c < children.size(); c ++) {
+                    int child_index = traceback[parent_index][c];
+                    Node child = children.get(c);
+                    child.backwardParsimony(unique[child_index], unique);
+                }
+            }
+            return setValue(unique[parent_index]);
         }
         
     }
