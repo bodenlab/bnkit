@@ -49,6 +49,11 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
         return name;
     }
     
+    @Override
+    public E getType() {
+        return super.getType();
+    }
+    
     public String getInfo() {
     	return info;
     }
@@ -187,6 +192,21 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
                 Object[] syms = new Object[getHeight()];
                 for (int i = 0; i < syms.length; i ++)
                     syms[i] = seqs.get(i).get()[col];
+                return syms;
+            }
+            return null;
+        }
+
+        /**
+         * Get the column with status of gaps (true or false) for a given column, indexed from 0 up to alignment width - 1.
+         * @param col column
+         * @return array of true or false indicating presence of gap in column
+         */
+        public Object[] getGapColumn(int col) {
+            if (col >= 0 && col < this.width) {
+                Object[] syms = new Object[getHeight()];
+                for (int i = 0; i < syms.length; i ++)
+                    syms[i] = seqs.get(i).get()[col] == null;
                 return syms;
             }
             return null;
