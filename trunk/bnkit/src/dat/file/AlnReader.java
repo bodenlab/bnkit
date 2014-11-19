@@ -167,6 +167,10 @@ public class AlnReader {
                 if (index > 0) {
                     id = names[a].substring(0, index);
                 }
+                index = id.indexOf("/");
+                if (index > 0) {
+                    id = id.substring(0, index);
+                }
                 aseqs[a] = new EnumSeq.Gappy<>(alpha);
                 aseqs[a].set(symarr);
                 aseqs[a].setName(id);

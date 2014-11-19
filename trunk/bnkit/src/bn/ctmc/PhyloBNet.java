@@ -25,6 +25,7 @@ import dat.PhyloTree;
 import dat.PhyloTree.Node;
 import dat.Variable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -68,7 +69,7 @@ public class PhyloBNet {
     public static PhyloBNet create(PhyloTree tree, SubstModel model) {
         PhyloBNet pbn = new PhyloBNet(model);
         Node root = tree.getRoot();
-//        EnumVariable rvar = Predef.AminoAcid(root.getContent().toString());
+//        EnumVariable rvar = Predef.AminoAcid(root.getLabel().toString());
         EnumVariable rvar = Predef.AminoAcid(replacePunct(root.toString()));
         pbn.bnroot = new SubstNode(rvar, model);
         pbn.addBNode(pbn.bnroot);
@@ -103,12 +104,12 @@ public class PhyloBNet {
     }
 
     private void createNodesForSubtree(Node pnode, EnumVariable evar) {
-        Set<Node> children = pnode.getChildren();
+        Collection<Node> children = pnode.getChildren();
         if (children.isEmpty()) {
             leaves.add(evar);
         } else {
             for (Node child : children) {
-//                EnumVariable cvar = Predef.AminoAcid(child.getContent().toString());
+//                EnumVariable cvar = Predef.AminoAcid(child.getLabel().toString());
                 EnumVariable cvar = Predef.AminoAcid(replacePunct(child.toString()));
                 SubstNode cnode = new SubstNode(cvar, evar, model, child.getDistance());
                 this.addBNode(cnode);
@@ -180,35 +181,38 @@ public class PhyloBNet {
             if (children.size() == 1) { // a "single-child" parent
                 Set<BNode> siblings = bn.getSiblings(parent);
                 boolean topNode;
-                if (siblings == null) // the parent has no siblings either, so will need to defer until we investigate its grandparent
+                if (siblings == null) // the parent has no siblings, because it has no parents of its own, so do not look above
                     topNode = true;
                 else
-                    topNode = (siblings.size() > 0);
+                    topNode = (siblings.size() > 0); // the parent has siblings, so we do not need to look above
                 if (topNode) {
                     // we have established that "parent" is at the top level to collapse/remove
                     toBePurged.add(parent);
+                    // we need to remember details because we are going to create a replacement node
                     double time = parent.getTime();
                     Object instance = null;
-                    // Let's look at the (only) child
+                    // let's look at the (only) child
                     SubstNode child = (SubstNode)(children.toArray()[0]);
                     while (true) {
-                        instance = child.getInstance();
-                        time += child.getTime();
+                        instance = child.getInstance(); // use instance of the most specific child
+                        time += child.getTime(); // add to evolutionary time for every node that is purged
                         toBePurged.add(child);
-                        Set<BNode> childrensChildren = bn.getChildren(child);
-                        if (childrensChildren == null)
+                        Set<BNode> childrensChildren = bn.getChildren(child); // look ahead
+                        if (childrensChildren == null) // no more nodes below
                             break;
-                        if (childrensChildren.size() != 1)
+                        if (childrensChildren.size() != 1) // more nodes below, but they cannot be purged
                             break;
-                        child = (SubstNode)(childrensChildren.toArray()[0]);
+                        child = (SubstNode)(childrensChildren.toArray()[0]); // only one child, let's look at that...
                     } 
+                    // found the most specific child in a chain of single-child parents
+                    // find more details to construct replacement
                     EnumVariable childVar = (EnumVariable)child.getVariable();
                     SubstNode replacement;
                     List<EnumVariable> superParentVars = parent.getParents();
-                    if (superParentVars != null) {
+                    if (superParentVars != null) { // the parent had parents of its own
                         EnumVariable superParentVar = superParentVars.get(0); // can only be one
                         replacement = new SubstNode(childVar, superParentVar, child.getModel(), time);
-                    } else {
+                    } else { // the parent was the root of the tree
                         replacement = new SubstNode(childVar, child.getModel());
                     }
                     replacement.setInstance(instance);
