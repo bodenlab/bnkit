@@ -17,6 +17,7 @@
  */
 package bn.example;
 
+import bn.BNet;
 import bn.BNode;
 import bn.alg.CGTable;
 import bn.alg.Query;
@@ -58,7 +59,7 @@ public class ASRExample {
             Map<String, String> mapForNodes = new HashMap<>(); // Shortname --> Newick string for subtree
             for (Node n : nodes) {
                 indexForNodes.add(replacePunct(n.toString()));
-                mapForNodes.put(n.getContent().toString(), replacePunct(n.toString()));
+                mapForNodes.put(n.getLabel().toString(), replacePunct(n.toString()));
             }
             
             seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);
@@ -94,9 +95,9 @@ public class ASRExample {
 
             for (int col = 0; col < aln.getWidth(); col ++) {
                 PhyloBNet pbn = pbnets[col];
-            
+                BNet bn = pbn.getBN();
                 VarElim ve = new VarElim();
-                ve.instantiate(pbn.getBN());
+                ve.instantiate(bn);
 
                 List<EnumVariable> intern = pbn.getInternal();
 
@@ -112,6 +113,8 @@ public class ASRExample {
                     int index = indexForNodes.indexOf(replacePunct(asr_var.getName()));
                     if (index >= 0) 
                         asr_matrix[index][col] = asr_val;
+                    BNode node = bn.getNode(asr_var);
+                    node.setInstance(asr_val);
                 }
 //                BNBuf.save(pbn.getBN(), "/Users/mikael/test.xml");
             }

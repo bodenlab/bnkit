@@ -17,12 +17,17 @@
  */
 package dat;
 
+import dat.EnumSeq.Alignment;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -49,8 +54,13 @@ public class PhyloTree {
      * String representation in the Newick format.
      * @return string representation of tree
      */
+    @Override
     public String toString() {
         return root.toString();
+    }
+    
+    public String printValues() {
+        return root.printValue();
     }
     
     public Node[] toNodesBreadthFirst() {
@@ -67,8 +77,7 @@ public class PhyloTree {
         if (queue.isEmpty())
             return;
         Node head = queue.remove(0);
-        Set<Node> children = head.getChildren();
-        for (Node child : children) {
+        for (Node child : head.getChildren()) {
             done.add(child);
             queue.add(child);
         }
@@ -79,7 +88,7 @@ public class PhyloTree {
         Node[] nodes = toNodesBreadthFirst();
         String[] arr = new String[nodes.length];
         for (int i = 0; i < nodes.length; i ++) 
-            arr[i] = nodes[i].content.toString();
+            arr[i] = nodes[i].label.toString();
         return arr;
     }
     
@@ -92,12 +101,27 @@ public class PhyloTree {
     }
     
     /**
-     * Find the node with the specified content.
-     * @param content content or label
+     * Find the node with the specified label.
+     * @param content label or label
      * @return matching node, or null if not found
      */
     public Node find(Object content) {
         return root.find(content);
+    }
+    
+    /**
+     * Set sequence of nodes that are matched (by name) by the sequences in the alignment.
+     * @param aln sequence alignment
+     */
+    public void setAlignment(EnumSeq.Alignment aln) {
+        int nseqs = aln.getHeight();
+        for (int i = 0; i < nseqs; i ++) {
+            EnumSeq seq = aln.getEnumSeq(i);
+            Node node = find(seq.getName());
+            if (node != null) {
+                node.setSequence(seq);
+            }
+        }
     }
     
     /**
@@ -181,26 +205,62 @@ public class PhyloTree {
         return t;
     }
     
+    public Object setContentByParsimony(String[] names, Object[] symbols) {
+        Map<String, Object> map = new HashMap<>();
+        for (int i = 0; i < names.length; i ++)
+            map.put(names[i], symbols[i]);
+        return setContentByParsimony(map);
+    }
+    
+    public Object setContentByParsimony(Map<String, Object> map) {
+        Set<Object> values = new HashSet<>(map.values());
+        Object[] unique = values.toArray();
+        Node root = this.getRoot();
+        root.forwardParsimony(map, unique);
+        return root.backwardParsimony(unique);
+    }
+    
     /**
      * Class for nodes that make up tree.
      * Note recursive definition. Supports any branching factor.
      */
     public static class Node {
-        final private Set<Node> children; // the children of this node
-        final private Object content; // arbitrary content/label of node
+        final private List<Node> children; // the children of this node
+        final private Object label; // arbitrary label of node
+        private Object value; // arbitrary value of node
+        private EnumSeq sequence = null; // sequence
+        private double[] scores = null; 
+        private int[][] traceback = null; 
         private Double dist = null; // optional distance (from this node to its parent)
         
         /**
-         * Construct node from content/label.
-         * @param content content/label
+         * Construct node from label/label.
+         * @param label label/label
          */
-        public Node(Object content) {
-            this.content = content;
-            this.children = new HashSet<>();
+        public Node(Object label) {
+            this.label = label;
+            this.children = new ArrayList<>();
         }
         
-        public Object getContent() {
-            return content;
+        public Object getLabel() {
+            return label;
+        }
+        
+        public Object getValue() {
+            return value;
+        }
+
+        public Object setValue(Object value) {
+            this.value = value;
+            return value;
+        }
+        
+        public void setSequence(EnumSeq seq) {
+            this.sequence = seq;
+        }
+        
+        public EnumSeq getSequence() {
+            return sequence;
         }
         
         /**
@@ -220,9 +280,27 @@ public class PhyloTree {
             if (dist != null)
                 dstr = ":" + dist.toString(); 
             if (nchildren < 1) 
-                return content.toString() + ((dist != null) ? (dstr) : (""));
+                return label.toString() + ((dist != null) ? (dstr) : (""));
             else 
-                return "(" + sb.toString() + ")" + content.toString() + ((dist != null) ? (dstr) : (""));
+                return "(" + sb.toString() + ")" + label.toString() + ((dist != null) ? (dstr) : (""));
+        }
+        
+        public String printValue() {
+            StringBuilder sb = new StringBuilder();
+            String dstr = null;
+            int nchildren = children.size();
+            int cnt = 0;
+            for (Node child : children) {
+                sb.append(child.printValue());
+                if (++cnt < nchildren)
+                    sb.append(",");
+            }
+            if (dist != null)
+                dstr = ":" + dist.toString(); 
+            if (nchildren < 1) 
+                return label.toString() + "_" + value.toString() + ((dist != null) ? (dstr) : (""));
+            else 
+                return "(" + sb.toString() + ")" + label.toString() + "_" + value.toString() + ((dist != null) ? (dstr) : (""));
         }
         
         /**
@@ -237,22 +315,22 @@ public class PhyloTree {
          * Retrieve all the children of the node.
          * @return 
          */
-        public Set<Node> getChildren() {
+        public Collection<Node> getChildren() {
             return children;
         }
         
         /**
-         * Find node by content/label. 
+         * Find node by label/label. 
          * Searches the tree recursively using the current node as root.
          * @param content 
-         * @return the node that contains the specified content, or null if not found
+         * @return the node that contains the specified label, or null if not found
          */
-        public Node find(Object content) {
-            if (this.content.equals(content)) 
+        public Node find(Object label) {
+            if (this.label.equals(label)) 
                 return this;
             else {
                 for (Node child : children) {
-                    Node node = child.find(content);
+                    Node node = child.find(label);
                     if (node != null)
                         return node;
                 }
@@ -274,9 +352,79 @@ public class PhyloTree {
          */ 
         public double getDistance() {
             if (this.dist == null)
-                throw new RuntimeException("Node " + this + " with content " + content + " does not have a distance");
+                throw new RuntimeException("Node " + this + " with content " + label + " does not have a distance");
             return this.dist;
         }
+
+        /**
+         * Internal function that operates recursively to first initialise each node (forward),
+         * stopping only once a sequence has been assigned to the node, 
+         * then to propagate scores from sequence assigned nodes to root (backward).
+         * @param assign map with assignments (named nodes and corresponding values)
+         * @param unique all possible values, in order
+         */
+        protected double[] forwardParsimony(Map<String, Object> assign, Object[] unique) {
+            this.scores = new double[unique.length]; 
+            Object sym = assign.get(label);
+            if (sym != null) { // this node is instantiated
+                int index;
+                for (index = 0; index < unique.length; index ++) 
+                    if (sym.equals(unique[index]))
+                        break;
+                setValue(unique[index]);
+                Arrays.fill(this.scores, Double.POSITIVE_INFINITY);
+                this.scores[index] = 0; // the actual symbol is scored 0, all others impossible do positive infinity
+                return this.scores;
+            } else { // this node is NOT instantiated
+                if (this.children == null) { // no children, ouch...
+                    throw new RuntimeException("Leaf " + this + " has not been assigned a value");
+                } else { // recurse into children nodes...
+                    double[][] cscores = new double[children.size()][];
+                    this.traceback = new int[unique.length][children.size()];
+                    for (int c = 0; c < children.size(); c ++) {
+                        Node child = children.get(c);
+                        cscores[c] = child.forwardParsimony(assign, unique);
+                    }
+                    
+                    // now we have children scores (cscores)
+                    for (int i = 0; i < scores.length; i ++) { // loop through each possible parent assignment, let's see what symbol in each child that best supports this
+                        for (int c = 0;  c < children.size(); c ++) {
+                            int best_index = 0;
+                            double best_score = Double.POSITIVE_INFINITY;
+                            for (int j = 0; j < cscores.length; j ++) { // loop through each possible child value to score parent value
+                                if (cscores[c][j] + (i == j ? 0 : 1) < best_score) {
+                                    best_score = cscores[c][j] + (i == j ? 0 : 1);
+                                    best_index = j;
+                                }
+                            }
+                            scores[i] += best_score; // the best we can do with this child
+                            traceback[i][c] = best_index; // ... and that score is based on this child symbol
+                        }
+                    }
+                    return this.scores;
+                }
+            }
+        }
+        
+        protected Object backwardParsimony(Object[] unique) {
+            return backwardParsimony(null, unique);
+        }
+        
+        protected Object backwardParsimony(Object symbol, Object[] unique) {
+            int best_index = 0;
+            for (int i = 1; i < scores.length; i ++) {
+                if (scores[i] < scores[best_index])
+                    best_index = i;
+            }
+            if (this.children != null) { // recurse into children nodes...
+                for (int c = 0; c < children.size(); c ++) {
+                    Node child = children.get(c);
+                    child.backwardParsimony(unique[best_index], unique);
+                }
+            }
+            return setValue(unique[best_index]);
+        }
+        
     }
     
     public static void main(String[] args) {
@@ -285,10 +433,15 @@ public class PhyloTree {
         root = parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)");
         System.out.println(root);
         try {
-            PhyloTree cyp3 = PhyloTree.loadNewick("/Users/mikael/workspace/binf/data/cyp3.newick");
+            PhyloTree cyp3 = PhyloTree.loadNewick("/Users/mikael/Desktop/try.newick");
             System.out.println(cyp3);
+            Alignment aln = new Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/Desktop/try.aln", Enumerable.aacid));
+            cyp3.setAlignment(aln);
+            cyp3.setContentByParsimony(aln.getNames(), aln.getGapColumn(1));
+            System.out.println(cyp3.printValues());
         } catch (IOException ex) {
             ex.printStackTrace();
         }
     }
+    
 }

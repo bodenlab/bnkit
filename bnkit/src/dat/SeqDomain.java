@@ -62,6 +62,10 @@ public class SeqDomain<E extends Domain> implements Domain {
             return 0;
     }
     
+    public E getType() {
+        return elementType;
+    }
+    
     public static SeqDomain<Continuous> cont_seq = new SeqDomain<>(new Continuous());
 
     public static void main(String[] args) {
