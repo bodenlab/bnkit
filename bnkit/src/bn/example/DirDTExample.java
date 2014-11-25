@@ -51,6 +51,7 @@ public class DirDTExample {
         
         long seed = 1;
 
+        // add data file into data folder
         String filename = "data/mm10_Mixed_NfiX_segmented20_100.out";
         
         int[][] data = loadData(filename);
