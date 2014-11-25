@@ -49,8 +49,7 @@ public class DirDTExample {
     public static void main(String[] args) {
         int ncluster = 9;
         long seed = 1;
-        
-        System.out.println(System.getProperty("user.dir"));
+
         String filename = "data/mm10_Mixed_NfiX_segmented20_100.out";
         
         int[][] data = loadData(filename);
