@@ -50,8 +50,8 @@ public class DirDTExample {
         int ncluster = 9;
         long seed = 1;
         
-        
-        String filename = "/Users/mikael/Desktop/mm10_Mixed_NfiX_segmented20_100.out";
+        System.out.println(System.getProperty("user.dir"));
+        String filename = "data/mm10_Mixed_NfiX_segmented20_100.out";
         
         int[][] data = loadData(filename);
         int N = data.length;
