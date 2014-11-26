@@ -300,6 +300,13 @@ public class Predef {
     public static EnumVariable AminoAcid() {
         return Predef.AminoAcid("AA");
     }
+    
+    public static EnumVariable SecondaryStructure(String name) {
+    	EnumVariable var = new EnumVariable(Enumerable.secondaryStructure, name);
+    	var.setPredef("Secondary Structure");
+    	var.setParams("H;E;C");
+    	return var;
+    }
 
     public static EnumVariable Nominal(String[] values, String name) {
         Enumerable domain = new Enumerable(values);
