@@ -100,6 +100,7 @@ public class Enumerable implements Domain {
 
     public static Enumerable bool = new Enumerable(new Boolean[]{true, false});
     public static Enumerable nacid = new Enumerable(new Character[]{'A', 'C', 'G', 'T'});
+    public static Enumerable secondaryStructure = new Enumerable(new Character[]{'H', 'C', 'E'});
     public static Enumerable aacid = new Enumerable(new Character[]{'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y'});
     public static Enumerable aacid_alt = new Enumerable(new Character[]{'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V'});
 
