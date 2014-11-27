@@ -1,12 +1,16 @@
 package bn.example;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Iterator;
+import java.util.Map;
 
 import dat.Domain;
 import dat.EnumVariable;
@@ -26,22 +30,24 @@ import bn.Predef;
 
 public class SecondaryStructurePredictor {
 	
-	final static private int windowSize = 5;
+	final static private int windowSize = 13;
 	final static private String fileName = "data/points.csv";
-	final static private double trainDataRadio = 0.6f;
+	final static private double trainDataRadio = 0.5f;
+	static private List<String> testAmiodData;
+	static private List<String> testSecondaryData;
 	
 	public static void main(String[] args) {
+		
+	}
+	
+	public static void NaiveBayes() {
 		EnumVariable classNode = Predef.SecondaryStructure("secondary structure class");
 		BNet bn = new BNet();
-	
+		
 		//train
 		List<EnumVariable> features = new LinkedList<EnumVariable>();
-		List<Character[]> data = loadData("data/points.csv",windowSize);
-		Collections.shuffle(data);
-		int cutOffIndex = (int)(data.size() * trainDataRadio);
-		
-		List<Character[]> training = data.subList(0, cutOffIndex);
-		List<Character[]> testing = data.subList(cutOffIndex, data.size());
+		initProcessData("data/result.out");
+		List<Character[]> training = loadData("data/points.csv",windowSize);
 		
 		for(int i = 0; i < windowSize; i++) {
 			features.add(Predef.AminoAcid("feature" + String.valueOf(i)));
@@ -54,9 +60,13 @@ public class SecondaryStructurePredictor {
 		
 		for(int i = 0; i < classNode.size(); i++) {
 			classCount[i] = 0;
-			for(int j = 0; j < features.get(0).size(); j++) {
-				classCount[i] += trainResult[0][i][j];
-			}
+		}
+		
+		Iterator<Character[]> iterator = training.iterator();
+		Character[] record;
+		while(iterator.hasNext()) {
+			record = iterator.next();
+			classCount[classNode.getIndex(record[windowSize])] ++;
 		}
 		
 		classDistrib.set(classCount);
@@ -78,31 +88,102 @@ public class SecondaryStructurePredictor {
         ve.instantiate(bn);
         Query q = null;
         double rightCase = 0;
-        Iterator<Character[]> iterator = testing.iterator();
-        Character[] record;
-        while(iterator.hasNext()) {
-			record = iterator.next();
-			for(int i = 0; i < windowSize; i++) {
-				featureList.get(i).setInstance(record[i]);
+        double totalCase = 0;
+        Iterator<String> iter1 = testAmiodData.iterator();
+        Iterator<String> iter2 = testSecondaryData.iterator();
+        String amiodData;
+        String secondaryData;
+        while(iter1.hasNext() && iter2.hasNext()) {
+        	amiodData = iter1.next();
+        	secondaryData = iter2.next();
+        	for(int i = 0; i < amiodData.length() - windowSize + 1; i++) {
+        		for(int j = 0; j < featureList.size(); j++){
+        			featureList.get(j).setInstance((Character)amiodData.charAt(i + j));
+        		}
+        		q = ve.makeQuery(classNode);
+    			CGTable r0 = (CGTable)ve.infer(q);
+    			double p = 0;
+    			int result = 0;
+                for(int x = 0; x < classNode.size(); x++){
+                	if(p < r0.getFactor(x)) {
+                		result = x;
+                		p = r0.getFactor(x);
+                	}
+                }
+                totalCase ++;
+                if(classNode.getIndex((Character)secondaryData.charAt(i + windowSize / 2)) == result) {
+                	rightCase ++;
+                }
 			}
-			q = ve.makeQuery(classNode);
-			CGTable r0 = (CGTable)ve.infer(q);
-			double p = 0;
-			int result = 0;
-            for(int i = 0; i < classNode.size(); i++){
-            	if(p < r0.getFactor(i)) {
-            		result = i;
-            		p = r0.getFactor(i);
-            	}
-            }
-            if(classNode.getIndex(record[windowSize]) == result) {
-            	rightCase ++;
-            }
+			
         }
-		System.out.println(rightCase / testing.size());
+		System.out.println(rightCase / totalCase);
+		File toDelete = new File(fileName);
+		if(toDelete.exists() && toDelete.isFile()) {
+			toDelete.delete();
+		}
 	}
 	
-	
+	public static void initProcessData(String initDataFileName) {
+		BufferedReader br = null;
+		BufferedWriter bw = null;
+		String amiod = "";
+		String secondary = "";
+		String[] data;
+		List<String> initData = new LinkedList<String>();
+		List<String> initTrainingData ;
+		List<String> initTestData;
+		try{
+			br = new BufferedReader(new FileReader(initDataFileName));
+			bw = new BufferedWriter(new FileWriter(new File(fileName))); 
+			while ((amiod = br.readLine()) != null) { 
+				secondary = br.readLine();
+				initData.add(amiod + ";" + secondary);
+			}
+			Collections.shuffle(initData);
+			int cutOffIndex = (int)(initData.size() * trainDataRadio);
+			initTrainingData = initData.subList(0, cutOffIndex);
+			initTestData = initData.subList(cutOffIndex, initData.size());
+			
+			Iterator<String> iter = initTrainingData.iterator();
+			 
+			while(iter.hasNext()) {
+				data = iter.next().split(";");
+				amiod = data[0];
+				secondary = data[1];
+				
+				for(int i = 0; i < amiod.length() - windowSize + 1; i++) {
+					bw.write(amiod.substring(i, i + windowSize) + "," + secondary.charAt(i + windowSize / 2));
+					bw.newLine();  
+	                bw.flush();  
+				}
+			}
+			
+			testAmiodData = new LinkedList<String>();
+			testSecondaryData = new LinkedList<String>();
+			
+			iter = initTestData.iterator();
+			while(iter.hasNext()) {
+				data = iter.next().split(";");
+				testAmiodData.add(data[0]);
+				testSecondaryData.add(data[1]);
+			}
+			
+		}catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			if (br != null) {
+				try {
+					br.close();
+					bw.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
 	
 	public static double[][][] learn(List<Character[]> data, List<EnumVariable> features, EnumVariable parent) {
 		double[][][] result = new double[features.size()][parent.size()][features.get(0).size()];
