@@ -105,7 +105,7 @@ public class SimpleExample {
             CGTable cgt = (CGTable)ai.infer(qq);
             cgt.display();
 
-            BNBuf.save(bn, "data/bn_simple.xml");
+            //BNBuf.save(bn, "data/bn_simple.xml");
 		
 	}
 	
