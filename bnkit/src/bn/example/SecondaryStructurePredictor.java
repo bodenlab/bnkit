@@ -53,25 +53,38 @@ public class SecondaryStructurePredictor {
 		for(int i = 0; i < windowSize; i++) {
 			features.add(Predef.AminoAcid("feature" + String.valueOf(i)));
 		}
-		double[][][] trainResult = learn(training,features,classNode);
+		//double[][][] trainResult = learn(training,features,classNode);
 		
 		CPT head = new CPT(classNode);
-		EnumDistrib classDistrib = new EnumDistrib(classNode.getDomain());
+		//EnumDistrib classDistrib = new EnumDistrib(classNode.getDomain());
+		List<CPT> featureList = new LinkedList<CPT>();
+		for(int i = 0; i < windowSize; i++) {
+			featureList.add(new CPT(features.get(i),classNode));
+		}
 		
-		double[] classCount = new double[classNode.size()];
-		Arrays.fill(classCount, 0.0);
+		//double[] classCount = new double[classNode.size()];
+		//Arrays.fill(classCount, 0.0);
 		
 		Iterator<Character[]> iterator = training.iterator();
 		Character[] record;
 		while(iterator.hasNext()) {
 			record = iterator.next();
-			classCount[classNode.getIndex(record[windowSize])] ++;
+			//classCount[classNode.getIndex(record[windowSize])] ++;
+			for(int i = 0; i < windowSize; i++) {
+				featureList.get(i).countInstance(new Object[] {record[windowSize]}, record[i]);
+			}
+			head.countInstance(null, record[windowSize]);
 		}
 		
-		classDistrib.set(classCount);
-		head.put(classDistrib);
-		
+		//classDistrib.set(classCount);
+		//head.put(classDistrib);
+		for(int i = 0; i < windowSize; i++) {
+			featureList.get(i).maximizeInstance();
+			bn.add(featureList.get(i));
+		}
+		head.maximizeInstance();
 		bn.add(head);
+		/*
 		List<CPT> featureList = new LinkedList<CPT>();
 		for(int i = 0; i < windowSize; i++) {
 			featureList.add(new CPT(features.get(i),classNode));
@@ -81,7 +94,7 @@ public class SecondaryStructurePredictor {
 				featureList.get(i).put(distrib,classNode.getDomain().get(j));
 			}
 			bn.add(featureList.get(i));
-		}
+		}*/
 		
 		VarElim ve = new VarElim();
         ve.instantiate(bn);
@@ -178,7 +191,8 @@ public class SecondaryStructurePredictor {
 			}
 		}
 	}
-	
+	/*
+	 * not necessary
 	public static double[][][] learn(List<Character[]> data, List<EnumVariable> features, EnumVariable parent) {
 		double[][][] result = new double[features.size()][parent.size()][];
 		for(int i = 0; i < features.size(); i++) {
@@ -202,6 +216,7 @@ public class SecondaryStructurePredictor {
 		
 		return result;
 	}
+	*/
 	
 	/**
 	 * load data from scv file
