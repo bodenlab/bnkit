@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -30,17 +31,17 @@ import bn.Predef;
 
 public class SecondaryStructurePredictor {
 	
-	final static private int windowSize = 13;
+	final static private int windowSize = 11;
 	final static private String fileName = "data/points.csv";
 	final static private double trainDataRadio = 0.5f;
 	static private List<String> testAmiodData;
 	static private List<String> testSecondaryData;
 	
 	public static void main(String[] args) {
-		
+		System.out.println(NaiveBayes());
 	}
 	
-	public static void NaiveBayes() {
+	public static double NaiveBayes() {
 		EnumVariable classNode = Predef.SecondaryStructure("secondary structure class");
 		BNet bn = new BNet();
 		
@@ -56,11 +57,9 @@ public class SecondaryStructurePredictor {
 		
 		CPT head = new CPT(classNode);
 		EnumDistrib classDistrib = new EnumDistrib(classNode.getDomain());
-		double[] classCount = new double[classNode.size()];
 		
-		for(int i = 0; i < classNode.size(); i++) {
-			classCount[i] = 0;
-		}
+		double[] classCount = new double[classNode.size()];
+		Arrays.fill(classCount, 0.0);
 		
 		Iterator<Character[]> iterator = training.iterator();
 		Character[] record;
@@ -77,7 +76,7 @@ public class SecondaryStructurePredictor {
 		for(int i = 0; i < windowSize; i++) {
 			featureList.add(new CPT(features.get(i),classNode));
 			for(int j = 0; j < classNode.size(); j++){
-				EnumDistrib distrib = new EnumDistrib(Enumerable.aacid);
+				EnumDistrib distrib = new EnumDistrib(features.get(i).getDomain());
 				distrib.set(trainResult[i][j]);
 				featureList.get(i).put(distrib,classNode.getDomain().get(j));
 			}
@@ -93,6 +92,7 @@ public class SecondaryStructurePredictor {
         Iterator<String> iter2 = testSecondaryData.iterator();
         String amiodData;
         String secondaryData;
+        EnumDistrib distrib;
         while(iter1.hasNext() && iter2.hasNext()) {
         	amiodData = iter1.next();
         	secondaryData = iter2.next();
@@ -102,26 +102,20 @@ public class SecondaryStructurePredictor {
         		}
         		q = ve.makeQuery(classNode);
     			CGTable r0 = (CGTable)ve.infer(q);
-    			double p = 0;
-    			int result = 0;
-                for(int x = 0; x < classNode.size(); x++){
-                	if(p < r0.getFactor(x)) {
-                		result = x;
-                		p = r0.getFactor(x);
-                	}
-                }
+    			distrib = (EnumDistrib)r0.query(classNode);
                 totalCase ++;
-                if(classNode.getIndex((Character)secondaryData.charAt(i + windowSize / 2)) == result) {
+                if(classNode.getIndex((Character)secondaryData.charAt(i + windowSize / 2)) 
+                		== distrib.getMaxIndex()) {
                 	rightCase ++;
                 }
 			}
 			
         }
-		System.out.println(rightCase / totalCase);
 		File toDelete = new File(fileName);
 		if(toDelete.exists() && toDelete.isFile()) {
 			toDelete.delete();
 		}
+		return rightCase / totalCase;
 	}
 	
 	public static void initProcessData(String initDataFileName) {
@@ -186,10 +180,11 @@ public class SecondaryStructurePredictor {
 	}
 	
 	public static double[][][] learn(List<Character[]> data, List<EnumVariable> features, EnumVariable parent) {
-		double[][][] result = new double[features.size()][parent.size()][features.get(0).size()];
+		double[][][] result = new double[features.size()][parent.size()][];
 		for(int i = 0; i < features.size(); i++) {
 			for(int j = 0; j < parent.size(); j++) {
-				for(int x = 0; x < features.get(0).size(); x++) {
+				result[i][j] = new double[features.get(i).size()];
+				for(int x = 0; x < features.get(i).size(); x++) {
 					result[i][j][x] = 0;
 				}
 			}
