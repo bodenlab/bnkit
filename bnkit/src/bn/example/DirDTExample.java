@@ -81,6 +81,9 @@ public class DirDTExample {
             segment = (DirDT)bn.getNode("Segments");
             Segment = segment.getVariable();
         } else {
+        	
+        	System.out.println("xxxxxxxxxxxxx");
+        	
             Cluster = Predef.Number(ncluster, "Cluster");
             segments = new Enumerable(nseg);
             Segment = Predef.Distrib(segments, "Segments");
@@ -94,6 +97,8 @@ public class DirDTExample {
             segment.print();
             BNBuf.save(bn, filename + ".xml");
         }
+        
+        System.out.println("yyyyyyyyyyyy");
 
         List[] bins = new ArrayList[ncluster];
         for (int i = 0; i < ncluster; i++)
