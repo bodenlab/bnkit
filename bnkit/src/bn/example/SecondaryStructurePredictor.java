@@ -8,19 +8,26 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Iterator;
 import java.util.Map;
 
+import dat.Continuous;
 import dat.Domain;
+import dat.DoubleSeq;
 import dat.EnumVariable;
 import dat.Enumerable;
+import dat.IntegerSeq;
+import dat.Variable;
 import bn.prob.EnumDistrib;
 import bn.alg.CGTable;
+import bn.alg.EM;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.node.CPT;
+import bn.node.DirDT;
 import bn.BNet;
 import bn.Predef;
 /**
@@ -31,23 +38,50 @@ import bn.Predef;
 
 public class SecondaryStructurePredictor {
 	
-	final static private int windowSize = 11;
+	//final static private int windowSize = 13;
+	final static private double trainDataRadio = 0.6f;
+	//Naive Bayse
 	final static private String fileName = "data/points.csv";
-	final static private double trainDataRadio = 0.5f;
 	static private List<String> testAmiodData;
 	static private List<String> testSecondaryData;
+	//Dirichlet Distribution
+	final static private String dataSetFolder = "/Users/wangyufei/BN/project1/MSA/100RESULT/";
+	final static private int attributesNum = 20;
 	
 	public static void main(String[] args) {
-		System.out.println(NaiveBayes());
+		/*
+		for(int i = 5; i < 19; i+=2) {
+			double result = 0.0;
+			for(int j = 0; j < 3; j++) {
+				result += DirPrediction(i);
+			}
+			System.out.println("window size = " + String.valueOf(i) + " " + String.valueOf(result / 3));
+		}*/
+		/*
+		Enumerable enumerable = new Enumerable(new Character[]{'A', 'C', 'B', 'E', 'D', 'G', 'F', 'I', 'H', 'K', 'M', 'L', 'O', 'N', 'Q', 'P', 'S', 'R', 'U', 'T', 'W', 'V', 'Y', 'X', 'Z','-'});
+		for(int i = 0; i < enumerable.size(); i++){
+			System.out.println(enumerable.get(i));
+		}*/
+		/*
+		List<List<int[]>> data = loadMSAData();
+		
+		double result = 0;
+		for(int i = 0; i < 3; i++) {
+			result = DirPrediction(data, 13,false);
+			System.out.println(result);
+		}*/
+		List<List<int[]>> data = loadMSAData();
+		/* The data, the windowSize, and boolean value if output procession information*/
+		System.out.println(DirPrediction(data,13,false));
 	}
 	
-	public static double NaiveBayes() {
+	public static double NaiveBayes(int windowSize) {
 		EnumVariable classNode = Predef.SecondaryStructure("secondary structure class");
 		BNet bn = new BNet();
 		
 		//train
 		List<EnumVariable> features = new LinkedList<EnumVariable>();
-		initProcessData("data/result.out");
+		initProcessData("data/result.out",windowSize);
 		List<Character[]> training = loadData("data/points.csv",windowSize);
 		
 		for(int i = 0; i < windowSize; i++) {
@@ -62,39 +96,40 @@ public class SecondaryStructurePredictor {
 			featureList.add(new CPT(features.get(i),classNode));
 		}
 		
-		//double[] classCount = new double[classNode.size()];
-		//Arrays.fill(classCount, 0.0);
 		
 		Iterator<Character[]> iterator = training.iterator();
-		Character[] record;
+		//Character[] record;
+		Character[][] datasetforEM = new Character[training.size()][];
+		int count = 0;
 		while(iterator.hasNext()) {
-			record = iterator.next();
-			//classCount[classNode.getIndex(record[windowSize])] ++;
+			//record = iterator.next();
+			/*
 			for(int i = 0; i < windowSize; i++) {
 				featureList.get(i).countInstance(new Object[] {record[windowSize]}, record[i]);
 			}
 			head.countInstance(null, record[windowSize]);
+			*/
+			datasetforEM[count ++] = iterator.next();
 		}
 		
-		//classDistrib.set(classCount);
-		//head.put(classDistrib);
+		long seed = 1;
+		
+		
 		for(int i = 0; i < windowSize; i++) {
-			featureList.get(i).maximizeInstance();
+			//featureList.get(i).maximizeInstance();
 			bn.add(featureList.get(i));
 		}
-		head.maximizeInstance();
+		//head.maximizeInstance();
 		bn.add(head);
-		/*
-		List<CPT> featureList = new LinkedList<CPT>();
+		
+		
+		EM em = new EM(bn);
+		Variable[] var = new Variable[windowSize + 1];
 		for(int i = 0; i < windowSize; i++) {
-			featureList.add(new CPT(features.get(i),classNode));
-			for(int j = 0; j < classNode.size(); j++){
-				EnumDistrib distrib = new EnumDistrib(features.get(i).getDomain());
-				distrib.set(trainResult[i][j]);
-				featureList.get(i).put(distrib,classNode.getDomain().get(j));
-			}
-			bn.add(featureList.get(i));
-		}*/
+			var[i] = features.get(i);
+		}
+		var[windowSize] = classNode;
+        em.train(datasetforEM, var, seed);
 		
 		VarElim ve = new VarElim();
         ve.instantiate(bn);
@@ -131,7 +166,177 @@ public class SecondaryStructurePredictor {
 		return rightCase / totalCase;
 	}
 	
-	public static void initProcessData(String initDataFileName) {
+	public static double DirPrediction(List<List<int[]>> data, int windowSize, boolean isLog) {
+		// construct BN
+		BNet bn = new BNet();
+		
+		EnumVariable classNode = Predef.SecondaryStructure("secondary structure class");
+		List<Variable<EnumDistrib>> features = new LinkedList<Variable<EnumDistrib>>();
+		for(int i = 0; i < windowSize; i++) {
+			EnumDistrib enumDistrib = new EnumDistrib(new Enumerable(attributesNum));
+			features.add(new Variable<EnumDistrib>(enumDistrib,"feature" + String.valueOf(i)));
+		}
+		CPT head = new CPT(classNode);
+		List<DirDT> featureList = new LinkedList<DirDT>();
+		for(int i = 0; i < windowSize; i++) {
+			featureList.add(new DirDT(features.get(i),classNode));
+		}
+		//get training & testing data
+		sudocountForSequence(data);
+		Collections.shuffle(data);
+		int cutOff = (int) (data.size() * trainDataRadio);
+		List<List<int[]>> training = data.subList(0, cutOff);
+		List<List<int[]>> testing = data.subList(cutOff, data.size());
+		
+		int trainingSequence = training.size();
+		int count = 0;
+		//training
+		Iterator<List<int[]>> iter = training.iterator();
+		int trainingPoint = 0;
+		for(List<int[]> protein: training) {
+			trainingPoint += protein.size() - windowSize + 1;
+		}
+		Object[][] training_EM = new Object[trainingPoint][windowSize + 1];
+		while(iter.hasNext()) {
+			List<int[]> protein = iter.next();
+			/*
+			for(int[] record: protein) {
+				Object secondary = classNode.getDomain().get((int)record[record.length - 1]);
+				head.countInstance(null, secondary);
+			}*/
+			for(int i = 0; i <= protein.size() - windowSize; i++) {
+				int[] classPoint = protein.get(i + windowSize / 2);
+				training_EM[count][windowSize] 
+						= classNode.getDomain().get(classPoint[classPoint.length - 1]);
+				for(int j = 0; j < windowSize; j++) {
+					int[] hist = protein.get(i + j);
+					int[] attributes = new int[attributesNum];
+					for(int x = 0; x < attributesNum; x++) {
+						attributes[x] = hist[x];
+					}
+					training_EM[count][j] = IntegerSeq.intSeq(attributes);
+				}
+				count ++;
+			}
+			if(isLog){
+				System.out.println("Finish training: " + String.valueOf(++count) + "/" + String.valueOf(trainingSequence));
+			}
+			
+		}
+		//head.maximizeInstance();
+		bn.add(head);
+		for(int i = 0; i < windowSize; i++) {
+			//featureList.get(i).maximizeInstance();
+			bn.add(featureList.get(i));
+			/*
+			if(isLog){
+				System.out.println("Finish node training: " + String.valueOf(i + 1) + "/" + String.valueOf(windowSize));
+			}*/
+		}
+		
+		EM em = new EM(bn);
+		Variable[] var = new Variable[windowSize + 1];
+		for(int i = 0; i < windowSize; i++) {
+			var[i] = features.get(i);
+		}
+		var[windowSize] = classNode;
+        em.train(training_EM, var, 1);
+		
+		if(isLog){
+			System.out.println("Start to test");
+		}
+		int testingSequence = testing.size();
+		int tested = 0;
+		//testing
+		VarElim ve = new VarElim();
+        ve.instantiate(bn);
+        Query q = null;
+		double totalCase = 0;
+		double rightCase = 0;
+		EnumDistrib distrib;
+		iter = testing.iterator();
+		while(iter.hasNext()) {
+			List<int[]> protein = iter.next();
+			for(int i = 0; i <= protein.size() - windowSize; i++) {
+				for(int j = 0; j < windowSize; j++) {
+					int[] hist = protein.get(i + j);
+					int[] attributes = new int[attributesNum];
+					for(int x = 0; x < attributesNum; x++) {
+						attributes[x] = hist[x];
+					}
+					featureList.get(j).setInstance(IntegerSeq.intSeq(attributes));
+				}
+				q = ve.makeQuery(classNode);
+    			CGTable r0 = (CGTable)ve.infer(q);
+    			distrib = (EnumDistrib)r0.query(classNode);
+                totalCase ++;
+                int[] target = protein.get(i + windowSize / 2);
+                if(target[target.length - 1] == distrib.getMaxIndex()) {
+                	rightCase ++;
+                }
+			}
+			if(isLog) {
+				System.out.println("Finish training: " + String.valueOf(++tested) + "/" + String.valueOf(testingSequence));
+			}
+		}
+		
+		return rightCase / totalCase;
+	}
+	
+	public static void sudocountForSequence(List<List<int[]>> data) {
+		Iterator<List<int[]>> iter = data.iterator();
+		Iterator<int[]> iter1;
+		while(iter.hasNext()) {
+			List<int[]> protein = iter.next();
+			iter1 = protein.iterator();
+			while(iter1.hasNext()) {
+				int[] record = iter1.next();
+				for(int i = 0; i < record.length - 1; i++) {
+					record[i] *= 100;
+					record[i] += 1;
+				}
+			}
+		}
+	}
+	
+	public static List<List<int[]>> loadMSAData() {
+		List<List<int[]>> result = new LinkedList<List<int[]>>();
+		File folder = new File(dataSetFolder);
+		for(File file: folder.listFiles()) {
+			List<int[]> list = loadSingleMSAData(file.getAbsolutePath());
+			result.add(list);
+		}
+		return result;
+	} 
+	
+	public static List<int[]> loadSingleMSAData(String fileName)  {
+		List<int[]> result = new LinkedList<int[]>();
+		BufferedReader br = null;
+		String line;
+		String[] stringData;
+		EnumVariable classNode = Predef.SecondaryStructure("secondary structure class");
+		try {
+			br = new BufferedReader(new FileReader(fileName));
+			while ((line = br.readLine()) != null) {
+				stringData = line.split(",");
+				int[] data = new int[attributesNum + 1];
+				for(int i = 0; i < attributesNum; i++) {
+					data[i] = Integer.valueOf(stringData[i]);
+				}
+				
+				Character s = stringData[stringData.length - 1].charAt(0);
+				data[attributesNum] = classNode.getDomain().getIndex(s);
+				result.add(data);
+			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return result;
+	}
+	
+	public static void initProcessData(String initDataFileName, int windowSize) {
 		BufferedReader br = null;
 		BufferedWriter bw = null;
 		String amiod = "";
