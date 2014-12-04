@@ -45,7 +45,7 @@ public class SecondaryStructurePredictor {
 	static private List<String> testAmiodData;
 	static private List<String> testSecondaryData;
 	//Dirichlet Distribution
-	final static private String dataSetFolder = "/Users/wangyufei/BN/project1/MSA/100RESULT/";
+	final static private String dataSetFolder = "PATH/TO/DATA";
 	final static private int attributesNum = 20;
 	
 	public static void main(String[] args) {
