@@ -304,7 +304,7 @@ public class Predef {
     public static EnumVariable SecondaryStructure(String name) {
     	EnumVariable var = new EnumVariable(Enumerable.secondaryStructure, name);
     	var.setPredef("Secondary Structure");
-    	var.setParams("H;E;C");
+    	var.setParams("H;E;C;");
     	return var;
     }
 
