@@ -48,10 +48,10 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
 
     private static final long serialVersionUID = 1L;
     final private EnumVariable var;
-    private EnumTable<EnumDistrib> table; // table of (enumerable) probability distributions
+    protected EnumTable<EnumDistrib> table; // table of (enumerable) probability distributions
     private EnumDistrib prior; // one (enumerable) probability distribution that is used if this variable is NOT conditioned
-    final private int nParents;
-    private CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in CPT
+    final protected int nParents;
+    protected CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in CPT
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
     private BNode tieSource = null;
 

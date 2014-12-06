@@ -75,6 +75,7 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
 			probs[i] = (getAlpha()[i] - 1) / (getSum() - domain.size());
 		}
 		likelihoodDistrib.set(probs);
+		likelihoodDistrib.normalise();
 		return likelihoodDistrib;
 	}
 
