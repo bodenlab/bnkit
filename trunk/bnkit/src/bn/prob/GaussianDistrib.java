@@ -99,11 +99,11 @@ public class GaussianDistrib implements Distrib, Serializable {
         return Double.valueOf(mu + (sigma * Math.sin(2 * Math.PI * V) * Math.sqrt((-2 * Math.log(U)))));
     }
 
-    private void setMean(double mean) {
+    protected void setMean(double mean) {
         mu = mean;
     }
 
-    private void setVariance(double variance) {
+    protected void setVariance(double variance) {
         sigmaSquared = variance;
 
         if (sigmaSquared <= 0) {
