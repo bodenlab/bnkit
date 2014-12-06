@@ -39,7 +39,7 @@ public class UniformPrior implements Prior, Serializable {
 		}
 		
 		enumDistrib.set(probs);
-		
+		enumDistrib.normalise();
 	}
 
 	@Override
