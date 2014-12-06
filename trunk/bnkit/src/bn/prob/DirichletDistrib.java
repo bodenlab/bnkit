@@ -353,11 +353,10 @@ public class DirichletDistrib implements Distrib, Serializable {
      * Newton's method to optimize alpha values based on count histograms, weighted by probabilities.
      * Uses a location of Dirichlet to determine the concentration around that location.
      * @param counts histograms
-     * @param p probabilities
+     * @param p probabilities (one for each histogram; the belief in it; always 1 for Gibbs, fraction of 1 if EM)
      * @param q location of Dirichlet (pre-determined; see Ye et al. 2011 to understand why this works)
      * @return the sum of alphas (i.e. concentration of probability mass)
      */
-      
     public static double getAlphaSum_byNewton(int[][] counts, double[] p, double[] q) {
         double x0  = 1.0; // make an informed choice? See eq 12 in Ye et al (2011).
         double eps = 0.000001; // zero for practical purposes
@@ -386,6 +385,7 @@ public class DirichletDistrib implements Distrib, Serializable {
         if (counts != null) {
             if (counts.length > 0 && counts.length == prob.length) {
                 double[] location = new double[counts[0].length];
+                Arrays.fill(location, 0.001); // to avoid null alpha values
                 double total = 0;
                 int[][] hists = new int[counts.length][location.length]; // a double version of counts
                 for (int j = 0; j < counts.length; j ++) {
@@ -432,9 +432,11 @@ public class DirichletDistrib implements Distrib, Serializable {
     public static double DL(int[][] data, EnumDistrib m, DirichletDistrib[] dds) {
         double outer = 0;
         for (int k = 0; k < data.length; k ++) {
-            double inner = 0.001;
+            double inner = Double.MIN_VALUE;
             for (int i = 0; i < dds.length; i ++) { 
-                inner += (m.get(i) * Math.exp(dds[i].logLikelihood(data[k])));
+                double log_p_i = dds[i].logLikelihood(data[k]);
+                double p_i = Math.exp(log_p_i);
+                inner += (m.get(i) * p_i);
             }
             outer += Math.log(inner);
         }
@@ -455,8 +457,6 @@ public class DirichletDistrib implements Distrib, Serializable {
         
         java.util.Random rand = new java.util.Random(seed);
 
-        //int N = 2000;
-        //int[][] data = generateData(eds, N, 1);
         int[][] data = loadData(filename);
         int N = data.length;
         int nseg = 0;
@@ -468,7 +468,6 @@ public class DirichletDistrib implements Distrib, Serializable {
             System.out.print("[" + i + "]\t= \t");
             for (int j = 0; j < data[i].length; j ++) 
                 System.out.print(data[i][j] + "\t");
-            //System.out.println(" C = " + component[i]);
         }
         EnumDistrib[] eds = new EnumDistrib[nbins];
         for (int i = 0; i < eds.length; i ++) {
@@ -479,7 +478,6 @@ public class DirichletDistrib implements Distrib, Serializable {
         DirichletDistrib[] dds = new DirichletDistrib[nbins];
         for (int i = 0; i < dds.length; i ++) {
             dds[i] = new DirichletDistrib(EnumDistrib.random(new Enumerable(nseg), rand.nextInt()), 10);
-            // dds[i] = new DirichletDistrib(eds[i], 10);
             System.out.println("D"+ i + " = " + dds[i]);
         }
         EnumDistrib m = EnumDistrib.random(new Enumerable(nbins), rand.nextInt()); // mixing weights, add to 1
@@ -488,11 +486,16 @@ public class DirichletDistrib implements Distrib, Serializable {
         p.setSeed(rand.nextInt());
 
         double dl_best = DL(data, m, dds);
+        double[][] alpha_best = new double[nbins][nseg];
+        for (int i = 0; i < nbins; i ++) 
+            System.arraycopy(dds[i].getAlpha(), 0, alpha_best[i], 0, nseg);
+        EnumDistrib m_best = new EnumDistrib(new Enumerable(nbins), m.get());
+
         System.out.println("M = " + m);
         System.out.println("P = " + p);
         System.out.println("DL_best = " + dl_best);
         int no_update = 0;
-        for (int round = 0; round < 100 && no_update < 20; round ++) {
+        for (int round = 0; round < 100 && no_update < 10; round ++) {
             for (int i = 0; i < nbins; i ++)
                 bins[i] = new ArrayList(); // start with empty bins
             int ncorrect = 0;
@@ -504,15 +507,11 @@ public class DirichletDistrib implements Distrib, Serializable {
                     }
                     p.set(EnumDistrib.log2Prob(logprob));
                     int bin = (Integer)p.sample();
-                    //if (bin == component[k])
-                    //    ncorrect ++;
-                    // System.out.println("P(" + k + ")\t= " + p + " picked " + bin); // + (bin == component[k]? "\t*": "\t "));
                     bins[bin].add(data[k]);
                 } catch (RuntimeException ex0) {
                     System.err.println("Problem with data point k = " + k);
                 }
             }
-            //System.out.println("Correct = " + ncorrect);
             
             for (int i = 0; i < nbins; i ++) {
                 int[][] hists = new int[bins[i].size()][];
@@ -523,11 +522,14 @@ public class DirichletDistrib implements Distrib, Serializable {
                 dds[i].setPrior(alpha); // 
                 m.set(i, bins[i].size() / (double)N);
             }
-            //System.out.println("M = " + m);
             
             double dl_cur = DL(data, m, dds);
             if (dl_cur < dl_best) {
                 dl_best = dl_cur;
+                // also save mixing weights and alpha values
+                for (int i = 0; i < nbins; i ++) 
+                    System.arraycopy(dds[i].getAlpha(), 0, alpha_best[i], 0, nseg);
+                m_best = new EnumDistrib(new Enumerable(nbins), m.get());
                 no_update = 0;
             } else
                 no_update ++;
@@ -535,6 +537,13 @@ public class DirichletDistrib implements Distrib, Serializable {
             System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
         }
         System.out.println("M = " + m);
+        // recall best mixing weights and alpha values
+        m = m_best;
+        System.out.println("M = " + m);
+        for (int i = 0; i < dds.length; i ++) {
+            dds[i].setPrior(alpha_best[i]);
+            System.out.println("D"+ i + " = " + dds[i]);
+        }
         
         // Save results
         
@@ -551,9 +560,6 @@ public class DirichletDistrib implements Distrib, Serializable {
                 }
                 p.set(EnumDistrib.log2Prob(logprob));
                 int bin = best;
-                //if (bin == component[k])
-                //    ncorrect ++;
-                //System.out.println("P(" + k + ")\t= " + p + " picked " + bin); // + (bin == component[k]? "\t*": "\t "));
                 bins[bin].add(k);
             } catch (RuntimeException ex0) {
                 System.err.println("Problem with data point k = " + k);
@@ -581,6 +587,103 @@ public class DirichletDistrib implements Distrib, Serializable {
             } catch (IOException ex) {
                 Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
             }
+        }
+
+    }
+
+    /**
+     * An example program that finds a mixture model based on Gibbs sampling, as per Ye et al (2011).
+     * This version is generating a data set from a set of enumerable distributions, so that accuracy can be ascertained.
+     * @param args 
+     */
+    public static void main0(String[] args) {
+        
+        int nbins = 9;
+        int nseg = 10; // number of segments = features in histogram
+        long seed = 1;
+        java.util.Random rand = new java.util.Random(seed);
+
+        EnumDistrib[] eds = new EnumDistrib[nbins];
+        for (int i = 0; i < eds.length; i ++) {
+            eds[i] = EnumDistrib.random(new Enumerable(nseg), rand.nextInt());
+        }
+        int N = 50;
+        int[][] data = generateData(eds, N, 1);
+
+        List[] bins = new ArrayList[nbins]; // hold components here
+        DirichletDistrib[] dds = new DirichletDistrib[nbins];
+        for (int i = 0; i < dds.length; i ++) {
+            dds[i] = new DirichletDistrib(eds[i], 10);
+            System.out.println("D"+ i + " = " + dds[i]);
+        }
+        EnumDistrib m = EnumDistrib.random(new Enumerable(nbins), rand.nextInt()); // mixing weights, add to 1
+        m.setSeed(rand.nextInt());
+        EnumDistrib p = EnumDistrib.random(new Enumerable(nbins), rand.nextInt()); // probability that sample belongs to bin
+        p.setSeed(rand.nextInt());
+
+        double dl_best = DL(data, m, dds);
+        double[][] alpha_best = new double[nbins][nseg];
+        for (int i = 0; i < nbins; i ++) 
+            System.arraycopy(dds[i].getAlpha(), 0, alpha_best[i], 0, nseg);
+        EnumDistrib m_best = new EnumDistrib(new Enumerable(nbins), m.get());
+
+        System.out.println("M = " + m);
+        System.out.println("P = " + p);
+        System.out.println("DL_best = " + dl_best);
+        int no_update = 0;
+        for (int round = 0; round < 100 && no_update < 10; round ++) {
+            for (int i = 0; i < nbins; i ++)
+                bins[i] = new ArrayList(); // start with empty bins
+            int ncorrect = 0;
+            for (int k = 0; k < N; k ++) { // loop through all data
+                double[] logprob = new double[nbins];
+                try {
+                    for (int i = 0; i < nbins; i ++) {
+                        logprob[i] = (Math.log(m.get(i)) + dds[i].logLikelihood(data[k]));
+                    }
+                    double[] prob = EnumDistrib.log2Prob(logprob);
+                    p.set(prob);
+                    int bin = (Integer)p.sample();
+                    if (bin == component[k])
+                        ncorrect ++;
+                    //System.out.println("P(" + k + ")\t= " + p + " picked " + bin); // + (bin == component[k]? "\t*": "\t "));
+                    bins[bin].add(data[k]);
+                } catch (RuntimeException ex0) {
+                    System.err.println("Problem with data point k = " + k);
+                }
+            }
+            System.out.println("Correct = " + ncorrect);
+            
+            for (int i = 0; i < nbins; i ++) {
+                int[][] hists = new int[bins[i].size()][];
+                for (int j = 0; j < bins[i].size(); j ++) {
+                    hists[j] = (int[])bins[i].get(j);
+                }
+                double[] alpha = getAlpha(hists);
+                dds[i].setPrior(alpha); // 
+                m.set(i, bins[i].size() / (double)N);
+            }
+            System.out.println("M = " + m);
+            
+            double dl_cur = DL(data, m, dds);
+            if (dl_cur < dl_best) {
+                dl_best = dl_cur;
+                // also save alpha values?
+                for (int i = 0; i < nbins; i ++) 
+                    System.arraycopy(dds[i].getAlpha(), 0, alpha_best[i], 0, nseg);
+                m_best = new EnumDistrib(new Enumerable(nbins), m.get());
+                no_update = 0;
+            } else
+                no_update ++;
+                
+            System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
+        }
+        // recall best mixing weights and alpha values
+        m = m_best;
+        System.out.println("M = " + m);
+        for (int i = 0; i < dds.length; i ++) {
+            dds[i].setPrior(alpha_best[i]);
+            System.out.println("D"+ i + " = " + dds[i]);
         }
 
     }
@@ -982,7 +1085,7 @@ public class DirichletDistrib implements Distrib, Serializable {
     }
 
     
-    public static void main0(String[] args) {
+    public static void main1(String[] args) {
         java.util.Random rand = new java.util.Random(1);
         Enumerable dom = new Enumerable(2);
         EnumDistrib[] samples = {
