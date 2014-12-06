@@ -119,6 +119,25 @@ public class GammaDistrib implements Distrib, Serializable {
         }
         return (-tmp + Math.log(2.5066282746310005 * ser / x));
     }
+    
+    /*
+     * used for parameter learning
+     * */
+    public double getK() {
+    	return k;
+    }
+    
+    public void setK(double _k) {
+    	k = _k;
+    }
+    
+    public double getLambda() {
+    	return lambda;
+    }
+    
+    public void setLambda(double _lambda) {
+    	lambda = _lambda;
+    }
 
     /*
     The following two methods: digamma and trigamma are ...
