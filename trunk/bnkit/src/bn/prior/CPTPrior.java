@@ -20,6 +20,8 @@ import bn.prob.EnumDistrib;
  *
  */
 public class CPTPrior extends CPT {
+	
+	private static final long serialVersionUID = 1L;
 	// prior for each condition
 	private EnumTable<Prior> PriorTable;
 	// prior for root
@@ -105,7 +107,8 @@ public class CPTPrior extends CPT {
 		if (count.table.isEmpty()) {
             return;
         }
-		
+		// The Integer is the index for parent value
+		// The Double array is the count for enumvariable
 		Map<Integer, Double[]> data = new HashMap<Integer, Double[]>();
 		EnumVariable var = getVariable();
 		
@@ -116,7 +119,6 @@ public class CPTPrior extends CPT {
             for (EnumDistrib d : this.table.getValues()) {
                 d.setValid(false);
             }
-            
             for (Map.Entry<Integer, Double> entry : count.table.getMapEntries()) {
             	double nobserv = entry.getValue();
                 Object[] cntkey = count.table.getKey(entry.getKey().intValue());
@@ -139,17 +141,18 @@ public class CPTPrior extends CPT {
             	Prior prior = PriorTable.getValue(entry.getKey().intValue());
             	double[] hist = new double[var.size()];
             	EnumDistrib resultDistrib = null;
+            	// convert the double array 
             	for(int i = 0; i < var.size(); i++) {
             		hist[i] = entry.getValue()[i].doubleValue();
             	}
             	if(prior != null) { // baysian prior
             		prior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
-            		prior.learn(var.getDomain().getValues(), hist);
+            		prior.learn(enumObject, hist);
             		resultDistrib = (EnumDistrib)prior.getMAPDistrib();
             	}else { // uniform prior, just ML
             		UniformPrior uniPrior = new UniformPrior();
             		uniPrior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
-            		uniPrior.learn(var.getDomain().getValues(), hist);
+            		uniPrior.learn(enumObject, hist);
             		resultDistrib = (EnumDistrib)uniPrior.getMAPDistrib();
             	}
             	table.setValue(entry.getKey().intValue(), resultDistrib);
@@ -163,7 +166,7 @@ public class CPTPrior extends CPT {
                     it.remove();
             }
             
-		} else {
+		} else { // the root node
 			Object[] cntkey = new Object[1];
             double[] cnts = new double[var.size()];
             for (int i = 0; i < var.size(); i++) {
