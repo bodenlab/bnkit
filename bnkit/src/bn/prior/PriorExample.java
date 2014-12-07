@@ -4,6 +4,7 @@ import bn.BNet;
 import bn.Predef;
 import bn.alg.CGTable;
 import bn.alg.EM;
+import bn.alg.MAP;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.prob.EnumDistrib;
@@ -40,7 +41,7 @@ public class PriorExample {
 	public static void complexExample() {
 		EnumVariable sun = Predef.Boolean("Sunrise");
 		CPTPrior cpt = new CPTPrior(sun);
-		DirichletDistribPrior betaDistrib = new DirichletDistribPrior(sun.getDomain(), new double[] {0.7,0.3}, 1);
+		DirichletDistribPrior betaDistrib = new DirichletDistribPrior(sun.getDomain(), new double[] {0.7,0.3}, 2);
 		cpt.setPrior(betaDistrib);
 		
 		EnumVariable rain = Predef.Boolean("rain");
@@ -52,19 +53,8 @@ public class PriorExample {
 		cpt2.setPrior(new Object[] {true}, sunRiseBetaDistrib);
 		cpt2.setPrior(new Object[] {false}, sunNotRiseBetaDistrib);
 		BNet bn = new BNet();
-		// learn Data manually 
-		cpt2.countInstance(new Object[] {true}, false, 2.0);
-		cpt2.countInstance(new Object[] {true}, true, 3.0);
-		cpt2.countInstance(new Object[] {false}, false , 2.0);
-		cpt2.countInstance(new Object[] {false}, true, 3.0);
-		cpt.countInstance(null, true, 5.0);
-		cpt.countInstance(null, false, 5.0);
-		cpt2.maximizeInstance();
-		cpt.maximizeInstance();
+		bn.add(cpt, cpt2);
 		
-		// currently, one cannot use prior in EM because EM would iterate many times
-		// but prior can only be calculated once (The prior will accumulate the result after each calculation).
-		/*
 		// learn data through EM
 		Boolean[][] data = new Boolean[10][];
 		data[0] = new Boolean[] {true, false};
@@ -77,11 +67,9 @@ public class PriorExample {
 		data[7] = new Boolean[] {false, true};
 		data[8] = new Boolean[] {false, true};
 		data[9] = new Boolean[] {false, true};
-		*/
-		bn.add(cpt, cpt2);
 		
-		//EM em = new EM(bn);
-		//em.train(data, new Variable[] {sun, rain}, 1);
+		MAP map = new MAP(bn);
+		map.train(data, new Variable[] {sun, rain}, 1);
 		
 		VarElim ve = new VarElim();
         ve.instantiate(bn);
