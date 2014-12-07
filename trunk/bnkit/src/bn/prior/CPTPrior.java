@@ -2,8 +2,10 @@ package bn.prior;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import dat.EnumTable;
 import dat.EnumVariable;
@@ -100,12 +102,14 @@ public class CPTPrior extends CPT {
 	
 	@Override
     public void maximizeInstance() {
-		Map<Integer, Double[]> data = new HashMap<Integer, Double[]>();
-		EnumVariable var = getVariable();
-		
 		if (count.table.isEmpty()) {
             return;
         }
+		
+		Map<Integer, Double[]> data = new HashMap<Integer, Double[]>();
+		EnumVariable var = getVariable();
+		
+		
 		if (table != null) { // there are parents in the CPT
             // Set all 'old' distributions in the CPT to valid = false, i.e.
             // we are marking entries so we can remove 'ghosts' after counting
@@ -138,17 +142,25 @@ public class CPTPrior extends CPT {
             	for(int i = 0; i < var.size(); i++) {
             		hist[i] = entry.getValue()[i].doubleValue();
             	}
-            	if(prior != null) {
+            	if(prior != null) { // baysian prior
             		prior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
             		prior.learn(var.getDomain().getValues(), hist);
             		resultDistrib = (EnumDistrib)prior.getMAPDistrib();
-            	}else {
+            	}else { // uniform prior, just ML
             		UniformPrior uniPrior = new UniformPrior();
             		uniPrior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
             		uniPrior.learn(var.getDomain().getValues(), hist);
             		resultDistrib = (EnumDistrib)uniPrior.getMAPDistrib();
             	}
             	table.setValue(entry.getKey().intValue(), resultDistrib);
+            }
+            
+          //Remove 'old' (or 'ghost' entries from CPT (for which no counts
+            for (Iterator<Entry<Integer, EnumDistrib>> it = table.getMapEntries().iterator(); it.hasNext(); ) {
+                Entry<Integer, EnumDistrib> entry = it.next();
+            	EnumDistrib obs = entry.getValue();
+            	if (!obs.isValid()) 
+                    it.remove();
             }
             
 		} else {
