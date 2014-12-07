@@ -38,6 +38,10 @@ public class PriorExample {
 		System.out.println(cpt.getDistrib().toString());
 	}
 	
+	/**
+	 * This example has two nodes, sun rise node and rain node.
+	 * each of them has prior.
+	 */
 	public static void complexExample() {
 		EnumVariable sun = Predef.Boolean("Sunrise");
 		CPTPrior cpt = new CPTPrior(sun);
@@ -50,6 +54,11 @@ public class PriorExample {
 		DirichletDistribPrior sunRiseBetaDistrib = new DirichletDistribPrior(sun.getDomain(), new double[] {0.1,0.9}, 1);
 		// prior for sun not rise. 60% it will rain
 		DirichletDistribPrior sunNotRiseBetaDistrib = new DirichletDistribPrior(sun.getDomain(), new double[] {0.6,0.4}, 1);
+		
+		/**
+		 * Node that when set prior, the order of parent value should 
+		 * be the same as the one used in constructor of CPTPrior
+		 */
 		cpt2.setPrior(new Object[] {true}, sunRiseBetaDistrib);
 		cpt2.setPrior(new Object[] {false}, sunNotRiseBetaDistrib);
 		BNet bn = new BNet();
@@ -68,6 +77,11 @@ public class PriorExample {
 		data[8] = new Boolean[] {false, true};
 		data[9] = new Boolean[] {false, true};
 		
+		/**
+		 * MAP can be applied when data is fully observed (No missing label)
+		 * if no prior is given, MAP would treat the prior as uniformPrior
+		 * This is when ML would be applied. 
+		 */
 		MAP map = new MAP(bn);
 		map.train(data, new Variable[] {sun, rain}, 1);
 		

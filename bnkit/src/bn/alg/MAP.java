@@ -7,6 +7,9 @@ import dat.Variable;
 
 /**
  * learning algorithm for fully observed data 
+ * @Note that a network with prior can only be trained via MAP
+ * 		      a network without prior can be trained via MAP or EM
+ *            But MAP is more efficient than EM training complete data
  * @author wangyufei
  *
  */
