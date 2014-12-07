@@ -26,7 +26,7 @@ import java.util.logging.Logger;
  * XUGANG YE, YI-KUO YU and STEPHEN F. ALTSCHUL
  * On the Inference of Dirichlet Mixture Priors for Protein Sequence Comparison
  * JOURNAL OF COMPUTATIONAL BIOLOGY Volume 18, Number 8, 2011
- * Pp. 941–954 DOI: 10.1089/cmb.2011.0040
+ * Pp. 941���954 DOI: 10.1089/cmb.2011.0040
  */
 public class DirichletDistrib implements Distrib, Serializable {
 
@@ -101,6 +101,10 @@ public class DirichletDistrib implements Distrib, Serializable {
         this.alpha = new double[p.length];
         for (int i = 0; i < p.length; i ++)
             this.alpha[i] = p[i] * m;
+        gammas = new GammaDistrib[this.alpha.length];
+        for (int i = 0; i < gammas.length; i++) {
+            gammas[i] = new GammaDistrib(alpha[i], 1);
+        }
     }
     
     /**

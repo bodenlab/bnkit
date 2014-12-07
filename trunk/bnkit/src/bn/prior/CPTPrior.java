@@ -74,17 +74,17 @@ public class CPTPrior extends CPT {
 		}
 	}
 	
-	public void setPrior(Prior prior) {
-		if(rootPrior != null && prior != null) {
-			rootPrior = prior;
+	public void setPrior(Prior _prior) {
+		if(rootPrior != null && _prior != null) {
+			rootPrior = _prior;
 		}else {
 			System.err.println("This CPT is conditioned on other nodes, need parents speicficed or prior is null");
 		}
 	}
 	
-	public void setPrior(Object[] key, Prior prior) {
-		if(PriorTable != null && prior != null) {
-			this.PriorTable.setValue(key, prior);
+	public void setPrior(Object[] key, Prior _prior) {
+		if(PriorTable != null && _prior != null) {
+			this.PriorTable.setValue(key, _prior);
 		}else {
 			System.err.println("This CPT is root node, no keys are needed or prior is null");
 		}
@@ -162,6 +162,8 @@ public class CPTPrior extends CPT {
             rootPrior.learn(var.getDomain().getValues(), cnts);
             put((EnumDistrib)rootPrior.getMAPDistrib());
 		}
+		
+		count.table.setEmpty(); // reset counts
 	}
 	
 	
