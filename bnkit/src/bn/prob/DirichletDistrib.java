@@ -101,6 +101,7 @@ public class DirichletDistrib implements Distrib, Serializable {
         this.alpha = new double[p.length];
         for (int i = 0; i < p.length; i ++)
             this.alpha[i] = p[i] * m;
+        //Added by Yufei to create gamma array
         gammas = new GammaDistrib[this.alpha.length];
         for (int i = 0; i < gammas.length; i++) {
             gammas[i] = new GammaDistrib(alpha[i], 1);
