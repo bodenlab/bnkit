@@ -15,6 +15,15 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
 	private EnumDistrib likelihoodDistrib;
 	private double[] originalAlpha;
     
+	public DirichletDistribPrior(Enumerable domain, double same_alpha) {
+		super(domain, same_alpha);
+		likelihoodDistrib = null;
+        originalAlpha = new double[domain.size()];
+        for(int i = 0; i < domain.size(); i++) {
+        	originalAlpha[i] = same_alpha;
+        }
+	}
+	
 	
 	public DirichletDistribPrior(Enumerable domain, double[] p, double m) {
         super(domain, p, m);
@@ -81,12 +90,12 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
 	 * Pi = (alphai - 1) / (sum(alpha) - K)
 	 */
 	@Override
-	public Distrib getMAPDistrib() {
+	public Distrib getBayesDistrib() {
 		Enumerable domain = (Enumerable) getDomain();
 		double[] probs = new double[domain.size()];
 		Arrays.fill(probs, 0.0);
 		for(int i = 0; i < domain.size(); i++) {
-			probs[i] = (getAlpha()[i] - 1) / (getSum() - domain.size());
+			probs[i] = getAlpha()[i] / getSum();
 		}
 		likelihoodDistrib.set(probs);
 		likelihoodDistrib.normalise();

@@ -56,7 +56,7 @@ public class GammaDistribPrior extends GammaDistrib implements Prior, Serializab
 	}
 
 	@Override
-	public Distrib getMAPDistrib() {
+	public Distrib getBayesDistrib() {
 		double precision = (getK() - 1) * getLambda();
 		likelihoodDistrib.sigmaSquared = 1 / precision;
 		likelihoodDistrib.sigma = Math.sqrt(likelihoodDistrib.sigmaSquared);

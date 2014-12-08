@@ -17,7 +17,7 @@ public class PriorExample {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		complexExample();
+		sampleSize();
 	}
 	
 	/**
@@ -51,9 +51,9 @@ public class PriorExample {
 		EnumVariable rain = Predef.Boolean("rain");
 		CPTPrior cpt2 = new CPTPrior(rain, sun);
 		// prior for sun rise. 90% it won't rain
-		DirichletDistribPrior sunRiseBetaDistrib = new DirichletDistribPrior(sun.getDomain(), new double[] {0.1,0.9}, 1);
+		DirichletDistribPrior sunRiseBetaDistrib = new DirichletDistribPrior(rain.getDomain(), new double[] {0.1,0.9}, 1);
 		// prior for sun not rise. 60% it will rain
-		DirichletDistribPrior sunNotRiseBetaDistrib = new DirichletDistribPrior(sun.getDomain(), new double[] {0.6,0.4}, 1);
+		DirichletDistribPrior sunNotRiseBetaDistrib = new DirichletDistribPrior(rain.getDomain(), new double[] {0.6,0.4}, 1);
 		
 		/**
 		 * Node that when set prior, the order of parent value should 
@@ -92,6 +92,44 @@ public class PriorExample {
         Query q2 = ve.makeQuery(sun);
         CGTable r2 = (CGTable)ve.infer(q2);
         r2.display();
+	}
+	
+	public static void sampleSize() {
+		EnumVariable s1 = Predef.Boolean("s1");
+		CPTPrior cpt = new CPTPrior(s1);
+		DirichletDistribPrior betaDistrib = new DirichletDistribPrior(s1.getDomain(), 4);
+		cpt.setPrior(betaDistrib);
+		
+		EnumVariable s2 = Predef.Boolean("s2");
+		CPTPrior cpt2 = new CPTPrior(s2, s1);
+		DirichletDistribPrior BetaDistrib1 = new DirichletDistribPrior(s2.getDomain(), 2);
+		DirichletDistribPrior BetaDistrib2 = new DirichletDistribPrior(s2.getDomain(), 2);
+		cpt2.setPrior(new Object[] {true}, BetaDistrib1);
+		cpt2.setPrior(new Object[] {false}, BetaDistrib2);
+		
+		Boolean[][] data = new Boolean[12][];
+		data[0] = new Boolean[] {true, false};
+		data[1] = new Boolean[] {true, true};
+		data[2] = new Boolean[] {false, true};
+		data[3] = new Boolean[] {false, false};
+		data[4] = new Boolean[] {false, true};
+		data[5] = new Boolean[] {false, true};
+		data[6] = new Boolean[] {true, false};
+		data[7] = new Boolean[] {false, false};
+		data[8] = new Boolean[] {false, false};
+		data[9] = new Boolean[] {true, true};
+		data[10] = new Boolean[] {true, false};
+		data[11] = new Boolean[] {false, false};
+		
+		BNet bn = new BNet();
+		bn.add(cpt, cpt2);
+		EM em = new EM(bn);
+		em.train(data, new Variable[] {s1, s2}, 1);
+		VarElim ve = new VarElim();
+        ve.instantiate(bn);
+		Query q1 = ve.makeQuery(s2);
+        CGTable r1 = (CGTable)ve.infer(q1);
+        r1.display();
 	}
 
 }
