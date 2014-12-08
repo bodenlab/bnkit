@@ -449,6 +449,36 @@ public class DirichletDistrib implements Distrib, Serializable {
     }
     
     /**
+     * The average entropy of cluster memberships for mixture of Dirichlets.
+     * The calculation uses the number of clusters as the base, so the entropy will be between 0 and 1.
+     * @param data count histograms
+     * @param m the mixing distribution
+     * @param dds the Dirichlet distributions that are mixed
+     * @return the average entropy
+     */
+    public static double mixEntropy(int[][] data, EnumDistrib m, DirichletDistrib[] dds) {
+        double outer = 0;
+        double log_base = Math.log(dds.length);
+        for (int k = 0; k < data.length; k ++) {
+            double[] p = new double[dds.length];
+            double sum = 0;
+            for (int i = 0; i < dds.length; i ++) { 
+                double log_p_i = dds[i].logLikelihood(data[k]);
+                double p_i = Math.exp(log_p_i);
+                p[i] = (m.get(i) * p_i) + Double.MIN_VALUE;
+                sum += p[i];
+            }
+            double ent = 0;
+            for (int i = 0; i < dds.length; i ++) { 
+                double p_i = p[i] / sum;
+                ent -= p_i * (Math.log(p_i) / log_base);
+            }
+            outer += ent / data.length;
+        }
+        return outer;
+    }
+    
+    /**
      * An example program that finds a mixture model based on Gibbs sampling, as per Ye et al (2011).
      * Note that it is possible to define mixtures in the context of a Bayesian network, and train it using EM
      * {@see bn.example.DirDTExample}.
@@ -529,6 +559,7 @@ public class DirichletDistrib implements Distrib, Serializable {
             }
             
             double dl_cur = DL(data, m, dds);
+            double ent = mixEntropy(data, m, dds);
             if (dl_cur < dl_best) {
                 dl_best = dl_cur;
                 // also save mixing weights and alpha values
@@ -539,7 +570,7 @@ public class DirichletDistrib implements Distrib, Serializable {
             } else
                 no_update ++;
                 
-            System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
+            System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best + "\tEntropy = " + ent);
         }
         System.out.println("M = " + m);
         // recall best mixing weights and alpha values
@@ -671,6 +702,8 @@ public class DirichletDistrib implements Distrib, Serializable {
             System.out.println("M = " + m);
             
             double dl_cur = DL(data, m, dds);
+            double ent = mixEntropy(data, m, dds);
+
             if (dl_cur < dl_best) {
                 dl_best = dl_cur;
                 // also save alpha values?
@@ -681,7 +714,7 @@ public class DirichletDistrib implements Distrib, Serializable {
             } else
                 no_update ++;
                 
-            System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
+            System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best + "\tEntropy = " + ent);
         }
         // recall best mixing weights and alpha values
         m = m_best;
