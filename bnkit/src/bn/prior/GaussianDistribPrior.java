@@ -65,7 +65,7 @@ public class GaussianDistribPrior extends GaussianDistrib implements Prior, Seri
 	}
 
 	@Override
-	public Distrib getMAPDistrib() {
+	public Distrib getBayesDistrib() {
 		// the mode for Gaussian is mu
 		likelihoodDistrib.mu = getMean();
 		return likelihoodDistrib;

@@ -28,7 +28,7 @@ public interface Prior {
 	 * get the MAP result distribution
 	 * @return
 	 */
-	public Distrib getMAPDistrib();
+	public Distrib getBayesDistrib();
 	
 	/**
 	 * reset the parameters to the initial value

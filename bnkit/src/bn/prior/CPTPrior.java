@@ -26,9 +26,9 @@ public class CPTPrior extends CPT {
 	 * This enumtable is for prior
 	 * each of them corresponding to the enumtable for EnumDistrib 
 	 */
-	private EnumTable<Prior> PriorTable;
+	private EnumTable<DirichletDistribPrior> PriorTable;
 	// prior for root
-	private Prior rootPrior;
+	private DirichletDistribPrior rootPrior;
 	
 	public CPTPrior(EnumVariable var, List<EnumVariable> parents) {
 		super(var, parents);
@@ -40,7 +40,7 @@ public class CPTPrior extends CPT {
             }
 		}
 		this.PriorTable = null;
-		rootPrior = new UniformPrior();
+		rootPrior = new DirichletDistribPrior(var.getDomain(), 1.0);
 	}
 
 	public CPTPrior(EnumVariable var, EnumVariable... parents) {
@@ -53,13 +53,13 @@ public class CPTPrior extends CPT {
             }
 		}
 		this.PriorTable = null;
-		rootPrior = new UniformPrior();
+		rootPrior = new DirichletDistribPrior(var.getDomain(), 1.0);
 	}
 
 	public CPTPrior(EnumVariable var) {
 		super(var);
 		this.PriorTable = null;
-		rootPrior = new UniformPrior();
+		rootPrior = new DirichletDistribPrior(var.getDomain(), 1.0);
 	}
 
 	public CPTPrior(JPT jpt, EnumVariable var) {
@@ -73,7 +73,7 @@ public class CPTPrior extends CPT {
         }
 		if(jpt.getParents().size() == 0) {
 			this.PriorTable = null;
-			rootPrior = new UniformPrior();
+			rootPrior = new DirichletDistribPrior(var.getDomain(), 1.0);
 		}else {
 			
 			this.PriorTable = new EnumTable<>(cptParents);
@@ -85,9 +85,9 @@ public class CPTPrior extends CPT {
 	 * set prior for the root node in BN
 	 * @param _prior
 	 */
-	public void setPrior(Prior _prior) {
-		if(rootPrior != null && _prior != null) {
-			rootPrior = _prior;
+	public void setPrior(DirichletDistribPrior prior) {
+		if(rootPrior != null && prior != null) {
+			rootPrior = prior;
 		}else {
 			System.err.println("This CPT is conditioned on other nodes, need parents speicficed or prior is null");
 		}
@@ -98,9 +98,9 @@ public class CPTPrior extends CPT {
 	 * @param key, the array of parents' value
 	 * @param _prior, the prior distribution
 	 */
-	public void setPrior(Object[] key, Prior _prior) {
-		if(PriorTable != null && _prior != null) {
-			this.PriorTable.setValue(key, _prior);
+	public void setPrior(Object[] key, DirichletDistribPrior prior) {
+		if(PriorTable != null && prior != null) {
+			this.PriorTable.setValue(key, prior);
 		}else {
 			System.err.println("This CPT is root node, no keys are needed or prior is null");
 		}
@@ -111,7 +111,7 @@ public class CPTPrior extends CPT {
 	 * @param keyIndex, the key index for the combination of parents' value
 	 * @param prior the prior distribution
 	 */
-	public void setPrior(int keyIndex, Prior prior) {
+	public void setPrior(int keyIndex, DirichletDistribPrior prior) {
 		if(PriorTable != null) {
 			this.PriorTable.setValue(keyIndex, prior);
 		}else {
@@ -168,8 +168,13 @@ public class CPTPrior extends CPT {
              */
             Object[] enumObject = var.getDomain().getValues();
             for (Map.Entry<Integer, Double[]> entry : data.entrySet()) {
+            	int index = entry.getKey().intValue();
             	//use the index to find the prior
-            	Prior prior = PriorTable.getValue(entry.getKey().intValue());
+            	DirichletDistribPrior prior = PriorTable.getValue(index);
+            	if(prior == null) {
+            		prior = new DirichletDistribPrior(var.getDomain(), 1.0);
+            		PriorTable.setValue(index, prior);
+            	}
             	// count vector
             	double[] hist = new double[var.size()];
             	EnumDistrib resultDistrib = null;
@@ -177,17 +182,10 @@ public class CPTPrior extends CPT {
             	for(int i = 0; i < var.size(); i++) {
             		hist[i] = entry.getValue()[i].doubleValue();
             	}
-            	if(prior != null) { // baysian prior
-            		prior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
-            		prior.learn(enumObject, hist);
-            		resultDistrib = (EnumDistrib)prior.getMAPDistrib();
-            		prior.resetParameters();
-            	}else { // uniform prior, just ML
-            		UniformPrior uniPrior = new UniformPrior();
-            		uniPrior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
-            		uniPrior.learn(enumObject, hist);
-            		resultDistrib = (EnumDistrib)uniPrior.getMAPDistrib();
-            	}
+            	prior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
+        		prior.learn(enumObject, hist);
+        		resultDistrib = (EnumDistrib)prior.getBayesDistrib();
+        		prior.resetParameters();
             	table.setValue(entry.getKey().intValue(), resultDistrib);
             }
             
@@ -208,7 +206,7 @@ public class CPTPrior extends CPT {
             }
             rootPrior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
             rootPrior.learn(var.getDomain().getValues(), cnts);
-            put((EnumDistrib)rootPrior.getMAPDistrib());
+            put((EnumDistrib)rootPrior.getBayesDistrib());
             rootPrior.resetParameters();
 		}
 		

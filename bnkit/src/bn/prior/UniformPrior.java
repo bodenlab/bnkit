@@ -54,7 +54,7 @@ public class UniformPrior implements Prior, Serializable {
 	}
 
 	@Override
-	public Distrib getMAPDistrib() {
+	public Distrib getBayesDistrib() {
 		return likelihoodDistrib;
 	}
 
