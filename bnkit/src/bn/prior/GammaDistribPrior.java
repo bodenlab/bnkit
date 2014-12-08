@@ -11,12 +11,19 @@ public class GammaDistribPrior extends GammaDistrib implements Prior, Serializab
 
 	// currently, GammaDistrib is only used as conjudge prior for GaussianDistrib
 	private GaussianDistrib likelihoodDistrib;
+	private double oldK;
+	private double oldLambda;
 	
 	public GammaDistribPrior(double k, double lambda) {
 		super(k, lambda);
 		likelihoodDistrib = null;
+		oldK = k;
+		oldLambda = lambda;
 	}
-
+	
+	/**
+     * MAP algorithm for Gaussian Distribution with known mean
+     */
 	@Override
 	public void learn(Object[] data, double[] prob) {
 		if(likelihoodDistrib == null) {
@@ -54,6 +61,12 @@ public class GammaDistribPrior extends GammaDistrib implements Prior, Serializab
 		likelihoodDistrib.sigmaSquared = 1 / precision;
 		likelihoodDistrib.sigma = Math.sqrt(likelihoodDistrib.sigmaSquared);
 		return likelihoodDistrib;
+	}
+
+	@Override
+	public void resetParameters() {
+		// TODO Auto-generated method stub
+		
 	}
 
 

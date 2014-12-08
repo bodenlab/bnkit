@@ -77,12 +77,7 @@ public class PriorExample {
 		data[8] = new Boolean[] {false, true};
 		data[9] = new Boolean[] {false, true};
 		
-		/**
-		 * MAP can be applied when data is fully observed (No missing label)
-		 * if no prior is given, MAP would treat the prior as uniformPrior
-		 * This is when ML would be applied. 
-		 */
-		MAP map = new MAP(bn);
+		EM map = new EM(bn);
 		map.train(data, new Variable[] {sun, rain}, 1);
 		
 		VarElim ve = new VarElim();

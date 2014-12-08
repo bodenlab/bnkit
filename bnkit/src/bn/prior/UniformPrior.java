@@ -27,7 +27,13 @@ public class UniformPrior implements Prior, Serializable {
 		}
 
 	}
-	
+	/**
+	 * this is ML for EnumDistribution
+	 * Pi = Ai / sum(a)
+	 * @param enumDistrib the distribution which is going to train
+	 * @param data training data
+	 * @param prob the corresponding count for data
+	 */
 	private void training(EnumDistrib enumDistrib, Object[] data, double[] prob) {
 		Enumerable domain = enumDistrib.getDomain();
 		double[] probs = new double[domain.size()];
@@ -50,6 +56,12 @@ public class UniformPrior implements Prior, Serializable {
 	@Override
 	public Distrib getMAPDistrib() {
 		return likelihoodDistrib;
+	}
+
+	@Override
+	public void resetParameters() {
+		// Nothing to do
+		
 	}
 
 }
