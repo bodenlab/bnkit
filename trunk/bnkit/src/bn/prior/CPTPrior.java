@@ -22,14 +22,17 @@ import bn.prob.EnumDistrib;
 public class CPTPrior extends CPT {
 	
 	private static final long serialVersionUID = 1L;
-	// prior for each condition
+	/**
+	 * This enumtable is for prior
+	 * each of them corresponding to the enumtable for EnumDistrib 
+	 */
 	private EnumTable<Prior> PriorTable;
 	// prior for root
 	private Prior rootPrior;
 	
 	public CPTPrior(EnumVariable var, List<EnumVariable> parents) {
 		super(var, parents);
-		if (parents != null) {
+		if (parents != null) { // if this node has parent
             if (parents.size() > 0) {
             	this.PriorTable = new EnumTable<>(parents);
             	rootPrior = null;
@@ -43,7 +46,7 @@ public class CPTPrior extends CPT {
 	public CPTPrior(EnumVariable var, EnumVariable... parents) {
 		super(var, parents);
 		if (parents != null) {
-            if (parents.length > 0) {
+            if (parents.length > 0) { // if this node has parent
             	this.PriorTable = new EnumTable<>(parents);
             	rootPrior = null;
             	return;
@@ -78,6 +81,10 @@ public class CPTPrior extends CPT {
 		}
 	}
 	
+	/**
+	 * set prior for the root node in BN
+	 * @param _prior
+	 */
 	public void setPrior(Prior _prior) {
 		if(rootPrior != null && _prior != null) {
 			rootPrior = _prior;
@@ -86,6 +93,11 @@ public class CPTPrior extends CPT {
 		}
 	}
 	
+	/**
+	 * set prior for the conditioned node
+	 * @param key, the array of parents' value
+	 * @param _prior, the prior distribution
+	 */
 	public void setPrior(Object[] key, Prior _prior) {
 		if(PriorTable != null && _prior != null) {
 			this.PriorTable.setValue(key, _prior);
@@ -94,6 +106,11 @@ public class CPTPrior extends CPT {
 		}
 	}
 	
+	/**
+	 * set prior for the conditioned node
+	 * @param keyIndex, the key index for the combination of parents' value
+	 * @param prior the prior distribution
+	 */
 	public void setPrior(int keyIndex, Prior prior) {
 		if(PriorTable != null) {
 			this.PriorTable.setValue(keyIndex, prior);
@@ -119,26 +136,41 @@ public class CPTPrior extends CPT {
             for (EnumDistrib d : this.table.getValues()) {
                 d.setValid(false);
             }
+            /**
+             * This for loop is used for generate a map between the index of parent value 
+             * and a count vector for EnumDistrib
+             */
             for (Map.Entry<Integer, Double> entry : count.table.getMapEntries()) {
+            	// get the count 
             	double nobserv = entry.getValue();
                 Object[] cntkey = count.table.getKey(entry.getKey().intValue());
                 Object[] cptkey = new Object[cntkey.length - 1];
+                // get the array of parent value
                 for (int i = 0; i < cptkey.length; i++) {
                     cptkey[i] = cntkey[i + 1];
                 }
+                // get index for the above array
                 Integer index = new Integer(this.table.getIndex(cptkey));
-                if(data.containsKey(index)) {
+
+                if(data.containsKey(index)) { // if the map contains this index
+                	// set the count to the appropriate position in the "count vector"
                 	data.get(index)[var.getIndex(cntkey[0])] = nobserv;
-                } else {
+                } else { // otherwise... create a new count vector
                 	Double[] subData = new Double[var.size()];
                 	subData[var.getIndex(cntkey[0])] = nobserv;
                 	data.put(index, subData);
                 }
             }
             
+            /**
+             * this for loop is mainly used for setting the count vector
+             * to the corresponding prior
+             */
             Object[] enumObject = var.getDomain().getValues();
             for (Map.Entry<Integer, Double[]> entry : data.entrySet()) {
+            	//use the index to find the prior
             	Prior prior = PriorTable.getValue(entry.getKey().intValue());
+            	// count vector
             	double[] hist = new double[var.size()];
             	EnumDistrib resultDistrib = null;
             	// convert the double array 
@@ -149,6 +181,7 @@ public class CPTPrior extends CPT {
             		prior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
             		prior.learn(enumObject, hist);
             		resultDistrib = (EnumDistrib)prior.getMAPDistrib();
+            		prior.resetParameters();
             	}else { // uniform prior, just ML
             		UniformPrior uniPrior = new UniformPrior();
             		uniPrior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
@@ -176,6 +209,7 @@ public class CPTPrior extends CPT {
             rootPrior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
             rootPrior.learn(var.getDomain().getValues(), cnts);
             put((EnumDistrib)rootPrior.getMAPDistrib());
+            rootPrior.resetParameters();
 		}
 		
 		count.table.setEmpty(); // reset counts

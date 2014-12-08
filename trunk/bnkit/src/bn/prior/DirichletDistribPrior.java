@@ -13,17 +13,23 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
 	
     // currently, Dirichlet is only used as conjudge prior for EnumDistrib
 	private EnumDistrib likelihoodDistrib;
+	private double[] originalAlpha;
     
 	
 	public DirichletDistribPrior(Enumerable domain, double[] p, double m) {
         super(domain, p, m);
         likelihoodDistrib = null;
+        originalAlpha = new double[p.length];
+        for(int i = 0; i < p.length; i++) {
+        	originalAlpha[i] = p[i] * m;
+        }
     }
     
     
     private void setPosterior(double[] alpha) {
     	setPrior(alpha);
     }
+    
     
     /**
      * learn from data
@@ -43,11 +49,16 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
 			return;
 		}
 		Arrays.fill(countVector, 0.0);
-		
+		/**
+		 * get the count vector for each variable
+		 */
 		for(int i = 0; i < data.length; i++) {
 			Object point = data[i];
 			countVector[domain.getIndex(point)] += prob[i];
 		}
+		/**
+		 * get new alpha value
+		 */
 		for(int i = 0; i < alpha.length; i++) {
 			newAlpha[i] = alpha[i] + countVector[i];
 		}
@@ -65,7 +76,10 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
 		}
 	}
 
-
+	/**
+	 * MAP for Dirichlet Distribution
+	 * Pi = (alphai - 1) / (sum(alpha) - K)
+	 */
 	@Override
 	public Distrib getMAPDistrib() {
 		Enumerable domain = (Enumerable) getDomain();
@@ -77,6 +91,11 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
 		likelihoodDistrib.set(probs);
 		likelihoodDistrib.normalise();
 		return likelihoodDistrib;
+	}
+
+	@Override
+	public void resetParameters() {
+		setPrior(originalAlpha);
 	}
 
 

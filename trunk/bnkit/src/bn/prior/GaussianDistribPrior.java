@@ -11,12 +11,19 @@ public class GaussianDistribPrior extends GaussianDistrib implements Prior, Seri
     
 	// currently, Gaussian is only used as conjudge prior for GaussianDistrib
 	private GaussianDistrib likelihoodDistrib;
+	private double oldMean;
+	private double oldVariance;
 	
     public GaussianDistribPrior(double mean, double variance) {
     	super(mean, variance);
     	likelihoodDistrib = null;
+    	oldMean = mean;
+    	oldVariance = variance;
     }
-
+    
+    /**
+     * MAP algorithm for Gaussian Distribution with known variance
+     */
 	@Override
 	public void learn(Object[] data, double[] prob) {
 		Double[] trainingData = (Double[]) data;
@@ -29,13 +36,19 @@ public class GaussianDistribPrior extends GaussianDistrib implements Prior, Seri
 			return;
 		}
 		
-		
+		/**
+		 * get the sum of all training Data
+		 */
 		for(Double point: trainingData) {
 			sum += point.doubleValue();
 		}
+		/**
+		 * formula for MAP
+		 */
 		posteriorMean = (mu / sigmaSquared + sum / likelihoodDistrib.getVariance()) 
 				/ ( 1 / sigmaSquared + trainingData.length / likelihoodDistrib.getVariance());
 		posteriorVariance = 1 / ( 1 / sigmaSquared + trainingData.length / likelihoodDistrib.getVariance());
+		// set parameters
 		setMean(posteriorMean);
 		setVariance(posteriorVariance);
 	}
@@ -56,6 +69,13 @@ public class GaussianDistribPrior extends GaussianDistrib implements Prior, Seri
 		// the mode for Gaussian is mu
 		likelihoodDistrib.mu = getMean();
 		return likelihoodDistrib;
+	}
+
+	@Override
+	public void resetParameters() {
+		setMean(oldMean);
+		setVariance(oldVariance);
+		
 	}
 
 

@@ -29,4 +29,10 @@ public interface Prior {
 	 * @return
 	 */
 	public Distrib getMAPDistrib();
+	
+	/**
+	 * reset the parameters to the initial value
+	 * used in EM
+	 */
+	public void resetParameters();
 }
