@@ -24,6 +24,15 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
         }
 	}
 	
+	public DirichletDistribPrior(Enumerable domain) {
+		super(domain, 0.0);
+		likelihoodDistrib = null;
+        originalAlpha = new double[domain.size()];
+        for(int i = 0; i < domain.size(); i++) {
+        	originalAlpha[i] = 0.0;
+        }
+	}
+	
 	
 	public DirichletDistribPrior(Enumerable domain, double[] p, double m) {
         super(domain, p, m);
@@ -105,6 +114,20 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
 	@Override
 	public void resetParameters() {
 		setPrior(originalAlpha);
+	}
+
+
+	@Override
+	public void learnPrior(Object[] data, double[] prob) {
+		int[][] rawData = new int[data.length][];
+		for(int i = 0; i < data.length; i++) {
+			Integer[] vector = (Integer[])data[i];
+			for(int j = 0; j < vector.length; j++) {
+				rawData[i][j] = vector[j].intValue();
+			}
+		}
+		double[] alpha = DirichletDistrib.getAlpha(rawData, prob);
+		setPrior(alpha);
 	}
 
 

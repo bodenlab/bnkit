@@ -78,5 +78,11 @@ public class GaussianDistribPrior extends GaussianDistrib implements Prior, Seri
 		
 	}
 
+	@Override
+	public void learnPrior(Object[] data, double[] prob) {
+		// TODO Auto-generated method stub
+		
+	}
+
 
 }
