@@ -183,10 +183,10 @@ public class DenseFactor extends AbstractFactor {
         map[key_index] = value;
         /*
         This is probably a temporary fix. Occasionally we get -infinity values stored in the map.
-        Not sure why... So if we see a value is going to be a -inf, assign a large -value instead
+        Not sure why... So if we see a value is going to be a -inf, assign 0.0 instead
          */
         if (map[key_index] == Double.NEGATIVE_INFINITY) {
-            map[key_index] = -1000000.00;
+            map[key_index] = 0.0;
         }
         return key_index;
     }
