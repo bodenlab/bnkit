@@ -1,6 +1,7 @@
 package bn.prior;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -22,6 +23,8 @@ import bn.prob.EnumDistrib;
 public class CPTPrior extends CPT {
 	
 	private static final long serialVersionUID = 1L;
+	
+	private final Double defaultValue = 0.01;
 	/**
 	 * This enumtable is for prior
 	 * each of them corresponding to the enumtable for EnumDistrib 
@@ -157,6 +160,7 @@ public class CPTPrior extends CPT {
                 	data.get(index)[var.getIndex(cntkey[0])] = nobserv;
                 } else { // otherwise... create a new count vector
                 	Double[] subData = new Double[var.size()];
+                	Arrays.fill(subData, defaultValue);
                 	subData[var.getIndex(cntkey[0])] = nobserv;
                 	data.put(index, subData);
                 }
@@ -172,7 +176,7 @@ public class CPTPrior extends CPT {
             	//use the index to find the prior
             	DirichletDistribPrior prior = PriorTable.getValue(index);
             	if(prior == null) {
-            		prior = new DirichletDistribPrior(var.getDomain(), 1.0);
+            		prior = new DirichletDistribPrior(var.getDomain(), defaultValue);
             		PriorTable.setValue(index, prior);
             	}
             	// count vector

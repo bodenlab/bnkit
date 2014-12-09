@@ -35,4 +35,11 @@ public interface Prior {
 	 * used in EM
 	 */
 	public void resetParameters();
+	/**
+	 * This is the interface to learn prior parameters
+	 * from raw dataset
+	 * @param data raw data
+	 * @param prob count for that data
+	 */
+	public void learnPrior(Object[] data, double[] prob);
 }

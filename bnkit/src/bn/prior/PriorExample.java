@@ -97,30 +97,34 @@ public class PriorExample {
 	public static void sampleSize() {
 		EnumVariable s1 = Predef.Boolean("s1");
 		CPTPrior cpt = new CPTPrior(s1);
-		DirichletDistribPrior betaDistrib = new DirichletDistribPrior(s1.getDomain(), 4);
+		DirichletDistribPrior betaDistrib = new DirichletDistribPrior(s1.getDomain(), 1000);
 		cpt.setPrior(betaDistrib);
 		
 		EnumVariable s2 = Predef.Boolean("s2");
 		CPTPrior cpt2 = new CPTPrior(s2, s1);
-		DirichletDistribPrior BetaDistrib1 = new DirichletDistribPrior(s2.getDomain(), 2);
-		DirichletDistribPrior BetaDistrib2 = new DirichletDistribPrior(s2.getDomain(), 2);
+		DirichletDistribPrior BetaDistrib1 = new DirichletDistribPrior(s2.getDomain(), 1000);
+		DirichletDistribPrior BetaDistrib2 = new DirichletDistribPrior(s2.getDomain(), 1000);
 		cpt2.setPrior(new Object[] {true}, BetaDistrib1);
 		cpt2.setPrior(new Object[] {false}, BetaDistrib2);
+		int n = 5000;
+		Boolean[][] data = new Boolean[8 * n][];
 		
-		Boolean[][] data = new Boolean[12][];
-		data[0] = new Boolean[] {true, false};
-		data[1] = new Boolean[] {true, true};
+		for(int i = 0; i < n; i++){
+			data[0 + i * 8] = new Boolean[] {true, false};
+			data[1 + i * 8] = new Boolean[] {true, true};
+			data[2 + i * 8] = new Boolean[] {false, true};
+			data[3 + i * 8] = new Boolean[] {false, false};
+			data[4 + i * 8] = new Boolean[] {false, true};
+			data[5 + i * 8] = new Boolean[] {false, true};
+			data[6 + i * 8] = new Boolean[] {true, false};
+			data[7 + i * 8] = new Boolean[] {false, false};
+		}
+		/*
+		data[0] = new Boolean[] {false, true};
+		data[1] = new Boolean[] {false, false};
 		data[2] = new Boolean[] {false, true};
-		data[3] = new Boolean[] {false, false};
-		data[4] = new Boolean[] {false, true};
-		data[5] = new Boolean[] {false, true};
-		data[6] = new Boolean[] {true, false};
-		data[7] = new Boolean[] {false, false};
-		data[8] = new Boolean[] {false, false};
-		data[9] = new Boolean[] {true, true};
-		data[10] = new Boolean[] {true, false};
-		data[11] = new Boolean[] {false, false};
-		
+		data[3] = new Boolean[] {true, true};
+		*/
 		BNet bn = new BNet();
 		bn.add(cpt, cpt2);
 		EM em = new EM(bn);
