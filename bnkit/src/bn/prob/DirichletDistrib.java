@@ -375,6 +375,8 @@ public class DirichletDistrib implements Distrib, Serializable {
             fprime = logLikelihood_1stDerivative(counts, p, q, x);
             round ++;
         }
+        if (Double.isNaN(x0) || x0 == 0) 
+            System.err.println("Alpha* search failed.");
         return x0;
     }
     
@@ -397,8 +399,9 @@ public class DirichletDistrib implements Distrib, Serializable {
                     int[] hist = counts[j];
                     for (int jj = 0; jj < location.length; jj ++) {
                         hists[j][jj] = hist[jj];
-                        location[jj] += hist[jj] * prob[j];
-                        total += hist[jj] * prob[j];
+                        double p = hist[jj] * prob[j];
+                        location[jj] += p;
+                        total += p;
                     }
                     if (Double.isNaN(total))
                         System.err.println("DirichletDistrib.getAlpha fails");
@@ -488,7 +491,7 @@ public class DirichletDistrib implements Distrib, Serializable {
         
         int nbins = 9;
         long seed = 1;
-        String filename = "/Users/mikael/Desktop/mm10_Mixed_NfiX_segmented_500.out";
+        String filename = "/Users/mikael/Desktop/encode7_100-500-1000-3000-5000_u.out";
         
         java.util.Random rand = new java.util.Random(seed);
 
@@ -496,13 +499,13 @@ public class DirichletDistrib implements Distrib, Serializable {
         int N = data.length;
         int nseg = 0;
         for (int i = 0; i < N; i ++) {
-            if (i == 0) 
+            if (nseg == 0) 
                 nseg = data[i].length;
             else if (nseg != data[i].length)
                 throw new RuntimeException("Error in data: invalid item at data point " + (i + 1));
-            System.out.print("[" + i + "]\t= \t");
-            for (int j = 0; j < data[i].length; j ++) 
-                System.out.print(data[i][j] + "\t");
+//            System.out.print("[" + i + "]\t= \t");
+//            for (int j = 0; j < data[i].length; j ++) 
+//                System.out.print(data[i][j] + "\t");
         }
         EnumDistrib[] eds = new EnumDistrib[nbins];
         for (int i = 0; i < eds.length; i ++) {
