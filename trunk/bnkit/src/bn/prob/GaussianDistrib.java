@@ -1,6 +1,7 @@
 package bn.prob;
 
 import bn.Distrib;
+import dat.Enumerable;
 import java.io.Serializable;
 import java.util.Random;
 
@@ -121,6 +122,116 @@ public class GaussianDistrib implements Distrib, Serializable {
         setVariance(rand1.nextDouble());
     }
 
+    
+    /**
+     * Create a density resembling those in the specified samples.
+     * @param samples samples
+     * @return a new distribution which could serve as a starting point for representing a sub-group of those in the samples.
+     */
+    public static GaussianDistrib probe(double[] samples) {
+        double min = Double.POSITIVE_INFINITY, max = Double.NEGATIVE_INFINITY, mean = 0;
+        for (int i = 0; i < samples.length; i ++) {
+            if (samples[i] < min)
+                min = samples[i];
+            if (samples[i] > max)
+                max = samples[i];
+            mean += samples[i] / samples.length;
+        }
+        Random myrand = new Random();
+        int choose = myrand.nextInt(samples.length);
+        if (samples[choose] > mean)
+            return new GaussianDistrib(samples[choose] - mean, myrand.nextDouble() * (max - mean));
+        else 
+            return new GaussianDistrib(mean - samples[choose], myrand.nextDouble() * (mean - min));
+    }
+    
+    /**
+     * Example that finds a mixture of Gaussians using Gibbs sampling.
+     * @param args 
+     */
+    public static void main(String[] args) {
+        int clusters = 2;
+        Enumerable label = new Enumerable(clusters);
+        EnumDistrib C = EnumDistrib.random(label); // mixture distrib
+        GaussianDistrib[] Q = new GaussianDistrib[clusters];
+        double[] X = {2.9, 3.3, 4.3, 6.1, 6.4, 7.5, 8.1, 8.8};
+        
+        // initialisation
+        Random r = new Random();
+
+        int[] Z_sample = new int[X.length];
+        EnumDistrib[] Z = new EnumDistrib[X.length];
+        for (int k = 0; k < clusters; k ++) {
+            Q[k] = GaussianDistrib.probe(X);
+            Q[k].setVariance(1);
+            System.out.println("P(Q|Z = " + k + ") = " + Q[k]);
+        }
+        double[] counts = new double[clusters];
+        for (int i = 0; i < X.length; i ++) {
+            Z[i] = new EnumDistrib(label);
+            Z_sample[i] = r.nextInt(clusters);
+            counts[Z_sample[i]] += 1.0;
+            System.out.println("X_" + i + " = " + X[i] + ": Z = " + Z_sample[i]);
+        }
+        C.set(counts);
+        for (int k = 0; k < clusters; k ++) {
+//            System.out.println("P(Z = " + k + ") = " + C.get(k));
+        }
+            
+        // training
+        
+        for (int round = 0; round < 10; round ++) {
+            int i_z = r.nextInt(X.length);
+            System.out.println("Hold-out X_" + i_z + " = " + X[i_z]);
+            
+            for (int k = 0; k < clusters; k ++) {
+                System.out.println("\tSamples labelled Z = " + k + ": ");
+                double sum = 0.0;
+                int cnt = 0;
+                for (int i = 0; i < X.length; i ++) {
+                    if (i != i_z && k == Z_sample[i]) {
+                        sum += X[i];
+                        System.out.println("\t\tX_" + i + " = " + X[i]);
+                        cnt ++;
+                    }
+                }
+                double mean = sum / cnt;
+                if (cnt > 0)
+                    Q[k].setMean(mean);
+                double diff = 0;
+                for (int i = 0; i < X.length; i ++) {
+                    if (i != i_z && k == Z_sample[i]) {
+                        diff += (mean - X[i]) * (mean - X[i]);
+                    }
+                }
+                double var = diff / cnt;
+                //if (cnt > 1)
+                //    Q[k].setVariance(var);
+                System.out.println("\t\tNew P(Q|Z = " + k + ") = " + Q[k]);
+            }
+            
+            int i = i_z;
+            double[] p = new double[clusters];
+            for (int k = 0; k < clusters; k ++) {
+                p[k] = Q[k].getDensity(X[i]);
+                //p[k] = Q[k].getDensity(X[i]) * C.get(k);
+            }
+            Z[i].set(p);
+            Z_sample[i] = (int)Z[i].sample();
+            System.out.println("\tX_" + i + " = " + X[i] + ": P(Z|Q = " + X[i] + ") = " + Z[i] + " =sample=> " + Z_sample[i]);
+            counts = new double[clusters];
+            for (i = 0; i < X.length; i ++) {
+                counts[Z_sample[i]] += 1.0;
+            }
+            C.set(counts);
+        }
+        
+        System.out.println("RESULT:");
+        for (int i = 0; i < X.length; i ++) {
+            System.out.println("X_" + i + " = " + X[i] + ": P(Z|Q = " + X[i] + ") = " + Z[i] + " =sample=> " + Z_sample[i]);
+        }
+        
+    }
 }
 /*
  * Copyright (c) 2005, Regents of the University of California

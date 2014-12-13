@@ -218,6 +218,16 @@ public class GammaDistrib implements Distrib, Serializable {
         }
         return trigamma(x + 1) + 1 / (x * x);
     }
+    
+    public static void main(String[] args) {
+        double[] x = {0, Double.MIN_VALUE, 1e-200, 1e-100, 1e-10, 0.00001, 0.1, 1.0, 100, 10000, 1e8, 1e10, 1e100, 1e200, Double.MAX_VALUE, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
+        for (double xx : x) {
+            System.out.println("Gamma(" + xx + ") = " + gamma(xx));
+            System.out.println("\tLog Gamma(" + xx + ") = " + lgamma(xx));
+            System.out.println("\tDi Gamma(" + xx + ") = " + digamma(xx));
+            System.out.println("\tTri Gamma(" + xx + ") = " + trigamma(xx));
+        }
+    }
 
 }
 
