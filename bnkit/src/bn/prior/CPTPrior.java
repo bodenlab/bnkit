@@ -24,7 +24,7 @@ public class CPTPrior extends CPT {
 	
 	private static final long serialVersionUID = 1L;
 	
-	private final Double defaultValue = 0.01;
+	private final Double defaultValue = 1.0;
 	/**
 	 * This enumtable is for prior
 	 * each of them corresponding to the enumtable for EnumDistrib 
