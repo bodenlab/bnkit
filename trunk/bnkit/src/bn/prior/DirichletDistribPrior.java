@@ -23,7 +23,11 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
         	originalAlpha[i] = same_alpha;
         }
 	}
-	
+	/**
+	 * do have to give the parameters
+	 * Used when training for prior is necessary
+	 * @param domain
+	 */
 	public DirichletDistribPrior(Enumerable domain) {
 		super(domain, 0.0);
 		likelihoodDistrib = null;
