@@ -576,14 +576,22 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      * @param key the boolean cptkey (probabilistic condition)
      * @param prob the probability value (must be >=0 and <=1)
      */
-    public void put(Object[] key, EnumDistrib prob) {
+    public void put(Object[] key, Distrib prob) {
         if (key == null) {
             put(prob);
         } else if (key.length == 0) {
             put(prob);
         } else {
-            table.setValue(key, prob);
+            table.setValue(key, (EnumDistrib)prob);
         }
+    }
+    
+    /**
+     * Set entry (or entries) of the CPT to the specified probability value index
+     * (variable is true).
+     */
+    public void put(int index, Distrib prob) {
+    	table.setValue(index, (EnumDistrib)prob);
     }
 
     /**
@@ -593,13 +601,13 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      * @param prob the probability value (must be >=0 and <=1)
      * @param key the cptkey (the condition)
      */
-    public void put(EnumDistrib prob, Object... key) {
+    public void put(Distrib prob, Object... key) {
         if (key == null) {
             put(prob);
         } else if (key.length == 0) {
             put(prob);
         } else {
-            table.setValue(key, prob);
+            table.setValue(key, (EnumDistrib) prob);
         }
     }
 
@@ -608,14 +616,14 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      *
      * @param prob
      */
-    public void put(EnumDistrib prob) {
+    public void put(Distrib prob) {
         if (!isPrior()) {
             throw new RuntimeException("Unable to set prior. CPT " + var + " is conditioned.");
         }
-        if (!prob.isNormalised()) {
+        if (!((EnumDistrib)prob).isNormalised()) {
             throw new RuntimeException("Probability value is invalid: " + prob);
         }
-        prior = prob;
+        prior = (EnumDistrib)prob;
     }
 
     /**
@@ -1058,5 +1066,34 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
         System.out.println("-----");
         
     }
+
+	@Override
+	public List<Sample> getConditionDataset(int conditionIndex) {
+		Object[] parentValues = null;
+		if(conditionIndex >= 0) { // non-root node
+			parentValues = table.getKey(conditionIndex);
+		} else { // root node
+			parentValues = new Object[0];
+		}
+		
+		List<Sample> data = new LinkedList<Sample>();
+		for(int i = 0; i < var.getDomain().size(); i++) {
+			Object[] key = new Object[parentValues.length + 1];
+			key[0] = var.getDomain().get(i);
+			for(int j = 0; j < parentValues.length; j++) {
+				key[1 + j] = parentValues[j];
+			}
+			double sampleProb = count.get(key);
+			Sample sample = new Sample(key[0], sampleProb);
+			data.add(sample);
+		}
+		return data;
+	}
+
+	@Override
+	public Distrib getlikelihoodDistrib() {
+		return new EnumDistrib(this.var.getDomain());
+	}
+
 
 }
