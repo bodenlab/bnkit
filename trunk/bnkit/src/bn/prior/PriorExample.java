@@ -65,7 +65,7 @@ public class PriorExample {
 		 * be the same as the one used in constructor of CPTPrior
 		 */
 		cpt2.setPrior(new Object[] {true}, sunRiseBetaDistrib);
-		cpt2.setPrior(new Object[] {false}, sunNotRiseBetaDistrib);
+		//cpt2.setPrior(new Object[] {false}, sunNotRiseBetaDistrib);
 		BNet bn = new BNet();
 		bn.add(cpt, cpt2);
 		
@@ -100,13 +100,15 @@ public class PriorExample {
 		DirichletDistribPrior sunRiseBetaDistrib = new DirichletDistribPrior(rain.getDomain(), new double[] {0.1,0.9}, 1);
 		// prior for sun not rise. 60% it will rain
 		DirichletDistribPrior sunNotRiseBetaDistrib = new DirichletDistribPrior(rain.getDomain(), new double[] {0.6,0.4}, 1);
-		
+		DirichletDistribPrior uni = new DirichletDistribPrior(rain.getDomain(), new double[] {1, 1}, 1);
+		//set the uniform distribution, used when there is no prior privoded for some condition
+		priorNode2.setUniformPrior(uni);
 		/**
 		 * Node that when set prior, the order of parent value should 
 		 * be the same as the one used in constructor of CPTPrior
 		 */
 		priorNode2.setPrior(new Object[] {true}, sunRiseBetaDistrib);
-		priorNode2.setPrior(new Object[] {false}, sunNotRiseBetaDistrib);
+		//priorNode2.setPrior(new Object[] {false}, sunNotRiseBetaDistrib);
 		BNet bn = new BNet();
 		bn.add(priorNode, priorNode2);
 		
