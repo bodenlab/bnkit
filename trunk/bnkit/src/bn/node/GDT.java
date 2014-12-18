@@ -426,8 +426,8 @@ public class GDT implements BNode, Serializable {
      * @param key the boolean key (probabilistic condition)
      * @param distr the distribution
      */
-    public void put(Object[] key, GaussianDistrib distr) {
-        table.setValue(key, distr);
+    public void put(Object[] key, Distrib distr) {
+        table.setValue(key, (GaussianDistrib)distr);
     }
 
     /**
@@ -437,8 +437,8 @@ public class GDT implements BNode, Serializable {
      * @param index the index for the key (probabilistic condition)
      * @param distr the distribution
      */
-    public void put(int index, GaussianDistrib distr) {
-        table.setValue(index, distr);
+    public void put(int index, Distrib distr) {
+        table.setValue(index, (GaussianDistrib)distr);
     }
 
     /**
@@ -448,12 +448,12 @@ public class GDT implements BNode, Serializable {
      * @param distr the distribution
      * @param key the boolean key (probabilistic condition)
      */
-    public void put(GaussianDistrib distr, Object... key) {
-        table.setValue(key, distr);
+    public void put(Distrib distr, Object... key) {
+        table.setValue(key, (GaussianDistrib) distr);
     }
 
-    public void put(GaussianDistrib distr) {
-        prior = distr;
+    public void put(Distrib distr) {
+        prior = (GaussianDistrib) distr;
     }
 
     @Override
@@ -891,5 +891,47 @@ public class GDT implements BNode, Serializable {
         gdt1.print();
         System.out.println(gdt1.get(new Object[]{true, false}, 0.5));
     }
+    
+    /**
+     * get the data from both distribution and the double sample
+     */
+	@Override
+	public List<Sample> getConditionDataset(int conditionIndex) {
+		int nSample = 20; 
+		List<Sample> result = new LinkedList<Sample>();
+		// if there is countDistrib, then get..
+        if (countDistrib != null) {
+        	List<Sample<Distrib>> samplesDistrib = countDistrib.get(conditionIndex);
+        	for(Sample<Distrib> sample: samplesDistrib) {
+        		for(int j = 0; j < nSample; j++) {
+        			Double r = (Double) sample.instance.sample();
+        			Sample<Double> newSample = new Sample<Double>(r, 1.0);
+        			result.add(newSample);
+        		}
+        	}
+        }
+        	
+        // if there is countDouble, then get..
+        if (countDouble != null) {
+        	List<Sample<Double>> samplesDouble = countDouble.get(conditionIndex);
+        	for(Sample<Double> s: samplesDouble) {
+        		Sample newSample = new Sample(s.instance, s.prob);
+        		result.add(newSample);
+        	}
+        }
+       
+        return result;
+        
+	}
+	
+	/**
+	 * pay attention here, we should note that if we assume that
+	 * our variable to be fixed, our prior is Guassian distribution 
+	 * otherwise, our prior is Gaumma distribution.
+	 */
+	@Override
+	public Distrib getlikelihoodDistrib() {
+		return new GaussianDistrib(0.0, 1.0);
+	}
 
 }

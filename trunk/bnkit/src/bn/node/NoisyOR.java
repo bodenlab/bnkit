@@ -640,7 +640,7 @@ public class NoisyOR implements BNode, Serializable{
      * @param key the boolean key (probabilistic condition)
      * @param prob the probability value (must be >=0 and <=1)
      */
-    public void put(Object[] key, EnumDistrib prob) {
+    public void put(Object[] key, Distrib prob) {
     	
         if (key == null) {
             put(prob);
@@ -656,8 +656,16 @@ public class NoisyOR implements BNode, Serializable{
         	}
         	if (nkey <= 1) {
         		//if no more than 1 of the parent labels is set, the key is valid
-        		table.setValue(key, prob);}
+        		table.setValue(key, (EnumDistrib)prob);}
         }
+    }
+    
+    /**
+     * Set entry (or entries) of the NoisyOR to the specified probability value index
+     * (variable is true).
+     */
+    public void put(int index, Distrib prob) {
+    	table.setValue(index, (EnumDistrib)prob);
     }
 
     /**
@@ -667,7 +675,7 @@ public class NoisyOR implements BNode, Serializable{
      * @param prob the probability value (must be >=0 and <=1)
      * @param key the key (the condition)
      */
-    public void put(EnumDistrib prob, Object... key) {
+    public void put(Distrib prob, Object... key) {
         if (key == null) {
             put(prob);
         } else if (key.length == 0) {
@@ -680,7 +688,7 @@ public class NoisyOR implements BNode, Serializable{
         			nkey++;}
         	}
         	if (nkey <= 1) {
-        		table.setValue(key, prob);}
+        		table.setValue(key, (EnumDistrib)prob);}
         }
     }
 
@@ -689,14 +697,14 @@ public class NoisyOR implements BNode, Serializable{
      *
      * @param prob
      */
-    public void put(EnumDistrib prob) {
+    public void put(Distrib prob) {
         if (!isPrior()) {
             throw new RuntimeException("Unable to set prior. NoisyOR " + var + " is conditioned.");
         }
-        if (!prob.isNormalised()) {
+        if (!((EnumDistrib)prob).isNormalised()) {
             throw new RuntimeException("Probability value is invalid: " + prob);
         }
-        prior = prob;
+        prior = (EnumDistrib)prob;
     }
 
     /**
@@ -1117,6 +1125,18 @@ public class NoisyOR implements BNode, Serializable{
 
 	@Override
 	public Distrib getDistrib() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public List<Sample> getConditionDataset(int conditionIndex) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Distrib getlikelihoodDistrib() {
 		// TODO Auto-generated method stub
 		return null;
 	}

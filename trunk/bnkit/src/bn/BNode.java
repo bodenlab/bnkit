@@ -231,5 +231,45 @@ public interface BNode {
      * @deprecated setting may interfere when multiple inferences are run multi-threaded, hence checking this status is moot
      */
     public boolean isRelevant();
+    
+    /**
+     * get the condition data given the condition index in the enum table 
+     * @param conditionIndex parent value index
+     * @return array of data
+     */
+    public List<Sample> getConditionDataset(int conditionIndex);
+    
+    /**
+     * get a new, empty distribution used by this Bnode
+     * @return distribution
+     */
+    public Distrib getlikelihoodDistrib();
+    
+    /**
+     * set the 
+     * @param key
+     * @param distr
+     */
+    public void put(Object[] key, Distrib distr);
+    
+    /**
+     * set the distribution for root node
+     * @param prob
+     */
+    public void put(Distrib prob);
+    
+    /**
+     * 
+     * @param prob
+     * @param key
+     */
+    public void put(Distrib prob, Object... key);
+    
+    /**
+     * 
+     * @param index
+     * @param distr
+     */
+    public void put(int index, Distrib distr);
 
 }

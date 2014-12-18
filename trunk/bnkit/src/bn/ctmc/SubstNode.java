@@ -597,4 +597,40 @@ public class SubstNode implements BNode, TiedNode {
         qr = (CGTable) ve.infer(q);
         qr.display();
     }
+
+	@Override
+	public List<Sample> getConditionDataset(int conditionIndex) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Distrib getlikelihoodDistrib() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public void put(Object[] key, Distrib distr) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void put(Distrib prob) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void put(Distrib prob, Object... key) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void put(int index, Distrib distr) {
+		// TODO Auto-generated method stub
+		
+	}
 }

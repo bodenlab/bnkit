@@ -24,7 +24,7 @@ public class Sample<T> {
     public final T instance;
     public final double prob;
 
-    Sample(T instance, double prob) {
+    public Sample(T instance, double prob) {
         this.instance = instance;
         this.prob = prob;
     }

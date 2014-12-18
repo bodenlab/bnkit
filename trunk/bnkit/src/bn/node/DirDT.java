@@ -369,8 +369,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
      * @param key the boolean key (probabilistic condition)
      * @param distr the distribution
      */
-    public void put(Object[] key, DirichletDistrib distr) {
-        table.setValue(key, distr);
+    public void put(Object[] key, Distrib distr) {
+        table.setValue(key, (DirichletDistrib) distr);
     }
 
     /**
@@ -380,8 +380,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
      * @param index the index for the key (probabilistic condition)
      * @param distr the distribution
      */
-    public void put(int index, DirichletDistrib distr) {
-        table.setValue(index, distr);
+    public void put(int index, Distrib distr) {
+        table.setValue(index, (DirichletDistrib) distr);
     }
 
     /**
@@ -391,12 +391,12 @@ public class DirDT implements BNode, TiedNode, Serializable {
      * @param distr the distribution
      * @param key the boolean key (probabilistic condition)
      */
-    public void put(DirichletDistrib distr, Object... key) {
-        table.setValue(key, distr);
+    public void put(Distrib distr, Object... key) {
+        table.setValue(key, (DirichletDistrib)distr);
     }
 
-    public void put(DirichletDistrib distr) {
-        prior = distr;
+    public void put(Distrib distr) {
+        prior = (DirichletDistrib)distr;
     }
 
     @Override
@@ -797,6 +797,18 @@ public class DirDT implements BNode, TiedNode, Serializable {
     public BNode getTieSource(){
         return this.tieSource;
     }
+
+	@Override
+	public List<Sample> getConditionDataset(int conditionIndex) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Distrib getlikelihoodDistrib() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
 
 }
