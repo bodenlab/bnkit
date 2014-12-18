@@ -10,6 +10,7 @@ import java.util.Map.Entry;
 
 import dat.EnumTable;
 import dat.EnumVariable;
+import bn.Distrib;
 import bn.JPT;
 import bn.node.CPT;
 import bn.prob.EnumDistrib;
@@ -181,16 +182,16 @@ public class CPTPrior extends CPT {
             	}
             	// count vector
             	double[] hist = new double[var.size()];
-            	EnumDistrib resultDistrib = null;
+            	Distrib resultDistrib = null;
             	// convert the double array 
             	for(int i = 0; i < var.size(); i++) {
             		hist[i] = entry.getValue()[i].doubleValue();
             	}
             	prior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
         		prior.learn(enumObject, hist);
-        		resultDistrib = (EnumDistrib)prior.getBayesDistrib();
+        		resultDistrib = /*(EnumDistrib)*/prior.getBayesDistrib();
         		prior.resetParameters();
-            	table.setValue(entry.getKey().intValue(), resultDistrib);
+            	table.setValue(entry.getKey().intValue(), (EnumDistrib)resultDistrib);
             }
             
           //Remove 'old' (or 'ghost' entries from CPT (for which no counts

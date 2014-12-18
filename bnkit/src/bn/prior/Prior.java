@@ -9,7 +9,7 @@ import bn.Distrib;
  * @author wangyufei
  *
  */
-public interface Prior {
+public interface Prior{
 	/**
 	 * distribution can learn from the data
 	 * and change its own parameters
