@@ -246,28 +246,28 @@ public interface BNode {
     public Distrib getlikelihoodDistrib();
     
     /**
-     * set the 
-     * @param key
-     * @param distr
+     * set the distribution conditioned on the parent value
+     * @param key parent value array
+     * @param distr the distribution you would like to set
      */
     public void put(Object[] key, Distrib distr);
     
     /**
      * set the distribution for root node
-     * @param prob
+     * @param prob distribution
      */
     public void put(Distrib prob);
     
     /**
-     * 
+     * set the distribution conditioned on the parent value
      * @param prob
      * @param key
      */
     public void put(Distrib prob, Object... key);
     
     /**
-     * 
-     * @param index
+     * set the distribution conditioned on the parent value index
+     * @param index parent value index
      * @param distr
      */
     public void put(int index, Distrib distr);
