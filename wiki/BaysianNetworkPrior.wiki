@@ -1,6 +1,4 @@
-#Implementation for BN prior
-
-= Introduction =
+= Implementation for BN prior =
 
 Prior is used as a alternative way for BN to estimate distribution given data. Prior is background knowledge in the absence of data, which is useful when data is limited.
 
@@ -8,7 +6,7 @@ The start point to understand prior is the log likelihood of the learning data. 
 
 The implementation for prior is shown below:
 
-===Bnode===
+===[https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/BNode.java Bnode]===
 
 In Bnod, we should implement,
 {{{
@@ -19,7 +17,7 @@ In Bnod, we should implement,
    public Distrib getlikelihoodDistrib(); 
 }}}
 
-===Prior===
+===[https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/Prior.java Prior]===
 
 In prior, we should implement all method. Prior example [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/DirichletDistribPrior.java DirichletDistribPrior] 
 [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/GammaDistribPrior.java GammaDistribPrior]
@@ -54,7 +52,7 @@ can be found in bn.prior.
      public void learnPrior(Object[] data, double[] prob);
 }}}
 
-===PriorBode===
+===[https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/PriorBNode.java PriorBode]===
 
 PriorBNode is a decoration for Bnode. Demo can be found in [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/PriorExample.java PriorExample] in bn.prior.
 
