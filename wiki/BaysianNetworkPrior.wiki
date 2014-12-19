@@ -9,13 +9,13 @@ The start point to understand prior is the log likelihood of the learning data. 
 The implementation for prior is shown below:
 
 In Bnod, we should implement,
-
+{{{
    // get the condition data given the condition (parent value) index in the enum table 
    public List<Sample> getConditionDataset(int conditionIndex);
 
    // get a new, empty distribution used in this Bnode (e.g. CPT return a new empty enum distribution)
    public Distrib getlikelihoodDistrib(); 
-
+}}}
 In prior, we should implement all method. Prior example (DirichletDistribPrior, GammaDistribPrior, GuassianDistribPrior) can be found in bn.prior.
 
 PriorBNode is a decoration for Bnode. Demo can be found in PriorExample in bn.prior.
