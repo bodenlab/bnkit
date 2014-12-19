@@ -17,7 +17,7 @@ In Bnod, we should implement,
    public Distrib getlikelihoodDistrib(); 
 }}}
 
-In prior, we should implement all method. Prior example *DirichletDistribPrior https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/DirichletDistribPrior.java* 
+In prior, we should implement all method. Prior example [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/DirichletDistribPrior.java DirichletDistribPrior] 
 *GammaDistribPrior* 
 *GuassianDistribPrior* 
 can be found in bn.prior.
