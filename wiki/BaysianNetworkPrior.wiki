@@ -4,17 +4,31 @@
 
 Prior is used as a alternative way for BN to estimate distribution given data. Prior is background knowledge in the absence of data, which is useful when data is limited.
 
-The start point to understand prior is the log likelihood of the learning data. Our estimated parameters are observed when the log likelihood is maximized. However, if we consider Bayesian framework, prior could be introduced. In Bayesian framework, we get our parameters from distribution rather likelihood. The distribution we use is "posterior", which equals to prior * likelihood. For the purpose of simplicity, we would like the conjugate distribution which has the same formula for prior and posterior.
+The start point to understand prior is the log likelihood of the learning data. Our estimated parameters are observed when the log likelihood is maximized. However, if we consider Bayesian framework, prior could be introduced. In Bayesian framework, we get our parameters from distribution rather likelihood. The distribution we use is "posterior", which equals to prior by likelihood. For the purpose of simplicity, we would like the conjugate distribution which has the same formula for prior and posterior.
 
 The implementation for prior is shown below:
 
-*In Bnode Interface, we have 
+In Bnod, we should implement,
+
+   // get the condition data given the condition (parent value) index in the enum table 
+   public List<Sample> getConditionDataset(int conditionIndex);
+
+   // get a new, empty distribution used in this Bnode (e.g. CPT return a new empty enum distribution)
+   public Distrib getlikelihoodDistrib(); 
+
+In prior, we should implement all method. Prior example (DirichletDistribPrior, GammaDistribPrior, GuassianDistribPrior) can be found in bn.prior.
+
+PriorBNode is a decoration for Bnode. Demo can be found in PriorExample in bn.prior.
+
+Simple Example:
+
+    EnumVariable sun = Predef.Boolean("Sunrise");
+
+    CPT cpt = new CPT(sun); // normal Bnode
+
+    PriorBNode priorNode = new PriorBNode(cpt);  // pass the Bnode into PriorBnode
+
+    DirichletDistribPrior betaDistrib = ...// get prior distribution
+
+    priorNode.setPrior(betaDistrib); // set Bnode
          
-
-
-= Details =
-
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
