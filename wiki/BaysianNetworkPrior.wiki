@@ -8,6 +8,8 @@ The start point to understand prior is the log likelihood of the learning data. 
 
 The implementation for prior is shown below:
 
+===Bnode===
+
 In Bnod, we should implement,
 {{{
    // get the condition data given the condition (parent value) index in the enum table 
@@ -16,6 +18,8 @@ In Bnod, we should implement,
    // get a new, empty distribution used in this Bnode (e.g. CPT return a new empty enum distribution)
    public Distrib getlikelihoodDistrib(); 
 }}}
+
+===Prior===
 
 In prior, we should implement all method. Prior example [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/DirichletDistribPrior.java DirichletDistribPrior] 
 [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/GammaDistribPrior.java GammaDistribPrior]
@@ -49,6 +53,8 @@ can be found in bn.prior.
        */
      public void learnPrior(Object[] data, double[] prob);
 }}}
+
+===PriorBode===
 
 PriorBNode is a decoration for Bnode. Demo can be found in [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/PriorExample.java PriorExample] in bn.prior.
 
