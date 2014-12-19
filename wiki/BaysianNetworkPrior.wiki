@@ -21,7 +21,7 @@ In prior, we should implement all method. Prior example (DirichletDistribPrior, 
 PriorBNode is a decoration for Bnode. Demo can be found in PriorExample in bn.prior.
 
 Simple Example:
-
+{{{
     EnumVariable sun = Predef.Boolean("Sunrise");
 
     CPT cpt = new CPT(sun); // normal Bnode
@@ -31,4 +31,4 @@ Simple Example:
     DirichletDistribPrior betaDistrib = ...// get prior distribution
 
     priorNode.setPrior(betaDistrib); // set Bnode
-         
+ }}}
