@@ -18,11 +18,11 @@ In Bnod, we should implement,
 }}}
 
 In prior, we should implement all method. Prior example [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/DirichletDistribPrior.java DirichletDistribPrior] 
-*GammaDistribPrior* 
-*GuassianDistribPrior* 
+[https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/GammaDistribPrior.java GammaDistribPrior]
+[https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/GaussianDistribPrior.java GuassianDistribPrior]
 can be found in bn.prior.
 
-PriorBNode is a decoration for Bnode. Demo can be found in *PriorExample* in bn.prior.
+PriorBNode is a decoration for Bnode. Demo can be found in [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/PriorExample.java PriorExample] in bn.prior.
 
 Simple Example:
 {{{
