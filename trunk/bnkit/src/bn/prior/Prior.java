@@ -42,4 +42,5 @@ public interface Prior{
 	 * @param prob count for that data
 	 */
 	public void learnPrior(Object[] data, double[] prob);
+	
 }

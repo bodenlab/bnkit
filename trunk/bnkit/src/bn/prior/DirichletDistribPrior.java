@@ -134,6 +134,10 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior, Se
 		setPrior(alpha);
 	}
 
-
+	public static DirichletDistribPrior getUniformDistrib(Enumerable domain) {
+		double[] alpha = new double[domain.size()];
+		Arrays.fill(alpha, 1.0);
+		return new DirichletDistribPrior(domain, alpha, 1.0);
+	}
 
 }

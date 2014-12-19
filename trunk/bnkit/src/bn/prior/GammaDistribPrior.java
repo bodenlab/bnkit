@@ -71,8 +71,11 @@ public class GammaDistribPrior extends GammaDistrib implements Prior, Serializab
 
 	@Override
 	public void learnPrior(Object[] data, double[] prob) {
-		// TODO Auto-generated method stub
-		
+		// TODO Auto-generated method stub	
+	}
+	
+	public static GammaDistribPrior getUniformDistrib() {
+		return new GammaDistribPrior(0.0, 0.0);
 	}
 
 

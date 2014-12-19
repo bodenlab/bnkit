@@ -1,7 +1,10 @@
 package bn.prior;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Random;
+
+import dat.Enumerable;
 
 import bn.Distrib;
 import bn.prob.EnumDistrib;
@@ -83,6 +86,9 @@ public class GaussianDistribPrior extends GaussianDistrib implements Prior, Seri
 		// TODO Auto-generated method stub
 		
 	}
-
+	
+	public static GaussianDistribPrior getUniformDistrib() {
+		return new GaussianDistribPrior(1.0, Double.POSITIVE_INFINITY);
+	}
 
 }
