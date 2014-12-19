@@ -66,5 +66,22 @@ Simple Example:
 
     DirichletDistribPrior betaDistrib = ...// get prior distribution
 
-    priorNode.setPrior(betaDistrib); // set Bnode
+    priorNode.setPrior(betaDistrib); // set Bnode for a root node
+
+    EnumVariable rain = Predef.Boolean("rain");
+    
+    CPT cpt2 = new CPT(rain, sun);
+    PriorBNode priorNode2 = new PriorBNode(cpt2);
+    // prior for sun rise. 90% it won't rain
+    DirichletDistribPrior sunRiseBetaDistrib = new DirichletDistribPrior(rain.getDomain(), new double[] {0.1,0.9}, 1);
+    // prior for sun not rise. 60% it will rain
+    DirichletDistribPrior sunNotRiseBetaDistrib = new DirichletDistribPrior(rain.getDomain(), new double[] {0.6,0.4}, 1);
+    DirichletDistribPrior uni = new DirichletDistribPrior(rain.getDomain(), new double[] {1, 1}, 1);
+    //set the uniform distribution, used when there is no prior privoded for some condition
+    priorNode2.setUniformPrior(uni);
+    /**
+      * Node that when set prior, the order of parent value should 
+      * be the same as the one used in constructor of CPTPrior
+    */
+    priorNode2.setPrior(new Object[] {true}, sunRiseBetaDistrib);
  }}}
