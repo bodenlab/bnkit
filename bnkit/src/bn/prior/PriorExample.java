@@ -20,9 +20,8 @@ public class PriorExample {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		Boolean[][] data = getDataSet();
-		complexExample(data);
-		newSample(data);
+		Double a = Double.POSITIVE_INFINITY;
+		System.out.println( 1 / a * 1);
 	}
 	
 	/**
@@ -102,7 +101,7 @@ public class PriorExample {
 		DirichletDistribPrior sunNotRiseBetaDistrib = new DirichletDistribPrior(rain.getDomain(), new double[] {0.6,0.4}, 1);
 		DirichletDistribPrior uni = new DirichletDistribPrior(rain.getDomain(), new double[] {1, 1}, 1);
 		//set the uniform distribution, used when there is no prior privoded for some condition
-		priorNode2.setUniformPrior(uni);
+		priorNode2.setUniformPrior(DirichletDistribPrior.getUniformDistrib(rain.getDomain()));
 		/**
 		 * Node that when set prior, the order of parent value should 
 		 * be the same as the one used in constructor of CPTPrior

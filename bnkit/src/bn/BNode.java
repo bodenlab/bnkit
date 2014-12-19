@@ -23,6 +23,8 @@ import dat.EnumVariable;
 import dat.Variable;
 import dat.EnumTable;
 import bn.factor.AbstractFactor;
+import bn.prior.Prior;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
