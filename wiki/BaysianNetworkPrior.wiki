@@ -16,7 +16,7 @@ In Bnod, we should implement,
    // get a new, empty distribution used in this Bnode (e.g. CPT return a new empty enum distribution)
    public Distrib getlikelihoodDistrib(); 
 }}}
-In prior, we should implement all method. Prior example (DirichletDistribPrior, GammaDistribPrior, GuassianDistribPrior) can be found in bn.prior.
+In prior, we should implement all method. Prior example (*DirichletDistribPrior* *GammaDistribPrior* *GuassianDistribPrior*) can be found in bn.prior.
 
 PriorBNode is a decoration for Bnode. Demo can be found in PriorExample in bn.prior.
 
