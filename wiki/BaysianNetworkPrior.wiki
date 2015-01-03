@@ -2,7 +2,13 @@
 
 Prior is used as a alternative way for BN to estimate distribution given data. Prior is background knowledge in the absence of data, which is useful when data is limited.
 
-The start point to understand prior is the log likelihood of the learning data. Our estimated parameters are observed when the log likelihood is maximized. However, if we consider Bayesian framework, prior could be introduced. In Bayesian framework, we get our parameters from distribution rather likelihood. The distribution we use is "posterior", which equals to prior by likelihood. For the purpose of simplicity, we would like the conjugate distribution which has the same formula for prior and posterior.
+The start point to understand prior is the log likelihood of the training data. Our estimated parameters are observed when the log likelihood is maximized. However, if we consider Bayesian framework, prior could be introduced. In Bayesian framework, we get our parameters from distribution rather likelihood. The distribution we use is "posterior", which is shown below. 
+{{{
+           Posterior = likelihood * Prior
+}}}
+
+
+For the purpose of simplicity, we would like the conjugate distribution which has the same formula for prior and posterior.
 
 The implementation for prior is shown below:
 
