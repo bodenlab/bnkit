@@ -2,7 +2,7 @@
 
 Prior is used as a alternative way for BN to estimate distribution given data. Prior is background knowledge in the absence of data, which is useful when data is limited.
 
-The start point to understand prior is the log likelihood of the training data. Our estimated parameters are observed when the log likelihood is maximized. However, if we consider Bayesian framework, prior could be introduced. In Bayesian framework, we get our parameters from distribution rather likelihood. The distribution we use is "posterior", which is shown below. 
+Learning parameters from training data is to maximize the "log" likelihood of the dataset.That is, we treat the parameters as a set of unknown value. However, if we consider Bayesian framework, then parameters are from specific distribution. We would maximize the value of distribution. Here, Prior would be helpful when estimating the distribution, which is shown below. 
 {{{
            Posterior = likelihood * Prior
 }}}
