@@ -72,6 +72,8 @@ public class ASRExample {
                 int index = names[i].indexOf("/"); // in this aln file, names have been amended
                 if (index > 0)
                     labels.add(names[i].substring(0, index));
+                else
+                    labels.add(names[i]);
             }
             
             PhyloBNet[] pbnets = new PhyloBNet[aln.getWidth()];
