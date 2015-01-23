@@ -10,7 +10,7 @@ import bn.Distrib;
 import bn.prob.EnumDistrib;
 import bn.prob.GaussianDistrib;
 
-public class GaussianDistribPrior extends GaussianDistrib implements Prior, Serializable{
+public class GaussianDistribPrior extends GaussianDistrib implements Prior {
     
 	// currently, Gaussian is only used as conjudge prior for GaussianDistrib
 	private GaussianDistrib likelihoodDistrib;

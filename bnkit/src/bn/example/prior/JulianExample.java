@@ -1,8 +1,10 @@
-package bn.prior;
+package bn.example.prior;
 
 import dat.EnumVariable;
 import bn.BNet;
 import bn.Predef;
+import bn.prior.CPTPrior;
+import bn.prior.DirichletDistribPrior;
 
 public class JulianExample {
 

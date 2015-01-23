@@ -1,4 +1,4 @@
-package bn.prior;
+package bn.example.prior;
 
 import java.util.Random;
 
@@ -10,6 +10,9 @@ import bn.alg.MAP;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.node.CPT;
+import bn.prior.CPTPrior;
+import bn.prior.DirichletDistribPrior;
+import bn.prior.PriorBNode;
 import bn.prob.EnumDistrib;
 import dat.EnumVariable;
 import dat.Variable;
