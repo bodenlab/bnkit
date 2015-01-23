@@ -507,10 +507,11 @@ public class DirichletDistrib implements Distrib, Serializable {
 //            for (int j = 0; j < data[i].length; j ++) 
 //                System.out.print(data[i][j] + "\t");
         }
+        /*
         EnumDistrib[] eds = new EnumDistrib[nbins];
         for (int i = 0; i < eds.length; i ++) {
             eds[i] = EnumDistrib.random(new Enumerable(nseg), rand.nextInt());
-        }
+        }*/
         
         List[] bins = new ArrayList[nbins]; // hold components here
         DirichletDistrib[] dds = new DirichletDistrib[nbins];
@@ -575,7 +576,7 @@ public class DirichletDistrib implements Distrib, Serializable {
                 
             System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best + "\tEntropy = " + ent);
         }
-        System.out.println("M = " + m);
+        //System.out.println("M = " + m);
         // recall best mixing weights and alpha values
         m = m_best;
         System.out.println("M = " + m);
@@ -604,9 +605,10 @@ public class DirichletDistrib implements Distrib, Serializable {
                 System.err.println("Problem with data point k = " + k);
             }
         }
+        /*
         for (int i = 0; i < dds.length; i ++) {
             System.out.println("D"+ i + " = " + dds[i]);
-        }
+        }*/
 
         for (int i = 0; i < nbins; i ++) {
             try {
