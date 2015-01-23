@@ -1,5 +1,7 @@
 package bn.prior;
 
+import java.io.Serializable;
+
 import bn.Distrib;
 
 /**
@@ -9,7 +11,7 @@ import bn.Distrib;
  * @author wangyufei
  *
  */
-public interface Prior{
+public interface Prior extends Serializable {
 	/**
 	 * distribution can learn from the data
 	 * and change its own parameters

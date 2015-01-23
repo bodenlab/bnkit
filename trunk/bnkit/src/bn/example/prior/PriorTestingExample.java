@@ -1,5 +1,6 @@
-package bn.prior;
+package bn.example.prior;
 
+import bn.prior.GaussianDistribPrior;
 import bn.prob.GaussianDistrib;
 
 /**

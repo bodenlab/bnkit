@@ -9,7 +9,7 @@ import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
 import dat.Enumerable;
 
-public class DirichletDistribPrior extends DirichletDistrib implements Prior, Serializable {
+public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 	
     // currently, Dirichlet is only used as conjudge prior for EnumDistrib
 	private EnumDistrib likelihoodDistrib;

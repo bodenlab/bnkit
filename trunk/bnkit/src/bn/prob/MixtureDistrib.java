@@ -19,6 +19,8 @@
 package bn.prob;
 
 import bn.Distrib;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -30,11 +32,26 @@ import java.util.Random;
  */
 public class MixtureDistrib implements Distrib {
 
-    final Map<Distrib, Double> mixture;
+    //final Map<Distrib, Double> mixture;
+    
+    protected ArrayList<Distrib> distribs;
+    protected ArrayList<Double> weights;
+    
     private double density;
-    Random rand = new Random();
+    Random rand = new Random(1);
+    
+    public MixtureDistrib() {
+    	//mixture = new HashMap<>();
+    	distribs = new ArrayList<Distrib>();
+    	weights = new ArrayList<Double>();
+    	density = 0.0;
+    }
 
     public MixtureDistrib(Distrib d1, double weight1) {
+    	distribs = new ArrayList<Distrib>();
+    	weights = new ArrayList<Double>();
+    	density = 0.0;
+    	/*
         mixture = new HashMap<>();
         try {
             MixtureDistrib packed = (MixtureDistrib) d1;
@@ -46,32 +63,96 @@ public class MixtureDistrib implements Distrib {
         } catch (ClassCastException e) {
             mixture.put(d1, weight1);
             density = weight1;
-        }
+        }*/
+    	if(d1 instanceof MixtureDistrib) {
+    		MixtureDistrib MD = (MixtureDistrib)d1;
+    		int size = MD.getMixtureSize();
+    		for(int i = 0; i < size; i++) {
+    			Distrib distrib = MD.getDistrib(i);
+    			addDistribForced(distrib, weight1 * MD.getWeights(i));
+    		}
+    	} else {
+    		addDistribForced(d1, weight1);
+    	}
     }
     
     private double addDistribForced(Distrib d2, double weight2) {
+    	/*
         Double prev_weight = mixture.get(d2);
         if (prev_weight == null)
             mixture.put(d2, weight2);
         else
             mixture.put(d2, prev_weight + weight2);
-        density += weight2;
+        density += weight2;*/
+    	if(hasDistrib(d2)) {
+    		int index = distribs.indexOf(d2);
+    		weights.set(index, weights.get(index) + weight2);
+    	} else {
+    		distribs.add(d2);
+    		weights.add(weight2);
+    	}
+    	density += weight2;
         return density;
     }
 
     public double addDistrib(Distrib d2, double weight2) {
+    	/*
         try {
             MixtureDistrib packed = (MixtureDistrib) d2;
             for (Map.Entry<Distrib, Double> entry : packed.mixture.entrySet())
                 addDistribForced(entry.getKey(), entry.getValue() * weight2);
         } catch (ClassCastException e) {
             addDistribForced(d2, weight2);
-        }
+        }*/
+    	if(d2 instanceof MixtureDistrib) {
+    		MixtureDistrib MD = (MixtureDistrib)d2;
+    		int size = MD.getMixtureSize();
+    		for(int i = 0; i < size; i++) {
+    			Distrib distrib = MD.getDistrib(i);
+    			addDistribForced(distrib, weight2 * MD.getWeights(i));
+    		}
+    	}else {
+    		addDistribForced(d2, weight2);
+    	}
         return density;
     }
     
     public boolean hasDistrib(Distrib d2) {
-        return mixture.containsKey(d2);
+        return distribs.contains(d2);
+    }
+    
+    public int getMixtureSize() {
+    	return this.distribs.size();
+    }
+    
+    public Distrib getDistrib(int index) {
+    	return distribs.get(index);
+    }
+    
+    public Double getWeights(int index) {
+    	return weights.get(index);
+    }
+    
+    public void setWeight(int index, double neWeight) {
+    	this.weights.set(index, neWeight);
+    }
+    
+    public void setWeights(double[] neWeight) {
+    	if(neWeight.length != this.weights.size()) {
+    		throw new RuntimeException("number of weights invalid");
+    	}
+    	
+    	for(int i = 0; i < neWeight.length; i++) {
+    		setWeight(i, neWeight[i]);
+    	}
+    }
+    
+    public double[] getAllWeights() {
+    	double[] weight = new double[weights.size()];
+    	for(int i = 0; i < weights.size(); i++) {
+    		weight[i] = weights.get(i).doubleValue();
+    	}
+    	return weight;
     }
     
     /**
@@ -80,25 +161,63 @@ public class MixtureDistrib implements Distrib {
      */
     public MixtureDistrib getNormalizedClone() {
         double sum = 0;
-        for (Double weight : mixture.values()) 
+        for (Double weight : weights) 
             sum += weight;
         MixtureDistrib md = null;
-        for (Map.Entry<Distrib, Double> entry : mixture.entrySet()) {
+        //for (Map.Entry<Distrib, Double> entry : mixture.entrySet()) {
+        for(int i = 0; i < distribs.size(); i++) {
             if (md == null) 
-                md = new MixtureDistrib(entry.getKey(), entry.getValue() / sum);
+                md = new MixtureDistrib(distribs.get(i), weights.get(i) / sum);
             else
-                md.addDistrib(entry.getKey(), entry.getValue() / sum);
+                md.addDistrib(distribs.get(i), weights.get(i) / sum);
         }
         return md;
+    }
+    
+    /**
+     * normalized the mixture weights sum up to be 1
+     */
+    public void getNormalized() {
+    	double sum = 0.0;
+    	for(Double weight: weights) {
+    		sum += weight;
+    	}
+    	for(int i = 0; i < weights.size(); i++) {
+    		weights.set(i, weights.get(i) / sum);
+    	}
     }
     
     @Override
     public double get(Object value) {
         double p = 0.0;
+        /*
         for (Map.Entry<Distrib, Double> entry : mixture.entrySet()) {
             p += entry.getKey().get(value) * entry.getValue();
+        }*/
+        for(int i = 0; i < distribs.size(); i++) {
+        	p += distribs.get(i).get(value) * weights.get(i);
         }
         return p;
+    }
+    
+    public Distrib componentSample() {
+    	double y = rand.nextDouble() * density;
+    	Distrib current = null;
+        double p = 0.0;
+        /*
+        for (Map.Entry<Distrib, Double> entry : mixture.entrySet()) {
+            current = entry.getKey();
+            p += entry.getValue();
+            if (p >= y)
+                break;
+        }*/
+        for(int i = 0; i < distribs.size(); i++) {
+        	current = distribs.get(i);
+        	p += weights.get(i);
+        	if (p >= y)
+                break;
+        }
+        return current;
     }
 
     /**
@@ -107,15 +226,7 @@ public class MixtureDistrib implements Distrib {
      */
     @Override
     public Object sample() {
-        double y = rand.nextDouble() * density;
-        Distrib current = null;
-        double p = 0.0;
-        for (Map.Entry<Distrib, Double> entry : mixture.entrySet()) {
-            current = entry.getKey();
-            p += entry.getValue();
-            if (p >= y)
-                break;
-        }
+        Distrib current = componentSample();
         if (current == null)
             throw new RuntimeException("Invalid MixtureDistrib");
         return current.sample();
@@ -123,23 +234,27 @@ public class MixtureDistrib implements Distrib {
     
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("^" + mixture.size());
-        for (Map.Entry<Distrib, Double> entry : mixture.entrySet())
-            sb.append("{" + entry.getKey() + "*" + String.format("%4.2f", entry.getValue()) + "}");
+        StringBuilder sb = new StringBuilder("^" + distribs.size());
+        //for (Map.Entry<Distrib, Double> entry : mixture.entrySet())
+        for(int i = 0; i < distribs.size(); i++) 
+            sb.append("{" + distribs.get(i) + "*" + String.format("%4.2f", weights.get(i)) + "}");
         return sb.toString();
     }
     
     public static void main(String[] args) {
+    	
         GaussianDistrib gd1 = new GaussianDistrib(0, 1.0);
         System.out.println("gd1 = " + gd1);
         GaussianDistrib gd2 = new GaussianDistrib(1, 0.5);
         System.out.println("gd2 = " + gd2);
         GaussianDistrib gd3 = new GaussianDistrib(-2, 2.5);
         System.out.println("gd3 = " + gd3);
+        
         MixtureDistrib md1 = new MixtureDistrib(gd1, 1.0);
         md1.addDistrib(gd2, 2);
         md1.addDistrib(gd2, 0.5);
         System.out.println("md1 is gd1*1.0 + gd2*2.5 : \n" + md1);
+        
         MixtureDistrib md2 = new MixtureDistrib(md1, 1.0);
         System.out.println("mds2 is md1*1.0 : \n" + md2);
         md2.addDistrib(gd1, 0.5);
@@ -149,6 +264,7 @@ public class MixtureDistrib implements Distrib {
         md2.addDistrib(md1, 2.0);
         System.out.println("md2 += md1*2.0 : \n" + md2);
         md2.addDistrib(gd1, 1.5);
+        
         System.out.println("md2 += gd1*1.5 : \n" + md2);
         System.out.println("density = " + md2.density);
     }

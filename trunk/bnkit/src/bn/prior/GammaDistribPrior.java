@@ -7,7 +7,7 @@ import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
 
 
-public class GammaDistribPrior extends GammaDistrib implements Prior, Serializable{
+public class GammaDistribPrior extends GammaDistrib implements Prior {
 
 	// currently, GammaDistrib is only used as conjudge prior for GaussianDistrib
 	private GaussianDistrib likelihoodDistrib;
