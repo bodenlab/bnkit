@@ -63,7 +63,7 @@ public class GaussianDistribPrior extends GaussianDistrib implements Prior {
 
 
 	@Override
-	public void setLikelihoodDistrib(Distrib distrib) {
+	public void setEstimatedDistrib(Distrib distrib) {
 		try {
 			likelihoodDistrib = (GaussianDistrib) distrib;
 		} catch(ClassCastException e) {
@@ -73,7 +73,7 @@ public class GaussianDistribPrior extends GaussianDistrib implements Prior {
 	}
 
 	@Override
-	public Distrib getBayesDistrib() {
+	public Distrib getEstimatedDistrib() {
 		// the mode for Gaussian is mu
 		likelihoodDistrib.mu = getMean();
 		return likelihoodDistrib;

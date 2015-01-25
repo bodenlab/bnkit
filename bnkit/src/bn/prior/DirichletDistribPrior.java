@@ -100,7 +100,7 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 
 
 	@Override
-	public void setLikelihoodDistrib(Distrib distrib) {
+	public void setEstimatedDistrib(Distrib distrib) {
 		try {
 			likelihoodDistrib = (EnumDistrib) distrib;
 		} catch(ClassCastException e) {
@@ -113,7 +113,7 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 	 * Pi = (alphai - 1) / (sum(alpha) - K)
 	 */
 	@Override
-	public Distrib getBayesDistrib() {
+	public Distrib getEstimatedDistrib() {
 		Enumerable domain = (Enumerable) getDomain();
 		double[] probs = new double[domain.size()];
 		Arrays.fill(probs, 0.0);

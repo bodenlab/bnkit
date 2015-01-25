@@ -243,12 +243,12 @@ public class PriorBNode implements BNode {
 				}
 			}
 			// prior start to learn from data
-			prior.setLikelihoodDistrib(getlikelihoodDistrib());
+			prior.setEstimatedDistrib(getlikelihoodDistrib());
 			prior.learn(data, prob);
 			if(!isRoot()) {
-				put(i,prior.getBayesDistrib());
+				put(i,prior.getEstimatedDistrib());
 			} else {
-				put(prior.getBayesDistrib());
+				put(prior.getEstimatedDistrib());
 			}
 			// reset parameters
 			prior.resetParameters();

@@ -90,7 +90,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	}
 
 	@Override
-	public void setLikelihoodDistrib(Distrib distrib) {
+	public void setEstimatedDistrib(Distrib distrib) {
 		try {
 			likelihoodDistrib = (EnumDistrib) distrib;
 		} catch(ClassCastException e) {
@@ -100,7 +100,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	}
 
 	@Override
-	public Distrib getBayesDistrib() {
+	public Distrib getEstimatedDistrib() {
 		Enumerable domain = getDomain();
 		double[] prob = new double[domain.size()];
 		double[] alphaSums = new double[this.getMixtureSize()];
