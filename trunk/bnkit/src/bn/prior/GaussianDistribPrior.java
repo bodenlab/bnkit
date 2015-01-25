@@ -17,6 +17,11 @@ public class GaussianDistribPrior extends GaussianDistrib implements Prior {
 	private double oldMean;
 	private double oldVariance;
 	
+	/**
+	 * given the Guassian parameters, we would get Guassian prior.
+	 * @param mean
+	 * @param variance
+	 */
     public GaussianDistribPrior(double mean, double variance) {
     	super(mean, variance);
     	likelihoodDistrib = null;
