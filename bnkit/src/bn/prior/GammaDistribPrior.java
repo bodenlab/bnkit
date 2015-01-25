@@ -6,7 +6,13 @@ import bn.Distrib;
 import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
 
-
+/**
+ * Gamma distribution is used as prior of Gaussian distribution
+ * here, Gamma distribution is described as parameters "shape" k and 
+ * parameters scale Lambda.
+ * @author wangyufei
+ *
+ */
 public class GammaDistribPrior extends GammaDistrib implements Prior {
 
 	// currently, GammaDistrib is only used as conjudge prior for GaussianDistrib
@@ -14,6 +20,11 @@ public class GammaDistribPrior extends GammaDistrib implements Prior {
 	private double oldK;
 	private double oldLambda;
 	
+	/**
+	 * 
+	 * @param k, describes shape
+	 * @param lambda, describes scale
+	 */
 	public GammaDistribPrior(double k, double lambda) {
 		super(k, lambda);
 		likelihoodDistrib = null;

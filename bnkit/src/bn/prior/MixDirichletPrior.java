@@ -9,6 +9,15 @@ import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
 import bn.prob.MixDirichletDistrib;
 
+/**
+ * This algorithm comes from 
+ * Sjšlander, K., Karplus, K., e.l.(1996). 
+ * Dirichlet mixtures: a method for improved detection 
+ * of weak but significant protein sequence homology. 
+ * Computer applications in the biosciences: CABIOS, 12(4), 327-345.
+ * @author wangyufei
+ *
+ */
 public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	
 	double[][] alpha;
@@ -16,6 +25,11 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	private EnumDistrib likelihoodDistrib;
 	private double[] countVector;
 	
+	/**
+	 * 
+	 * @param domain enumerable variable for each Dirichlet component
+	 * @param component the number of components in the "mixture"
+	 */
 	public MixDirichletPrior(Enumerable domain, int component) {
 		super(domain, component);
 		alpha = new double[component][domain.size()];
@@ -30,6 +44,13 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 		
 	}
 	
+	/**
+	 * calculate the probability of the count vector of the training data
+	 * given the different Dirichlet component represented
+	 * by array of alpha value
+	 * @param alpha
+	 * @return the probability of the count vector
+	 */
 	private double probCountVector(double[] alpha) {
 		double result = 0.0;
 		int sumCountVector = 0;
@@ -49,11 +70,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	}
 
 	/**
-	 * This algorithm comes from 
-	 * Sjšlander, K., Karplus, K., e.l.(1996). 
-	 * Dirichlet mixtures: a method for improved detection 
-	 * of weak but significant protein sequence homology. 
-	 * Computer applications in the biosciences: CABIOS, 12(4), 327-345.
+	 * learn data
 	 */
 	@Override
 	public void learn(Object[] data, double[] prob) {
@@ -125,7 +142,10 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 		}
 
 	}
-
+	/**
+	 * learn mixture Dirichlet distribution from the data
+	 * here, the probability of data are treated as 1  
+	 */
 	@Override
 	public void learnPrior(Object[] data, double[] prob) {
 		int[][] learningData = new int[data.length][];

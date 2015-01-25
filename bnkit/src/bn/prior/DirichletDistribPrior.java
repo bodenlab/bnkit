@@ -15,6 +15,11 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 	private EnumDistrib likelihoodDistrib;
 	private double[] originalAlpha;
     
+	/**
+	 * give the enumerable variable for enum distribution and the alpha
+	 * @param domain enumerable variable
+	 * @param same_alpha this value will be assigned to all alpha of Dirichlet distribution
+	 */
 	public DirichletDistribPrior(Enumerable domain, double same_alpha) {
 		super(domain, same_alpha);
 		likelihoodDistrib = null;
@@ -37,7 +42,12 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
         }
 	}
 	
-	
+	/**
+	 * 
+	 * @param domain the enumerable for enum distribution
+	 * @param p array of alpha values of Dirichlet distribution
+	 * @param m the scaling variable for the array above
+	 */
 	public DirichletDistribPrior(Enumerable domain, double[] p, double m) {
         super(domain, p, m);
         likelihoodDistrib = null;
@@ -120,7 +130,10 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 		setPrior(originalAlpha);
 	}
 
-
+	/**
+	 * learn parameters of Dirichlet distribution 
+	 * from the dataset
+	 */
 	@Override
 	public void learnPrior(Object[] data, double[] prob) {
 		int[][] rawData = new int[data.length][];
@@ -133,7 +146,12 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 		double[] alpha = DirichletDistrib.getAlpha(rawData, prob);
 		setPrior(alpha);
 	}
-
+	
+	/**
+	 * 
+	 * @param domain the enum distribution
+	 * @return the uniform Distribution of Dirichlet distribution
+	 */
 	public static DirichletDistribPrior getUniformDistrib(Enumerable domain) {
 		double[] alpha = new double[domain.size()];
 		Arrays.fill(alpha, 1.0);
