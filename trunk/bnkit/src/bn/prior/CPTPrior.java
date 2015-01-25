@@ -187,9 +187,9 @@ public class CPTPrior extends CPT {
             	for(int i = 0; i < var.size(); i++) {
             		hist[i] = entry.getValue()[i].doubleValue();
             	}
-            	prior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
+            	prior.setEstimatedDistrib(new EnumDistrib(var.getDomain()));
         		prior.learn(enumObject, hist);
-        		resultDistrib = /*(EnumDistrib)*/prior.getBayesDistrib();
+        		resultDistrib = /*(EnumDistrib)*/prior.getEstimatedDistrib();
         		prior.resetParameters();
             	table.setValue(entry.getKey().intValue(), (EnumDistrib)resultDistrib);
             }
@@ -209,9 +209,9 @@ public class CPTPrior extends CPT {
                 cntkey[0] = var.getDomain().get(i);
                 cnts[i] = count.get(cntkey);
             }
-            rootPrior.setLikelihoodDistrib(new EnumDistrib(var.getDomain()));
+            rootPrior.setEstimatedDistrib(new EnumDistrib(var.getDomain()));
             rootPrior.learn(var.getDomain().getValues(), cnts);
-            put((EnumDistrib)rootPrior.getBayesDistrib());
+            put((EnumDistrib)rootPrior.getEstimatedDistrib());
             rootPrior.resetParameters();
 		}
 		

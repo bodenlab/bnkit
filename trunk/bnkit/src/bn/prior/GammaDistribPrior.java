@@ -44,8 +44,7 @@ public class GammaDistribPrior extends GammaDistrib implements Prior {
 		Double[] training = (Double[]) data;
 		
 		// learn K
-		double oldK = getK();
-		setK(oldK + ((double)data.length) / 2);
+		setK(getK() + ((double)data.length) / 2);
 		
 		// learn lambda
 		double dataVariance = 0.0;
@@ -57,7 +56,7 @@ public class GammaDistribPrior extends GammaDistrib implements Prior {
 	}
 
 	@Override
-	public void setLikelihoodDistrib(Distrib distrib) {
+	public void setEstimatedDistrib(Distrib distrib) {
 		try {
 			likelihoodDistrib = (GaussianDistrib) distrib;
 		} catch(ClassCastException e) {
@@ -67,8 +66,8 @@ public class GammaDistribPrior extends GammaDistrib implements Prior {
 	}
 
 	@Override
-	public Distrib getBayesDistrib() {
-		double precision = (getK() - 1) * getLambda();
+	public Distrib getEstimatedDistrib() {
+		double precision = (getK() - 1) * (1 / getLambda());
 		likelihoodDistrib.sigmaSquared = 1 / precision;
 		likelihoodDistrib.sigma = Math.sqrt(likelihoodDistrib.sigmaSquared);
 		return likelihoodDistrib;

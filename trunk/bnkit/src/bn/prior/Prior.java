@@ -6,8 +6,10 @@ import bn.Distrib;
 
 /**
  * interface for conjugate prior
- * Note: it is still on design stage, never use it before everything works all right
- * WORKING STATUS
+ * before use prior, users should set the estimated Distribution
+ * e.g. we should set enum distribution to Dirichlet Distribution 
+ * or mixture dirichlet distribution because Dirichlet Distribution prior would
+ * estimated enum distribution
  * @author wangyufei
  *
  */
@@ -24,13 +26,13 @@ public interface Prior extends Serializable {
 	 * set likelihood distribution
 	 * @param distrib
 	 */
-	public void setLikelihoodDistrib(Distrib distrib);
+	public void setEstimatedDistrib(Distrib distrib);
 	
 	/**
 	 * get the MAP result distribution
 	 * @return
 	 */
-	public Distrib getBayesDistrib();
+	public Distrib getEstimatedDistrib();
 	
 	/**
 	 * reset the parameters to the initial value
