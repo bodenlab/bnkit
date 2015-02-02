@@ -67,6 +67,7 @@ public class PhyloTree {
         List<Node> done = new ArrayList<>();
         List<Node> queue = new ArrayList<>();
         queue.add(root);
+        done.add(root);
         expandNodes(done, queue);
         Node[] arr = new Node[done.size()];
         done.toArray(arr);
