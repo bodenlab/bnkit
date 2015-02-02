@@ -26,6 +26,7 @@ import bn.ctmc.PhyloBNet;
 import bn.ctmc.matrix.JTT;
 import bn.factor.Factorize;
 import bn.file.BNBuf;
+import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.EnumVariable;
 import dat.Enumerable;
@@ -38,14 +39,15 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  *
  * @author mikael
  */
 public class ASRExample {
-    static String file_tree = "/Users/mikael/simhome/ASR/cyp3.newick";
-    static String file_aln = "/Users/mikael/simhome/ASR/cyp3.aln";
+    static String file_tree = "/Users/mikael/simhome/ASR/dp16_example4.nwk";
+    static String file_aln = "/Users/mikael/simhome/ASR/dp16_example4.aln";
     
     static PhyloTree tree;
     static List<EnumSeq.Gappy<Enumerable>> seqs;
@@ -78,7 +80,7 @@ public class ASRExample {
             
             PhyloBNet[] pbnets = new PhyloBNet[aln.getWidth()];
             
-            Object[][] asr_matrix = new Object[indexForNodes.size()][aln.getWidth()];
+            Object[][] asr_matrix = new Object[indexForNodes.size()][aln.getWidth()]; // joint reconstruction for tree
 
             for (int col = 0; col < aln.getWidth(); col ++) {
                 PhyloBNet pbn = PhyloBNet.create(tree, new JTT());
@@ -95,9 +97,16 @@ public class ASRExample {
                 }
             }
 
+            double[][] margin_probs = new double[Enumerable.aacid.size()][aln.getWidth()]; // marginal reconstruction for root
+            EnumDistrib[] margin_distribs = new EnumDistrib[aln.getWidth()];
+            
+            BNode root = null;
+            String asr_root = null;
+            
             for (int col = 0; col < aln.getWidth(); col ++) {
                 PhyloBNet pbn = pbnets[col];
                 BNet bn = pbn.getBN();
+                root = pbn.getRoot();
                 VarElim ve = new VarElim();
                 ve.instantiate(bn);
 
@@ -106,9 +115,13 @@ public class ASRExample {
                 int purged_leaves = pbn.purgeGaps();
                 int collapsed_nodes = pbn.collapseSingles();
                 //System.out.println("Col " + col + "\tPurged: " + purged_leaves + " + " + collapsed_nodes);
-                Query q = ve.makeMPE();
-                CGTable r = (CGTable)ve.infer(q);
-                Assignment[] a = r.getMPE();
+                Query q_marg = ve.makeQuery(root.getVariable());
+                CGTable r_marg = (CGTable)ve.infer(q_marg);
+                EnumDistrib d_marg = (EnumDistrib)r_marg.query(root.getVariable());
+                margin_distribs[col] = d_marg;
+                Query q_joint = ve.makeMPE();
+                CGTable r_joint = (CGTable)ve.infer(q_joint);
+                Assignment[] a = r_joint.getMPE();
                 for (Assignment a0 : a) {
                     EnumVariable asr_var = (EnumVariable)a0.var;
                     Object asr_val = a0.val;
@@ -129,12 +142,27 @@ public class ASRExample {
                 myasr.setName(indexForNodes.get(row));
                 asrs.add(myasr);
             }
+            
+            String rootname = root.getVariable().getName();
+            
             EnumSeq.Alignment aln_asr = new EnumSeq.Alignment(asrs);
             for (int i = 0; i < aln_asr.getHeight(); i ++) {
                 EnumSeq.Gappy<Enumerable> asr_seq = aln_asr.getEnumSeq(i);
+                String nodename = asr_seq.getName();
+                if (rootname.equals(nodename))
+                    asr_root = asr_seq.toString();
                 System.out.println(asr_seq.getName() + "\t" + asr_seq.toString());
             }
             
+            System.out.println("Joint reconstruction: " + asr_root);
+            System.out.print("  ");
+            for (int j = 0; j < Enumerable.aacid.size(); j ++) {
+                System.out.print(Enumerable.aacid.get(j) + "    ");
+            }
+            System.out.println();
+            for (int col = 0; col < aln.getWidth(); col ++) {
+                System.out.println(margin_distribs[col] + "\t" + asr_root.charAt(col));
+            }            
             
         } catch (IOException ex) {
             ex.printStackTrace();
