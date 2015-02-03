@@ -241,7 +241,7 @@ public class DirichletDistrib implements Distrib, Serializable {
             if (i < alpha.length - 1)
                 sb.append(String.format("%4.2f,", alpha[i]));
             else
-                sb.append(String.format("%4.2f;", alpha[i]));
+                sb.append(String.format("%4.2f", alpha[i]));
         }
         return sb.toString();
     }
@@ -290,6 +290,19 @@ public class DirichletDistrib implements Distrib, Serializable {
         for (int[] count : counts)
             sum += logLikelihood(count);
         return sum;
+    }
+    
+    public boolean equals(DirichletDistrib otherDirDistrib) {
+    	if(!getDomain().equals(otherDirDistrib.getDomain())) {
+    		return false;
+    	}
+    	double[] otherAlpha = otherDirDistrib.getAlpha();
+    	for(int i = 0; i < alpha.length; i++) {
+    		if(alpha[i] != otherAlpha[i]) {
+    			return false;
+    		}
+    	}
+    	return true;
     }
     
     /**
@@ -730,7 +743,6 @@ public class DirichletDistrib implements Distrib, Serializable {
         }
 
     }
-
     
     static int[] component = null;
     

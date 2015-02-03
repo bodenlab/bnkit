@@ -50,6 +50,20 @@ public class Enumerable implements Domain {
     public int size() {
         return order;
     }
+    
+    public boolean equals(Enumerable enumerable) {
+    	if(size() != enumerable.size()) {
+    		return false;
+    	}
+    	
+    	for(int i = 0; i < size(); i++) {
+    		if(!get(i).equals(enumerable.get(i))) {
+    			return false;
+    		}
+    	}
+    	
+    	return true;
+    }
 
     /**
      * Retrieve the index of the value in the domain.

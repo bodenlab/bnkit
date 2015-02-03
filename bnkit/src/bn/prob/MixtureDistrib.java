@@ -32,26 +32,33 @@ import java.util.Random;
  */
 public class MixtureDistrib implements Distrib {
 
-    //final Map<Distrib, Double> mixture;
-    
+    final Map<Distrib, Double> mixture;
     protected ArrayList<Distrib> distribs;
     protected ArrayList<Double> weights;
     
     private double density;
     Random rand = new Random(1);
     
+    /**
+     * construct an empty mixture distribution
+     * you will have a mixture without any component
+     */
     public MixtureDistrib() {
-    	//mixture = new HashMap<>();
+    	mixture = new HashMap<>();
     	distribs = new ArrayList<Distrib>();
     	weights = new ArrayList<Double>();
     	density = 0.0;
     }
-
+    
+    /**
+     * construct a mixture distribution with a distribution
+     * @param d1, could be mixture distribution, or single distribution
+     * @param weight1, the corrsponding weight
+     */
     public MixtureDistrib(Distrib d1, double weight1) {
     	distribs = new ArrayList<Distrib>();
     	weights = new ArrayList<Double>();
     	density = 0.0;
-    	/*
         mixture = new HashMap<>();
         try {
             MixtureDistrib packed = (MixtureDistrib) d1;
@@ -63,7 +70,7 @@ public class MixtureDistrib implements Distrib {
         } catch (ClassCastException e) {
             mixture.put(d1, weight1);
             density = weight1;
-        }*/
+        }
     	if(d1 instanceof MixtureDistrib) {
     		MixtureDistrib MD = (MixtureDistrib)d1;
     		int size = MD.getMixtureSize();
@@ -77,13 +84,12 @@ public class MixtureDistrib implements Distrib {
     }
     
     private double addDistribForced(Distrib d2, double weight2) {
-    	/*
+    	
         Double prev_weight = mixture.get(d2);
         if (prev_weight == null)
             mixture.put(d2, weight2);
         else
             mixture.put(d2, prev_weight + weight2);
-        density += weight2;*/
     	if(hasDistrib(d2)) {
     		int index = distribs.indexOf(d2);
     		weights.set(index, weights.get(index) + weight2);
@@ -94,16 +100,22 @@ public class MixtureDistrib implements Distrib {
     	density += weight2;
         return density;
     }
-
+    
+    /**
+     * add a distribution to this mixture model
+     * @param d2 could be mixture distribution, or single distribution
+     * @param weight2 the corrsponding weight
+     * @return
+     */
     public double addDistrib(Distrib d2, double weight2) {
-    	/*
+    	
         try {
             MixtureDistrib packed = (MixtureDistrib) d2;
             for (Map.Entry<Distrib, Double> entry : packed.mixture.entrySet())
                 addDistribForced(entry.getKey(), entry.getValue() * weight2);
         } catch (ClassCastException e) {
             addDistribForced(d2, weight2);
-        }*/
+        }
     	if(d2 instanceof MixtureDistrib) {
     		MixtureDistrib MD = (MixtureDistrib)d2;
     		int size = MD.getMixtureSize();
@@ -117,26 +129,60 @@ public class MixtureDistrib implements Distrib {
         return density;
     }
     
+    /**
+     * check if mixture has this distribution
+     * @param d2
+     * @return
+     */
     public boolean hasDistrib(Distrib d2) {
         return distribs.contains(d2);
     }
     
+    /**
+     * get the size of mixture
+     * @return
+     */
     public int getMixtureSize() {
     	return this.distribs.size();
     }
     
+    /**
+     * get distribution given index
+     * @param index
+     * @return
+     */
     public Distrib getDistrib(int index) {
-    	return distribs.get(index);
+    	if(index < getMixtureSize()) {
+    		return distribs.get(index);
+    	}
+    	return null;
     }
     
+    /**
+     * get the weight given index
+     * @param index
+     * @return
+     */
     public Double getWeights(int index) {
-    	return weights.get(index);
+    	if(index < getMixtureSize()) {
+    		return weights.get(index);
+    	}
+    	return null;
     }
     
+    /**
+     * set new weight given the index
+     * @param index
+     * @param neWeight
+     */
     public void setWeight(int index, double neWeight) {
     	this.weights.set(index, neWeight);
     }
     
+    /**
+     * set a new set of weights
+     * @param neWeight
+     */
     public void setWeights(double[] neWeight) {
     	if(neWeight.length != this.weights.size()) {
     		throw new RuntimeException("number of weights invalid");
@@ -147,12 +193,28 @@ public class MixtureDistrib implements Distrib {
     	}
     }
     
+    /**
+     * get all weights
+     * @return
+     */
     public double[] getAllWeights() {
     	double[] weight = new double[weights.size()];
     	for(int i = 0; i < weights.size(); i++) {
     		weight[i] = weights.get(i).doubleValue();
     	}
     	return weight;
+    }
+    
+    /**
+     * get wights given distribution
+     * @param distrib
+     * @return
+     */
+    public Double getWeightsByDistrib(Distrib distrib) {
+    	if(mixture.containsKey(distrib)) {
+    		return mixture.get(distrib);
+    	}
+    	return null;
     }
     
     /**
@@ -234,11 +296,20 @@ public class MixtureDistrib implements Distrib {
     
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("^" + distribs.size());
+        StringBuilder sb = new StringBuilder("mixture size: " + distribs.size() + "\n");
         //for (Map.Entry<Distrib, Double> entry : mixture.entrySet())
         for(int i = 0; i < distribs.size(); i++) 
-            sb.append("{" + distribs.get(i) + "*" + String.format("%4.2f", weights.get(i)) + "}");
+            sb.append("weight: " + String.format("%4.2f", weights.get(i)) + "; distrib: " + distribs.get(i) + "\n");
         return sb.toString();
+    }
+    
+    public String toXMLString() {
+    	StringBuilder sb = new StringBuilder("<Mix>\n<MixtureSize>" + distribs.size() + "</MixtureSize>\n<MixtureModels>\n");
+    	for(int i = 0; i < distribs.size(); i++) {
+    		sb.append("<model>\n<weight>" + String.format("%4.2f", weights.get(i)) + "</weight>\n<distrib>" + distribs.get(i) + "</distrib>\n</model>\n");
+    	}
+    	sb.append("</MixtureModels>\n</Mix>");
+    	return sb.toString();
     }
     
     public static void main(String[] args) {
