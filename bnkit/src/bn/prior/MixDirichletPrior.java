@@ -131,8 +131,8 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 			for(int j = 0; j < this.getMixtureSize();j++) {
 				DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(j);
 				componentProb = prob[j] / probSum;
-				componentProb *= ((this.countVector[j] + dirichlet.getAlpha()[j]) / (countSum + alphaSums[i]));
-				dist[j] += componentProb;
+				componentProb *= ((this.countVector[j] + dirichlet.getAlpha()[j]) / (countSum + alphaSums[j]));
+				dist[i] += componentProb;
 			}
 		}
 		likelihoodDistrib.set(dist);
