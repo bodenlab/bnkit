@@ -19,6 +19,8 @@ import bn.Distrib;
  * Mixture Dirichlet distribution is weighted sum of different Dirichlet distribution
  * MDir = w1 * Dir1 + w2 * Dir2 + ... 
  * This class includes learning parameters from data
+ * However, if you would like to use Dirichlet distribution as prior in BN,
+ * please look at the method in MixDirichletPrior.java
  * @author wangyufei
  *
  */
@@ -213,9 +215,9 @@ public class MixDirichletDistrib  extends MixtureDistrib implements Serializable
 		
 		MixDirichletDistrib dis2 = new MixDirichletDistrib(domain, 9);
 		dis2.getNormalized();
-		System.out.println(dis2.toString());
-		dis2.learnParameters(loadData("data/mm10_Mixed_NfiX_segmented20_100.out"));
-		System.out.println(dis2.toString());
+		System.out.println(dis2.toXMLString());
+		//dis2.learnParameters(loadData("data/mm10_Mixed_NfiX_segmented20_100.out"));
+		//System.out.println(dis2.toString());
 	}
 	
 	public static int[][] loadData(String filename) {

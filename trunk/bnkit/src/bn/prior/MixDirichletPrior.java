@@ -12,9 +12,13 @@ import bn.prob.MixDirichletDistrib;
 /**
  * This algorithm comes from 
  * Sj�lander, K., Karplus, K., e.l.(1996). 
- * Dirichlet mixtures: a method for improved detection 
- * of weak but significant protein sequence homology. 
  * Computer applications in the biosciences: CABIOS, 12(4), 327-345.
+ * 
+ * @Note this prior is only used for the estimation of enum distribution in BN
+ *       To learn the parameters of this prior, learnPrior can be useful
+ *       You don't have to use the method in MixDirichlet.java!
+ *       If you use Mixture Dirichlet distribution for other purpose, you should
+ *       use MixDirichletDistrib instead
  * @author wangyufei
  *
  */
@@ -102,11 +106,12 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	@Override
 	public Distrib getEstimatedDistrib() {
 		Enumerable domain = getDomain();
-		double[] prob = new double[domain.size()];
+		double[] prob = new double[this.getMixtureSize()];
 		double[] alphaSums = new double[this.getMixtureSize()];
+		double[] dist = new double[domain.size()];
 		double probSum = 0.0;
 		int countSum = 0;
-		double[] dist = new double[domain.size()];
+		
 		for(int i = 0; i < domain.size(); i++) {
 			countSum += countVector[i];
 		}
@@ -121,11 +126,11 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 			}
 		}
 		Arrays.fill(dist, 0);
-		for(int i = 0; i < domain.size(); i++) {
-			for(int j = 0; j < this.getMixtureSize(); j++) {
-				DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(j);
-				dist[i] = (prob[i] / probSum);
-				dist[i] *= ((this.countVector[i] + dirichlet.getAlpha()[i]) / (countSum + alphaSums[j]));
+		for(int i = 0; i < this.getMixtureSize(); i++) {
+			for(int j = 0; j < domain.size(); j++) {
+				DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
+				dist[j] = (prob[i] / probSum);
+				dist[j] *= ((this.countVector[j] + dirichlet.getAlpha()[j]) / (countSum + alphaSums[i]));
 			}
 			
 		}
@@ -143,7 +148,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 
 	}
 	/**
-	 * learn mixture Dirichlet distribution from the data
+	 * learn parameters mixture Dirichlet distribution from the data
 	 * here, the probability of data are treated as 1  
 	 */
 	@Override
@@ -163,7 +168,12 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
             m[i] = this.getWeights(i);
 		}
 	}
-
+	
+	/**
+	 * the same interface for learnPrior
+	 * only learning data is necessary. 
+	 * @param data
+	 */
     public void learnPrior(Object[] data){
         this.learnPrior(data, new double[] {1});
     }
