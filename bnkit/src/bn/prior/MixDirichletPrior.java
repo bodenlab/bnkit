@@ -11,7 +11,7 @@ import bn.prob.MixDirichletDistrib;
 
 /**
  * This algorithm comes from 
- * Sjšlander, K., Karplus, K., e.l.(1996). 
+ * Sjï¿½lander, K., Karplus, K., e.l.(1996). 
  * Dirichlet mixtures: a method for improved detection 
  * of weak but significant protein sequence homology. 
  * Computer applications in the biosciences: CABIOS, 12(4), 327-345.
@@ -163,5 +163,9 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
             m[i] = this.getWeights(i);
 		}
 	}
+
+    public void learnPrior(Object[] data){
+        this.learnPrior(data, new double[] {1});
+    }
 
 }
