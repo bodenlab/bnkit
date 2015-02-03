@@ -177,6 +177,7 @@ public class MixtureDistrib implements Distrib {
      */
     public void setWeight(int index, double neWeight) {
     	this.weights.set(index, neWeight);
+    	this.mixture.put(this.distribs.get(index), Double.valueOf(neWeight));
     }
     
     /**
@@ -281,6 +282,23 @@ public class MixtureDistrib implements Distrib {
         }
         return current;
     }
+    
+    public boolean equals(MixtureDistrib md) {
+    	for(int i = 0; i < distribs.size(); i++) {
+    		
+    		DirichletDistrib dir1 = (DirichletDistrib)getDistrib(i);
+    		DirichletDistrib dir2 = (DirichletDistrib)md.getDistrib(i);
+    		if(!dir1.equals(dir2)) {
+    			return false;
+    		}
+    		Distrib distrib = getDistrib(i);
+    		if(Math.abs(md.getWeightsByDistrib(dir2) - getWeightsByDistrib(dir1)) > 1e-15) {
+    			return false;
+    		}
+    	}
+    	
+    	return true;
+    } 
 
     /**
      * Sample the mixture distribution.
@@ -304,11 +322,11 @@ public class MixtureDistrib implements Distrib {
     }
     
     public String toXMLString() {
-    	StringBuilder sb = new StringBuilder("<Mix>\n<MixtureSize>" + distribs.size() + "</MixtureSize>\n<MixtureModels>\n");
+    	StringBuilder sb = new StringBuilder("<MixtureModels>\n");
     	for(int i = 0; i < distribs.size(); i++) {
-    		sb.append("<model>\n<weight>" + String.format("%4.2f", weights.get(i)) + "</weight>\n<distrib>" + distribs.get(i) + "</distrib>\n</model>\n");
+    		sb.append("<model>\n<weight>" + String.format("%4.17f", weights.get(i)) + "</weight>\n<distrib>" + distribs.get(i) + "</distrib>\n</model>\n");
     	}
-    	sb.append("</MixtureModels>\n</Mix>");
+    	sb.append("</MixtureModels>");
     	return sb.toString();
     }
     

@@ -5,6 +5,8 @@ import java.util.*;
 import org.w3c.dom.*; 
 import org.xml.sax.SAXException;
 
+import bn.prob.DirichletDistrib;
+
 import dat.Enumerable;
 
 import javax.xml.parsers.*; 
@@ -40,24 +42,44 @@ public class MixDirichletManager {
 	 * @throws SAXException
 	 * @throws IOException
 	 */
-	public MixDirichletPrior load(Enumerable domain, String file) throws ParserConfigurationException, SAXException, IOException {
-		File f=new File(file); 
+	public static MixDirichletPrior load(Enumerable domain, String file) throws ParserConfigurationException, SAXException, IOException {
+		File f = new File(file); 
 		DocumentBuilderFactory factory=DocumentBuilderFactory.newInstance(); 
 		DocumentBuilder builder=factory.newDocumentBuilder(); 
 		Document doc = builder.parse(f); 
-		
-		return null;
+		NodeList models = doc.getElementsByTagName("model");
+		MixDirichletPrior prior = new MixDirichletPrior(domain, models.getLength());
+		for(int i = 0; i < models.getLength(); i++) {
+			Node model = models.item(i);
+			Node weight = model.getChildNodes().item(1); 
+			Node distrib = model.getChildNodes().item(3); 
+			String[] StringAlpha = distrib.getTextContent().split(",");
+			double[] alpha = new double[StringAlpha.length];
+			for(int j = 0; j < StringAlpha.length; j++) {
+				alpha[j] = Double.valueOf(StringAlpha[j]);
+			}
+			prior.setWeight(i,Double.valueOf(weight.getTextContent()));
+			DirichletDistrib dirichlet = (DirichletDistrib)prior.getDistrib(i);
+			dirichlet.setPrior(alpha);
+		}
+		return prior;
 	}
 	
 	
 	/**
 	 * @param args
+	 * @throws SAXException 
+	 * @throws ParserConfigurationException 
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) throws ParserConfigurationException, SAXException {
 		Enumerable domain = new Enumerable(5);
 		MixDirichletPrior mixPrior = new MixDirichletPrior(domain, 9);
 		try {
 			MixDirichletManager.save(mixPrior, "data/prior.xml");
+			MixDirichletPrior prior = MixDirichletManager.load(domain, "data/prior.xml");
+			if(prior.equals(mixPrior)) {
+				System.out.println("yes");
+			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
