@@ -239,9 +239,9 @@ public class DirichletDistrib implements Distrib, Serializable {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < alpha.length; i ++) {
             if (i < alpha.length - 1)
-                sb.append(String.format("%4.2f,", alpha[i]));
+                sb.append(String.format("%4.17f,", alpha[i]));
             else
-                sb.append(String.format("%4.2f", alpha[i]));
+                sb.append(String.format("%4.17f", alpha[i]));
         }
         return sb.toString();
     }
@@ -298,7 +298,7 @@ public class DirichletDistrib implements Distrib, Serializable {
     	}
     	double[] otherAlpha = otherDirDistrib.getAlpha();
     	for(int i = 0; i < alpha.length; i++) {
-    		if(alpha[i] != otherAlpha[i]) {
+    		if(Math.abs(alpha[i] - otherAlpha[i]) > 1e-15) {
     			return false;
     		}
     	}
