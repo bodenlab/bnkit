@@ -6,6 +6,8 @@ import org.w3c.dom.*;
 import org.xml.sax.SAXException;
 
 import bn.prob.DirichletDistrib;
+import bn.prob.EnumDistrib;
+import bn.prob.GammaDistrib;
 
 import dat.Enumerable;
 
@@ -70,21 +72,17 @@ public class MixDirichletManager {
 	 * @param args
 	 * @throws SAXException 
 	 * @throws ParserConfigurationException 
+	 * @throws IOException 
 	 */
-	public static void main(String[] args) throws ParserConfigurationException, SAXException {
-		Enumerable domain = new Enumerable(5);
-		MixDirichletPrior mixPrior = new MixDirichletPrior(domain, 9);
-		try {
-			MixDirichletManager.save(mixPrior, "data/prior.xml");
-			MixDirichletPrior prior = MixDirichletManager.load(domain, "data/prior.xml");
-			if(prior.equals(mixPrior)) {
-				System.out.println("yes");
-			}
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
+	public static void main(String[] args) throws ParserConfigurationException, SAXException, IOException {
+		Enumerable domain = Enumerable.aacid;
+		MixDirichletPrior prior = MixDirichletManager.load(domain, "data/newPrior.xml");
+		EnumDistrib enumDistrib = new EnumDistrib(domain);
+		double[] prob = new double[domain.size()];
+		Arrays.fill(prob, 0);
+		prior.setEstimatedDistrib(enumDistrib);
+		prior.learn(domain.getValues(), prob);
+		System.out.println(prior.getEstimatedDistrib());
 	}
 
 }
