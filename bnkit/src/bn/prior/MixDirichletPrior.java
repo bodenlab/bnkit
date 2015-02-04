@@ -57,7 +57,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	 */
 	private double probCountVector(double[] alpha) {
 		double result = 0.0;
-		int sumCountVector = 0;
+		double sumCountVector = 0.0;
 		double sumAlpha = 0;
 		if(countVector.length != alpha.length) {
 			throw new RuntimeException("the length of count vector and alpha should be same");
@@ -68,7 +68,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 		}
 		result = GammaDistrib.lgamma(sumCountVector + 1) + GammaDistrib.lgamma(sumAlpha) - GammaDistrib.lgamma(sumCountVector + sumAlpha);
 		for(int i = 0; i < countVector.length; i++) {
-			result = GammaDistrib.lgamma(countVector[i] + alpha[i]) - GammaDistrib.lgamma(countVector[i] + 1) - GammaDistrib.lgamma(alpha[i]);
+			result += GammaDistrib.lgamma(countVector[i] + alpha[i]) - GammaDistrib.lgamma(countVector[i] + 1) - GammaDistrib.lgamma(alpha[i]);
 		}
 		return result;
 	}
@@ -110,7 +110,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 		double[] alphaSums = new double[this.getMixtureSize()];
 		double[] dist = new double[domain.size()];
 		double probSum = 0.0;
-		int countSum = 0;
+		double countSum = 0.0;
 		
 		for(int i = 0; i < domain.size(); i++) {
 			countSum += countVector[i];
@@ -131,7 +131,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 			for(int j = 0; j < this.getMixtureSize();j++) {
 				DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(j);
 				componentProb = prob[j] / probSum;
-				componentProb *= ((this.countVector[j] + dirichlet.getAlpha()[j]) / (countSum + alphaSums[j]));
+				componentProb *= ((this.countVector[i] + dirichlet.getAlpha()[i]) / (countSum + alphaSums[j]));
 				dist[i] += componentProb;
 			}
 		}
