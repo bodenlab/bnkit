@@ -28,6 +28,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	double[] m;
 	private EnumDistrib likelihoodDistrib;
 	private double[] countVector;
+	private double scale;
 	
 	/**
 	 * 
@@ -36,6 +37,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	 */
 	public MixDirichletPrior(Enumerable domain, int component) {
 		super(domain, component);
+		scale = 1.0;
 		alpha = new double[component][domain.size()];
 		m = new double[component];
 		countVector = new double[domain.size()];
@@ -64,11 +66,11 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 		}
 		for(int i = 0; i < countVector.length; i++) {
 			sumCountVector += countVector[i];
-			sumAlpha += alpha[i];
+			sumAlpha += alpha[i] * scale;
 		}
 		result = GammaDistrib.lgamma(sumCountVector + 1) + GammaDistrib.lgamma(sumAlpha) - GammaDistrib.lgamma(sumCountVector + sumAlpha);
 		for(int i = 0; i < countVector.length; i++) {
-			result += GammaDistrib.lgamma(countVector[i] + alpha[i]) - GammaDistrib.lgamma(countVector[i] + 1) - GammaDistrib.lgamma(alpha[i]);
+			result += GammaDistrib.lgamma(countVector[i] + alpha[i] * scale) - GammaDistrib.lgamma(countVector[i] + 1) - GammaDistrib.lgamma(alpha[i] * scale);
 		}
 		return result;
 	}
@@ -122,7 +124,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 			prob[i] = this.getWeights(i) * Math.exp(probCountVector(alpha));
 			probSum += prob[i];
 			for(int j = 0; j < domain.size(); j++) {
-				alphaSums[i] += alpha[j]; 
+				alphaSums[i] += alpha[j] * scale; 
 			}
 		}
 		Arrays.fill(dist, 0);
@@ -131,12 +133,16 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 			for(int j = 0; j < this.getMixtureSize();j++) {
 				DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(j);
 				componentProb = prob[j] / probSum;
-				componentProb *= ((this.countVector[i] + dirichlet.getAlpha()[i]) / (countSum + alphaSums[j]));
+				componentProb *= ((this.countVector[i] + dirichlet.getAlpha()[i] * scale) / (countSum + alphaSums[j]));
 				dist[i] += componentProb;
 			}
 		}
 		likelihoodDistrib.set(dist);
 		return likelihoodDistrib;
+	}
+	
+	public void setAlphaScale(double NewScale) {
+		scale = NewScale;
 	}
 
 	@Override
@@ -146,7 +152,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 			DirichletDistrib dirichlet = (DirichletDistrib)this.getDistrib(i); 
 			dirichlet.setPrior(alpha[i]);
 		}
-
+		Arrays.fill(countVector, 0.0);
 	}
 	/**
 	 * learn parameters mixture Dirichlet distribution from the data

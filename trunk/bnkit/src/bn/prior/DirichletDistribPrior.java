@@ -14,7 +14,7 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
     // currently, Dirichlet is only used as conjudge prior for EnumDistrib
 	private EnumDistrib likelihoodDistrib;
 	private double[] originalAlpha;
-    
+    private double scale;
 	/**
 	 * give the enumerable variable for enum distribution and the alpha
 	 * @param domain enumerable variable
@@ -23,6 +23,7 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 	public DirichletDistribPrior(Enumerable domain, double same_alpha) {
 		super(domain, same_alpha);
 		likelihoodDistrib = null;
+		scale = 1.0;
         originalAlpha = new double[domain.size()];
         for(int i = 0; i < domain.size(); i++) {
         	originalAlpha[i] = same_alpha;
@@ -35,6 +36,7 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 	 */
 	public DirichletDistribPrior(Enumerable domain) {
 		super(domain, 0.0);
+		scale = 1.0;
 		likelihoodDistrib = null;
         originalAlpha = new double[domain.size()];
         for(int i = 0; i < domain.size(); i++) {
@@ -51,6 +53,7 @@ public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 	public DirichletDistribPrior(Enumerable domain, double[] p, double m) {
         super(domain, p, m);
         likelihoodDistrib = null;
+        scale = 1.0;
         originalAlpha = new double[p.length];
         for(int i = 0; i < p.length; i++) {
         	originalAlpha[i] = p[i] * m;

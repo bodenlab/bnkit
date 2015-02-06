@@ -150,6 +150,7 @@ public class MixDirichletDistrib  extends MixtureDistrib implements Serializable
                     	DirichletDistrib dirichlet = (DirichletDistrib)this.getDistrib(i);
                         logprob[i] += (Math.log(this.getWeights(i)) + dirichlet.logLikelihood(data[k]));
                     }
+                    //FIXME some of them would be zero......
                     p.set(EnumDistrib.log2Prob(logprob));
                     Integer index = (Integer)p.sample();
                     bins[index].add(data[k]);
