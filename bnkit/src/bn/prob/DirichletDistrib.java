@@ -404,6 +404,7 @@ public class DirichletDistrib implements Distrib, Serializable {
     public static double[] getAlpha(int[][] counts, double[] prob) {
         if (counts != null) {
             if (counts.length > 0 && counts.length == prob.length) {
+            	//FIXME counts[0] may
                 double[] location = new double[counts[0].length];
                 Arrays.fill(location, 0.001); // to avoid null alpha values
                 double total = 0;

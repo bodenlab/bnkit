@@ -12,6 +12,7 @@ import bn.prob.GammaDistrib;
 import dat.Enumerable;
 
 import javax.xml.parsers.*; 
+import java.util.Random;
 
 /**
  * This is the manager for saving and loading the parameters of Mixture Dirichlet model
@@ -79,10 +80,28 @@ public class MixDirichletManager {
 		MixDirichletPrior prior = MixDirichletManager.load(domain, "data/newPrior.xml");
 		EnumDistrib enumDistrib = new EnumDistrib(domain);
 		double[] prob = new double[domain.size()];
-		Arrays.fill(prob, 0);
-		prior.setEstimatedDistrib(enumDistrib);
-		prior.learn(domain.getValues(), prob);
-		System.out.println(prior.getEstimatedDistrib());
+		Random random = new Random(1);
+		prior.setAlphaScale(1000);
+		for(int i = 0; i < 3; i++) {
+			double sum = 0.0;
+			for(int j = 0; j < domain.size(); j++) {
+				prob[j] = (int)(random.nextDouble() * 100 + 1);
+				sum += prob[j];
+				
+			}
+			prior.setEstimatedDistrib(enumDistrib);
+			prior.learn(domain.getValues(), prob);
+			System.out.print("{");
+			for(int j = 0; j < domain.size(); j++) {
+				System.out.print(prob[j] / sum);
+				System.out.print(",");
+			}
+			System.out.println("}");
+			System.out.println(prior.getEstimatedDistrib());
+			System.out.println("");
+			prior.resetParameters();
+		}
+		
 	}
 
 }
