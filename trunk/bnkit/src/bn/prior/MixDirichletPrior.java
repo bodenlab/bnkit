@@ -31,7 +31,7 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	private double scale;
 	
 	/**
-	 * 
+	 * constructure a mixture Dirichlet Prior given domain and component size
 	 * @param domain enumerable variable for each Dirichlet component
 	 * @param component the number of components in the "mixture"
 	 */
@@ -46,8 +46,31 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
             DirichletDistrib dirichlet = (DirichletDistrib)this.getDistrib(i); 
             System.arraycopy(dirichlet.getAlpha(), 0, alpha[i], 0, domain.size());
             m[i] = this.getWeights(i);
+		}	
+	}
+	
+	/**
+	 * construct a mixture Dirichlet Prior given one single Dirichlet and component number
+	 * each component will be identical to the given Dirichlet distribution
+	 * @param d1
+	 * @param component
+	 */
+	public MixDirichletPrior(DirichletDistrib d1, int component) {
+		super(d1, 1 / (float)component);
+		Enumerable domain = (Enumerable)d1.getDomain();
+		scale = 1.0;
+		m = new double[component];
+		alpha = new double[component][domain.size()];
+		countVector = new double[domain.size()];
+		Arrays.fill(countVector, 0.0);
+		for(int i = 0; i < component; i++) {
+			System.arraycopy(d1.getAlpha(), 0, alpha[i], 0, domain.size());
+			m[i] = 1 / (float)component;
 		}
-		
+		for(int i = 1; i < component; i++) {
+			DirichletDistrib dirichlet = new DirichletDistrib(domain, d1.getAlpha().clone(), 1);
+			this.addDistrib(dirichlet, m[i]);
+		}
 	}
 	
 	/**
@@ -183,6 +206,14 @@ public class MixDirichletPrior extends MixDirichletDistrib implements Prior {
 	 */
     public void learnPrior(Object[] data){
         this.learnPrior(data, new double[] {1});
+    }
+    
+    public static MixDirichletPrior getUniformDistrib(Enumerable domain, int component) {
+    	double[] alpha = new double[domain.size()];
+		Arrays.fill(alpha, 1.0);
+    	DirichletDistrib dirichlet = new DirichletDistrib(domain, alpha, 1);
+    	MixDirichletPrior uniformPrior = new MixDirichletPrior(dirichlet, component);
+    	return uniformPrior;
     }
 
 }

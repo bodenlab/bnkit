@@ -108,14 +108,14 @@ public class MixtureDistrib implements Distrib {
      * @return
      */
     public double addDistrib(Distrib d2, double weight2) {
-    	
+    	/*
         try {
             MixtureDistrib packed = (MixtureDistrib) d2;
             for (Map.Entry<Distrib, Double> entry : packed.mixture.entrySet())
                 addDistribForced(entry.getKey(), entry.getValue() * weight2);
         } catch (ClassCastException e) {
             addDistribForced(d2, weight2);
-        }
+        }*/
     	if(d2 instanceof MixtureDistrib) {
     		MixtureDistrib MD = (MixtureDistrib)d2;
     		int size = MD.getMixtureSize();
