@@ -77,11 +77,13 @@ public class MixDirichletManager {
 	 */
 	public static void main(String[] args) throws ParserConfigurationException, SAXException, IOException {
 		Enumerable domain = Enumerable.aacid;
-		MixDirichletPrior prior = MixDirichletManager.load(domain, "data/newPrior.xml");
+		//MixDirichletPrior prior = MixDirichletManager.load(domain, "data/newPrior.xml");
+		// use uniform prior
+		MixDirichletPrior prior = MixDirichletPrior.getUniformDistrib(domain, 10);
 		EnumDistrib enumDistrib = new EnumDistrib(domain);
 		double[] prob = new double[domain.size()];
 		Random random = new Random(1);
-		prior.setAlphaScale(1000);
+		//prior.setAlphaScale(1000);
 		for(int i = 0; i < 3; i++) {
 			double sum = 0.0;
 			for(int j = 0; j < domain.size(); j++) {
@@ -101,6 +103,7 @@ public class MixDirichletManager {
 			System.out.println("");
 			prior.resetParameters();
 		}
+		
 		
 	}
 
