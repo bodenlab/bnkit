@@ -60,6 +60,7 @@ public class MixtureDistrib implements Distrib {
     	weights = new ArrayList<Double>();
     	density = 0.0;
         mixture = new HashMap<>();
+        /*
         try {
             MixtureDistrib packed = (MixtureDistrib) d1;
             for (Map.Entry<Distrib, Double> entry : packed.mixture.entrySet()) {
@@ -70,16 +71,19 @@ public class MixtureDistrib implements Distrib {
         } catch (ClassCastException e) {
             mixture.put(d1, weight1);
             density = weight1;
-        }
+        }*/
     	if(d1 instanceof MixtureDistrib) {
     		MixtureDistrib MD = (MixtureDistrib)d1;
     		int size = MD.getMixtureSize();
     		for(int i = 0; i < size; i++) {
     			Distrib distrib = MD.getDistrib(i);
-    			addDistribForced(distrib, weight1 * MD.getWeights(i));
+    			double delta = weight1 * MD.getWeights(i);
+    			addDistribForced(distrib, delta);
+    			mixture.put(distrib, delta);
     		}
     	} else {
     		addDistribForced(d1, weight1);
+    		mixture.put(d1, weight1);
     	}
     }
     
