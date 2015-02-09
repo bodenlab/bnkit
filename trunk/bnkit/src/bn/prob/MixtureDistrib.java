@@ -251,6 +251,7 @@ public class MixtureDistrib implements Distrib {
     	}
     	for(int i = 0; i < weights.size(); i++) {
     		weights.set(i, weights.get(i) / sum);
+    		this.mixture.put(distribs.get(i), weights.get(i));
     	}
     }
     
