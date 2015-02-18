@@ -150,27 +150,29 @@ public class AlnReader {
         for (int a = 0; a < aseqs.length; a++) {
             StringBuffer strbuf = seq.get(names[a]);
             if (strbuf != null) {
+                int idx = names[a].indexOf("\\");
+                String id = names[a];
+                if (idx > 0) {
+                    id = names[a].substring(0, idx);
+                }
+                idx = id.indexOf("/");
+                if (idx > 0) {
+                    id = id.substring(0, idx);
+                }
                 String syms = strbuf.toString();
                 List<Character> symlist = new ArrayList<>();
                 for (int index = 0; index < strbuf.length(); index++) {
                     Character sym = strbuf.charAt(index);
                     if (sym == '-')
                         symlist.add(null);
-                    else
+                    else if (alpha.isValid(sym))
                         symlist.add(sym);
+                    else
+                        throw new RuntimeException("Invalid symbol " + sym + " in sequence " + id + " at index " + index);
                 }
                 Character[] symarr = new Character[symlist.size()];
                 symlist.toArray(symarr);
                 // remove the numbering from the name
-                int index = names[a].indexOf("\\");
-                String id = names[a];
-                if (index > 0) {
-                    id = names[a].substring(0, index);
-                }
-                index = id.indexOf("/");
-                if (index > 0) {
-                    id = id.substring(0, index);
-                }
                 aseqs[a] = new EnumSeq.Gappy<>(alpha);
                 aseqs[a].set(symarr);
                 aseqs[a].setName(id);
