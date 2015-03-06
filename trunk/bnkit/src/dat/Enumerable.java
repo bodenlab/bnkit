@@ -112,6 +112,41 @@ public class Enumerable implements Domain {
         return this.values;
     }
 
+    /**
+     * Determine a unique hash key that can be used for encoding a word of enumerables.
+     * @param arr the symbols making up the word
+     * @return the key
+     */
+    public int getKey4Word(Object[] arr) {
+        int sum1 = 0;
+        int multiplier1 = 1;
+        for (int i = 0; i < arr.length; i ++) {
+            int idx = getIndex(arr[i]);
+            sum1 += multiplier1 * idx;
+            multiplier1 *= this.order;
+        }
+        return sum1;
+    }
+
+    /**
+     * Determine a unique hash key that can be used for encoding a word of enumerables, here specified as a substring of an array.
+     * @param arr the symbols making up the word
+     * @param start the start index
+     * @param end the end index
+     * @return the key
+     */
+    public int getKey4Word(Object[] arr, int start, int end) {
+        int sum1 = 0;
+        int multiplier1 = 1;
+        for (int i = start; i < arr.length && i < end; i ++) {
+            int idx = getIndex(arr[i]);
+            sum1 += multiplier1 * idx;
+            multiplier1 *= this.order;
+        }
+        return sum1;
+    }
+
+    
     public static Enumerable bool = new Enumerable(new Boolean[]{true, false});
     public static Enumerable nacid = new Enumerable(new Character[]{'A', 'C', 'G', 'T'});
     public static Enumerable secondaryStructure = new Enumerable(new Character[]{'H', 'C', 'E'});

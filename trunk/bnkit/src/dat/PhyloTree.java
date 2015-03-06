@@ -392,7 +392,7 @@ public class PhyloTree {
                         for (int c = 0;  c < children.size(); c ++) {
                             int best_index = 0;
                             double best_score = Double.POSITIVE_INFINITY;
-                            for (int j = 0; j < cscores.length; j ++) { // loop through each possible child value to score parent value
+                            for (int j = 0; j < cscores[c].length; j ++) { // loop through each possible child value to score parent value
                                 if (cscores[c][j] + (i == j ? 0 : 1) < best_score) {
                                     best_score = cscores[c][j] + (i == j ? 0 : 1);
                                     best_index = j;
@@ -443,11 +443,11 @@ public class PhyloTree {
         root = parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)");
         System.out.println(root);
         try {
-            PhyloTree cyp3 = PhyloTree.loadNewick("/Users/mikael/Desktop/try.newick");
+            PhyloTree cyp3 = PhyloTree.loadNewick("/Users/mikael/simhome/ASR/gap_example.nwk");
             System.out.println(cyp3);
-            Alignment aln = new Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/Desktop/try.aln", Enumerable.aacid));
+            Alignment aln = new Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/gap_example.aln", Enumerable.aacid));
             cyp3.setAlignment(aln);
-            cyp3.setContentByParsimony(aln.getNames(), aln.getGapColumn(1));
+            cyp3.setContentByParsimony(aln.getNames(), aln.getGapColumn(2));
             System.out.println(cyp3.printValues());
         } catch (IOException ex) {
             ex.printStackTrace();
