@@ -46,8 +46,8 @@ import java.util.Set;
  * @author mikael
  */
 public class ASRExample {
-    static String file_tree = "/Users/mikael/simhome/ASR/dp16_example4.nwk";
-    static String file_aln = "/Users/mikael/simhome/ASR/dp16_example4.aln";
+    static String file_tree = "/Users/mikael/simhome/ASR/gap_example.nwk";
+    static String file_aln = "/Users/mikael/simhome/ASR/gap_example.aln";
     
     static PhyloTree tree;
     static List<EnumSeq.Gappy<Enumerable>> seqs;
@@ -83,10 +83,13 @@ public class ASRExample {
             Object[][] asr_matrix = new Object[indexForNodes.size()][aln.getWidth()]; // joint reconstruction for tree
 
             for (int col = 0; col < aln.getWidth(); col ++) {
+                Object[] gaps = aln.getGapColumn(col); // array with true for gap, false for symbol
+                Object[] column = aln.getColumn(col);  // array for symbols, null for gaps
+                tree.setContentByParsimony(names, gaps);
                 PhyloBNet pbn = PhyloBNet.create(tree, new JTT());
                 pbnets[col] = pbn;
 
-                Object[] column = aln.getColumn(col);
+                // set variables according to alignment
                 for (int i = 0; i < labels.size(); i ++) {
                     String shortname = labels.get(i);
                     String longname = mapForNodes.get(shortname);
