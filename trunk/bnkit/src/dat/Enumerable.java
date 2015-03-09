@@ -146,6 +146,36 @@ public class Enumerable implements Domain {
         return sum1;
     }
 
+    /**
+     * Create the word (array of Object) that the specified key encodes.
+     * @param key
+     * @param k length of word
+     * @return the word
+     */
+    public Object[] getWord4Key(int key, int k) {
+        int maxmultip = (int)Math.pow(order, k);
+        int multiplier = maxmultip / order;
+        int remainder = key;
+        Object[] word = new Object[k];
+        for (int i = k - 1; i >= 0; i --) {
+            int idx = remainder / multiplier;
+            word[i] = get(idx);
+            remainder = remainder % multiplier;
+            multiplier /= order;
+        }
+        return word;
+    }
+
+    public static String toString(Object[] word) {
+        StringBuilder sb = new StringBuilder();
+        for (Object sym : word)
+            sb.append(sym.toString());
+        return sb.toString();
+    }
+    public String toString(int key, int k) {
+        Object[] word = getWord4Key(key, k);
+        return Enumerable.toString(word);
+    }
     
     public static Enumerable bool = new Enumerable(new Boolean[]{true, false});
     public static Enumerable nacid = new Enumerable(new Character[]{'A', 'C', 'G', 'T'});
