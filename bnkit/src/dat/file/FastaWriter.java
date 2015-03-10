@@ -91,6 +91,7 @@ public class FastaWriter {
                         writer.newLine();
                     writer.write(str[i].toString());
                 }
+                writer.newLine();
             } catch (IOException e) {
                 throw new IOException("Error in writing sequence "+collection[s]+" (index "+s+")");
             }
