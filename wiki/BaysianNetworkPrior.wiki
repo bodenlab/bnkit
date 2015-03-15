@@ -119,3 +119,9 @@ Each "distrib"  represents the alpha values for each dirichlet distribution comp
     </model>
 <MixtureModels>
 }}}
+
+===Core Idea in [https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/PriorBNode.java PriorBNode]===
+
+How can PriorBNode handle all kinds of Prior. The important idea is in the method "maximizeInstance". If you really look into class PriorBNode, you will find that all other methods are just a "wrapper" for BNode. Let's look into this method. <br />
+
+
