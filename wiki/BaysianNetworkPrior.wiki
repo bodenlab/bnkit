@@ -91,3 +91,13 @@ Simple Example:
     */
     priorNode2.setPrior(new Object[] {true}, sunRiseBetaDistrib);
  }}}
+
+===[https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/MixDirichletManager.java MixDirichletManager]===
+
+MixDirichletManager is used for loading and saving parameters of trained Dirichlet or mixed Dirichlet distribution. It is easy to use. Examples below:
+
+{{{
+      Enumerable domain = Enumerable.aacid;  //create the domain for the Dirichlet model  you want to load
+      MixDirichletPrior prior = MixDirichletManager.load(domain, "path/to/xml/file"); // loaded! it's done.
+      MixDirichletManager.save(piror, "path/to/targeted/file");  // saved!
+}}}
