@@ -104,7 +104,7 @@ MixDirichletManager is used for loading and saving parameters of trained Dirichl
 
 ==XML Structure==
 This is an example xml structure for a mixture Dirichlet model with 2 components
-Each <model> tag represents a component.
+Each "model" tag represents a component.
 weight represents coefficient
 distrib represents the alpha values for each dirichlet distribution 
 {{{
