@@ -124,4 +124,81 @@ Each "distrib"  represents the alpha values for each dirichlet distribution comp
 
 How can PriorBNode handle all kinds of Prior. The important idea is in the method "maximizeInstance". If you really look into class PriorBNode, you will find that all other methods are just a "wrapper" for BNode. Let's look into this method. <br />
 
+In BNode, we have a priorTable, which is a enumTable. It is the same as the "table" in CPT. The priorTable takes the parents' value (or the index) and returns the corresponding "prior". In this way, we can easily get both distribution and prior given parents' value.
 
+In the maximizeInstance, we first calculate the number of combination of parents' value.
+{{{
+         // get the number of condition that this Bnode has
+	List<EnumVariable> parents = getParents();
+	int conditionNum = 1;
+	if(!isRoot()) {
+		for(EnumVariable parent: parents) {
+			conditionNum *= parent.getDomain().size();
+		}
+	}
+}}}
+
+In the next step, let's go through each parents' value index and for each value, we do the same thing.
+
+For each parents' value, we have
+
+{{{
+       // i is the index
+       int index = i;
+       if(isRoot()) {
+	      index = -1;
+	}
+	// get condition data
+	List<Sample> samples = this.getConditionDataset(index);
+	// convert the format
+	Object[] data = new Object[samples.size()];
+	double[] prob = new double[samples.size()];
+	int count = 0;
+	for(Sample sample: samples) {
+		data[count] = sample.instance;
+		prob[count] = sample.prob;
+		count ++;
+	}
+}}} 
+
+We just get the training data for this condition.
+
+Further, we get prior for this condition.
+
+{{{
+        // get corresponding prior
+	Prior prior = null;
+	if(isRoot()) {
+		prior = this.rootPrior;
+	} else {
+		prior = PriorTable.getValue(i);
+	}
+	// if there is no prior for that condition, we use
+	// user-defined uniform prior
+	if(prior == null) {
+		prior = uniformPrior;
+		if(prior == null) {
+			throw new RuntimeException("cannot find any unifor Prior for this node");
+		}
+	}
+}}}
+
+In the PriorBNode, we can set prior for specific condition, or set a global prior which is useful when no prior is set.
+
+Finally, we feed the data we get in the previous step into the prior
+
+{{{
+       // prior start to learn from data
+	prior.setEstimatedDistrib(getlikelihoodDistrib());
+	prior.learn(data, prob);
+	if(!isRoot()) {
+		put(i,prior.getEstimatedDistrib());
+	} else {
+		put(prior.getEstimatedDistrib());
+	}
+	// reset parameters
+	prior.resetParameters();
+}}}
+
+In this way, we have all our nodes trained with prior.
+ 
