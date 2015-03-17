@@ -10,6 +10,10 @@ import bn.prob.GaussianDistrib;
  * Gamma distribution is used as prior of Gaussian distribution
  * here, Gamma distribution is described as parameters "shape" k and 
  * parameters scale Lambda.
+ * 
+ * Gamma prior is useful for likelihood of Guassian distribution with 
+ * unknown variance. All Prior uses the same interface so please @see bn.example.prior for
+ * more information
  * @author wangyufei
  *
  */
