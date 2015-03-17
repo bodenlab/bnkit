@@ -31,31 +31,38 @@ In prior, we should implement all method. Prior example [https://code.google.com
 can be found in bn.prior.
 
 {{{
-    /**
-      * distribution can learn from the data and change its own parameters this is a process from prior to posterior.
-     * each Object is a training point, and their weight (or count) stored in prob array.
-     */
-     public void learn(Object[] data, double[] prob);
+	/**
+	 * distribution can learn from the data
+	 * and change its own parameters
+	 * this is a process from prior to posterior
+	 * @param data
+	 */
+	public void learn(Object[] data, double[] prob);
 	
-     /**
-      * set likelihood distribution (get from the method getlikelihoodDistrib in BNode)
-      */
-     public void setLikelihoodDistrib(Distrib distrib);
+	/**
+	 * set likelihood distribution
+	 * @param distrib
+	 */
+	public void setEstimatedDistrib(Distrib distrib);
 	
-     /**
-       * get the MAP result distribution
-      */
-     public Distrib getBayesDistrib();
+	/**
+	 * get the MAP result distribution
+	 * @return
+	 */
+	public Distrib getEstimatedDistrib();
 	
-     /**
-       * reset the parameters to the initial value used in EM
-      */
-     public void resetParameters();
-     /**
-       * This is the interface to learn prior parameters
-       * from raw dataset
-       */
-     public void learnPrior(Object[] data, double[] prob);
+	/**
+	 * reset the parameters to the initial value
+	 * used in EM
+	 */
+	public void resetParameters();
+	/**
+	 * This is the interface to learn prior parameters
+	 * from raw dataset
+	 * @param data raw data
+	 * @param prob count for that data
+	 */
+	public void learnPrior(Object[] data, double[] prob);
 }}}
 
 ===[https://code.google.com/p/bnkit/source/browse/trunk/bnkit/src/bn/prior/PriorBNode.java PriorBode]===
