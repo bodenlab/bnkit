@@ -9,6 +9,14 @@ import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
 import dat.Enumerable;
 
+/**
+ * Dirichlet distribution prior is useful for likelihood of Enum distribution.
+ * All Prior uses the same interface so please @see bn.example.prior for
+ * more information
+ * @author wangyufei
+ *
+ */
+
 public class DirichletDistribPrior extends DirichletDistrib implements Prior {
 	
     // currently, Dirichlet is only used as conjudge prior for EnumDistrib

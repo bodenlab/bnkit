@@ -1,6 +1,7 @@
 package bn.prior;
 
 import java.io.Serializable;
+
 import java.util.Arrays;
 import java.util.Random;
 
@@ -9,6 +10,14 @@ import dat.Enumerable;
 import bn.Distrib;
 import bn.prob.EnumDistrib;
 import bn.prob.GaussianDistrib;
+
+/**
+ * This is Guassian Prior, which is useful for likelihood of Guassian distribution with 
+ * unknown mean. All Prior uses the same interface so please @see bn.example.prior for
+ * more information
+ * @author wangyufei
+ *
+ */
 
 public class GaussianDistribPrior extends GaussianDistrib implements Prior {
     
