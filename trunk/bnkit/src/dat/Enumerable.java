@@ -159,6 +159,8 @@ public class Enumerable implements Domain {
         Object[] word = new Object[k];
         for (int i = k - 1; i >= 0; i --) {
             int idx = remainder / multiplier;
+            if (idx < 0 || idx >= order)
+                throw new RuntimeException("Index invalid: " + key);
             word[i] = get(idx);
             remainder = remainder % multiplier;
             multiplier /= order;
