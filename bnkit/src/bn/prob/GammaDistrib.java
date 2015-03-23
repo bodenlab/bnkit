@@ -24,8 +24,8 @@ public class GammaDistrib implements Distrib, Serializable {
     private static final double C_LIMIT = 49;
     private static final double S_LIMIT = 1e-5;
 
-    private double lambda;
-    private double k;
+    private double lambda; // same as 1 / beta; see http://en.wikipedia.org/wiki/Gamma_distribution
+    private double k; // alpha = k
     private Random rand = new Random();
     
     /**
@@ -139,6 +139,97 @@ public class GammaDistrib implements Distrib, Serializable {
     	lambda = _lambda;
     }
 
+    public double getAlpha() {
+        return k;
+    }
+    
+    public double getBeta() {
+        return 1.0 / lambda;
+    }
+    
+    public void setBeta(double beta) {
+        lambda = 1.0 / beta;
+    }
+    
+    public void setAlpha(double alpha) {
+        k = alpha;
+    }
+    
+    /**
+     * The log likelihood of the data X given the gamma distribution.
+     * Based on Thomas Minka "Estimating a Gamma distribution" 2002.
+     * http://research.microsoft.com/en-us/um/people/minka/papers/minka-gamma.pdf
+     * @param X data
+     * @return the log likelihood of the data; log p(X|alpha, beta)
+     */
+    public double logLikelihood(double[] X) {
+        double a = getAlpha();
+        double b = getBeta();
+        int n = X.length;
+        double x_mean = 0;
+        double log_x_mean = 0;
+        for (double xi : X) {
+            x_mean += xi;
+            log_x_mean += Math.log(xi);
+        }
+        x_mean /= n;
+        log_x_mean /= n;
+        return n * (a - 1.0) * log_x_mean - n * lgamma(a) - n * a * Math.log(b) - n * x_mean / b;
+    }
+    
+    /**
+     * Estimate the parameters of a gamma distribution from data.
+     * Specifically the implementation estimates alpha, and beta is given by
+     * beta = mean(x) / alpha.
+     * It uses a fast approximation based on Thomas Minka "Estimating a Gamma distribution" 2002.
+     * http://research.microsoft.com/en-us/um/people/minka/papers/minka-gamma.pdf
+     * @param X data
+     * @return alpha parameter (same as lambda here)
+     */
+    public static double getAlpha(double[] X) {
+        double delta = 1;
+        int n = X.length;
+        double x_mean = 0;
+        double log_x_mean = 0;
+        for (double xi : X) {
+            x_mean += xi;
+            log_x_mean += Math.log(xi);
+        }
+        x_mean /= n;
+        log_x_mean /= n;
+        double a = 0.5 / (Math.log(x_mean) - log_x_mean); // good starting point (see Minka 2002)
+        double a_inv = 1.0 / a;
+        for (int r = 0; r < 10; r ++) { // max 10 iterations, should converge in ~4
+            double numerator = log_x_mean - Math.log(x_mean) + Math.log(a) - digamma(a);
+            double denominator = a * a * (1.0 / a - trigamma(a));
+            double next_inv = a_inv + numerator / denominator;
+            double next_a = 1.0 / next_inv;
+            delta = Math.abs(next_a - a);
+            a = next_a;
+            if (delta < .01) {
+                //System.out.println("Converged after " + (r + 1) + " rounds");
+                break;
+            }
+        }
+        return a;
+    }
+    
+    /**
+     * Get beta that maximises likelihood as computed for a specified alpha.
+     * @param X data
+     * @param alpha
+     * @return beta
+     */
+    public static double getBeta(double[] X, double alpha) {
+        int n = X.length;
+        double x_mean = 0;
+        for (double xi : X) {
+            x_mean += xi;
+        }
+        x_mean /= n;
+        return x_mean / alpha;
+    }
+    
     /*
     The following two methods: digamma and trigamma are ...
 
@@ -220,13 +311,30 @@ public class GammaDistrib implements Distrib, Serializable {
     }
     
     public static void main(String[] args) {
-        double[] x = {0, Double.MIN_VALUE, 1e-200, 1e-100, 1e-10, 0.00001, 0.1, 1.0, 100, 10000, 1e8, 1e10, 1e100, 1e200, Double.MAX_VALUE, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
-        for (double xx : x) {
-            System.out.println("Gamma(" + xx + ") = " + gamma(xx));
-            System.out.println("\tLog Gamma(" + xx + ") = " + lgamma(xx));
-            System.out.println("\tDi Gamma(" + xx + ") = " + digamma(xx));
-            System.out.println("\tTri Gamma(" + xx + ") = " + trigamma(xx));
+        double[] X = {11.1, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9};
+        double alpha = GammaDistrib.getAlpha(X);
+        double beta = GammaDistrib.getBeta(X, alpha);
+        System.out.println("Setting Gamma distrib with alpha = " + alpha + " beta = " + beta);
+        GammaDistrib gd = new GammaDistrib(alpha, 1/beta);
+        double mean = 0.0;
+        System.out.println("Sample");
+        int N = 20;
+        for (int i = 0; i < N; i ++) {
+            double y = gd.sample();
+            mean += y;
+            System.out.println(i + "\t" + y);
         }
+        System.out.println("Mean\t" + mean / N);
+        
+        
+        
+//        double[] x = {0, Double.MIN_VALUE, 1e-200, 1e-100, 1e-10, 0.00001, 0.1, 1.0, 100, 10000, 1e8, 1e10, 1e100, 1e200, Double.MAX_VALUE, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
+//        for (double xx : x) {
+//            System.out.println("Gamma(" + xx + ") = " + gamma(xx));
+//            System.out.println("\tLog Gamma(" + xx + ") = " + lgamma(xx));
+//            System.out.println("\tDi Gamma(" + xx + ") = " + digamma(xx));
+//            System.out.println("\tTri Gamma(" + xx + ") = " + trigamma(xx));
+//        }
     }
 
 }
