@@ -99,6 +99,54 @@ public class PhyloBNet {
         return internal;
     }
 
+    /**
+     * Get the rate of change as determined from instantiated nodes.
+     * @return rate of change relative evolutionary time
+     */
+    public double getRate() {
+        double rate = 0;
+        int nBranches = 0;
+        for (BNode node : bn.getNodes()) {
+            // only consider leaf nodes
+            if (!bn.hasChildren(node)) {
+                int nChanges = 0; // no of different instantiations 
+                double cumTime = 0; // cumulative time according to nodes
+                SubstNode snode = null;
+                Object prev = node.getInstance();
+                try {
+                    snode = (SubstNode)node;
+                } catch (ClassCastException e) {
+                    System.err.println("Not supported node type for PhyloBNet, whole branch ignored");
+                }
+                do {
+                    try {
+                        Object inst = snode.getInstance();
+                        if (inst != prev && inst != null) {
+                            prev = snode.getInstance();
+                            nChanges ++;
+                        }
+                        cumTime += snode.getTime();
+                        Set<BNode> parents = bn.getParents(snode);
+                        if (parents == null)
+                            break;
+                        if (parents.isEmpty())
+                            break;
+                        for (BNode parent : parents) // there can only be one parent
+                            snode = (SubstNode)parent;
+                    } catch (ClassCastException e) {
+                        System.err.println("Not supported node type for PhyloBNet, whole branch ignored");
+                    }
+                } while (snode != null);
+                rate += (nChanges + 0.00001) / cumTime;
+                nBranches ++;
+            }
+        }
+        if (nBranches > 0)
+            return rate / nBranches;
+        else
+            return 0;
+    }
+    
     private static String replacePunct(String str) {
         return str.replace('.', '_');
     }

@@ -27,6 +27,7 @@ import bn.ctmc.matrix.JTT;
 import bn.factor.Factorize;
 import bn.file.BNBuf;
 import bn.prob.EnumDistrib;
+import bn.prob.GammaDistrib;
 import dat.EnumSeq;
 import dat.EnumVariable;
 import dat.Enumerable;
@@ -106,6 +107,7 @@ public class ASRExample {
             BNode root = null;
             String asr_root = null;
             
+            double[] R = new double[aln.getWidth()];
             for (int col = 0; col < aln.getWidth(); col ++) {
                 PhyloBNet pbn = pbnets[col];
                 BNet bn = pbn.getBN();
@@ -134,6 +136,7 @@ public class ASRExample {
                     BNode node = bn.getNode(asr_var);
                     node.setInstance(asr_val);
                 }
+                R[col] = pbn.getRate();
 //                BNBuf.save(pbn.getBN(), "/Users/mikael/test.xml");
             }
             
@@ -162,11 +165,25 @@ public class ASRExample {
             for (int j = 0; j < Enumerable.aacid.size(); j ++) {
                 System.out.print(Enumerable.aacid.get(j) + "    ");
             }
-            System.out.println();
+            System.out.println("Rate from joint reconstructions");
             for (int col = 0; col < aln.getWidth(); col ++) {
-                System.out.println(margin_distribs[col] + "\t" + asr_root.charAt(col));
+                System.out.println(margin_distribs[col] + "\t" + asr_root.charAt(col) + "\t" + R[col]);
             }            
-            
+            double alpha = GammaDistrib.getAlpha(R);
+            double beta = 1 / alpha;
+            System.out.println("Gamma alpha = " + alpha + " beta = " + beta);
+            GammaDistrib gd = new GammaDistrib(alpha, 1/beta);
+            double mean = 0.0;
+            System.out.println("Sample (showing only first 10)");
+            int N = 1000;
+            for (int i = 0; i < N; i ++) {
+                double y = gd.sample();
+                mean += y;
+                if (i < 10)
+                    System.out.println(i + "\t" + y);
+            }
+            System.out.println("Mean\t" + mean / N + " in the limit it should be 1.0");
+
         } catch (IOException ex) {
             ex.printStackTrace();
 
