@@ -47,7 +47,7 @@ public class SubstNode implements BNode, TiedNode {
     private SubstModel model;
     private final Object[] values;
     
-    private double time = 1.0;
+    private double time = 0.0;
     private Object instance = null;
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
 

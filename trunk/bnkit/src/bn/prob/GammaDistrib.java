@@ -311,18 +311,19 @@ public class GammaDistrib implements Distrib, Serializable {
     }
     
     public static void main(String[] args) {
-        double[] X = {11.1, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9};
+        double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5};
         double alpha = GammaDistrib.getAlpha(X);
         double beta = GammaDistrib.getBeta(X, alpha);
+        //double beta = 1 / alpha; // force mean to be 1
         System.out.println("Setting Gamma distrib with alpha = " + alpha + " beta = " + beta);
         GammaDistrib gd = new GammaDistrib(alpha, 1/beta);
         double mean = 0.0;
         System.out.println("Sample");
-        int N = 20;
+        int N = 2000;
         for (int i = 0; i < N; i ++) {
             double y = gd.sample();
             mean += y;
-            System.out.println(i + "\t" + y);
+            //System.out.println(i + "\t" + y);
         }
         System.out.println("Mean\t" + mean / N);
         
