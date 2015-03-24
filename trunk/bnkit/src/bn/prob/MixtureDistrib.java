@@ -211,7 +211,7 @@ public class MixtureDistrib implements Distrib {
     }
     
     /**
-     * get wights given distribution
+     * get weights given distribution
      * @param distrib
      * @return
      */
