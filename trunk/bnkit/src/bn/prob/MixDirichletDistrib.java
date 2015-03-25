@@ -12,6 +12,8 @@ import java.util.Random;
 import dat.Enumerable;
 
 import bn.Distrib;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 
 /**
  * Mixture Dirichlet distribution is weighted sum of different Dirichlet
@@ -57,7 +59,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         super();
         Random rand = new Random(System.currentTimeMillis());
         for (int i = 0; i < ComponentNum; i++) {
-            super.addDistrib(new DirichletDistrib(EnumDistrib.random(domain, rand.nextInt()), 10), rand.nextDouble());
+            super.addDistrib(new DirichletDistrib(EnumDistrib.random(domain, rand.nextInt()), rand.nextInt(90) + 10), rand.nextDouble());
         }
         this.domain = domain;
     }
@@ -105,12 +107,12 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         for (int i = 0; i < logprob.length; i++) {
             logprob[i] = ((DirichletDistrib) distribs.get(i)).logLikelihood(data);
             double p_i = Math.exp(logprob[i]);
+            logprob[i] = (Math.log(m[i]) + logprob[i]);
             prob[i] = (m[i] * p_i);
-            if (i > 0 && prob[i] > prob[best])
+            if (i > 0 && logprob[i] > logprob[best])
                 best = i;
         }
-        int bin = best;
-        return bin;
+        return best;
     }
     
     /**
@@ -171,13 +173,14 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
             }
 
             // try to put each data points into different bins
+            //this.getNormalized();
             double[] m = this.getAllWeights();
             for (int k = 0; k < dataSize; k++) {
                 try {
                     double[] logprob = new double[nbins];
                     for (int i = 0; i < nbins; i++) {
                         DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
-                        logprob[i] += (Math.log(m[i]) + dirichlet.logLikelihood(data[k]));
+                        logprob[i] = (Math.log(m[i]) + dirichlet.logLikelihood(data[k]));
                     }
                     //FIXME some of them would be zero......
                     p.set(EnumDistrib.log2Prob(logprob));
@@ -185,12 +188,13 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
                     bins[index].add(data[k]);
                 } catch (RuntimeException ex0) {
                     System.err.println("Problem with data point k = " + k);
+                    throw new RuntimeException("Problem with data point k = " + k);
                 }
             }
             /*
              Divide the points in the largest bin and place half in the empty bin... (yes, we assume only 1 empty bin)
              What about if there are more than 2 empty bins? We could divide the largest bin multiple times
-             or recursively go through the bins and pick the largest and divide until all bins have values?
+             or recursively go through the bins and pick the largest and divide until all bins have values1?
              This may require further work.
              */
             int largestIndex = 0;
@@ -202,7 +206,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
                     largestIndex = i;
                 }
                 if (bins[i].size() == 0) {
-//                    System.out.println("Empty Bin : " + i);
+                    System.err.println("Empty Bin : " + i);
                     emptyIndex = i;
                 }
             }
@@ -235,7 +239,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
             if (dl_cur < dl_best) {
                 dl_best = dl_cur;
                 m_best.set(this.getAllWeights());
-                // also save mixing weights and alpha values
+                // also save mixing weights and alpha values1
                 for (int i = 0; i < nbins; i++) {
                     DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
                     System.arraycopy(dirichlet.getAlpha(), 0, alpha_best[i], 0, nseg);
@@ -254,24 +258,47 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         }
     }
 
+    public static double getEntropy(double[] p) {
+        double log_base = Math.log(p.length);
+        double ent = 0;
+        for (int i = 0; i < p.length; i ++) { 
+            double p_i = p[i] + 0.0001;
+            ent -= p_i * (Math.log(p_i) / log_base);
+        }
+        return ent;
+    }
+    
     public static void main(String[] args) {
-        String filename = "/Users/mikael/simhome/Fantom5/suzy_all.csv";
+        String filename1 = "/Users/mikael/simhome/Fantom5/suzy_all.csv";
+        String filename2 = "/Users/mikael/simhome/Fantom5/suzy_corr.csv";
         if (args.length > 0)
-            filename = args[0];
+            filename1 = args[0];
         // this CAGE tag, expresses in condition?
-        Object[][] matrix = loadObjects(filename);
-        int[][] values = new int[matrix.length][];
-        for (int i = 0; i < matrix.length; i ++) {
-            values[i] = new int[matrix[i].length - 1];
-            for (int j = 0; j < matrix[i].length - 1; j ++) {
+        Object[][] matrix1 = loadObjects(filename1);
+        int[][] values1 = new int[matrix1.length][];
+        for (int i = 0; i < matrix1.length; i ++) {
+            values1[i] = new int[matrix1[i].length - 1];
+            for (int j = 0; j < matrix1[i].length - 1; j ++) {
                 try {
-                    values[i][j] = (Integer)matrix[i][j + 1];
+                    values1[i][j] = (Integer)matrix1[i][j + 1];
                 } catch (ClassCastException e) {
-                    System.err.println("Invalid integer: " + matrix[i][j + 1]);
+                    System.err.println("Invalid integer: " + matrix1[i][j + 1]);
                 }
             }
         }
-        Enumerable domain = new Enumerable(matrix[0].length - 1);
+        Object[][] matrix2 = loadObjects(filename2);
+        int[][] values2 = new int[matrix2.length][];
+        for (int i = 0; i < matrix2.length; i ++) {
+            values2[i] = new int[matrix2[i].length - 1];
+            for (int j = 0; j < matrix2[i].length - 1; j ++) {
+                try {
+                    values2[i][j] = (Integer)matrix2[i][j + 1];
+                } catch (ClassCastException e) {
+                    System.err.println("Invalid integer: " + matrix2[i][j + 1]);
+                }
+            }
+        }
+        Enumerable domain = new Enumerable(values1[0].length);
         /*
          MixDirichletDistrib dis = new MixDirichletDistrib(domain, 9);
          System.out.println(dis.toString());
@@ -283,13 +310,69 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
          data[i][j] = (int) (enumDistrib.get(j) * 30);
          }
          }*/
-
+        int MAX_CLUSTER = 20;
+        int[][] labels = new int[values2.length][MAX_CLUSTER - 1];
+        for (int ncluster = 2; ncluster <= MAX_CLUSTER; ncluster ++) {
+            MixDirichletDistrib dis = new MixDirichletDistrib(domain, ncluster);
+            dis.learnParameters(values1);
+            System.out.println("Done training with " + ncluster + " clusters");
+            String prevgene = "";
+            int[] cnt4gene = new int[ncluster]; // counts for a gene
+            int tot4gene = 0; // total for a gene
+            int[] cnt4all = new int[ncluster]; // counts for a gene
+            int tot4all = 0; // total for a gene
+            int total = 0; // total number of genes
+            double entropy = 0;
+            for (int k = 0; k < values2.length; k ++) {
+                int currcluster = dis.getLabel(values2[k]);
+                labels[k][ncluster - 2] = currcluster;
+                cnt4gene[currcluster] ++;
+                cnt4all[currcluster] ++;
+                tot4gene ++;
+                tot4all ++;
+                String genename = (String)matrix2[k][0];
+                if ((!prevgene.equals(genename) || k == values2.length - 1) && k != 0) { // new gene or last tag, determine the entropy of the previous gene
+                    double[] p = new double[ncluster];
+                    for (int i = 0; i < ncluster; i ++) {
+                        p[i] = cnt4gene[i] / (double)tot4gene;
+                        cnt4gene[i] = 0;
+                    }
+                    tot4gene = 0;
+                    entropy += getEntropy(p);
+                    total ++; 
+                }
+            }
+            System.out.println("Average per-gene entropy is " + entropy / (double)total);
+            double[] p = new double[ncluster];
+            for (int i = 0; i < ncluster; i ++) {
+                System.out.print(cnt4all[i] + "\t");
+                p[i] = cnt4all[i] / (double)tot4all;
+            }
+            System.out.println();
+            System.out.println("Overall entropy is " + getEntropy(p));
+            
+            try {
+                BufferedWriter bw = new BufferedWriter(new FileWriter(filename2 + ".out"));
+                for (int k = 0; k < labels.length; k ++) {
+                    bw.write(matrix2[k][0] + "\t");
+                    for (int j = 0; j < labels[k].length; j ++)
+                        bw.write(labels[k][j] + "\t");
+                    bw.newLine();
+                }
+                bw.close();
+            } catch (IOException ex) {
+                System.err.println("Error writing results");
+            }
+        }
+        
+        /*
         MixDirichletDistrib dis2 = new MixDirichletDistrib(domain, 9);
         dis2.getNormalized();
         System.out.println(dis2.toXMLString());
-        dis2.learnParameters(values);
+        dis2.learnParameters(values1);
         System.out.println(dis2.toString());
         System.out.println(dis2.toXMLString());
+                */
     }
 
     
