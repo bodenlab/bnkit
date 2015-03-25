@@ -204,9 +204,13 @@ public class MixtureDistrib implements Distrib {
      */
     public double[] getAllWeights() {
     	double[] weight = new double[weights.size()];
-    	for(int i = 0; i < weights.size(); i++) {
-    		weight[i] = weights.get(i).doubleValue();
+        double sum = 0;
+    	for (int i = 0; i < weights.size(); i++) {
+            weight[i] = weights.get(i).doubleValue();
+            sum += weight[i];
     	}
+        for (int i = 0; i < weight.length; i ++)
+            weight[i] /= sum;
     	return weight;
     }
     
