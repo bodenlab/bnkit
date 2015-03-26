@@ -310,12 +310,12 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
          data[i][j] = (int) (enumDistrib.get(j) * 30);
          }
          }*/
-        int MAX_CLUSTER = 20;
+        int MAX_CLUSTER = 30;
         int[][] labels = new int[values2.length][MAX_CLUSTER - 1];
         for (int ncluster = 2; ncluster <= MAX_CLUSTER; ncluster ++) {
             MixDirichletDistrib dis = new MixDirichletDistrib(domain, ncluster);
             dis.learnParameters(values1);
-            System.out.println("Done training with " + ncluster + " clusters");
+            System.out.println("\nDone training with " + ncluster + " clusters");
             String prevgene = "";
             int[] cnt4gene = new int[ncluster]; // counts for a gene
             int tot4gene = 0; // total for a gene
@@ -340,29 +340,31 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
                     tot4gene = 0;
                     entropy += getEntropy(p);
                     total ++; 
+                    prevgene = genename;
                 }
             }
             System.out.println("Average per-gene entropy is " + entropy / (double)total);
             double[] p = new double[ncluster];
             for (int i = 0; i < ncluster; i ++) {
-                System.out.print(cnt4all[i] + "\t");
                 p[i] = cnt4all[i] / (double)tot4all;
             }
-            System.out.println();
             System.out.println("Overall entropy is " + getEntropy(p));
-            
-            try {
-                BufferedWriter bw = new BufferedWriter(new FileWriter(filename2 + ".out"));
-                for (int k = 0; k < labels.length; k ++) {
-                    bw.write(matrix2[k][0] + "\t");
-                    for (int j = 0; j < labels[k].length; j ++)
-                        bw.write(labels[k][j] + "\t");
-                    bw.newLine();
-                }
-                bw.close();
-            } catch (IOException ex) {
-                System.err.println("Error writing results");
+            for (int i = 0; i < ncluster; i ++) {
+                System.out.println(i + "\t" + cnt4all[i] + "\t" + dis.getDistrib(i));
+                
             }
+        }
+        try {
+            BufferedWriter bw = new BufferedWriter(new FileWriter(filename2 + ".out"));
+            for (int k = 0; k < labels.length; k ++) {
+                bw.write(matrix2[k][0] + "\t");
+                for (int j = 0; j < labels[k].length; j ++)
+                    bw.write(labels[k][j] + "\t");
+                bw.newLine();
+            }
+            bw.close();
+        } catch (IOException ex) {
+            System.err.println("Error writing results");
         }
         
         /*
