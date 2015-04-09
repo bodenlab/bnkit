@@ -269,8 +269,9 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
     }
     
     public static void main(String[] args) {
-        String filename1 = "/Users/mikael/simhome/Fantom5/suzy_all.csv";
-        String filename2 = "/Users/mikael/simhome/Fantom5/suzy_corr.csv";
+        String filename1 = "/Users/mikael/simhome/Fantom5/suzy_alltags.csv";
+        String filename2 = "/Users/mikael/simhome/Fantom5/suzy_alltags.csv";
+        //String filename2 = "/Users/mikael/simhome/Fantom5/suzy_corr.csv";
         if (args.length > 0)
             filename1 = args[0];
         // this CAGE tag, expresses in condition?
@@ -310,7 +311,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
          data[i][j] = (int) (enumDistrib.get(j) * 30);
          }
          }*/
-        int MAX_CLUSTER = 30;
+        int MAX_CLUSTER = 20;
         int[][] labels = new int[values2.length][MAX_CLUSTER - 1];
         for (int ncluster = 2; ncluster <= MAX_CLUSTER; ncluster ++) {
             MixDirichletDistrib dis = new MixDirichletDistrib(domain, ncluster);
@@ -353,6 +354,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
                 System.out.println(i + "\t" + cnt4all[i] + "\t" + dis.getDistrib(i));
                 
             }
+            dis.toXMLString();
         }
         try {
             BufferedWriter bw = new BufferedWriter(new FileWriter(filename2 + ".out"));

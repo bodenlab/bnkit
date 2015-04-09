@@ -47,12 +47,18 @@ import java.util.Set;
  * @author mikael
  */
 public class ASRExample {
-    static String file_tree = "/Users/mikael/simhome/ASR/gap_example.nwk";
-    static String file_aln = "/Users/mikael/simhome/ASR/gap_example.aln";
+    static String file_tree = "/Users/mikael/simhome/ASR/CYP2/CYP2F.nwk";
+    static String file_aln = "/Users/mikael/simhome/ASR/CYP2/CYP2F.aln";
     
     static PhyloTree tree;
     static List<EnumSeq.Gappy<Enumerable>> seqs;
     static EnumSeq.Alignment<Enumerable> aln;
+    
+    static double sampled_rate = // sampled rate, copy from a previous 1.0-rate run
+	0.15599004226404184;
+    
+
+    static boolean use_sampled_rate = false;
     
     public static void main(String[] args) {
         try {
@@ -87,7 +93,11 @@ public class ASRExample {
                 Object[] gaps = aln.getGapColumn(col); // array with true for gap, false for symbol
                 Object[] column = aln.getColumn(col);  // array for symbols, null for gaps
                 tree.setContentByParsimony(names, gaps);
-                PhyloBNet pbn = PhyloBNet.create(tree, new JTT());
+                PhyloBNet pbn;
+                if (use_sampled_rate)
+                    pbn = PhyloBNet.create(tree, new JTT(), sampled_rate);
+                else
+                    pbn = PhyloBNet.create(tree, new JTT());
                 pbnets[col] = pbn;
 
                 // set variables according to alignment
@@ -177,10 +187,10 @@ public class ASRExample {
             System.out.println("Sample (showing only first 10)");
             int N = 1000;
             for (int i = 0; i < N; i ++) {
-                double y = gd.sample();
-                mean += y;
+                double rate = gd.sample();
+                mean += rate;
                 if (i < 10)
-                    System.out.println(i + "\t" + y);
+                    System.out.println(i + "\t" + rate);
             }
             System.out.println("Mean\t" + mean / N + " in the limit it should be 1.0");
 

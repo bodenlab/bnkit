@@ -95,6 +95,18 @@ public class Enumerable implements Domain {
         }
     }
 
+    /**
+     * Retrieve the index for each of the symbols in the array
+     * @param value_array array of symbols
+     * @return array of indices
+     */
+    public int[] getIndices(Object[] value_array) {
+        int[] idx = new int[value_array.length];
+        for (int i = 0; i < value_array.length; i ++) 
+            idx[i] = getIndex(value_array[i]);
+        return idx;
+    }
+    
     public Object get(int index) {
         return values[index];
     }
