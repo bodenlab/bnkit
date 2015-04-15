@@ -10,8 +10,8 @@ import java.util.logging.Logger;
 import java.util.Random;
 
 import dat.Enumerable;
-
 import bn.Distrib;
+
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 
@@ -37,6 +37,10 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
      */
     private final int NO_UPDATE = 10;
     private Enumerable domain;
+    private double components;
+    private double letters;
+    private double DL_best;
+    private EnumDistrib m_best;
 
     /**
      * Construct a mixture Dirichlet model from a single component
@@ -62,6 +66,8 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
             super.addDistrib(new DirichletDistrib(EnumDistrib.random(domain, rand.nextInt()), rand.nextInt(90) + 10), rand.nextDouble());
         }
         this.domain = domain;
+        this.components = ComponentNum;
+        this.letters = (double)domain.size();
     }
 
     /**
@@ -94,7 +100,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
     }
 
     /**
-     * Determine the most likely label (index of distribution) to explains the data.
+     * Determine the most likely label (index of distribution) to explain the data.
      * 
      * @param data
      * @return index to Dirichlet distribution
@@ -166,6 +172,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
 
         int no_update = 0;
         // start iteration
+        likeLoop:
         for (int round = 0; round < ROUND_LIMITATION && no_update < NO_UPDATE; round++) {
             // start with empty bins
             for (int i = 0; i < nbins; i++) {
@@ -230,13 +237,23 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
                     counts[j] = (int[]) bins[i].get(j);
                 }
                 DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
-                dirichlet.setPrior(DirichletDistrib.getAlpha(counts));
+                
+                try {
+                	dirichlet.setPrior(DirichletDistrib.getAlpha(counts));
+                } catch (NullPointerException e) {
+                	System.out.println(i);
+//                	break mainloop;
+                	break likeLoop;
+                }
+                
+//                dirichlet.setPrior(DirichletDistrib.getAlpha(counts));
             }
             this.getNormalized();
 
             double dl_cur = DL(data);
-//            System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
+            System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
             if (dl_cur < dl_best) {
+            	setDLBest(dl_cur);
                 dl_best = dl_cur;
                 m_best.set(this.getAllWeights());
                 // also save mixing weights and alpha values1
@@ -252,12 +269,29 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
 
         // set the best data back
         this.setWeights(m_best.get());
+        
         for (int i = 0; i < nbins; i++) {
             DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
             dirichlet.setPrior(alpha_best[i]);
         }
     }
-
+    
+    public void setDLBest(double dl_best) {
+    	this.DL_best = dl_best;
+    }
+    
+    public double getDLBest() {
+    	return this.DL_best;
+    }
+    
+    public void setMBest(EnumDistrib m_best) {
+    	this.m_best = m_best;
+    }
+    
+    public EnumDistrib getMBest() {
+    	return this.m_best;
+    }
+    
     public static double getEntropy(double[] p) {
         double log_base = Math.log(p.length);
         double ent = 0;
@@ -268,8 +302,185 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         return ent;
     }
     
+    /**
+     * Approximate the complexity of a Dirichlet Mixture Model.
+     * Uses equations 3,4&5 from Ye et al (2011)
+     * 
+     * @return complexity
+     */
+    public double getComplexity(int[][]data) {
+     	//letters = L
+    	//components = M
+    	//data.length/nData = n
+    	
+    	//calculate the average counts across all data
+    		//Possible alternative // c = average of (average per bin)
+    	Double nData = (double) data.length;
+    	Double cCounts = 0.0;
+    	for (int d = 0; d < data.length; d++) {
+    		for (int col = 0; col < data[d].length; col++) {
+    			cCounts += data[d][col];
+    		}
+    	}
+    	Double cAvg = cCounts/(data.length * letters);
+    	
+    	//delta L,c approaches 0 as c increases. It is a constant. At L = 20, c = 100 the value is 0.057 - a negligible impact
+    	// o(1) is a constant with no explanation in either Altschul paper (Ye or Yu)
+    	
+    	//COMP(Dl, M/n, c), formula 3
+    	Double comp3 = ((letters/2)*Math.log(nData/components)) + ((letters-1)/2)*Math.log(cAvg/2) - GammaDistrib.lgamma(letters/2) - ((1/2)*Math.log(letters-1)) ; //excluding 2 constants at end
+    	
+    	//COMP(Mm, n), formula 4
+    	Double comp4 = (((components - 1)/2)*Math.log(nData)) + ((1/2)*Math.log(Math.PI)) - GammaDistrib.lgamma(components/2); // + o(1)
+    	
+    	//calculate M!
+    	double mfact = 1.0;
+    	for (double i = 1; i <=components; i++) {
+    		mfact = mfact*i;
+    	}
+    	
+    	//COMP(DM(m, L), n, c) ~= COMP(Mm, n) + M*COMP(Dl, M/n, c) - log*(M!)
+    	Double complexity = comp4 + components*comp3 - Math.log(mfact);
+//    	System.out.println(complexity);
+    	
+    	return complexity;
+    }
+    
+    public void saveAlphas(String filename) {
+    	try {
+        	BufferedWriter bd = new BufferedWriter(new FileWriter(filename + "_alpha_"+(int)this.components+".out"));
+	        for (int i = 0; i < this.components; i ++) {
+	        	DirichletDistrib dd = (DirichletDistrib) this.getDistrib(i);
+//	            System.out.println("D"+ i + " = " + dd);
+	            bd.write("D"+i+","+dd);
+	            bd.newLine();
+	        }
+	        bd.close();
+	    } catch (IOException ex) {
+            Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
+        }   
+    }
+    
+    public void saveClusters(int[][] data, String filename) {
+    	
+    	int N = data.length;
+    	int nbins = (int)this.components;
+        List[] bins = new ArrayList[nbins]; // hold components here
+        for (int i = 0; i < nbins; i++)
+          bins[i] = new ArrayList(); // start with empty bins
+        for (int k = 0; k < N; k++) { //N = data points
+        	int index = getLabel(data[k]);
+        	bins[index].add(k);
+        }
+
+        /*
+        for (int i = 0; i < dds.length; i ++) {
+            System.out.println("D"+ i + " = " + dds[i]);
+        }*/
+
+        for (int i = 0; i < nbins; i ++) {
+            try {
+                BufferedWriter bw = new BufferedWriter(new FileWriter(filename + "_bin_" + i + "_"+nbins+".out"));
+                for (int a = 0; a < bins[i].size(); a ++) {
+                    int k = (Integer)bins[i].get(a);
+                    bw.write(""+k);
+//                    bw.write(k + "\t");
+//                    for (int j = 0; j < data[k].length; j ++)
+//                        bw.write(data[k][j] + "\t");
+//                    bw.write(k + "\t");
+//                    EnumDistrib d = new EnumDistrib(new Enumerable((int)this.letters), data[k]);
+//                    for (int j = 0; j < d.getDomain().size(); j ++)
+//                        bw.write(d.get(j) + "\t");
+                    bw.newLine();
+                }
+                bw.close();
+            } catch (IOException ex) {
+                Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+       
     public static void main(String[] args) {
-        String filename1 = "/Users/mikael/simhome/Fantom5/suzy_alltags.csv";
+    
+    	int min = Integer.parseInt(args[1]);
+        int max = Integer.parseInt(args[2]);
+        int alphaInit = Integer.parseInt(args[3]);
+        
+        System.out.println("Alpha initialiser = " +  alphaInit);
+//        String filename = args[0];
+        String filename = "cage_all_expression.out";
+
+        int[][] data = loadData(filename);
+        int N = data.length;
+        int nseg = 0;
+        for (int i = 0; i < N; i ++) {
+            if (nseg == 0) 
+                nseg = data[i].length;
+            else if (nseg != data[i].length)
+                throw new RuntimeException("Error in data: invalid item at data point " + (i + 1));
+//            System.out.print("[" + i + "]\t= \t");
+//            for (int j = 0; j < data[i].length; j ++) 
+//                System.out.print(data[i][j] + "\t");
+        }
+        
+        Enumerable domain = new Enumerable(data[0].length);
+        
+        double[] dlBestList = new double[max-min];
+        double[] complexityList = new double[max-min];
+        
+        for ( int nbins = min; nbins < max; nbins++) {
+        	
+        	System.out.println("nbins = " +nbins);
+        	MixDirichletDistrib dis = new MixDirichletDistrib(domain, nbins);
+            dis.learnParameters(data);
+//            System.out.println("Learnt Parameters");
+            dis.saveAlphas(filename);
+//            System.out.println("Saved Alphas");
+	        dlBestList[nbins - min] = dis.getDLBest();
+	        complexityList[nbins - min] = dis.getComplexity(data);
+	        //FIXME Track changes here - automate isolation of optimal cluster group
+//	        System.out.println("Found complexity");
+	        dis.saveClusters(data, filename);
+//	        System.out.println("Saved Clusters");
+	        
+	        
+        }
+        
+        //finalComplexity
+        double[] fComp = new double[max - min];
+        for (int c = 0; c < dlBestList.length; c++ ) {
+        	fComp[c] = dlBestList[c] + complexityList[c];
+        }
+        
+        //write list of dl_best scores
+//        try {
+//        	BufferedWriter bd = new BufferedWriter(new FileWriter(filename + "_ll.out"));
+//        	for (double dl : dlBestList) {
+//        		bd.write(min + " = " +dl);
+//        		min++;
+//        	}
+//        	bd.close();
+//        } catch (IOException ex) {
+//        	Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
+//        } 
+        
+        //write list of complexity scores
+        try {
+        	BufferedWriter bd = new BufferedWriter(new FileWriter(filename + "_comp.out"));
+        	for (double fc : fComp) {
+        		bd.write(min + "\t" +fc);
+        		bd.newLine();
+        		min++;
+        	}
+        	bd.close();
+        } catch (IOException ex) {
+        	Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+    }
+    
+    public static void main0(String[] args) {
+        String filename1 = "wgEncodeRad21_seg20_500_hg19.out";
         String filename2 = "/Users/mikael/simhome/Fantom5/suzy_alltags.csv";
         //String filename2 = "/Users/mikael/simhome/Fantom5/suzy_corr.csv";
         if (args.length > 0)
