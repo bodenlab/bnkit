@@ -5,6 +5,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.Random;
@@ -72,7 +73,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         	while (ArrayUtils.contains(dataPoint, 0)) {
         		dataPoint = data[rand.nextInt(data.length)];
         	}
-        	System.out.println(Arrays.toString(dataPoint));
+//        	System.out.println(Arrays.toString(dataPoint));
             super.addDistrib(new DirichletDistrib(new EnumDistrib(domain, dataPoint), rand.nextInt(90) + 10), rand.nextDouble());
 //            super.addDistrib(new DirichletDistrib(new EnumDistrib(domain, data[rand.nextInt(data.length)]), rand.nextInt(90) + 10), rand.nextDouble());
         }
@@ -216,17 +217,23 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
             // try to put each data points into different bins
             //this.getNormalized();
             double[] m = this.getAllWeights();
+            Map<int[], Double> trackPoints = new HashMap();
             for (int k = 0; k < dataSize; k++) {
                 try {
                     double[] logprob = new double[nbins];
+                    double maxLog = -1000000;
                     for (int i = 0; i < nbins; i++) {
                         DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
-                        logprob[i] = (Math.log(m[i]) + dirichlet.logLikelihood(data[k]));
+                        double log = Math.log(m[i]) + dirichlet.logLikelihood(data[k]);
+                        logprob[i] = log;
+                        if (log > maxLog)
+                        	maxLog = log;
                     }
                     //FIXME some of them would be zero......
                     p.set(EnumDistrib.log2Prob(logprob));
                     Integer index = (Integer) p.sample();
                     bins[index].add(data[k]);
+                    trackPoints.put(data[k], maxLog);
                 } catch (RuntimeException ex0) {
                     System.err.println("Problem with data point k = " + k);
                     throw new RuntimeException("Problem with data point k = " + k);
@@ -235,41 +242,44 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
             
             /*
              * Test whether any bins are 'empty' - i.e. data does not comply with what distribution can generate?
-             * If there are empty bins - re-initialise the Dirichlet distribution
+             * If there are empty bins -take the data point with the highest log likelihood (lowest probability of 
+             * belonging to cluster) and place it in empty bin
              */
-            boolean[] emptyIndex = new boolean[nbins];
-            boolean empty = false;
             for (int i = 0; i < nbins; i++) {
                 if (bins[i].size() == 0) {
                     System.err.println("Empty Bin : " + i);
-                    emptyIndex[i] = true;
-                    empty = true;
+                    double maxValueInMap=(Collections.max(trackPoints.values()));  // This will return max value in the Hashmap
+                    for (Entry<int[], Double> entry : trackPoints.entrySet()) {
+                        if (entry.getValue()==maxValueInMap) {
+                        	//FIXME better way of removing data point from bin?
+                        	for (int k = 0; k < nbins; k++) {
+                        		for (int l = 0; l < bins[k].size(); l++) {
+                        			if (bins[k].get(l) == entry.getKey()) {
+                        				bins[k].remove(l);
+                        			}
+                        		}
+                        	}
+                            bins[i].add(entry.getKey());
+                            trackPoints.remove(entry.getKey());
+                            break;
+                        }
+                    }
                     anyEmpty = true;
                 }
             }
-            if (empty) {
-            	System.out.println("Re-initialised distributions");
-            	reintCount ++;
-                for (int i = 0; i < nbins; i++) {                	
-                	if (emptyIndex[i]) {
-	                	DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
-	                	dirichlet = new DirichletDistrib(EnumDistrib.random(domain, rand.nextInt()), rand.nextInt(30) + 10);
-                	}
-                }
-                continue likeLoop;
-            }
-            
-
-            // based on the data in each bin, adjust parameters of each dirichlet distribution
-//            System.out.println("Updating weights");
+           
+            // Report if there were any bins shuffled
             if (anyEmpty) {
-            	System.out.println("There were "+reintCount+" re-initialisations");
+            	System.out.println("Empty bins were re-initialised");
             	anyEmpty = false;
             	training = true;
             	round = 0;
             } else {
             	training = true;
             }
+            
+            // based on the data in each bin, adjust parameters of each dirichlet distribution
+//          System.out.println("Updating weights");
             for (int i = 0; i < nbins; i++) {
                 // update mixture coefficient
                 this.setWeight(i, bins[i].size());
@@ -453,8 +463,8 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
 //        int alphaInit = Integer.parseInt(args[3]);
         
 //        String filename = args[0];
-        String filename = "cage_all_expression.out";
-//        String filename = "wgEncodeH1hescSrf_seg20_500_srf_hg19.out";
+//        String filename = "cage_all_expression.out";
+        String filename = "wgEncodeH1hescSrf_seg20_500_srf_hg19.out";
 //        String filename = "wgEncodeRad21_seg20_500_hg19.out";
       
         int[][] data = loadData(filename);
