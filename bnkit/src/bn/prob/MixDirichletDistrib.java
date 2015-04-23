@@ -15,6 +15,8 @@ import bn.Distrib;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 
+import org.apache.commons.lang3.ArrayUtils;
+
 /**
  * Mixture Dirichlet distribution is weighted sum of different Dirichlet
  * distribution MDir = w1 * Dir1 + w2 * Dir2 + ... This class includes learning
@@ -55,13 +57,42 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
 
     /**
      * Given the domain of Dirichlet distribution build an empty Mixture model
+     * Initialises distributions using random points from the data
+     *
+     * @param domain
+     * @param ComponentNum
+     */
+    public MixDirichletDistrib(Enumerable domain, int ComponentNum, int[][] data) {
+        super();
+        Random rand = new Random(System.currentTimeMillis());
+        for (int i = 0; i < ComponentNum; i++) {
+//        	EnumDistrib dataDistrib = new EnumDistrib(domain, data[rand.nextInt(data.length)]);
+//        	EnumDistrib randomDistrib = EnumDistrib.random(domain, rand.nextInt());
+        	int[] dataPoint = data[rand.nextInt(data.length)]; //Cannot contain any 0's
+        	while (ArrayUtils.contains(dataPoint, 0)) {
+        		dataPoint = data[rand.nextInt(data.length)];
+        	}
+        	System.out.println(Arrays.toString(dataPoint));
+            super.addDistrib(new DirichletDistrib(new EnumDistrib(domain, dataPoint), rand.nextInt(90) + 10), rand.nextDouble());
+//            super.addDistrib(new DirichletDistrib(new EnumDistrib(domain, data[rand.nextInt(data.length)]), rand.nextInt(90) + 10), rand.nextDouble());
+        }
+        this.domain = domain;
+        this.components = ComponentNum;
+        this.letters = (double)domain.size();
+    }
+    
+    /**
+     * Given the domain of Dirichlet distribution build an empty Mixture model
+     * Initialises distributions randomly
      *
      * @param domain
      * @param ComponentNum
      */
     public MixDirichletDistrib(Enumerable domain, int ComponentNum) {
         super();
-        Random rand = new Random(System.currentTimeMillis());
+//        Random rand = new Random(System.currentTimeMillis());
+        Random rand = new Random((long)1000);
+//        Random rand = new Random((long)System.currentTimeMillis()/1000000000);
         for (int i = 0; i < ComponentNum; i++) {
             super.addDistrib(new DirichletDistrib(EnumDistrib.random(domain, rand.nextInt()), rand.nextInt(90) + 10), rand.nextDouble());
         }
@@ -171,6 +202,9 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         p.setSeed(rand.nextInt());
 
         int no_update = 0;
+        int reintCount = 0;
+        boolean anyEmpty = false;
+        boolean training = false;
         // start iteration
         likeLoop:
         for (int round = 0; round < ROUND_LIMITATION && no_update < NO_UPDATE; round++) {
@@ -198,38 +232,46 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
                     throw new RuntimeException("Problem with data point k = " + k);
                 }
             }
+            
             /*
-             Divide the points in the largest bin and place half in the empty bin... (yes, we assume only 1 empty bin)
-             What about if there are more than 2 empty bins? We could divide the largest bin multiple times
-             or recursively go through the bins and pick the largest and divide until all bins have values1?
-             This may require further work.
+             * Test whether any bins are 'empty' - i.e. data does not comply with what distribution can generate?
+             * If there are empty bins - re-initialise the Dirichlet distribution
              */
-            int largestIndex = 0;
-            int largestSize = 0;
-            int emptyIndex = -1;
+            boolean[] emptyIndex = new boolean[nbins];
+            boolean empty = false;
             for (int i = 0; i < nbins; i++) {
-                if (bins[i].size() > largestSize) {
-                    largestSize = bins[i].size();
-                    largestIndex = i;
-                }
                 if (bins[i].size() == 0) {
                     System.err.println("Empty Bin : " + i);
-                    emptyIndex = i;
+                    emptyIndex[i] = true;
+                    empty = true;
+                    anyEmpty = true;
                 }
             }
-            if (emptyIndex != -1) {
-                Collections.shuffle(bins[largestIndex]);
-                int pointsToSelect = bins[largestIndex].size() / 2;
-                for (int i = 0; i < pointsToSelect; i++) {
-                    Object countArray = bins[largestIndex].get(i);
-                    bins[emptyIndex].add(countArray);
-                    bins[largestIndex].remove(i);
+            if (empty) {
+            	System.out.println("Re-initialised distributions");
+            	reintCount ++;
+                for (int i = 0; i < nbins; i++) {                	
+                	if (emptyIndex[i]) {
+	                	DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
+	                	dirichlet = new DirichletDistrib(EnumDistrib.random(domain, rand.nextInt()), rand.nextInt(30) + 10);
+                	}
                 }
+                continue likeLoop;
             }
+            
 
             // based on the data in each bin, adjust parameters of each dirichlet distribution
+//            System.out.println("Updating weights");
+            if (anyEmpty) {
+            	System.out.println("There were "+reintCount+" re-initialisations");
+            	anyEmpty = false;
+            	training = true;
+            	round = 0;
+            } else {
+            	training = true;
+            }
             for (int i = 0; i < nbins; i++) {
-                // update mixture coeffience
+                // update mixture coefficient
                 this.setWeight(i, bins[i].size());
                 // update parameters for model
                 int[][] counts = new int[bins[i].size()][];
@@ -273,6 +315,10 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         for (int i = 0; i < nbins; i++) {
             DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
             dirichlet.setPrior(alpha_best[i]);
+        }
+        
+        if (!training) {
+        	System.err.print("Failed to remove empty bins\n");
         }
     }
     
@@ -404,12 +450,13 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
     
     	int min = Integer.parseInt(args[1]);
         int max = Integer.parseInt(args[2]);
-        int alphaInit = Integer.parseInt(args[3]);
+//        int alphaInit = Integer.parseInt(args[3]);
         
-        System.out.println("Alpha initialiser = " +  alphaInit);
 //        String filename = args[0];
         String filename = "cage_all_expression.out";
-
+//        String filename = "wgEncodeH1hescSrf_seg20_500_srf_hg19.out";
+//        String filename = "wgEncodeRad21_seg20_500_hg19.out";
+      
         int[][] data = loadData(filename);
         int N = data.length;
         int nseg = 0;
@@ -429,21 +476,15 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         double[] complexityList = new double[max-min];
         
         for ( int nbins = min; nbins < max; nbins++) {
-        	
         	System.out.println("nbins = " +nbins);
-        	MixDirichletDistrib dis = new MixDirichletDistrib(domain, nbins);
+        	MixDirichletDistrib dis = new MixDirichletDistrib(domain, nbins, data);
+//        	MixDirichletDistrib dis = new MixDirichletDistrib(domain, nbins);
             dis.learnParameters(data);
-//            System.out.println("Learnt Parameters");
             dis.saveAlphas(filename);
-//            System.out.println("Saved Alphas");
 	        dlBestList[nbins - min] = dis.getDLBest();
 	        complexityList[nbins - min] = dis.getComplexity(data);
 	        //FIXME Track changes here - automate isolation of optimal cluster group
-//	        System.out.println("Found complexity");
 	        dis.saveClusters(data, filename);
-//	        System.out.println("Saved Clusters");
-	        
-	        
         }
         
         //finalComplexity
@@ -476,7 +517,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         } catch (IOException ex) {
         	Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
+        System.out.println("COMPLETE");
     }
     
     public static void main0(String[] args) {
@@ -663,5 +704,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         }
         return data;
     }
-
+    
 }
+
+
