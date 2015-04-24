@@ -70,8 +70,16 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
 //        	EnumDistrib dataDistrib = new EnumDistrib(domain, data[rand.nextInt(data.length)]);
 //        	EnumDistrib randomDistrib = EnumDistrib.random(domain, rand.nextInt());
         	int[] dataPoint = data[rand.nextInt(data.length)]; //Cannot contain any 0's
-        	while (ArrayUtils.contains(dataPoint, 0)) {
-        		dataPoint = data[rand.nextInt(data.length)];
+        	boolean zeros = true;
+        	//Ensure dataPoint does not contain 0's
+        	while (zeros) {
+        		for (int d : dataPoint) {
+        			if (d == 0) {
+        				dataPoint = data[rand.nextInt(data.length)];
+        				continue;
+        			}
+        		}
+        		zeros = false;
         	}
 //        	System.out.println(Arrays.toString(dataPoint));
             super.addDistrib(new DirichletDistrib(new EnumDistrib(domain, dataPoint), rand.nextInt(90) + 10), rand.nextDouble());
