@@ -233,6 +233,11 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
                     p.set(EnumDistrib.log2Prob(logprob));
                     Integer index = (Integer) p.sample();
                     bins[index].add(data[k]);
+                    //Store each data point and it's lowest log likelihood
+                    //FIXME more efficient way to track 'worst' data points
+                    //Only need to store nbins-1 data points (worst case scenario)
+                    //Could do this with a map and add/remove data points as necessary
+                    //Efficiency? Memory?
                     trackPoints.put(data[k], maxLog);
                 } catch (RuntimeException ex0) {
                     System.err.println("Problem with data point k = " + k);
@@ -462,9 +467,9 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         int max = Integer.parseInt(args[2]);
 //        int alphaInit = Integer.parseInt(args[3]);
         
-//        String filename = args[0];
+        String filename = args[0];
 //        String filename = "cage_all_expression.out";
-        String filename = "wgEncodeH1hescSrf_seg20_500_srf_hg19.out";
+//        String filename = "wgEncodeH1hescSrf_seg20_500_srf_hg19.out";
 //        String filename = "wgEncodeRad21_seg20_500_hg19.out";
       
         int[][] data = loadData(filename);
