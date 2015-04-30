@@ -16,8 +16,6 @@ import bn.Distrib;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 
-import org.apache.commons.lang3.ArrayUtils;
-
 /**
  * Mixture Dirichlet distribution is weighted sum of different Dirichlet
  * distribution MDir = w1 * Dir1 + w2 * Dir2 + ... This class includes learning

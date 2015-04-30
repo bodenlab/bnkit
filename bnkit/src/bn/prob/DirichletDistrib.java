@@ -505,7 +505,7 @@ public class DirichletDistrib implements Distrib, Serializable {
         
         int nbins = 9;
         long seed = 1;
-        String filename = "/Users/mikael/Desktop/encode7_100-500-1000-3000-5000_u.out";
+        String filename = "/Users/mikael/Desktop/blocks_counts.txt";
         
         java.util.Random rand = new java.util.Random(seed);
 
@@ -530,7 +530,7 @@ public class DirichletDistrib implements Distrib, Serializable {
         List[] bins = new ArrayList[nbins]; // hold components here
         DirichletDistrib[] dds = new DirichletDistrib[nbins];
         for (int i = 0; i < dds.length; i ++) {
-            dds[i] = new DirichletDistrib(EnumDistrib.random(new Enumerable(nseg), rand.nextInt()), 10);
+            dds[i] = new DirichletDistrib(EnumDistrib.random(new Enumerable(nseg), rand.nextInt()), 100);
             System.out.println("D"+ i + " = " + dds[i]);
         }
         EnumDistrib m = EnumDistrib.random(new Enumerable(nbins), rand.nextInt()); // mixing weights, add to 1
