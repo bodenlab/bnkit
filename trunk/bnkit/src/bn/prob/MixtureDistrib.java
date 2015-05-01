@@ -333,7 +333,7 @@ public class MixtureDistrib implements Distrib {
     public String toXMLString() {
     	StringBuilder sb = new StringBuilder("<MixtureModels>\n");
     	for(int i = 0; i < distribs.size(); i++) {
-    		sb.append("<model>\n<weight>" + String.format("%4.17f", weights.get(i)) + "</weight>\n<distrib>" + distribs.get(i) + "</distrib>\n</model>\n");
+    		sb.append("<model>\n<weight>" + weights.get(i) + "</weight>\n<distrib>" + distribs.get(i) + "</distrib>\n</model>\n");
     	}
     	sb.append("</MixtureModels>");
     	return sb.toString();

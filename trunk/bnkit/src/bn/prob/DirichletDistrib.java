@@ -239,9 +239,9 @@ public class DirichletDistrib implements Distrib, Serializable {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < alpha.length; i ++) {
             if (i < alpha.length - 1)
-                sb.append(String.format("%4.17f,", alpha[i]));
+                sb.append(String.format("%7.5f,", alpha[i]));
             else
-                sb.append(String.format("%4.17f", alpha[i]));
+                sb.append(String.format("%7.5f", alpha[i]));
         }
         return sb.toString();
     }
