@@ -98,10 +98,10 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
     public MixDirichletDistrib(Enumerable domain, int ComponentNum) {
         super();
 //        Random rand = new Random(System.currentTimeMillis());
-        Random rand = new Random((long)1000);
-//        Random rand = new Random((long)System.currentTimeMillis()/1000000000);
+//        Random rand = new Random((long)1000); // Mikael: I removed this line to introduce the use of MixtureDistrib's own random number generator. No need for a local one.
+        super.setSeed(System.currentTimeMillis());
         for (int i = 0; i < ComponentNum; i++) {
-            super.addDistrib(new DirichletDistrib(EnumDistrib.random(domain, rand.nextInt()), rand.nextInt(90) + 10), rand.nextDouble());
+            super.addDistrib(new DirichletDistrib(EnumDistrib.random(domain, nextInt(Integer.MAX_VALUE)), nextInt(90) + 10), nextDouble());
         }
         this.domain = domain;
         this.components = ComponentNum;
@@ -541,156 +541,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         System.out.println("COMPLETE");
     }
     
-    public static void main0(String[] args) {
-        String filename1 = "wgEncodeRad21_seg20_500_hg19.out";
-        String filename2 = "/Users/mikael/simhome/Fantom5/suzy_alltags.csv";
-        //String filename2 = "/Users/mikael/simhome/Fantom5/suzy_corr.csv";
-        if (args.length > 0)
-            filename1 = args[0];
-        // this CAGE tag, expresses in condition?
-        Object[][] matrix1 = loadObjects(filename1);
-        int[][] values1 = new int[matrix1.length][];
-        for (int i = 0; i < matrix1.length; i ++) {
-            values1[i] = new int[matrix1[i].length - 1];
-            for (int j = 0; j < matrix1[i].length - 1; j ++) {
-                try {
-                    values1[i][j] = (Integer)matrix1[i][j + 1];
-                } catch (ClassCastException e) {
-                    System.err.println("Invalid integer: " + matrix1[i][j + 1]);
-                }
-            }
-        }
-        Object[][] matrix2 = loadObjects(filename2);
-        int[][] values2 = new int[matrix2.length][];
-        for (int i = 0; i < matrix2.length; i ++) {
-            values2[i] = new int[matrix2[i].length - 1];
-            for (int j = 0; j < matrix2[i].length - 1; j ++) {
-                try {
-                    values2[i][j] = (Integer)matrix2[i][j + 1];
-                } catch (ClassCastException e) {
-                    System.err.println("Invalid integer: " + matrix2[i][j + 1]);
-                }
-            }
-        }
-        Enumerable domain = new Enumerable(values1[0].length);
-        /*
-         MixDirichletDistrib dis = new MixDirichletDistrib(domain, 9);
-         System.out.println(dis.toString());
-         int dataNum = 23000;
-         int[][] data = new int[dataNum][5];
-         for(int i = 0; i < dataNum; i++) {
-         EnumDistrib enumDistrib = (EnumDistrib)dis.sample();
-         for(int j = 0; j < 5; j++) {
-         data[i][j] = (int) (enumDistrib.get(j) * 30);
-         }
-         }*/
-        int MAX_CLUSTER = 20;
-        int[][] labels = new int[values2.length][MAX_CLUSTER - 1];
-        for (int ncluster = 2; ncluster <= MAX_CLUSTER; ncluster ++) {
-            MixDirichletDistrib dis = new MixDirichletDistrib(domain, ncluster);
-            dis.learnParameters(values1);
-            System.out.println("\nDone training with " + ncluster + " clusters");
-            String prevgene = "";
-            int[] cnt4gene = new int[ncluster]; // counts for a gene
-            int tot4gene = 0; // total for a gene
-            int[] cnt4all = new int[ncluster]; // counts for a gene
-            int tot4all = 0; // total for a gene
-            int total = 0; // total number of genes
-            double entropy = 0;
-            for (int k = 0; k < values2.length; k ++) {
-                int currcluster = dis.getLabel(values2[k]);
-                labels[k][ncluster - 2] = currcluster;
-                cnt4gene[currcluster] ++;
-                cnt4all[currcluster] ++;
-                tot4gene ++;
-                tot4all ++;
-                String genename = (String)matrix2[k][0];
-                if ((!prevgene.equals(genename) || k == values2.length - 1) && k != 0) { // new gene or last tag, determine the entropy of the previous gene
-                    double[] p = new double[ncluster];
-                    for (int i = 0; i < ncluster; i ++) {
-                        p[i] = cnt4gene[i] / (double)tot4gene;
-                        cnt4gene[i] = 0;
-                    }
-                    tot4gene = 0;
-                    entropy += getEntropy(p);
-                    total ++; 
-                    prevgene = genename;
-                }
-            }
-            System.out.println("Average per-gene entropy is " + entropy / (double)total);
-            double[] p = new double[ncluster];
-            for (int i = 0; i < ncluster; i ++) {
-                p[i] = cnt4all[i] / (double)tot4all;
-            }
-            System.out.println("Overall entropy is " + getEntropy(p));
-            for (int i = 0; i < ncluster; i ++) {
-                System.out.println(i + "\t" + cnt4all[i] + "\t" + dis.getDistrib(i));
-                
-            }
-            dis.toXMLString();
-        }
-        try {
-            BufferedWriter bw = new BufferedWriter(new FileWriter(filename2 + ".out"));
-            for (int k = 0; k < labels.length; k ++) {
-                bw.write(matrix2[k][0] + "\t");
-                for (int j = 0; j < labels[k].length; j ++)
-                    bw.write(labels[k][j] + "\t");
-                bw.newLine();
-            }
-            bw.close();
-        } catch (IOException ex) {
-            System.err.println("Error writing results");
-        }
-        
-        /*
-        MixDirichletDistrib dis2 = new MixDirichletDistrib(domain, 9);
-        dis2.getNormalized();
-        System.out.println(dis2.toXMLString());
-        dis2.learnParameters(values1);
-        System.out.println(dis2.toString());
-        System.out.println(dis2.toXMLString());
-                */
-    }
-
     
-    public static Object[][] loadObjects(String filename) {
-        BufferedReader br = null;
-        Object[][] data = null;
-        try {
-            br = new BufferedReader(new FileReader(filename));
-            String line = br.readLine();
-            List<Object[]> alldata = new ArrayList<>();
-            while (line != null) {
-                String[] tokens = line.split("\t");
-                Object[] values = new Object[tokens.length];
-                for (int i = 0; i < tokens.length; i++) {
-                    try {
-                        values[i] = Integer.valueOf(tokens[i]); // value is an int
-                    } catch (NumberFormatException e1) {
-                        try {
-                            values[i] = Double.valueOf(tokens[i]); // value is a double
-                        } catch (NumberFormatException e2) {
-                            values[i] = tokens[i]; // value is a string
-                        }
-                    }
-                }
-                alldata.add(values);
-                line = br.readLine();
-            }
-            data = new Object[alldata.size()][];
-            for (int k = 0; k < data.length; k++) {
-                data[k] = new Object[alldata.get(k).length];
-                for (int j = 0; j < data[k].length; j++) {
-                    data[k][j] = alldata.get(k)[j];
-                }
-            }
-            br.close();
-        } catch (IOException ex) {
-            Logger.getLogger(DirichletDistrib.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return data;
-    }
-
     
     public static int[][] loadData(String filename) {
         BufferedReader br = null;
