@@ -87,6 +87,31 @@ public class MixtureDistrib implements Distrib {
     	}
     }
     
+    /**
+     * Set seed for random number generator.
+     * @param seed 
+     */
+    public void setSeed(long seed) {
+        rand = new Random(seed);
+    }
+    
+    /**
+     * Get an integer using the random number generator.
+     * @param max value
+     * @return 
+     */
+    public int nextInt(int max) {
+        return rand.nextInt(max);
+    }
+    
+    /**
+     * Get a double using the random number generator.
+     * @return 
+     */
+    public double nextDouble() {
+        return rand.nextDouble();
+    }
+    
     private double addDistribForced(Distrib d2, double weight2) {
     	
         Double prev_weight = mixture.get(d2);
