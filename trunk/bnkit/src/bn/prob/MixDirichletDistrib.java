@@ -343,6 +343,206 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         }
     }
     
+    /**
+     * Learning the parameters, including mixture coefficient and parameters for
+     * each component. In the case of ChIP peak data sets, check both the forward
+     * and reverse of each vector
+     *
+     * @param data training data, in this case, this would be a count vector,
+     * the weight for each training point is assumed to be 1
+     */
+    public void learnParametersFlip(int[][] data) {
+
+        // necessary parameters
+        int nseg = data[0].length;
+        int nbins = this.getMixtureSize();
+        int dataSize = data.length;
+        // init dl value and alpha best
+        double dl_best = DL(data);
+        double[][] alpha_best = new double[nbins][nseg];
+        EnumDistrib m_best = new EnumDistrib(new Enumerable(nbins), this.getAllWeights());
+        ArrayList[] bins = new ArrayList[nbins];
+        this.getNormalized();
+
+        for (int i = 0; i < nbins; i++) {
+            DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
+            System.arraycopy(dirichlet.getAlpha(), 0, alpha_best[i], 0, nseg);
+        }
+        EnumDistrib p = EnumDistrib.random(new Enumerable(nbins), rand.nextInt()); // probability that sample belongs to bin
+        p.setSeed(rand.nextInt());
+
+        int no_update = 0;
+        int reintCount = 0;
+        boolean anyEmpty = false;
+        boolean training = false;
+        // start iteration
+        likeLoop:
+        for (int round = 0; round < ROUND_LIMITATION && no_update < NO_UPDATE; round++) {
+            // start with empty bins
+            for (int i = 0; i < nbins; i++) {
+                bins[i] = new ArrayList();
+            }
+
+            // try to put each data points into different bins
+            //this.getNormalized();
+            double[] m = this.getAllWeights();
+            Map<int[], Double> trackPoints = new HashMap();
+            for (int k = 0; k < dataSize; k++) {
+            	//get the reverse count vector
+            	int[] reverse = new int[data[k].length];
+            	int[] forward = data[k];
+            	int stop = data[k].length /2; //assume list is even
+            	if (data[k].length % 2 == 1) {
+            		stop = (data[k].length/2) +1;
+            	}
+                for(int r = 0; r < stop; r++) {
+                    int temp = data[k][r];
+                    reverse[r] = data[k][data[k].length - r - 1];
+                    reverse[data[k].length - r - 1] = temp;
+                }
+                boolean rev = false; //assume forward until proven otherwise
+                try {
+                    double[] logprob = new double[nbins];
+                    double maxLog = -1000000;
+                    for (int i = 0; i < nbins; i++) {
+                        DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
+                        //Here need to check both 'forward' and 'reverse'
+                        //Does it need to be tracked? Would it be beneficial to know?
+                        //Could be done post hoc if reverse vector is recorded
+                        double logForward = Math.log(m[i]) + dirichlet.logLikelihood(data[k]);
+                        double logReverse = Math.log(m[i]) + dirichlet.logLikelihood(reverse);
+//                        rev = false; //assume forward until proven otherwise
+                        double log = logForward;
+                        if (logForward < logReverse) {
+                        	rev = true;
+                        	log = logReverse;
+//                        	System.out.println("Reversed");
+                        } 
+                        logprob[i] = log;
+                        if (log > maxLog)
+                        	maxLog = log;
+                    }
+                    p.set(EnumDistrib.log2Prob(logprob));
+                    Integer index = (Integer) p.sample();
+                    if (rev) {
+                    	bins[index].add(reverse);
+                    	data[k] = reverse; //data has to reflect current state 
+                    					   //of all vectors or DL calculation is incorrect
+                    } else {
+                    	bins[index].add(data[k]);
+                    }
+                    
+                    //Store each data point and it's lowest log likelihood
+                    //FIXME more efficient way to track 'worst' data points?
+                    //Only need to store nbins-1 data points (worst case scenario)
+                    //Could do this with a map and add/remove data points as necessary
+                    //Efficiency? Memory?
+                    //What about uniqueness - are all data points unique?
+                    //Tracking forward and reverse potentially doubles size of map
+                    if (rev) {
+                    	trackPoints.put(reverse, maxLog);
+                    } else {
+                    	trackPoints.put(data[k], maxLog);
+                    }
+                    
+                } catch (RuntimeException ex0) {
+                    System.err.println("Problem with data point k = " + k);
+                    throw new RuntimeException("Problem with data point k = " + k);
+                }
+            }
+            
+            /*
+             * Test whether any bins are 'empty' - i.e. data does not comply with what distribution can generate?
+             * If there are empty bins -take the data point with the highest log likelihood (lowest probability of 
+             * belonging to cluster) and place it in empty bin
+             */
+            for (int i = 0; i < nbins; i++) {
+                if (bins[i].size() == 0) {
+                    System.err.println("Empty Bin : " + i);
+                    double maxValueInMap=(Collections.max(trackPoints.values()));  // This will return max value in the Hashmap
+                    for (Entry<int[], Double> entry : trackPoints.entrySet()) {
+                        if (entry.getValue()==maxValueInMap) {
+                        	//FIXME better way of removing data point from bin?
+                        	for (int k = 0; k < nbins; k++) {
+                        		for (int l = 0; l < bins[k].size(); l++) {
+                        			if (bins[k].get(l) == entry.getKey()) {
+                        				bins[k].remove(l);
+                        			}
+                        		}
+                        	}
+                            bins[i].add(entry.getKey());
+                            trackPoints.remove(entry.getKey());
+                            break;
+                        }
+                    }
+                    anyEmpty = true;
+                }
+            }
+           
+            // Report if there were any bins shuffled
+            if (anyEmpty) {
+            	System.out.println("Empty bins were re-initialised");
+            	anyEmpty = false;
+            	training = true;
+            	round = 0;
+            } else {
+            	training = true;
+            }
+            
+            // based on the data in each bin, adjust parameters of each dirichlet distribution
+//          System.out.println("Updating weights");
+            for (int i = 0; i < nbins; i++) {
+                // update mixture coefficient
+                this.setWeight(i, bins[i].size());
+                // update parameters for model
+                int[][] counts = new int[bins[i].size()][];
+                for (int j = 0; j < bins[i].size(); j++) {
+                    counts[j] = (int[]) bins[i].get(j);
+                }
+                DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
+                
+                try {
+                	dirichlet.setPrior(DirichletDistrib.getAlpha(counts));
+                } catch (NullPointerException e) {
+                	System.out.println(i);
+//                	break mainloop;
+                	break likeLoop;
+                }
+                
+//                dirichlet.setPrior(DirichletDistrib.getAlpha(counts));
+            }
+            this.getNormalized();
+
+            double dl_cur = DL(data);
+            System.out.println("DL_cur = " + dl_cur + "\tDL_best = " + dl_best);
+            if (dl_cur < dl_best) {
+            	setDLBest(dl_cur);
+                dl_best = dl_cur;
+                m_best.set(this.getAllWeights());
+                // also save mixing weights and alpha values1
+                for (int i = 0; i < nbins; i++) {
+                    DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
+                    System.arraycopy(dirichlet.getAlpha(), 0, alpha_best[i], 0, nseg);
+                }
+                no_update = 0;
+            } else {
+                no_update++;
+            }
+        }
+
+        // set the best data back
+        this.setWeights(m_best.get());
+        
+        for (int i = 0; i < nbins; i++) {
+            DirichletDistrib dirichlet = (DirichletDistrib) this.getDistrib(i);
+            dirichlet.setPrior(alpha_best[i]);
+        }
+        
+        if (!training) {
+        	System.err.print("Failed to remove empty bins\n");
+        }
+    }
+    
     public void setDLBest(double dl_best) {
     	this.DL_best = dl_best;
     }
@@ -473,9 +673,9 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         int max = Integer.parseInt(args[2]);
 //        int alphaInit = Integer.parseInt(args[3]);
         
-        String filename = args[0];
+//        String filename = args[0];
 //        String filename = "cage_all_expression.out";
-//        String filename = "wgEncodeH1hescSrf_seg20_500_srf_hg19.out";
+        String filename = "wgEncodeH1hescSrf_seg20_500_srf_hg19.out";
 //        String filename = "wgEncodeRad21_seg20_500_hg19.out";
       
         int[][] data = loadData(filename);
@@ -500,7 +700,8 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         	System.out.println("nbins = " +nbins);
         	MixDirichletDistrib dis = new MixDirichletDistrib(domain, nbins, data);
 //        	MixDirichletDistrib dis = new MixDirichletDistrib(domain, nbins);
-            dis.learnParameters(data);
+            dis.learnParametersFlip(data); //For ChIP-seq peak data that has unknown orientation
+//            dis.learnParameters(data);
             dis.saveAlphas(filename);
 	        dlBestList[nbins - min] = dis.getDLBest();
 	        complexityList[nbins - min] = dis.getComplexity(data);
