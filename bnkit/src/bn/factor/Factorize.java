@@ -1120,8 +1120,10 @@ public class Factorize {
                 // Trace implied assignments
                 Object[] xkey = X.getKey(maxidx);
                 for (int i = 0; i < evars.length; i++) {
-                    Variable.Assignment a = new Variable.Assignment(evars[i], xkey[ecross2x[i]]);
-                    Y.addAssign(y, a);
+                    if (ecross2x[i] >= 0) { // check so that the enumerable variable can be assigned by X
+                        Variable.Assignment a = new Variable.Assignment(evars[i], xkey[ecross2x[i]]);
+                        Y.addAssign(y, a);
+                    }
                 }
             }
         }
