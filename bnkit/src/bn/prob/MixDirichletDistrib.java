@@ -578,7 +578,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
     public double getComplexity(int[][]data) {
      	//letters = L
     	//components = M
-    	//data.length/nData = n
+    	//data.length or nData = n
     	
     	//calculate the average counts across all data
     		//Possible alternative // c = average of (average per bin)
@@ -594,11 +594,11 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
     	//delta L,c approaches 0 as c increases. It is a constant. At L = 20, c = 100 the value is 0.057 - a negligible impact
     	// o(1) is a constant with no explanation in either Altschul paper (Ye or Yu)
     	
-    	//COMP(Dl, M/n, c), formula 3
+    	//COMP(Dl, n/M, c), formula 3
     	Double comp3 = ((letters/2)*Math.log(nData/components)) + ((letters-1)/2)*Math.log(cAvg/2) - GammaDistrib.lgamma(letters/2) - ((1/2)*Math.log(letters-1)) ; //excluding 2 constants at end
     	
     	//COMP(Mm, n), formula 4
-    	Double comp4 = (((components - 1)/2)*Math.log(nData)) + ((1/2)*Math.log(Math.PI)) - GammaDistrib.lgamma(components/2); // + o(1)
+    	Double comp4 = (((components - 1)/2)*Math.log(nData/2)) + ((1/2)*Math.log(Math.PI)) - GammaDistrib.lgamma(components/2); // + o(1)
     	
     	//calculate M!
     	double mfact = 1.0;
@@ -606,7 +606,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
     		mfact = mfact*i;
     	}
     	
-    	//COMP(DM(m, L), n, c) ~= COMP(Mm, n) + M*COMP(Dl, M/n, c) - log*(M!)
+    	//COMP(DM(m, L), n, c) ~= COMP(Mm, n) + M*COMP(Dl, M/n, c) - log*(M!), formula 5
     	Double complexity = comp4 + components*comp3 - Math.log(mfact);
 //    	System.out.println(complexity);
     	
@@ -676,7 +676,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
 //        String filename = args[0];
 //        String filename = "cage_all_expression.out";
         String filename = "wgEncodeH1hescSrf_seg20_500_srf_hg19.out";
-//        String filename = "wgEncodeRad21_seg20_500_hg19.out";
+//        String filename = "wgEncodeGm12878Max_seg20_500_max_gm_hg19.out";
       
         int[][] data = loadData(filename);
         int N = data.length;
