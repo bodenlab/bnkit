@@ -40,6 +40,7 @@ import java.util.Set;
 public class PhyloTree {
     
     final private Node root; // the root of the tree
+    static int count;
     
     /**
      * Private constructor for tree from a root with all nodes connected off that.
@@ -167,9 +168,10 @@ public class PhyloTree {
             String tail = str.substring(end_index + 1, str.length());
             int split_index = tail.indexOf(':'); // check if a distance is specified
             if (split_index == -1) // no distance
-                node = new Node(tail);
+                node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1));
             else { // there's a distance
-                node = new Node(tail.substring(0, split_index));
+                count +=1
+                node = new Node("N" + count + "_" + tail.substring(0, split_index));
                 double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()));
                 node.setDistance(dist);
             }
