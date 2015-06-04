@@ -170,7 +170,7 @@ public class PhyloTree {
             if (split_index == -1) // no distance
                 node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1));
             else { // there's a distance
-                count +=1
+                count +=1;
                 node = new Node("N" + count + "_" + tail.substring(0, split_index));
                 double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()));
                 node.setDistance(dist);
