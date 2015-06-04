@@ -169,11 +169,12 @@ public class PhyloTree {
             int split_index = tail.indexOf(':'); // check if a distance is specified
             if (split_index == -1) // no distance
                 node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1));
-            else { // there's a distance
                 count +=1;
+            else { // there's a distance
                 node = new Node("N" + count + "_" + tail.substring(0, split_index));
                 double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()));
                 node.setDistance(dist);
+                count +=1;
             }
             // find where the commas are, and create children of node
             int comma = getComma(embed);
