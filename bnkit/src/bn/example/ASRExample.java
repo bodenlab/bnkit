@@ -167,7 +167,12 @@ public class ASRExample {
                 String nodename = asr_seq.getName();
                 if (rootname.equals(nodename))
                     asr_root = asr_seq.toString();
-                System.out.println(asr_seq.getName() + "\t" + asr_seq.toString());
+                //System.out.println(asr_seq.getName() + "\t" + asr_seq.toString());
+
+                if (nodes[i].getChildren().toArray().length > 0){
+                    System.out.println(">" + nodes[i].getLabel());
+                    System.out.println(asr_seq.toString());
+                }
             }
             
             System.out.println("Joint reconstruction: " + asr_root);
@@ -193,6 +198,8 @@ public class ASRExample {
                     System.out.println(i + "\t" + rate);
             }
             System.out.println("Mean\t" + mean / N + " in the limit it should be 1.0");
+
+            System.out.println("Newick string: " + nodes[0].toString() + ";");
 
         } catch (IOException ex) {
             ex.printStackTrace();
