@@ -167,10 +167,10 @@ public class PhyloTree {
             String embed = str.substring(start_index + 1, end_index);
             String tail = str.substring(end_index + 1, str.length());
             int split_index = tail.indexOf(':'); // check if a distance is specified
-            if (split_index == -1) // no distance
+            if (split_index == -1) { // no distance
                 node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1));
-                count +=1;
-            else { // there's a distance
+                count += 1;
+            } else { // there's a distance
                 node = new Node("N" + count + "_" + tail.substring(0, split_index));
                 double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()));
                 node.setDistance(dist);
