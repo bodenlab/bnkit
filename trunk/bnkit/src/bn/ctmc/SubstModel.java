@@ -180,10 +180,12 @@ public abstract class SubstModel {
         SubstModel sm_jtt = new JTT();
         SubstModel sm_dh = new Dayhoff();
 
+        System.out.println("R (Dayhoff)");
+        bn.math.Matrix.print(sm_dh.getR());
         System.out.println("R (WAG)");
-        bn.math.Matrix.print(sm_wag.R);
+        bn.math.Matrix.print(sm_wag.getR());
         System.out.println("\nR (LG)");
-        bn.math.Matrix.print(sm_lg.R);
+        bn.math.Matrix.print(sm_lg.getR());
 
         double time = 1.0;
         System.out.println("\n\nTransition probabilities of R (WAG) @ time = " + time);

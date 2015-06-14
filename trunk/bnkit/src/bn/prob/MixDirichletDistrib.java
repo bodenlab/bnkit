@@ -31,12 +31,12 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
     /**
      * The max number of rounds the Gibbs sampler would run
      */
-    private final int ROUND_LIMITATION = 100;
+    private final int ROUND_LIMITATION = 200;
     /**
      * The max number of rounds with no update for DL value the algorithm would
      * allow
      */
-    private final int NO_UPDATE = 10;
+    private final int NO_UPDATE = 20;
     private Enumerable domain;
     private double components;
     private double letters;
