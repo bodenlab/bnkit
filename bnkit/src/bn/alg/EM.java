@@ -429,11 +429,12 @@ public class EM extends LearningAlg {
                             for (BNode node : update.keySet()) {
                                 // check if the node should be updated, and if so put together expectations for maximisation...
                                 if (node.isTrainable()) {
+                                    Object[] evid_key = null;
                                     // if the node has parents, we need to check out the variables of its parents too
                                     if (!node.isRoot()) {
-                                        Object[] evid_key = update.get(node);
-                                        node.countInstance(evid_key, node.getInstance());
+                                        evid_key = update.get(node);
                                     }
+                                    node.countInstance(evid_key, node.getInstance());
                                 }
                             }
                         }
