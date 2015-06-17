@@ -187,8 +187,9 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
      *
      * @param data training data, in this case, this would be a count vector,
      * the weight for each training point is assumed to be 1
+     * @return the description length (smaller means better)
      */
-    public void learnParameters(int[][] data) {
+    public double learnParameters(int[][] data) {
 
         // necessary parameters
         int nseg = data[0].length;
@@ -341,6 +342,7 @@ public class MixDirichletDistrib extends MixtureDistrib implements Serializable 
         if (!training) {
         	System.err.print("Failed to remove empty bins\n");
         }
+        return dl_best;
     }
     
     /**
