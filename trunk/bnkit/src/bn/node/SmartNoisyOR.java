@@ -453,12 +453,35 @@ public class SmartNoisyOR implements BNode, Serializable{
                 if (searchcpt[i] == null) // new factor will include this variable
                     fvars.add(parent);
             }
+            
+            /*
+             * if the search key is not 'OR'; i.e. there is more than
+             * one parent labels set, then adding factors is not a simple
+             * case of looking up the table.
+             * The easiest solution for now may be to populate the table with 
+             * the calculated values (from get) as required.
+             */
+            int mkey = 0;
+            for (int i=0; i<searchcpt.length; i++) {
+            	if (searchcpt[i] != null) {
+            		if (searchcpt[i].equals(this.plabels.get(i))) {
+            			mkey++;}
+            	}
+            }
+            if (mkey > 1) {
+            	insert(searchcpt);
+            }
+            
             if (varinstance == null) {
                 fvars.add(myvar);
             }
             Variable[] vars_arr = new Variable[fvars.size()];
             fvars.toArray(vars_arr);
             AbstractFactor ft = new DenseFactor(vars_arr);
+
+            //if (Factorize.exitIfInvalid2(ft, this.toString())){
+            //	System.out.println("invalid");
+            //}
             EnumVariable[] evars = ft.getEnumVars(); // the order may have changed
             int[] xcross = new int[parents.size()];
             int[] ycross = new int[evars.length];
@@ -480,6 +503,9 @@ public class SmartNoisyOR implements BNode, Serializable{
                     }
                 }
             }
+            //if (Factorize.exitIfInvalid2(ft, this.toString())){
+            //	System.out.println("invalid");
+            //}
             int[] indices = table.getIndices(searchcpt);
             Object[] fkey = new Object[evars.length];
             for (int index : indices) {
@@ -508,6 +534,9 @@ public class SmartNoisyOR implements BNode, Serializable{
                             ft.setValue(d.get(varinstance));
                         else
                             ft.setValue(fkey, d.get(varinstance));
+                        //if (Factorize.exitIfInvalid2(ft, this.toString())){
+                        //	System.out.println("invalid");
+                        //}
                     } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
                         for (int j = 0; j < dom.size(); j++) {
                             fkey[missing] = dom.get(j);
@@ -522,7 +551,9 @@ public class SmartNoisyOR implements BNode, Serializable{
                 sumout.toArray(sumout_arr);
             	ft = Factorize.getMargin(ft, sumout_arr);
             }
-            Factorize.exitIfInvalid(ft, this.toString());
+           // if (Factorize.exitIfInvalid2(ft, this.toString())){
+           // 	System.out.println("invalid");
+            //}
             return ft;
         } else { // no parents, just a prior
             if (varinstance != null) { // instantiated prior
