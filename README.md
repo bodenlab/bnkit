@@ -18,6 +18,5 @@ brief tutorial in the "bn" package documentation.
 The GUI is at a very early stage and is not suited to serious use.
 To compile the GUI, you need JGraphX (v.6 or later; https://github.com/jgraph/jgraphx).
 
-# Details #
-
-To be written
+# Wiki #
+https://github.com/bodenlab/bnkit/wiki
