@@ -127,8 +127,8 @@ public class DenseFactor extends AbstractFactor {
      */
     @Override
     public double getLogValue(int index) {
-        if (index >= getSize() || index < 0 || this.getSize() == 1)
-            throw new DenseFactorRuntimeException("Invalid index");
+        if (index >= getSize() || index < 0 || getSize() == 1)
+            throw new DenseFactorRuntimeException("Invalid index: " + index + " in factor with " + getSize() + " entries");
         double value = map[index];
         return value;
     }

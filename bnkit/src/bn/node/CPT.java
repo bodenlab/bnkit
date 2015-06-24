@@ -34,6 +34,7 @@ import dat.Enumerable;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
+import static bn.factor.Factorize.exitIfInvalid;
 import java.io.Serializable;
 import java.util.*;
 import java.util.Map.Entry;
@@ -445,11 +446,13 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                 sumout.toArray(sumout_arr);
             	ft = Factorize.getMargin(ft, sumout_arr);
             }
+            Factorize.exitIfInvalid(ft, this.toString());
             return ft;
         } else { // no parents, just a prior
             if (varinstance != null) { // instantiated prior
                 AbstractFactor ft = new DenseFactor();
                 ft.setValue(this.prior.get(varinstance));
+                Factorize.exitIfInvalid(ft, this.toString());
                 return ft;
             }
             AbstractFactor ft = new DenseFactor(myvar);
@@ -460,6 +463,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                 Double p = d.get(j);
                 ft.setValue(newkey, p);
             }
+            Factorize.exitIfInvalid(ft, this.toString());
             return ft;
         }
     }

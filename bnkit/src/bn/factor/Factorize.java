@@ -324,6 +324,28 @@ public class Factorize {
         return node;
     }
 
+    public static boolean isValid(AbstractFactor f) {
+        int n = f.getSize();
+        boolean allNegInf = true;
+        if (n == 1) {
+            double y = f.getLogValue();
+            allNegInf = Double.isInfinite(y);
+        } else {
+            for (int i = 0; i < n; i ++) {
+                double y = f.getLogValue(i);
+                allNegInf = allNegInf && Double.isInfinite(y);
+            }
+        }
+        return !allNegInf;
+    }
+    
+    public static void exitIfInvalid(AbstractFactor f, String msg) {
+        if (!isValid(f)) {
+            System.err.println("Invalid factor: " + f + " (" + msg + ")");
+            f.display();
+            System.exit(111);
+        }
+    }
     /**
      * Recursive function to perform a single product of factors, potentially resulting 
      * from products themselves.
@@ -336,6 +358,7 @@ public class Factorize {
         AbstractFactor X = getProduct(node.x);
         AbstractFactor Y = getProduct(node.y);
         AbstractFactor f = getProduct(X, Y);
+        exitIfInvalid(f, "getProduct");
         node.setFactor(f);
         return f;
     }
