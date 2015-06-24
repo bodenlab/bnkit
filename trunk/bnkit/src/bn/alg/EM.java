@@ -229,7 +229,9 @@ public class EM extends LearningAlg {
                 case 1: 
 
                     // Principal way 1: go through each of the BN nodes... pose a query for, and update each...
-
+                    if (i == 11)
+                        i = 11;
+                    
                     for (BNode node : update.keySet()) {
 
                         if (node.isTrainable()) {
@@ -317,7 +319,7 @@ public class EM extends LearningAlg {
                                         }
                                     }
                                 } catch (RuntimeException e) {
-                                    throw new EMRuntimeException("Failed query for sample #" + (i + 1) + " and node " + node.getName() + ": " + e.getMessage());
+                                    throw new EMRuntimeException("Failed query for sample #" + (i + 1) + " and node " + node.getName() + ": " + e.getLocalizedMessage());
                                 }
                             } else { // all variables are instantiated, no need to do inference
                                 node.countInstance(evid_key, ovalue);
@@ -482,7 +484,14 @@ public class EM extends LearningAlg {
                             instantiate_me.resetInstance();
                         }
                     }
-                    log_likelihood += ((VarElim) inf).logLikelihood();
+                    double sample_likelihood = ((VarElim) inf).logLikelihood();
+                    if (Double.isNaN(sample_likelihood)) {
+                        System.err.println("Sample " + i + "/" + values.length + " log-likelihood is " + sample_likelihood);
+//                        for (int j = 0; j < vars.length; j++) {
+//                            System.err.println("\t" + vars[j].getName() + " = " + values[i][j]);
+//                        }
+                    }
+                    log_likelihood += sample_likelihood;
                     if (Double.isInfinite(log_likelihood)) {
                         System.err.println("Log-likelihood is infinite: " + log_likelihood);
                     }
