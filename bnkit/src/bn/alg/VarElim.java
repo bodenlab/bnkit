@@ -106,7 +106,7 @@ public class VarElim implements Inference {
      * Most probable assignments to X can be accessed via CGTable.getMPE.
      * TODO: Investigate if "hybrid" queries, known as marginal MAP (see Koller and Friedman, p. 27) can fit
      * as a variant query under this or if a new query form needs to be implemented. 
-     * Marginal MAP means that variables are either "summed out" (if they are not relevant) or 
+     * Marginal MAP means that variables are either "summed out" or 
      * "maxed out" (if assigned values to form part of a diagnosis).
      * @param qvars variables to include in query, can be empty
      */
@@ -128,6 +128,39 @@ public class VarElim implements Inference {
             if (val != null) {
                 E.add(new Variable.Assignment(var, val));
             } else if (!Q.contains(var)) {
+                X.add(var);
+            }
+        }
+        CGQuery q = new CGQuery(Q, E, X);
+        q.setStatus(STATUS_MPE);
+        return q;
+    }
+    
+    /**
+     * Construct the data structure for the specified variables in preparation
+     * of inference of the most probable explanation (also known as MAP query)
+     * but only over nominated variables.
+     * There are three types of variables (given the BN): 
+     *  1. Assignment variables E--which have been assigned values via the BN 
+     *  2. Query variables Q--empty set in this variant of MPE
+     *  3. Other variables X--which, IF nominated, will be maxed out during inference
+     * Most probable assignments to X can be accessed via CGTable.getMPE.
+     * @param nomvars all variables to include
+     */
+    @SuppressWarnings("rawtypes")
+    public Query makeNominatedMPEQuery(Variable... nomvars) {
+	// Find out which variables in the BN that will be max:ed out and organise them into "buckets".
+        List<Variable> Q = new ArrayList<>(); // Query, empty in this variant
+        List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
+        List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
+        List<BNode> rnl = bn.getDconnected(nomvars); //relevant *ordered* node list, based on the concept of D-separation, and topological ordering
+        //BNet qbn = bn;
+        for (BNode node : rnl) {
+            Variable var = node.getVariable();
+            Object val = node.getInstance();
+            if (val != null) {
+                E.add(new Variable.Assignment(var, val));
+            } else {
                 X.add(var);
             }
         }
