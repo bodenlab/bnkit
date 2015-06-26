@@ -146,6 +146,7 @@ public class VarElim implements Inference {
      *  3. Other variables X--which, IF nominated, will be maxed out during inference
      * Most probable assignments to X can be accessed via CGTable.getMPE.
      * @param nomvars all variables to include
+     * @return the query data structure
      */
     @SuppressWarnings("rawtypes")
     public Query makeNominatedMPEQuery(Variable... nomvars) {
@@ -154,7 +155,6 @@ public class VarElim implements Inference {
         List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
         List<BNode> rnl = bn.getDconnected(nomvars); //relevant *ordered* node list, based on the concept of D-separation, and topological ordering
-        //BNet qbn = bn;
         for (BNode node : rnl) {
             Variable var = node.getVariable();
             Object val = node.getInstance();
