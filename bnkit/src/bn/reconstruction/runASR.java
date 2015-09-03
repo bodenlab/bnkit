@@ -5,8 +5,6 @@
  */
 package bn.reconstruction;
 
-import bn.prob.EnumDistrib;
-import java.util.Arrays;
 
 /**
  *
