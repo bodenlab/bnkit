@@ -7,7 +7,6 @@ package bn.reconstruction;
 
 import bn.BNet;
 import bn.BNode;
-import bn.Distrib;
 import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
@@ -19,24 +18,19 @@ import dat.EnumSeq;
 import dat.EnumVariable;
 import dat.Enumerable;
 import dat.PhyloTree;
-import dat.PhyloTree.Node;
 import dat.Variable;
-import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import json.JSONObject;
-import json.JSONStringer;
-import json.JSONWriter;
+
 
 /**
  * @author Mikael Boden
