@@ -7,6 +7,7 @@ package bn.reconstruction;
 
 import bn.BNet;
 import bn.BNode;
+import bn.Distrib;
 import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
@@ -18,13 +19,24 @@ import dat.EnumSeq;
 import dat.EnumVariable;
 import dat.Enumerable;
 import dat.PhyloTree;
+import dat.PhyloTree.Node;
 import dat.Variable;
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import json.JSONObject;
+import json.JSONStringer;
+import json.JSONWriter;
 
 /**
  * @author Mikael Boden
@@ -150,6 +162,9 @@ public class ASR {
             int purged_leaves = pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
             int collapsed_nodes = pbn.collapseSingles();
 
+//            Variable testNode = bn.getAlphabetical().get(1).getVariable();
+//            EnumDistrib test = getMarginalDistrib(ve, testNode);
+            
             margin_distribs[col] = getMarginalDistrib(ve, root.getVariable());
         }        
     }
@@ -288,14 +303,14 @@ public class ASR {
             String nodename = asr_seq.getName();
             if (rootname.equals(nodename))
                 this.asr_root = asr_seq.toString();
+                nodes[i].setSequence(asr_seq);
                 //System.out.println(asr_seq.getName() + "\t" + asr_seq.toString());
                 
             //Not root and not leaf
             if (nodes[i].getChildren().toArray().length > 0){
-                System.out.println(">" + nodes[i].getLabel());
-                System.out.println(asr_seq.toString());
-                }
+                nodes[i].setSequence(asr_seq);
             }
+        }
     }
     
     /**
@@ -305,9 +320,88 @@ public class ASR {
         //estimates parameters of gamma distribution
         double alpha = GammaDistrib.getAlpha(R);
         double beta = 1 / alpha;
-        System.out.println("Gamma alpha = " + alpha + " beta = " + beta);
+//        System.out.println("Gamma alpha = " + alpha + " beta = " + beta);
         //Creates a gamma distribution
         this.gd = new GammaDistrib(alpha, 1/beta);
+    }
+    
+    public boolean save(String filename) {
+        
+        try{
+            Writer writer = new PrintWriter(filename, "UTF-8");
+            
+            JSONObject recon = new JSONObject();
+        
+            JSONObject root = new JSONObject();
+            root.put("Sequence",tree.getRoot().getSequence().toString());
+            root.put("SeqName", tree.getRoot().getLabel());
+            root.put("NewickRep", tree.getRoot().toString());
+            JSONObject rates = new JSONObject();
+            for (int j = 0; j < R.length; j++){
+                rates.put(Integer.toString(j), R[j]);
+            }
+            root.put("Rates", rates);
+            JSONObject margDistribs = new JSONObject();
+            Object[] aacid = Enumerable.aacid.getValues();
+            for (int k = 0; k < margin_distribs.length; k++) {
+                EnumDistrib distr = margin_distribs[k];
+                JSONObject position = new JSONObject();
+                for (int a = 0; a < aacid.length; a++) {
+                    double val = distr.get(aacid[a]);
+                    position.put(aacid[a].toString(), val);
+                }
+                margDistribs.put(Integer.toString(k), position);                
+            }
+            root.put("MarginalDistribs", margDistribs);
+            recon.put("Root", root);
+            
+            PhyloTree.Node[] nodes = getInternalNodes();
+            for(int i = 0; i < nodes.length; i++) {
+                JSONObject node = new JSONObject();
+                node.put("SeqName",nodes[i].getLabel());
+                node.put("Sequence", nodes[i].getSequence().toString());
+                node.put("NewickRep",nodes[i].toString());
+                recon.append("ReconstructedNodes", node);
+            }
+            
+            JSONObject gammaAB = new JSONObject();
+            gammaAB.put("alpha", gd.getAlpha());
+            gammaAB.put("beta", gd.getBeta());
+            recon.put("gammaDistrib", gammaAB);
+            
+            JSONObject fin = new JSONObject();
+            fin.put("Reconstruction", recon);
+            fin.write(writer);
+            writer.close();
+            
+        } catch (UnsupportedEncodingException uee) {
+            uee.printStackTrace();
+            return false;
+        } catch (FileNotFoundException fnf) {
+            fnf.printStackTrace();
+            return false;
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+    
+    private PhyloTree.Node[] getInternalNodes(){
+        String rootname = tree.getRoot().toString();
+        PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
+        List<PhyloTree.Node> intNodes = new ArrayList<>();
+        for (PhyloTree.Node node : nodes) {
+            String nodename = node.toString();
+            if (rootname.equals(nodename))
+                continue;   
+            //Not root and not leaf
+            if (node.getChildren().toArray().length > 0){
+                intNodes.add(node);
+            }
+        }
+        PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - seqs.size() - 1];
+        return intNodes.toArray(intNodesA);
     }
     
     public String getAsrSeq(){
