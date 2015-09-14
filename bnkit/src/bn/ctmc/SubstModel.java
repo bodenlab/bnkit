@@ -157,7 +157,7 @@ public abstract class SubstModel {
      * @param time expected distance
      * @return the conditional probabilities of a symbol at time t+time GIVEN a symbol at time t  [row: X(t)][col: X(t+time)]
      */
-    private final double[][] getProbs(double time) {
+    public final double[][] getProbs(double time) {
         this.time = time;
         int i, j, k;
         double temp;
