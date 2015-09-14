@@ -122,6 +122,16 @@ public abstract class SubstModel {
         int index_Y = alpha.getIndex(Y);
         return probs[index_Y][index_X];
     }
+
+    /**
+     * Helper method. Returns the corresponding entry from an user supplied
+     * probability matrix using the model alphabet.
+     */
+    public double getProb(Object X, Object Y, double[][] probMatrix) {
+        int index_X = alpha.getIndex(X);
+        int index_Y = alpha.getIndex(Y);
+        return probMatrix[index_Y][index_X];
+    }
     
     public double getProb(Object X) {
         int index_X = alpha.getIndex(X);
