@@ -23,7 +23,7 @@ import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.PhyloBNet;
-import bn.ctmc.matrix.JTT;
+import bn.ctmc.matrix.WAG;
 import bn.factor.Factorize;
 import bn.file.BNBuf;
 import bn.prob.EnumDistrib;
@@ -47,8 +47,10 @@ import java.util.Set;
  * @author mikael
  */
 public class ASRExample {
-    static String file_tree = "/Users/mikael/simhome/ASR/CYP2/CYP2F.nwk";
-    static String file_aln = "/Users/mikael/simhome/ASR/CYP2/CYP2F.aln";
+    static String file_tree = "/Users/mikael/simhome/ASR/toy.nwk";
+    static String file_aln = "/Users/mikael/simhome/ASR/toy.aln";
+//    static String file_tree = "/Users/mikael/simhome/ASR/CYP2/CYP2F.nwk";
+//    static String file_aln = "/Users/mikael/simhome/ASR/CYP2/CYP2F.aln";
     
     static PhyloTree tree;
     static List<EnumSeq.Gappy<Enumerable>> seqs;
@@ -95,9 +97,9 @@ public class ASRExample {
                 tree.setContentByParsimony(names, gaps);
                 PhyloBNet pbn;
                 if (use_sampled_rate)
-                    pbn = PhyloBNet.create(tree, new JTT(), sampled_rate);
+                    pbn = PhyloBNet.create(tree, new WAG(), sampled_rate);
                 else
-                    pbn = PhyloBNet.create(tree, new JTT());
+                    pbn = PhyloBNet.create(tree, new WAG());
                 pbnets[col] = pbn;
 
                 // set variables according to alignment
