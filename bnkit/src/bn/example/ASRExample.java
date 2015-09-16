@@ -47,10 +47,18 @@ import java.util.Set;
  * @author mikael
  */
 public class ASRExample {
+<<<<<<< HEAD
     static String file_tree = "/Users/mikael/simhome/ASR/toy.nwk";
     static String file_aln = "/Users/mikael/simhome/ASR/toy.aln";
 //    static String file_tree = "/Users/mikael/simhome/ASR/CYP2/CYP2F.nwk";
 //    static String file_aln = "/Users/mikael/simhome/ASR/CYP2/CYP2F.aln";
+=======
+//    static String file_tree = "../CYP2F.nwk";
+//    static String file_aln = "../CYP2F.aln";
+//    
+    static String file_tree = "../test_tree.txt";
+    static String file_aln = "../test_aln.aln";
+>>>>>>> f6486764c2c236c08e8e59041fcdfe52a07ed4e0
     
     static PhyloTree tree;
     static List<EnumSeq.Gappy<Enumerable>> seqs;
@@ -64,22 +72,27 @@ public class ASRExample {
     
     public static void main(String[] args) {
         try {
-            tree = PhyloTree.loadNewick(file_tree);
-            Node[] nodes = tree.toNodesBreadthFirst();
+            tree = PhyloTree.loadNewick(file_tree); //load tree - tree not in Newick?
+            Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
             List<String> indexForNodes = new ArrayList<>(); // Newick string for subtree
             Map<String, String> mapForNodes = new HashMap<>(); // Shortname --> Newick string for subtree
             for (Node n : nodes) {
-                indexForNodes.add(replacePunct(n.toString()));
+                //n string format internal 'N0_'
+                //n string format extant (no children) 'seq_name_id'
+                //n.toString() recursive Newick representation node and children
+                //creates subtrees?
+                indexForNodes.add(replacePunct(n.toString())); 
                 mapForNodes.put(n.getLabel().toString(), replacePunct(n.toString()));
             }
             
             seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);
             aln = new EnumSeq.Alignment<>(seqs);
 
-            String[] names = aln.getNames();
+            String[] names = aln.getNames(); //seq_name_id - names of sequences
             List<String> labels = new ArrayList<>();
             
             for (int i = 0; i < names.length; i ++) {
+                //check if any names ammended and modify if they are
                 int index = names[i].indexOf("/"); // in this aln file, names have been amended
                 if (index > 0)
                     labels.add(names[i].substring(0, index));
@@ -87,10 +100,13 @@ public class ASRExample {
                     labels.add(names[i]);
             }
             
+            //Each column/position in alignment/sequence gets a network
             PhyloBNet[] pbnets = new PhyloBNet[aln.getWidth()];
+            // joint reconstruction for tree
+            Object[][] asr_matrix = new Object[indexForNodes.size()][aln.getWidth()]; 
             
-            Object[][] asr_matrix = new Object[indexForNodes.size()][aln.getWidth()]; // joint reconstruction for tree
-
+            //Create network for each column in alignment
+            //Instantiate nodes
             for (int col = 0; col < aln.getWidth(); col ++) {
                 Object[] gaps = aln.getGapColumn(col); // array with true for gap, false for symbol
                 Object[] column = aln.getColumn(col);  // array for symbols, null for gaps
@@ -99,7 +115,13 @@ public class ASRExample {
                 if (use_sampled_rate)
                     pbn = PhyloBNet.create(tree, new WAG(), sampled_rate);
                 else
+<<<<<<< HEAD
                     pbn = PhyloBNet.create(tree, new WAG());
+=======
+                    //creates BNet beginning with root then recursively
+                    //traversing subtrees
+                    pbn = PhyloBNet.create(tree, new JTT());
+>>>>>>> f6486764c2c236c08e8e59041fcdfe52a07ed4e0
                 pbnets[col] = pbn;
 
                 // set variables according to alignment
@@ -119,17 +141,22 @@ public class ASRExample {
             BNode root = null;
             String asr_root = null;
             
-            double[] R = new double[aln.getWidth()];
+            //Calculate marginal (standard query) distribution
+            //Calculate MPE
+            //Calculate rate for position in alignment
+            double[] R = new double[aln.getWidth()]; //Rate matrix
             for (int col = 0; col < aln.getWidth(); col ++) {
                 PhyloBNet pbn = pbnets[col];
                 BNet bn = pbn.getBN();
-                root = pbn.getRoot();
+                root = pbn.getRoot(); //Possibly in wrong location??
+                //Root can change in purge and collapes steps?
                 VarElim ve = new VarElim();
                 ve.instantiate(bn);
-
+                
+                //Identify internal nodes to be queried
                 List<EnumVariable> intern = pbn.getInternal();
 
-                int purged_leaves = pbn.purgeGaps();
+                int purged_leaves = pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
                 int collapsed_nodes = pbn.collapseSingles();
                 //System.out.println("Col " + col + "\tPurged: " + purged_leaves + " + " + collapsed_nodes);
                 Query q_marg = ve.makeQuery(root.getVariable());
@@ -144,17 +171,22 @@ public class ASRExample {
                     Object asr_val = a0.val;
                     int index = indexForNodes.indexOf(replacePunct(asr_var.getName()));
                     if (index >= 0) 
+                        //index = current node
+                        //col = position in alignment
                         asr_matrix[index][col] = asr_val;
                     BNode node = bn.getNode(asr_var);
                     node.setInstance(asr_val);
                 }
-                R[col] = pbn.getRate();
+                R[col] = pbn.getRate(); //calculates rate based on evidence provided
+                //All nodes instantiated with MPE - rate across entire tree
 //                BNBuf.save(pbn.getBN(), "/Users/mikael/test.xml");
             }
             
+            //Retrieve and store reconstructions for each latent node
             List<EnumSeq.Gappy<Enumerable>> asrs = new ArrayList<>();
-            for (int row = 0; row < asr_matrix.length; row ++) {
-                Object[] asr_obj = asr_matrix[row];
+            //asr_matrix stores joint reconstruction - MPE assignment of each node in each network
+            for (int row = 0; row < asr_matrix.length; row ++) { 
+                Object[] asr_obj = asr_matrix[row]; //retrieve MP sequence for node/row
                 EnumSeq.Gappy<Enumerable> myasr = new EnumSeq.Gappy<>(Enumerable.aacid_alt);
                 myasr.set(asr_obj);
                 myasr.setName(indexForNodes.get(row));
@@ -162,7 +194,8 @@ public class ASRExample {
             }
             
             String rootname = root.getVariable().getName();
-            
+            //Create a new alignment from the reconstructed sequences
+            //Print reconstruction for each internal node
             EnumSeq.Alignment aln_asr = new EnumSeq.Alignment(asrs);
             for (int i = 0; i < aln_asr.getHeight(); i ++) {
                 EnumSeq.Gappy<Enumerable> asr_seq = aln_asr.getEnumSeq(i);
@@ -170,14 +203,18 @@ public class ASRExample {
                 if (rootname.equals(nodename))
                     asr_root = asr_seq.toString();
                 //System.out.println(asr_seq.getName() + "\t" + asr_seq.toString());
-
+                
+                //Not root and not leaf
                 if (nodes[i].getChildren().toArray().length > 0){
                     System.out.println(">" + nodes[i].getLabel());
                     System.out.println(asr_seq.toString());
                 }
             }
             
-            System.out.println("Joint reconstruction: " + asr_root);
+            
+            //Report findings
+            System.out.println("Joint reconstruction root node: " + asr_root);
+            System.out.print("Marginal Distrib for each network when root is queried\n");
             System.out.print("  ");
             for (int j = 0; j < Enumerable.aacid.size(); j ++) {
                 System.out.print(Enumerable.aacid.get(j) + "    ");
@@ -185,13 +222,15 @@ public class ASRExample {
             System.out.println("Rate from joint reconstructions");
             for (int col = 0; col < aln.getWidth(); col ++) {
                 System.out.println(margin_distribs[col] + "\t" + asr_root.charAt(col) + "\t" + R[col]);
-            }            
+            }    
+            //estimates parameters of gamma distribution
             double alpha = GammaDistrib.getAlpha(R);
             double beta = 1 / alpha;
             System.out.println("Gamma alpha = " + alpha + " beta = " + beta);
+            //Creates a gamma distribution
             GammaDistrib gd = new GammaDistrib(alpha, 1/beta);
             double mean = 0.0;
-            System.out.println("Sample (showing only first 10)");
+            System.out.println("Sample from new gamma distrib (showing only first 10)");
             int N = 1000;
             for (int i = 0; i < N; i ++) {
                 double rate = gd.sample();
