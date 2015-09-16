@@ -141,7 +141,7 @@ public abstract class SubstModel {
     public EnumDistrib getDistrib(Object Y, double time) {
         if (this.time != time || probs == null || table == null) { // only re-compute matrix if time has changed
             probs = getProbs(time);
-            table = new EnumTable<>(new EnumVariable(alpha));
+            table = new EnumTable<>(new EnumVariable(alpha), new EnumVariable(alpha));
             for (int i = 0; i < probs.length; i ++) {
                 EnumDistrib d = new EnumDistrib(alpha, probs[i]);
                 table.setValue(i, d);
