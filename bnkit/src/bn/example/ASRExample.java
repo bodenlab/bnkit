@@ -47,18 +47,11 @@ import java.util.Set;
  * @author mikael
  */
 public class ASRExample {
-<<<<<<< HEAD
-    static String file_tree = "/Users/mikael/simhome/ASR/toy.nwk";
-    static String file_aln = "/Users/mikael/simhome/ASR/toy.aln";
-//    static String file_tree = "/Users/mikael/simhome/ASR/CYP2/CYP2F.nwk";
-//    static String file_aln = "/Users/mikael/simhome/ASR/CYP2/CYP2F.aln";
-=======
 //    static String file_tree = "../CYP2F.nwk";
 //    static String file_aln = "../CYP2F.aln";
 //    
     static String file_tree = "../test_tree.txt";
     static String file_aln = "../test_aln.aln";
->>>>>>> f6486764c2c236c08e8e59041fcdfe52a07ed4e0
     
     static PhyloTree tree;
     static List<EnumSeq.Gappy<Enumerable>> seqs;
@@ -115,13 +108,7 @@ public class ASRExample {
                 if (use_sampled_rate)
                     pbn = PhyloBNet.create(tree, new WAG(), sampled_rate);
                 else
-<<<<<<< HEAD
                     pbn = PhyloBNet.create(tree, new WAG());
-=======
-                    //creates BNet beginning with root then recursively
-                    //traversing subtrees
-                    pbn = PhyloBNet.create(tree, new JTT());
->>>>>>> f6486764c2c236c08e8e59041fcdfe52a07ed4e0
                 pbnets[col] = pbn;
 
                 // set variables according to alignment
