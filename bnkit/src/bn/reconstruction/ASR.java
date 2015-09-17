@@ -324,8 +324,10 @@ public class ASR {
         try{
             Writer writer = new PrintWriter(filename, "UTF-8");
             
+            //Create the top level object - reconstruction
             JSONObject recon = new JSONObject();
         
+            //Create and populate the root node object
             JSONObject root = new JSONObject();
             root.put("Sequence",tree.getRoot().getSequence().toString());
             root.put("SeqName", tree.getRoot().getLabel());
@@ -335,33 +337,48 @@ public class ASR {
                 rates.put(Integer.toString(j), R[j]);
             }
             root.put("Rates", rates);
-            JSONObject margDistribs = new JSONObject();
-            Object[] aacid = Enumerable.aacid.getValues();
-            for (int k = 0; k < margin_distribs.length; k++) {
-                EnumDistrib distr = margin_distribs[k];
-                JSONObject position = new JSONObject();
-                for (int a = 0; a < aacid.length; a++) {
-                    double val = distr.get(aacid[a]);
-                    position.put(aacid[a].toString(), val);
-                }
-                margDistribs.put(Integer.toString(k), position);                
-            }
-            root.put("MarginalDistribs", margDistribs);
+//            JSONObject margDistribs = new JSONObject();
+//            Object[] aacid = Enumerable.aacid.getValues();
+//            for (int k = 0; k < margin_distribs.length; k++) {
+//                EnumDistrib distr = margin_distribs[k];
+//                JSONObject position = new JSONObject();
+//                for (int a = 0; a < aacid.length; a++) {
+//                    double val = distr.get(aacid[a]);
+//                    position.put(aacid[a].toString(), val);
+//                }
+//                margDistribs.put(Integer.toString(k), position);                
+//            }
+//            root.put("MarginalDistribs", margDistribs);
+            
+            //Add the root information to the reconstruction object
             recon.put("Root", root);
             
+            //Create and populate the internal nodes object
             PhyloTree.Node[] nodes = getInternalNodes();
-            for(int i = 0; i < nodes.length; i++) {
+            for (PhyloTree.Node n: nodes) {
                 JSONObject node = new JSONObject();
-                node.put("SeqName",nodes[i].getLabel());
-                node.put("Sequence", nodes[i].getSequence().toString());
-                node.put("NewickRep",nodes[i].toString());
+                node.put("SeqName",n.getLabel());
+                node.put("Sequence", n.getSequence().toString());
+//                node.put("NewickRep",nodes[i].toString());
+                //Using append rather than put automatically creates an array
                 recon.append("ReconstructedNodes", node);
-            }
+            }  
             
-            JSONObject gammaAB = new JSONObject();
-            gammaAB.put("alpha", gd.getAlpha());
-            gammaAB.put("beta", gd.getBeta());
-            recon.put("gammaDistrib", gammaAB);
+            //Create and populate the extant nodes object
+            PhyloTree.Node[] exNodes = getExtantNodes();
+            for (PhyloTree.Node n: exNodes) {
+                JSONObject node = new JSONObject();
+                node.put("SeqName",n.getLabel());
+                node.put("Sequence", n.getSequence().toString());
+//                node.put("NewickRep",nodes[i].toString());
+                recon.append("ExtantNodes", node);
+            } 
+            
+//            //Create and populate the gamma information
+//            JSONObject gammaAB = new JSONObject();
+//            gammaAB.put("alpha", gd.getAlpha());
+//            gammaAB.put("beta", gd.getBeta());
+//            recon.put("gammaDistrib", gammaAB);
             
             JSONObject fin = new JSONObject();
             fin.put("Reconstruction", recon);
@@ -380,7 +397,7 @@ public class ASR {
         }
         return true;
     }
-    
+       
     private PhyloTree.Node[] getInternalNodes(){
         String rootname = tree.getRoot().toString();
         PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
@@ -396,6 +413,23 @@ public class ASR {
         }
         PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - seqs.size() - 1];
         return intNodes.toArray(intNodesA);
+    }
+    
+    private PhyloTree.Node[] getExtantNodes(){
+        PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
+        List<PhyloTree.Node> extNodes = new ArrayList<>();
+        for (PhyloTree.Node node : nodes) {
+            //Only leaf nodes have no children
+            if (node.getChildren().toArray().length == 0){
+                extNodes.add(node);
+            }
+        }
+        for (int j = 0; j < seqs.size(); j++) {
+            EnumSeq.Gappy<Enumerable> seq = seqs.get(j);
+            tree.find(seq.getName()).setSequence(seq);
+        }
+        PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - seqs.size() - 1];
+        return extNodes.toArray(intNodesA);
     }
     
     public String getAsrSeq(){
