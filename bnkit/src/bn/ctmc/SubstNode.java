@@ -29,7 +29,9 @@ import bn.alg.VarElim;
 import bn.ctmc.matrix.*;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
+import dat.Enumerable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -154,7 +156,10 @@ public class SubstNode implements BNode, TiedNode {
 
     @Override
     public Distrib getDistrib() {
-        return new EnumDistrib(var.getDomain(), model.F); 
+        EnumDistrib d = new EnumDistrib(var.getDomain()); 
+        for (Object y : d.getDomain().getValues())
+            d.set(y, model.getProb(y));
+        return d;
     }
 
     @Override
@@ -523,7 +528,44 @@ public class SubstNode implements BNode, TiedNode {
         return null;
     }
 
-    public static void main(String[] args) {
+	@Override
+	public List<Sample> getConditionDataset(int conditionIndex) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Distrib getlikelihoodDistrib() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public void put(Object[] key, Distrib distr) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void put(Distrib prob) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void put(Distrib prob, Object... key) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void put(int index, Distrib distr) {
+		// TODO Auto-generated method stub
+		
+	}
+        
+        
+    public static void main0(String[] args) {
         // here are all the variables, representing the sequence at a position
         EnumVariable r1 = Predef.AminoAcid("R1");
         EnumVariable x1 = Predef.AminoAcid("X1");
@@ -598,39 +640,87 @@ public class SubstNode implements BNode, TiedNode {
         qr.display();
     }
 
-	@Override
-	public List<Sample> getConditionDataset(int conditionIndex) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    public static void myPrintAADistrib(Distrib d) {
+        Character[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
+        for (Character c : S)
+            System.out.print(c + "    ");
+        System.out.println();
+        for (Character c : S)
+            System.out.print(String.format("%4.2f", ((int)((d.get(c)*100))/100.0)) + " ");
+        System.out.println();
+    }
+    
+    public static void main(String[] args) {
+        // here are all the variables, representing the sequence at a position
+        EnumVariable x1 = Predef.AminoAcid("X1");
+        EnumVariable x2 = Predef.AminoAcid("X2");
+        EnumVariable x3 = Predef.AminoAcid("X3");
+        // here's the phylogenetic tree represented by a BN
+        SubstNode snx1 = new SubstNode(x1, new WAG());
+        SubstNode snx2 = new SubstNode(x2, x1, new WAG(), 1.0);
+        SubstNode snx3 = new SubstNode(x3, x1, new WAG(), 1.0);
+        BNet bn = new BNet();
+        bn.add(snx1, snx2, snx3);
+        // assign values to some variables, what we observe at the leaves of the tree
+        snx2.setInstance('K');
+        snx3.setInstance('Q');
 
-	@Override
-	public Distrib getlikelihoodDistrib() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+        myPrintAADistrib(snx1.getDistrib());
+        Character[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
+        double[] myd = new double[S.length];
+        Arrays.fill(myd, 1.0);
+        
+        for (int i = 0; i < S.length; i ++)
+            myd[i] *= snx1.getDistrib().get(S[i]);
+        
+        for (int i = 0; i < S.length; i ++) 
+            System.out.print(S[i] + "    ");
+        System.out.println();
+        for (int i = 0; i < S.length; i ++) {
+            Distrib d = snx2.getDistrib(new Object[] {S[i]});
+            System.out.print(String.format("%4.2f", ((int)((d.get('K')*100))/100.0)) + " ");
+            myd[i] *= d.get('K');
+        }
+        System.out.println();
+                
+        for (int i = 0; i < S.length; i ++) 
+            System.out.print(S[i] + "    ");
+        System.out.println();
+        for (int i = 0; i < S.length; i ++) {
+            Distrib d = snx3.getDistrib(new Object[] {S[i]});
+            System.out.print(String.format("%4.2f", ((int)((d.get('Q')*100))/100.0)) + " ");
+            myd[i] *= d.get('Q');
+        }
+        System.out.println();
+        
+        // Use variable elimination to perform inference in the tree
+        VarElim ve = new VarElim();
+        ve.instantiate(bn);
+        
+        // construct a query, this one to determine the "most probable explanation" (MPE) to the observations above
+        // where each variable is assigned a value
+//        Query q = ve.makeMPE(r1, x1, y1); // we only look at three
+        Query q = ve.makeMPE(); // we only look at three
+        CGTable qr = (CGTable) ve.infer(q);
+        Variable.Assignment[] assigned = qr.getMPE();
+        for (Variable.Assignment a : assigned) {
+            System.out.println(a.var + " = " + a.val.toString());
+        }
+        
+        // construct other queries, this time to determine the normal joint probability
+        q = ve.makeQuery(x1);
+        qr = (CGTable) ve.infer(q);
+        myPrintAADistrib(qr.query(x1));
+        
+        
+        System.out.println();
+        EnumDistrib mydistr = new EnumDistrib(Enumerable.aacid_alt, myd);
+        myPrintAADistrib(mydistr);
+        for (int i = 0; i < S.length; i ++) {
+            System.out.println(S[i] + "\t" + myd[i]);
+        }
+    }
 
-	@Override
-	public void put(Object[] key, Distrib distr) {
-		// TODO Auto-generated method stub
-		
-	}
 
-	@Override
-	public void put(Distrib prob) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void put(Distrib prob, Object... key) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void put(int index, Distrib distr) {
-		// TODO Auto-generated method stub
-		
-	}
+    
 }

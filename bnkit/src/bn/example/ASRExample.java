@@ -23,7 +23,7 @@ import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.PhyloBNet;
-import bn.ctmc.matrix.JTT;
+import bn.ctmc.matrix.WAG;
 import bn.factor.Factorize;
 import bn.file.BNBuf;
 import bn.prob.EnumDistrib;
@@ -106,11 +106,9 @@ public class ASRExample {
                 tree.setContentByParsimony(names, gaps);
                 PhyloBNet pbn;
                 if (use_sampled_rate)
-                    pbn = PhyloBNet.create(tree, new JTT(), sampled_rate);
+                    pbn = PhyloBNet.create(tree, new WAG(), sampled_rate);
                 else
-                    //creates BNet beginning with root then recursively
-                    //traversing subtrees
-                    pbn = PhyloBNet.create(tree, new JTT());
+                    pbn = PhyloBNet.create(tree, new WAG());
                 pbnets[col] = pbn;
 
                 // set variables according to alignment
