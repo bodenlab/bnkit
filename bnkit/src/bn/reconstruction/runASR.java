@@ -27,3 +27,9 @@ public class runASR {
         }
     }
 }
+
+//"../test_tree.txt" "../test_aln.aln"
+//"../test_tree.txt" "../test_aln_jitter.txt"
+//"../CYP2F.nwk" "../CYP2F.aln"
+//"../soxb_tree.nwk" "../soxb_clustal.aln"
+//"../voordeckers_tree.txt" "../voordeckers_aln.txt"
