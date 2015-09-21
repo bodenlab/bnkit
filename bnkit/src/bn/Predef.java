@@ -25,13 +25,10 @@ import bn.node.CPT;
 import bn.node.CPTPseudo;
 import bn.node.DirDT;
 import bn.node.GDT;
-import bn.node.NoisyOR;
 import dat.Continuous;
-import dat.Domain;
 import dat.EnumVariable;
 import dat.Variable;
 import dat.Enumerable;
-import gui2.NodeModel;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -64,20 +61,6 @@ public class Predef {
             return false;
         } else {
             return true;
-        }
-    }
-
-    /**
-     * This function is used by Jun's GUI.
-     * @param var_type
-     * @return 
-     * @deprecated
-     */
-    public static String getBNodeType(String var_type) {
-        if (isEnumerable(var_type)) {
-            return "CPT";
-        } else {
-            return "GDT";
         }
     }
 
@@ -163,37 +146,6 @@ public class Predef {
                 } else {
                     return new SubstNode((EnumVariable)var, model);
                 }
-            }
-            return null;
-        } catch (ClassCastException e) {
-            return null;
-        }
-    }
-    
-    /**
-     * This function is used by Jun's GUI.
-     * Do not use.
-     * @return 
-     * @deprecated
-     */
-    @SuppressWarnings("rawtypes")
-    public static NodeModel getNodeModel(Variable var, List<Variable> parents, String type) {
-        if (parents == null) {
-            parents = new ArrayList<>();
-        }
-        try {
-            if (type.equalsIgnoreCase("CPT")) {
-                List<EnumVariable> elist = new ArrayList<>();
-                for (Variable v : parents) {
-                    elist.add((EnumVariable) v);
-                }
-                return new NodeModel((EnumVariable) var, elist);
-            } else if (type.equalsIgnoreCase("GDT")) {
-                List<EnumVariable> elist = new ArrayList<>();
-                for (Variable v : parents) {
-                    elist.add((EnumVariable) v);
-                }
-                return new NodeModel((Variable<Continuous>) var, elist);
             }
             return null;
         } catch (ClassCastException e) {
