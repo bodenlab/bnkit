@@ -21,6 +21,8 @@ public class runASR {
         } else if (args.length == 2) {
             ASR asr = new ASR(args[0], args[1]);
             asr.save("JSONoutput.txt");
+            asr.exploreBranches();
+//            asr.createBNdata();
         } else {
             ASR asr = new ASR(args[0], args[1]);
             asr.save(args[2]);
@@ -28,8 +30,8 @@ public class runASR {
     }
 }
 
-//"../test_tree.txt" "../test_aln.aln"
-//"../test_tree.txt" "../test_aln_jitter.txt"
-//"../CYP2F.nwk" "../CYP2F.aln"
+//"bnkit/data/test_tree.txt" "bnkit/data/test_aln.aln"
+//"bnkit/data/test_tree.txt" "bnkit/data/test_aln_jitter.txt"
+//"bnkit/data/CYP2F.nwk" "bnkit/data/CYP2F.aln"
 //"../soxb_tree.nwk" "../soxb_clustal.aln"
 //"../voordeckers_tree.txt" "../voordeckers_aln.txt"
