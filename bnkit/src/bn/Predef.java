@@ -53,7 +53,7 @@ public class Predef {
     }
 
     public static String[] getVariableTypes() {
-        return new String[]{"Boolean", "String", "Number", "Real", "Amino acid", "Nucleic acid", "Distrib"};
+        return new String[]{"Boolean", "String", "Number", "Real", "Amino acid", "Amino acid extended", "Nucleic acid", "Distrib"};
     }
 
     public static boolean isEnumerable(String typename) {
@@ -83,6 +83,9 @@ public class Predef {
             }
         }
         if (typename.equalsIgnoreCase("Amino acid")) {
+            return Predef.AminoAcid(varname);
+        }
+        if (typename.equalsIgnoreCase("Amino acid extended")) {
             return Predef.AminoAcid(varname);
         }
         if (typename.equalsIgnoreCase("Nucleic acid")) {
@@ -192,6 +195,13 @@ public class Predef {
                             return ch;
                         }       break;
                     }
+                case "Amino acid extended":
+                {
+                    Character ch = vstr.charAt(0);
+                    if (var.getDomain().isValid(ch)) {
+                        return ch;
+                    }       break;
+                }
                 case "String":
                     if (var.getDomain().isValid(vstr)) {
                         return vstr;
@@ -243,6 +253,16 @@ public class Predef {
         var.setPredef("Amino acid");
         StringBuilder sbuf = new StringBuilder("");
         for (Object v : Enumerable.aacid.getValues()) {
+            sbuf.append(v).append(";");
+        }
+        var.setParams(sbuf.toString());
+        return var;
+    }
+    public static EnumVariable AminoAcidExt(String name) {
+        EnumVariable var = new EnumVariable(Enumerable.aacid_ext, name);
+        var.setPredef("Amino acid extended");
+        StringBuilder sbuf = new StringBuilder("");
+        for (Object v : Enumerable.aacid_ext.getValues()) {
             sbuf.append(v).append(";");
         }
         var.setParams(sbuf.toString());
