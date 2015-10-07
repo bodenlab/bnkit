@@ -27,8 +27,10 @@ public class Analysis {
 
     private PhyloTree tree;
     private PhyloBNet pbn; //only to be used for navigating branches
-    private List<EnumSeq.Gappy<Enumerable>> seqs;
     private EnumSeq.Alignment<Enumerable> aln;
+    private Map<String, String> mapForNodes;
+
+//    private List<EnumSeq.Gappy<Enumerable>> seqs;
 //    private PhyloBNet[] pbnets;
 //    private double[] R; //Rates at positions in alignment
 //    private EnumDistrib[] margin_distribs; //Marginal distributions for nodes
@@ -36,53 +38,48 @@ public class Analysis {
 //    private String asr_root; //Reconstructed sequence
 //    private GammaDistrib gd; //Calculated gamma distribution
 //    private BNet[] models; //model that will be trained for each column in alignment
-
-
-    private List<String> indexForNodes;
-    private Map<String, String> mapForNodes;
-
+//    private List<String> indexForNodes;
 
     public Analysis(ASR reconstruction) {
-
+        tree = reconstruction.getTree();
+        pbn = reconstruction.getPbn();
+        aln = reconstruction.getAln();
+        mapForNodes = reconstruction.getMapForNodes();
+        labelEdges();
     }
 
     public Analysis(String file_tree, String file_aln){
-
-    }
-
-    public Analysis(String json_result_file){
-
-    }
-
-    /**
-     * Load the supplied tree and alignment files
-     * Create phylogenetic tree, create node index, create node map
-     * Store sequences and alignment
-     * @param file_tree
-     * @param file_aln
-     */
-    public void loadData(String file_tree, String file_aln) {
         try {
             tree = PhyloTree.loadNewick(file_tree); //load tree - tree not in Newick
             PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
-            indexForNodes = new ArrayList<>(); // Newick string for subtree
             mapForNodes = new HashMap<>(); // Shortname --> Newick string for subtree
             for (PhyloTree.Node n : nodes) {
-                //n string format internal 'N0_'
-                //n string format extant (no children) 'seq_name_id'
-                //n.toString() recursive Newick representation node and children
-                //creates subtrees?
-                indexForNodes.add(replacePunct(n.toString()));
                 mapForNodes.put(n.getLabel().toString(), replacePunct(n.toString()));
             }
 
-            seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);
+            List<EnumSeq.Gappy<Enumerable>> seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);
             aln = new EnumSeq.Alignment<>(seqs);
             pbn = PhyloBNet.create(tree, new JTT());
 
         } catch (IOException ex) {
             ex.printStackTrace();
         }
+    }
+
+    /**
+     * FIXME need to work on this
+     * @param result_file
+     */
+    public Analysis(String result_file, int type){
+        switch(type){
+            case 1:
+                //JSON output
+                break;
+            case 2:
+                //XML output
+                break;
+        }
+
     }
 
 
@@ -236,7 +233,7 @@ public class Analysis {
         return entropy;
     }
 
-    public void createBNdata() {
+    public BNet[] createNtrainBN() {
         BNet[] columnModels = new BNet[aln.getWidth()];
         Map<Object, Map<Object,List<Object>>> trainingData = new HashMap<>();
         int edges = tree.toNodesBreadthFirst().length - 1; //edges = total nodes - 1
@@ -246,12 +243,13 @@ public class Analysis {
             Collection<PhyloTree.Node> children = root.getChildren();
             Map<Object, List<Object>> store = new HashMap<>();
             Set<PhyloTree.Node> visited = new HashSet<>();
-            Map<Object, List<Object>> result = getTransitions(a, root, children, store, root, visited);
-            trainingData.put(a, result);
+            Collection<PhyloTree.Node> newChildren = new HashSet<>(children);
+            getTransitions(a, root, newChildren, store, root, visited);
+            trainingData.put(a, store);
 
             Object[][] columnTransitions = new Object[edges][];
             int e = 0;
-            for (Map.Entry<Object, List<Object>> trans : result.entrySet()) {
+            for (Map.Entry<Object, List<Object>> trans : store.entrySet()) {
                 Object aaParent = trans.getKey();
                 for (Object aaChild : trans.getValue()) {
                     Object[] tran = {null, null, aaParent, aaChild};//nodes in curNet are ordered parent, aaparent, child, aachild - data must reflect this
@@ -260,15 +258,91 @@ public class Analysis {
                 }
             }
 
-//            List<BNode> bNodes = curNet.getOrdered();
             List<BNode> bNodes = Arrays.asList(curNet.getNode("Parent"), curNet.getNode("Child"), curNet.getNode("AAparent"), curNet.getNode("AAchild"));
             LearningAlg em = new EM(curNet);
             em.train(columnTransitions, bNodes);
             columnModels[a] = curNet;
-            BNBuf.save(curNet, "col_" + a + "_network.out");
+//            BNBuf.save(curNet, "col_" + a + "_network.out");
             System.out.println();
         }
+        return columnModels;
+    }
 
+    public void inferBranchValues(BNet[] models) {
+
+        for (int c = 0; c < models.length; c++) {
+
+        }
+
+    }
+
+    private void labelEdges() {
+        PhyloTree.Node root = tree.getRoot();
+        Collection<PhyloTree.Node> children = root.getChildren();
+        Map<String, PhyloTree.Node> branchParent = new HashMap<>();
+        Map<String, PhyloTree.Node> branchChild = new HashMap<>();
+        Collection<PhyloTree.Node> newChildren = new HashSet<>(children);
+        int indx = 0;
+        Set<PhyloTree.Node> visited = new HashSet<>();
+        expandNode(root, newChildren, indx, branchParent, branchChild, visited);
+        System.out.println();
+
+    }
+//
+    private void expandNode(PhyloTree.Node node, Collection<PhyloTree.Node> children, int indx, Map<String, PhyloTree.Node> branchParent,Map<String, PhyloTree.Node> branchChild, Set<PhyloTree.Node> visited){
+        //node = current node = parent
+        if (children.iterator().hasNext()) {
+            PhyloTree.Node newNode = children.iterator().next();
+            //newNode = child
+            children.remove(newNode); //we are now looking at this child so remove it from set
+            visited.add(newNode); //add child node to visited list
+            Object test = newNode.getChildren();
+            if (newNode.getChildren().size() > 0) { //this child has children, recurse
+                String bName = "b" + indx;
+                indx++;
+                branchParent.put(bName, node);
+                branchChild.put(bName, newNode);
+                Collection<PhyloTree.Node> nextChildren = newNode.getChildren(); //get next set of children to explore
+                Collection<PhyloTree.Node> newChildren = new HashSet<>(nextChildren);
+                expandNode(newNode, newChildren, indx, branchParent, branchChild, visited);
+            }
+            else { //we have reached the end of this branch
+                String bName = "b" + indx;
+                indx++;
+                branchParent.put(bName, node);
+                branchChild.put(bName, newNode);
+                expandNode(node, children, indx, branchParent, branchChild, visited);
+            }
+        } else { //we are back tracking up the tree
+            if (node != tree.getRoot()) { //to handle root
+
+                //need to identify parent of current node - tricky when you're looking at a phylo tree not phylo BNet
+                String nodeLab = (String)node.getLabel();
+                String nodeName = mapForNodes.get(nodeLab); //get identifier of current node for bnet
+                BNode bNode = pbn.getBN().getNode(nodeName); //find current node in bnet of phylo tree
+                String bParent = bNode.getParents().get(0).getName(); //only ever single parent in phylo tree
+
+                //FIXME there must be a better way to extract to node label!
+                //get the node label of the parent of current node to enable back tracking
+                String parentLab = null;
+                for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
+                    String value = e.getValue();
+                    if (value.equals(bParent)){
+                        parentLab = e.getKey();
+                        break;
+                    }
+                }
+                PhyloTree.Node newNode = tree.find(parentLab); //identify parent from bnet in phylo tree
+                Collection<PhyloTree.Node> back = newNode.getChildren(); //get the children of the parent of current node
+                visited.add(node); //add node to visited list
+                Collection<PhyloTree.Node> newChildren = new HashSet<>(back);
+                newChildren.removeAll(visited);
+                expandNode(newNode, newChildren, indx, branchParent, branchChild, visited);; //the parent goes back to being the node of interest
+                //potentially incorrect use of recursion...but it works
+            } else { //explored all branches so finish
+                return;
+            }
+        }
     }
 
     private BNet network() {
@@ -302,20 +376,19 @@ public class Analysis {
      * @param visited record of which nodes have been visited
      * @return a map with parent as key and all possible children store in a list as the value
      */
-    private Map<Object, List<Object>> getTransitions(int col, PhyloTree.Node node, Collection<PhyloTree.Node> children, Map<Object, List<Object>> store, PhyloTree.Node root, Set<PhyloTree.Node> visited) {
+    private void getTransitions(int col, PhyloTree.Node node, Collection<PhyloTree.Node> children, Map<Object, List<Object>> store, PhyloTree.Node root, Set<PhyloTree.Node> visited) {
         //node = parent
         //newNode = child
         char parentState = node.getSequence().toString().charAt(col); //get state of parent
 
         if (children.iterator().hasNext()) {
             PhyloTree.Node newNode = children.iterator().next(); //identify child of interest
-            if (visited.contains(newNode)) { //This isn't as clean as it should be - will only work for bifurcating tree
-                newNode = children.iterator().next(); //identify next child of interest if we've already visited one
-            }
+            children.remove(newNode);
             char childState = newNode.getSequence().toString().charAt(col); //get state of child of interest
             visited.add(newNode); //add child node to visited list
-            if (newNode.getChildren() != null) { //this child has children, recurse
-                Collection<PhyloTree.Node> newChildren = newNode.getChildren(); //get next set of children to explore
+            if (newNode.getChildren().size() > 0) { //this child has children, recurse
+                Collection<PhyloTree.Node> nextChildren = newNode.getChildren(); //get next set of children to explore
+                Collection<PhyloTree.Node> newChildren = new HashSet<>(nextChildren);
                 if (store.containsKey(parentState)) { //you've seen the parent state before
                     store.get(parentState).add(childState); //record parent -> child relationship
                 } else { //this is a new parent state to record
@@ -324,9 +397,10 @@ public class Analysis {
                     store.put(parentState, states); //record parent -> child relationship
                 }
                 getTransitions(col, newNode, newChildren, store, root, visited); //recurse with child of interest as new parent
-            } else { //we have reached the end of this branch
+            }
+            else { //we have reached the end of this branch
                 store.get(parentState).add(childState);
-                return getTransitions(col, node, children, store, root, visited);
+                getTransitions(col, node, children, store, root, visited); //recurse with child of interest as new parent
             }
         } else { //we are back tracking up the tree
             if (node != root) { //to handle root
@@ -352,13 +426,12 @@ public class Analysis {
                 visited.add(node); //add node to visited list
                 Collection<PhyloTree.Node> newChildren = new HashSet<>(back);
                 newChildren.removeAll(visited);
-                return getTransitions(col, parent, newChildren, store, root, visited); //the parent goes back to being the node of interest
+                getTransitions(col, parent, newChildren, store, root, visited); //the parent goes back to being the node of interest
                 //potentially incorrect use of recursion...but it works
             } else { //explored all branches so finish
-                return store;
+                return;
             }
         }
-        return store;
     }
 
 
@@ -375,7 +448,7 @@ public class Analysis {
                 intNodes.add(node);
             }
         }
-        PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - seqs.size() - 1];
+        PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - intNodes.size() - 1];
         return intNodes.toArray(intNodesA);
     }
 
@@ -388,11 +461,7 @@ public class Analysis {
                 extNodes.add(node);
             }
         }
-        for (int j = 0; j < seqs.size(); j++) {
-            EnumSeq.Gappy<Enumerable> seq = seqs.get(j);
-            tree.find(seq.getName()).setSequence(seq);
-        }
-        PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - seqs.size() - 1];
+        PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - extNodes.size() - 1];
         return extNodes.toArray(intNodesA);
     }
 
