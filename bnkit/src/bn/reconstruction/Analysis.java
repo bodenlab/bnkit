@@ -30,8 +30,8 @@ public class Analysis {
     private EnumSeq.Alignment<Enumerable> aln;
     private Map<String, String> mapForNodes;
 
-    private Map<String, PhyloTree.Node> branchParent;
-    private Map<String, PhyloTree.Node> branchChild;
+    private Map<String, PhyloTree.Node> edgeParent;
+    private Map<String, PhyloTree.Node> edgeChild;
 
 //    private List<EnumSeq.Gappy<Enumerable>> seqs;
 //    private PhyloBNet[] pbnets;
@@ -43,6 +43,11 @@ public class Analysis {
 //    private BNet[] models; //model that will be trained for each column in alignment
 //    private List<String> indexForNodes;
 
+    /**
+     * Constructor following on immediately from performing a reconstruction
+     * Currently runs the methods to model transitions across all columns in the alignment
+     * @param reconstruction
+     */
     public Analysis(ASR reconstruction) {
         tree = reconstruction.getTree();
         pbn = reconstruction.getPbn();
@@ -54,6 +59,12 @@ public class Analysis {
         inferEdgeValues(models);
     }
 
+    /**
+     * Constructor which assumes the reconstructed sequence and reconstructed tree have been saved and
+     * can be loaded
+     * @param file_tree
+     * @param file_aln
+     */
     public Analysis(String file_tree, String file_aln){
         try {
             tree = PhyloTree.loadNewick(file_tree); //load tree - tree not in Newick
@@ -78,6 +89,7 @@ public class Analysis {
     }
 
     /**
+     * Constructor which takes the output from ASR
      * FIXME need to work on this
      * @param result_file
      */
@@ -101,6 +113,8 @@ public class Analysis {
      * alignment.
      * The scores are then written to a file which can be read by an R script to
      * make the output look pretty
+     *
+     * FIXME could be split into smaller methods
      */
     public void exploreBranches() {
 
@@ -244,6 +258,14 @@ public class Analysis {
         return entropy;
     }
 
+    /**
+     * Creates a Bayesian network for each column in the alignment. This network is specified in network().
+     * (FIXME create method which has the network passed in)
+     * Each network is trained based on all transitions seen in phylogenetic tree (including ancestral sequence) for a
+     * specific column in the alignment. Transitions are recorded using getTransitions().
+     *
+     * @return an array of trained Bayesian networks
+     */
     public BNet[] createNtrainBN() {
         BNet[] columnModels = new BNet[aln.getWidth()];
         Map<Object, Map<Object,List<Object>>> trainingData = new HashMap<>();
@@ -279,15 +301,21 @@ public class Analysis {
         return columnModels;
     }
 
+    /**
+     * Based on the trained network for each column, instantiate the parent and child node and get the likelihood of
+     * the model in that state. Record this value for every edge, across every column
+     * FIXME where does this output go?
+     * @param models
+     */
     public void inferEdgeValues(BNet[] models) {
 
         Map<Integer, Map<String,Double>> store = new HashMap<>();
         for (int c = 0; c < models.length; c++) {
             Map<String, Double> branchRes = new HashMap<>();
-            for (Map.Entry<String, PhyloTree.Node> branch : branchParent.entrySet()) {
+            for (Map.Entry<String, PhyloTree.Node> branch : edgeParent.entrySet()) {
                 String bName = branch.getKey();
                 Object parent = branch.getValue().getSequence().get()[c];
-                Object child = branchChild.get(bName).getSequence().get()[c];
+                Object child = edgeChild.get(bName).getSequence().get()[c];
 
                 BNet model = models[c];
                 model.getNode("AAparent").setInstance(parent);
@@ -301,20 +329,35 @@ public class Analysis {
         }
     }
 
+    /**
+     * To record the loglikelihood score for each edge you need to label the edges.
+     * Each edge has to be linked to a parent and a child.
+     * Two maps are used to do this - each with the same set of keys identifying edges
+     */
     private void labelEdges() {
         PhyloTree.Node root = tree.getRoot();
         Collection<PhyloTree.Node> children = root.getChildren();
-        branchParent = new HashMap<>();
-        branchChild = new HashMap<>();
+        edgeParent = new HashMap<>();
+        edgeChild = new HashMap<>();
         Collection<PhyloTree.Node> newChildren = new HashSet<>(children);
         int indx = 0;
         Set<PhyloTree.Node> visited = new HashSet<>();
-        expandNode(root, newChildren, indx, branchParent, branchChild, visited);
+        findEdges(root, newChildren, indx, edgeParent, edgeChild, visited);
         System.out.println();
 
     }
-//
-    private void expandNode(PhyloTree.Node node, Collection<PhyloTree.Node> children, int indx, Map<String, PhyloTree.Node> branchParent,Map<String, PhyloTree.Node> branchChild, Set<PhyloTree.Node> visited){
+
+    /**
+     * Recursive method to identify all edges, provide a label and record parent and child of edge.
+     * Depth first search
+     * @param node
+     * @param children
+     * @param indx
+     * @param edgeParent
+     * @param edgeChild
+     * @param visited
+     */
+    private void findEdges(PhyloTree.Node node, Collection<PhyloTree.Node> children, int indx, Map<String, PhyloTree.Node> edgeParent, Map<String, PhyloTree.Node> edgeChild, Set<PhyloTree.Node> visited){
         //node = current node = parent
         if (children.iterator().hasNext()) {
             PhyloTree.Node newNode = children.iterator().next();
@@ -325,18 +368,18 @@ public class Analysis {
             if (newNode.getChildren().size() > 0) { //this child has children, recurse
                 String bName = "b" + indx;
                 indx++;
-                branchParent.put(bName, node);
-                branchChild.put(bName, newNode);
+                edgeParent.put(bName, node);
+                edgeChild.put(bName, newNode);
                 Collection<PhyloTree.Node> nextChildren = newNode.getChildren(); //get next set of children to explore
                 Collection<PhyloTree.Node> newChildren = new HashSet<>(nextChildren);
-                expandNode(newNode, newChildren, indx, branchParent, branchChild, visited);
+                findEdges(newNode, newChildren, indx, edgeParent, edgeChild, visited);
             }
             else { //we have reached the end of this branch
                 String bName = "b" + indx;
                 indx++;
-                branchParent.put(bName, node);
-                branchChild.put(bName, newNode);
-                expandNode(node, children, indx, branchParent, branchChild, visited);
+                edgeParent.put(bName, node);
+                edgeChild.put(bName, newNode);
+                findEdges(node, children, indx, edgeParent, edgeChild, visited);
             }
         } else { //we are back tracking up the tree
             if (node != tree.getRoot()) { //to handle root
@@ -362,7 +405,7 @@ public class Analysis {
                 visited.add(node); //add node to visited list
                 Collection<PhyloTree.Node> newChildren = new HashSet<>(back);
                 newChildren.removeAll(visited);
-                expandNode(newNode, newChildren, indx, branchParent, branchChild, visited);; //the parent goes back to being the node of interest
+                findEdges(newNode, newChildren, indx, edgeParent, edgeChild, visited);; //the parent goes back to being the node of interest
                 //potentially incorrect use of recursion...but it works
             } else { //explored all branches so finish
                 return;
@@ -370,6 +413,10 @@ public class Analysis {
         }
     }
 
+    /**
+     * Create the network for modelling transitions across the alignment
+     * @return
+     */
     private BNet network() {
         String[] stringVars = {"1","2","3","4","5"};
         EnumVariable P = Predef.Nominal(stringVars, "Parent");
