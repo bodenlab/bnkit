@@ -56,7 +56,8 @@ public class Analysis {
 
         labelEdges();
         BNet[] models = createNtrainBN();
-        inferEdgeValues(models);
+        Map<Integer, Map<String, Double>> result = inferEdgeValues(models); //first key is column number, second key is
+        //edge label (according to labelEdges()) linking to a loglikelihood value
     }
 
     /**
@@ -307,7 +308,7 @@ public class Analysis {
      * FIXME where does this output go?
      * @param models
      */
-    public void inferEdgeValues(BNet[] models) {
+    public Map<Integer, Map<String, Double>> inferEdgeValues(BNet[] models) {
 
         Map<Integer, Map<String,Double>> store = new HashMap<>();
         for (int c = 0; c < models.length; c++) {
@@ -327,6 +328,7 @@ public class Analysis {
             }
             store.put(c, branchRes);
         }
+        return store;
     }
 
     /**
