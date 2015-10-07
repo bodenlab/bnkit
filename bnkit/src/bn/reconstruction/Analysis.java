@@ -5,9 +5,9 @@ import bn.BNode;
 import bn.Predef;
 import bn.alg.EM;
 import bn.alg.LearningAlg;
+import bn.alg.VarElim;
 import bn.ctmc.PhyloBNet;
 import bn.ctmc.matrix.JTT;
-import bn.file.BNBuf;
 import bn.node.CPT;
 import dat.EnumSeq;
 import dat.EnumVariable;
@@ -30,6 +30,9 @@ public class Analysis {
     private EnumSeq.Alignment<Enumerable> aln;
     private Map<String, String> mapForNodes;
 
+    private Map<String, PhyloTree.Node> branchParent;
+    private Map<String, PhyloTree.Node> branchChild;
+
 //    private List<EnumSeq.Gappy<Enumerable>> seqs;
 //    private PhyloBNet[] pbnets;
 //    private double[] R; //Rates at positions in alignment
@@ -45,7 +48,10 @@ public class Analysis {
         pbn = reconstruction.getPbn();
         aln = reconstruction.getAln();
         mapForNodes = reconstruction.getMapForNodes();
+
         labelEdges();
+        BNet[] models = createNtrainBN();
+        inferEdgeValues(models);
     }
 
     public Analysis(String file_tree, String file_aln){
@@ -64,6 +70,11 @@ public class Analysis {
         } catch (IOException ex) {
             ex.printStackTrace();
         }
+
+        labelEdges();
+        BNet[] models = createNtrainBN();
+        inferEdgeValues(models);
+
     }
 
     /**
@@ -268,19 +279,33 @@ public class Analysis {
         return columnModels;
     }
 
-    public void inferBranchValues(BNet[] models) {
+    public void inferEdgeValues(BNet[] models) {
 
+        Map<Integer, Map<String,Double>> store = new HashMap<>();
         for (int c = 0; c < models.length; c++) {
+            Map<String, Double> branchRes = new HashMap<>();
+            for (Map.Entry<String, PhyloTree.Node> branch : branchParent.entrySet()) {
+                String bName = branch.getKey();
+                Object parent = branch.getValue().getSequence().get()[c];
+                Object child = branchChild.get(bName).getSequence().get()[c];
 
+                BNet model = models[c];
+                model.getNode("AAparent").setInstance(parent);
+                model.getNode("AAchild").setInstance(child);
+                VarElim ve = new VarElim();
+                ve.instantiate(model);
+                double llh = ve.logLikelihood();
+                branchRes.put(bName, llh);
+            }
+            store.put(c, branchRes);
         }
-
     }
 
     private void labelEdges() {
         PhyloTree.Node root = tree.getRoot();
         Collection<PhyloTree.Node> children = root.getChildren();
-        Map<String, PhyloTree.Node> branchParent = new HashMap<>();
-        Map<String, PhyloTree.Node> branchChild = new HashMap<>();
+        branchParent = new HashMap<>();
+        branchChild = new HashMap<>();
         Collection<PhyloTree.Node> newChildren = new HashSet<>(children);
         int indx = 0;
         Set<PhyloTree.Node> visited = new HashSet<>();
