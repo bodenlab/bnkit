@@ -21,8 +21,8 @@ public class runASR {
         } else if (args.length == 2) {
             ASR asr = new ASR(args[0], args[1]);
             asr.save("JSONoutput.txt");
-            asr.exploreBranches();
-//            asr.createBNdata();
+            Analysis test = new Analysis(asr); //the constructor currently handles all steps required
+//            test.createNtrainBN();
         } else {
             ASR asr = new ASR(args[0], args[1]);
             asr.save(args[2]);
