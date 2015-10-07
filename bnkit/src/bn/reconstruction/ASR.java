@@ -11,7 +11,6 @@ import bn.Predef;
 import bn.alg.*;
 import bn.ctmc.PhyloBNet;
 import bn.ctmc.matrix.JTT;
-import bn.file.BNBuf;
 import bn.node.CPT;
 import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
@@ -51,6 +50,7 @@ public class ASR {
     
     private List<String> indexForNodes;
     private Map<String, String> mapForNodes;
+    private Map<String, String> nodeToLabel;
     //Joint reconstruction of tree
     private Object[][] asr_matrix; //storage of all reconstructed sequences
     private double sampled_rate = // sampled rate, copy from a previous 1.0-rate run
@@ -78,6 +78,7 @@ public class ASR {
             PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
             indexForNodes = new ArrayList<>(); // Newick string for subtree
             mapForNodes = new HashMap<>(); // Shortname --> Newick string for subtree
+            nodeToLabel = new HashMap<>(); //convert underscore punctuation to decimal
             for (PhyloTree.Node n : nodes) {
                 //n string format internal 'N0_'
                 //n string format extant (no children) 'seq_name_id'
@@ -85,6 +86,7 @@ public class ASR {
                 //creates subtrees?
                 indexForNodes.add(replacePunct(n.toString())); 
                 mapForNodes.put(n.getLabel().toString(), replacePunct(n.toString()));
+                nodeToLabel.put(replacePunct(n.toString()), n.getLabel().toString());
             }
             
             seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);
@@ -274,15 +276,26 @@ public class ASR {
      * Identify sequence of root node and print internal node results
      */
     public void getSequences(){
-        //Retrieve and store reconstructions for each latent node
+        //Set extant nodes
+        for (int j = 0; j < seqs.size(); j++) {
+            EnumSeq.Gappy<Enumerable> seq = seqs.get(j);
+            tree.find(seq.getName()).setSequence(seq);
+        }
+
+        //Retrieve and store reconstructions for each node
         List<EnumSeq.Gappy<Enumerable>> asrs = new ArrayList<>();
-        //asr_matrix stores joint reconstruction - MPE assignment of each node in each network
+        //asr_matrix stores joint reconstruction - MPE assignment of each internal node in each network
         for (int row = 0; row < asr_matrix.length; row ++) { 
             Object[] asr_obj = asr_matrix[row]; //retrieve MP sequence for node/row
-            EnumSeq.Gappy<Enumerable> myasr = new EnumSeq.Gappy<>(Enumerable.aacid_alt);
-            myasr.set(asr_obj);
-            myasr.setName(indexForNodes.get(row));
-            asrs.add(myasr);
+            if (asr_obj[0] == null) { //extant node so have to manually retrieve sequence
+                EnumSeq.Gappy<Enumerable> extSeq = (EnumSeq.Gappy<Enumerable>) tree.find(nodeToLabel.get(indexForNodes.get(row))).getSequence();
+                asrs.add(extSeq);
+            } else { //reconstructed node so get sequence from matrix
+                EnumSeq.Gappy<Enumerable> myasr = new EnumSeq.Gappy<>(Enumerable.aacid_alt);
+                myasr.set(asr_obj);
+                myasr.setName(indexForNodes.get(row));
+                asrs.add(myasr);
+            }
         }
         
         String rootname = replacePunct(tree.getRoot().toString());
@@ -300,11 +313,10 @@ public class ASR {
                 
             //Not root and not leaf
             if (nodes[i].getChildren().toArray().length > 0){
-                nodes[i].setSequence(asr_seq);
-            } else {
                 nodes[i].setSequence(asr_seq); //set sequence for internal nodes
             }
         }
+        aln = aln_asr;
     }
 
     /**
@@ -424,21 +436,18 @@ public class ASR {
                 extNodes.add(node);
             }
         }
-        for (int j = 0; j < seqs.size(); j++) {
-            EnumSeq.Gappy<Enumerable> seq = seqs.get(j);
-            tree.find(seq.getName()).setSequence(seq);
-        }
+
         PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - seqs.size() - 1];
         return extNodes.toArray(intNodesA);
     }
     
-    public String getAsrSeq(){
-        return asr_root;
-    }
+    public String getAsrSeq(){ return asr_root; }
     
     public PhyloTree getTree() {
         return tree;
     }
+
+    public PhyloBNet getPbn() {return pbn;}
     
     public List<EnumSeq.Gappy<Enumerable>> getSeqs(){
         return seqs;
@@ -447,6 +456,8 @@ public class ASR {
     public EnumSeq.Alignment<Enumerable> getAln() {
         return aln;
     }
+
+    public  Map<String, String> getMapForNodes() { return mapForNodes; }
     
     //FIXME: Can you update the pbnets array without modifying the aln. Where
     //do the two interact?
