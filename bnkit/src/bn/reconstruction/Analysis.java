@@ -106,18 +106,12 @@ public class Analysis {
 
     }
 
-
     /**
      * A method to explore all branches of a phylogenetic tree based on
-     * EXTANT nodes. An alignment is generated for each branch and its ancestors
-     * and an entropy score is calculated for each column in the branch specific
-     * alignment.
-     * The scores are then written to a file which can be read by an R script to
-     * make the output look pretty
-     *
-     * FIXME could be split into smaller methods
+     * EXTANT nodes.
+     * @return map of branches keyed by leaf node
      */
-    public void exploreBranches() {
+    public Map<Object, List<Object>> exploreBranches() {
 
         //Structure to store the set of branches in the tree
         Map<Object, List<BNode>> result = new HashMap<>();
@@ -170,26 +164,95 @@ public class Analysis {
             //Where the newly edited node labels are stored
             modified.put(key, branchNodes);
         }
+        return modified;
+    }
 
+
+    /**
+     * A method to explore all branches of a phylogenetic tree based on
+     * PROVIDED nodes.
+     * @param nodes - list of nodes which represent the 'leafs' of the branches to be explored
+     * @return map of branches keyed by leaf node
+     */
+    public Map<Object, List<Object>> exploreBranches(PhyloTree.Node[] nodes) {
+
+        //Structure to store the set of branches in the tree
+        Map<Object, List<BNode>> result = new HashMap<>();
+
+        for (int n = 0; n < nodes.length; n++) {
+            String nodeLab = (String)nodes[n].getLabel();
+            String nodeName = mapForNodes.get(nodeLab);
+            BNode node = pbn.getBN().getNode(nodeName);
+            List<BNode> ancs = pbn.getBN().getAncestors(node);
+            result.put(nodeLab, ancs);
+        }
+
+        //This part is up for debate - currently each node in the branch is recorded
+        //using the BNet node name not the phyloTree label
+        //This converts them all to phyloTree labels
+        //This makes it easier to extract sequence stored in the phyloTree structure
+        Map<Object, List<Object>> modified = new HashMap<>();
+        List<String> extant = new ArrayList<>();
+        for (int i = 0 ; i < nodes.length; i++) {
+            String n = replacePunct(nodes[i].toString());
+            extant.add(n);
+        }
+
+        //Convert from BNode to phylo tree label
+        for (Map.Entry<Object, List<BNode>> res : result.entrySet()) {
+            Object key = res.getKey();
+            List<BNode> branch = res.getValue();
+            List<Object> branchNodes = new ArrayList<>();
+            for (BNode node : branch) {
+                String nodeTwo = node.toString();
+                String nodeName = null;
+                if (nodeTwo.contains("|")) {
+                    nodeName = nodeTwo.substring(3, nodeTwo.indexOf("|"));
+                } else {
+                    nodeName = nodeTwo.substring(3, nodeTwo.length() - 1);
+                }
+                String nodeLabel = null;
+                //FIXME there must be a better way to extract to node label!
+                for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
+                    String value = e.getValue();
+                    if (value.equals(nodeName)){
+                        nodeLabel = e.getKey();
+                        continue;
+                    }
+                }
+                branchNodes.add(nodeLabel);
+            }
+            //Where the newly edited node labels are stored
+            modified.put(key, branchNodes);
+        }
+        return modified;
+    }
+
+    /**
+     * Based on the branches of interest from exploreBranches(), generate an alignment for each branch including
+     * ancestral sequence. Then calculate the entropy for each column in the alignment
+     * @param branchMap - keyed by leaf node of branch
+     * @return an array of entropy scores for each branch across the alignment
+     */
+    public Object[][] calculateBranchEntropy(Map<Object, List<Object>> branchMap) {
         //For each branch in tree, get the sequence for each node and create an alignment
-        List<Object> branchOrder = new ArrayList<>();
         int r = 0; //count rows
-        Object[][] store = new Object[modified.size()][];
-        for (Map.Entry<Object, List<Object>> b : modified.entrySet()) {
+        Object[][] store = new Object[branchMap.size()][];
+        for (Map.Entry<Object, List<Object>> b : branchMap.entrySet()) {
             List<EnumSeq.Gappy<Enumerable>> asrs = new ArrayList<>();
             Object ext = b.getKey();
-            branchOrder.add(ext);//Important to know which branch is associated with which set of values
             List<Object> brNodes = b.getValue();
             PhyloTree.Node[] tNodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
             for (PhyloTree.Node tNode: tNodes) {
                 if (brNodes.contains(tNode.getLabel())) {
-                    asrs.add((dat.EnumSeq.Gappy<dat.Enumerable>)tNode.getSequence());
+                    asrs.add((EnumSeq.Gappy<Enumerable>)tNode.getSequence());
                 }
             }
             EnumSeq.Alignment aln_asr = new EnumSeq.Alignment(asrs);
             //For each column in branch specific alignment (based on ancestors), calculate an entropy score
-            Object[] row = new Object[aln_asr.getWidth()];
-            for (int i = 0; i < aln_asr.getWidth(); i++) {
+            Object[] row = new Object[aln_asr.getWidth() + 1]; //hard code branch name into array
+            row[0] = ext; //Need to know which set of scores belongs to which branch
+            for (int i = 1; i < aln_asr.getWidth()+1; i++) {
                 Object[] col = aln_asr.getColumn(i);
                 double entropy = getShannonEntropy(col);
                 row[i] = entropy;
@@ -197,30 +260,48 @@ public class Analysis {
             store[r] = row;
             r++;
         }
+        return store;
+    }
 
+    /**
+     *
+     * @param branchMap
+     * @return
+     */
+    public Object[][] calculateBranchLikelihood(Map<Object, List<Object>> branchMap, Map<Integer, Map<String, Double>> edgeValues) {
+
+
+
+        return null;
+    }
+
+    /**
+     * Take the 2D array generated by one of the branch processing methods and write it to a file
+     * @param branchValues
+     * @param file_name - include only the base of the name - no file extensions
+     */
+    public void writeBranches(Object[][] branchValues, String file_name) {
         //save the results to a file
         try {
-            PrintWriter writer = new PrintWriter("test_matrix.txt", "UTF-8");
-            for (int b = 0; b < store.length; b++) {
-                for (int d = 0; d < store[b].length; d++) {
-                    if (d < store[b].length -1) {
-                        writer.print(store[b][d] + "\t");
+            PrintWriter writer = new PrintWriter(file_name+".txt", "UTF-8");
+            for (int b = 0; b < branchValues.length; b++) {
+                for (int d = 1; d < branchValues[b].length; d++) { //ignore the label in column 0
+                    if (d < branchValues[b].length -1) {
+                        writer.print(branchValues[b][d] + "\t");
                     } else {
-                        writer.print(store[b][d]);
+                        writer.print(branchValues[b][d]);
                     }
                 }
                 writer.print("\n");
             }
             writer.close();
-            PrintWriter writerLab = new PrintWriter("test_matrix_lab.txt", "UTF-8");
-            for (int b = 0; b < store.length; b++) {
-                String label = (String)branchOrder.get(b);
-                writerLab.print(label+"\t");
-                for (int d = 0; d < store[b].length; d++) {
-                    if (d < store[b].length -1) {
-                        writerLab.print(store[b][d] + "\t");
+            PrintWriter writerLab = new PrintWriter(file_name+"lab.txt", "UTF-8");
+            for (int b = 0; b < branchValues.length; b++) {
+                for (int d = 0; d < branchValues[b].length; d++) { //include label in column 0
+                    if (d < branchValues[b].length -1) {
+                        writerLab.print(branchValues[b][d] + "\t");
                     } else {
-                        writerLab.print(store[b][d]);
+                        writerLab.print(branchValues[b][d]);
                     }
                 }
                 writerLab.print("\n");
@@ -232,7 +313,6 @@ public class Analysis {
         } catch (UnsupportedEncodingException use) {
             System.out.println(use.getStackTrace());
         }
-        System.out.println();
     }
 
     /**
@@ -261,7 +341,7 @@ public class Analysis {
 
     /**
      * Creates a Bayesian network for each column in the alignment. This network is specified in network().
-     * (FIXME create method which has the network passed in)
+     * (FIXME create method which has the network passed in?)
      * Each network is trained based on all transitions seen in phylogenetic tree (including ancestral sequence) for a
      * specific column in the alignment. Transitions are recorded using getTransitions().
      *
