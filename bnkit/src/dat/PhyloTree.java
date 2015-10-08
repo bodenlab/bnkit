@@ -236,6 +236,7 @@ public class PhyloTree {
         private double[] scores = null; 
         private int[][] traceback = null; 
         private Double dist = null; // optional distance (from this node to its parent)
+        private Double likelihood = null; //Every node has a single parent (bar root) so it can carry the value for the edge
         
         /**
          * Construct node from label/label.
@@ -258,6 +259,10 @@ public class PhyloTree {
             this.value = value;
             return value;
         }
+
+        public Double getLikelihood() { return likelihood; }
+
+        public void setLikelihood(Double likelihood) { this.likelihood  = likelihood; }
         
         public void setSequence(EnumSeq seq) {
             this.sequence = seq;
