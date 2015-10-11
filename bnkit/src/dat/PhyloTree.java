@@ -149,18 +149,20 @@ public class PhyloTree {
      * @param str text on Newick format
      * @return the root node of tree
      */
-    private static Node parseNewick(String str) {
+    private static Node parseNewick(String str, Node parent) { //FIXME!!
         Node node = null;
         int start_index = str.indexOf('('); // start parenthesis
         int end_index = str.lastIndexOf(')'); // end parenthesis
         if (start_index == -1 && end_index == -1) { // we are at leaf (no parentheses)
             int split_index = str.indexOf(':'); // check if a distance is specified
-            if (split_index == -1) // no distance
+            if (split_index == -1) {// no distance
                 node = new Node(str);
-            else { // there's a distance
+                node.setParent(parent);
+            } else { // there's a distance
                 node = new Node(str.substring(0, split_index));
                 double dist = Double.parseDouble(str.substring(split_index + 1, str.length()));
                 node.setDistance(dist);
+                node.setParent(parent);
             }
         } else if (start_index >= 0 && end_index >= 0) { // balanced parentheses
             //end_index = str.length() - end_index - 1; // correct index to refer from start instead of end of string
@@ -169,18 +171,21 @@ public class PhyloTree {
             int split_index = tail.indexOf(':'); // check if a distance is specified
             if (split_index == -1) { // no distance
                 node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1));
+                node.setParent(parent);
                 count += 1;
             } else { // there's a distance
                 node = new Node("N" + count + "_" + tail.substring(0, split_index));
                 double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()));
                 node.setDistance(dist);
+                node.setParent(parent);
                 count +=1;
             }
             // find where the commas are, and create children of node
             int comma = getComma(embed);
             while (comma != -1) {
                 String process_me = embed.substring(0, comma);
-                node.addChild(parseNewick(process_me));
+                //GOING TO HAVE TO PASS PARENT NODE WITH RECURSION TO RECORD IT
+                node.addChild(parseNewick(process_me, node)); //pass the current node down as the parent
                 if (comma + 1 > embed.length())
                     break;
                 embed = embed.substring(comma + 1);
@@ -203,7 +208,7 @@ public class PhyloTree {
         while ((line = reader.readLine()) != null)
             sb.append(line.trim());
         String newick = sb.toString();
-        Node root = parseNewick(newick);
+        Node root = parseNewick(newick, null); //null parent for root
         PhyloTree t = new PhyloTree(root);
         reader.close();
         return t;
@@ -236,8 +241,8 @@ public class PhyloTree {
         private double[] scores = null; 
         private int[][] traceback = null; 
         private Double dist = null; // optional distance (from this node to its parent)
-        private Double likelihood = null; //Every node has a single parent (bar root) so it can carry the value for the edge
-        
+        private List<Double> likelihood = new ArrayList<>(); //Every node has a single parent (bar root) so it can carry the value for the edge
+        private Node parent;
         /**
          * Construct node from label/label.
          * @param label label/label
@@ -260,9 +265,15 @@ public class PhyloTree {
             return value;
         }
 
-        public Double getLikelihood() { return likelihood; }
+        public List<Double> getLikelihood() { return likelihood; }
 
-        public void setLikelihood(Double likelihood) { this.likelihood  = likelihood; }
+        public Double getLikelihood(int c) { return likelihood.get(c); }
+
+        public void addLikelihood(Double likelihood, int column) { this.likelihood.set(column, likelihood); }
+
+        public void setParent(Node parent) { this.parent = parent; }
+
+        public Node getParent() { return parent; }
         
         public void setSequence(EnumSeq seq) {
             this.sequence = seq;
@@ -331,7 +342,7 @@ public class PhyloTree {
         /**
          * Find node by label/label. 
          * Searches the tree recursively using the current node as root.
-         * @param content 
+         * @param label
          * @return the node that contains the specified label, or null if not found
          */
         public Node find(Object label) {
@@ -446,9 +457,11 @@ public class PhyloTree {
     }
     
     public static void main(String[] args) {
-        Node root = parseNewick("((A:0.6,((B:3.3,(C:1.0,D:2.5)cd:1.8)bcd:5,((E:3.9,F:4.5)ef:2.5,G:0.3)efg:7)X:3.2)Y:0.5,H:1.1)I:0.2");
+        //null parent for root
+        Node root = parseNewick("((A:0.6,((B:3.3,(C:1.0,D:2.5)cd:1.8)bcd:5,((E:3.9,F:4.5)ef:2.5,G:0.3)efg:7)X:3.2)Y:0.5,H:1.1)I:0.2", null);
         System.out.println(root);
-        root = parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)");
+        //null parent for root
+        root = parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)", null);
         System.out.println(root);
         try {
             PhyloTree cyp3 = PhyloTree.loadNewick("/Users/mikael/simhome/ASR/gap_example.nwk");
