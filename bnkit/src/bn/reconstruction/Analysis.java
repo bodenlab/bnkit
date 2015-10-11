@@ -30,9 +30,6 @@ public class Analysis {
     private EnumSeq.Alignment<Enumerable> aln;
     private Map<String, String> mapForNodes;
 
-    private Map<String, PhyloTree.Node> edgeParent;
-    private Map<String, PhyloTree.Node> edgeChild;
-
 //    private List<EnumSeq.Gappy<Enumerable>> seqs;
 //    private PhyloBNet[] pbnets;
 //    private double[] R; //Rates at positions in alignment
@@ -54,10 +51,9 @@ public class Analysis {
         aln = reconstruction.getAln();
         mapForNodes = reconstruction.getMapForNodes();
 
-        labelEdges();
         BNet[] models = createNtrainBN();
-        Map<Integer, Map<String, Double>> result = inferEdgeValues(models); //first key is column number, second key is
-        //edge label (according to labelEdges()) linking to a loglikelihood value
+        inferEdgeValues(models); //Stored within each node
+        System.out.println();
     }
 
     /**
@@ -83,9 +79,8 @@ public class Analysis {
             ex.printStackTrace();
         }
 
-        labelEdges();
         BNet[] models = createNtrainBN();
-        inferEdgeValues(models);
+        inferEdgeValues(models); //Stored within each node
 
     }
 
@@ -385,112 +380,31 @@ public class Analysis {
     /**
      * Based on the trained network for each column, instantiate the parent and child node and get the likelihood of
      * the model in that state. Record this value for every edge, across every column
-     * FIXME where does this output go?
      * @param models
      */
-    public Map<Integer, Map<String, Double>> inferEdgeValues(BNet[] models) {
+    public void inferEdgeValues(BNet[] models) {
 
         Map<Integer, Map<String,Double>> store = new HashMap<>();
         for (int c = 0; c < models.length; c++) {
-            Map<String, Double> branchRes = new HashMap<>();
-            for (Map.Entry<String, PhyloTree.Node> branch : edgeParent.entrySet()) {
-                String bName = branch.getKey();
-                Object parent = branch.getValue().getSequence().get()[c];
-                Object child = edgeChild.get(bName).getSequence().get()[c];
+            PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //Explore all nodes to get all branches
+            for (int n = 0; n < nodes.length; n++) {
+                if (nodes[n].getParent() == null) {
+                    continue; //node is root so no branch to record
+                } else {
+                    PhyloTree.Node child = nodes[n];
+                    PhyloTree.Node parent = child.getParent(); //works for bifurcating trees as a child has a single parent
 
-                BNet model = models[c];
-                model.getNode("AAparent").setInstance(parent);
-                model.getNode("AAchild").setInstance(child);
-                VarElim ve = new VarElim();
-                ve.instantiate(model);
-                double llh = ve.logLikelihood();
-                branchRes.put(bName, llh);
-            }
-            store.put(c, branchRes);
-        }
-        return store;
-    }
+                    Object childState = child.getSequence().get()[c];
+                    Object parentState = parent.getSequence().get()[c];
+                    BNet model = models[c];
+                    model.getNode("AAparent").setInstance(parentState);
+                    model.getNode("AAchild").setInstance(childState);
+                    VarElim ve = new VarElim();
+                    ve.instantiate(model);
+                    double llh = ve.logLikelihood();
+                    child.addLikelihood(llh); //Child stores the likelihoods for the edge connecting it to its parent
 
-    /**
-     * To record the loglikelihood score for each edge you need to label the edges.
-     * Each edge has to be linked to a parent and a child.
-     * Two maps are used to do this - each with the same set of keys identifying edges
-     */
-    private void labelEdges() {
-        PhyloTree.Node root = tree.getRoot();
-        Collection<PhyloTree.Node> children = root.getChildren();
-        edgeParent = new HashMap<>();
-        edgeChild = new HashMap<>();
-        Collection<PhyloTree.Node> newChildren = new HashSet<>(children);
-        int indx = 0;
-        Set<PhyloTree.Node> visited = new HashSet<>();
-        findEdges(root, newChildren, indx, edgeParent, edgeChild, visited);
-        System.out.println();
-
-    }
-
-    /**
-     * Recursive method to identify all edges, provide a label and record parent and child of edge.
-     * Depth first search
-     * @param node
-     * @param children
-     * @param indx
-     * @param edgeParent
-     * @param edgeChild
-     * @param visited
-     */
-    private void findEdges(PhyloTree.Node node, Collection<PhyloTree.Node> children, int indx, Map<String, PhyloTree.Node> edgeParent, Map<String, PhyloTree.Node> edgeChild, Set<PhyloTree.Node> visited){
-        //node = current node = parent
-        if (children.iterator().hasNext()) {
-            PhyloTree.Node newNode = children.iterator().next();
-            //newNode = child
-            children.remove(newNode); //we are now looking at this child so remove it from set
-            visited.add(newNode); //add child node to visited list
-            Object test = newNode.getChildren();
-            if (newNode.getChildren().size() > 0) { //this child has children, recurse
-                String bName = "b" + indx;
-                indx++;
-                edgeParent.put(bName, node);
-                edgeChild.put(bName, newNode);
-                Collection<PhyloTree.Node> nextChildren = newNode.getChildren(); //get next set of children to explore
-                Collection<PhyloTree.Node> newChildren = new HashSet<>(nextChildren);
-                findEdges(newNode, newChildren, indx, edgeParent, edgeChild, visited);
-            }
-            else { //we have reached the end of this branch
-                String bName = "b" + indx;
-                indx++;
-                edgeParent.put(bName, node);
-                edgeChild.put(bName, newNode);
-                findEdges(node, children, indx, edgeParent, edgeChild, visited);
-            }
-        } else { //we are back tracking up the tree
-            if (node != tree.getRoot()) { //to handle root
-
-                //need to identify parent of current node - tricky when you're looking at a phylo tree not phylo BNet
-                String nodeLab = (String)node.getLabel();
-                String nodeName = mapForNodes.get(nodeLab); //get identifier of current node for bnet
-                BNode bNode = pbn.getBN().getNode(nodeName); //find current node in bnet of phylo tree
-                String bParent = bNode.getParents().get(0).getName(); //only ever single parent in phylo tree
-
-                //FIXME there must be a better way to extract to node label!
-                //get the node label of the parent of current node to enable back tracking
-                String parentLab = null;
-                for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
-                    String value = e.getValue();
-                    if (value.equals(bParent)){
-                        parentLab = e.getKey();
-                        break;
-                    }
                 }
-                PhyloTree.Node newNode = tree.find(parentLab); //identify parent from bnet in phylo tree
-                Collection<PhyloTree.Node> back = newNode.getChildren(); //get the children of the parent of current node
-                visited.add(node); //add node to visited list
-                Collection<PhyloTree.Node> newChildren = new HashSet<>(back);
-                newChildren.removeAll(visited);
-                findEdges(newNode, newChildren, indx, edgeParent, edgeChild, visited);; //the parent goes back to being the node of interest
-                //potentially incorrect use of recursion...but it works
-            } else { //explored all branches so finish
-                return;
             }
         }
     }
