@@ -270,7 +270,26 @@ public class PhyloTree {
 
         public Double getLikelihood(int c) { return likelihood.get(c); }
 
-        public void addLikelihood(Double likelihood, int column) { this.likelihood.set(column, likelihood); }
+        /**
+         * When adding likelihood values you must iterate over the alignment in order so each value is added in
+         * the position corresponding to the column it represents
+         * @param likelihood
+         */
+        public void addLikelihood(Double likelihood) { this.likelihood.add(likelihood); }
+
+        /**
+         * Can only be used after the initial assignment of all likelihood values (using addLikelihood()) otherwise the list will be unpopulated
+         * and you will get a nullPointerException
+         * @param likelihood
+         * @param column
+         */
+        public void setLikelihood(Double likelihood, int column) {
+            try {
+                this.likelihood.set(column, likelihood);
+            } catch (NullPointerException npe) {
+                System.out.println("Likelihood list must be initialised using addLikelihood() prior to setting specific columns");
+            }
+        }
 
         public void setParent(Node parent) { this.parent = parent; }
 
