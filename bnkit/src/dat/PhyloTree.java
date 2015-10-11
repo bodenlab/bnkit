@@ -279,14 +279,14 @@ public class PhyloTree {
 
         /**
          * Can only be used after the initial assignment of all likelihood values (using addLikelihood()) otherwise the list will be unpopulated
-         * and you will get a nullPointerException
+         * and you will get an indexOutOfBoundsException
          * @param likelihood
          * @param column
          */
         public void setLikelihood(Double likelihood, int column) {
             try {
                 this.likelihood.set(column, likelihood);
-            } catch (NullPointerException npe) {
+            } catch (IndexOutOfBoundsException iob) {
                 System.out.println("Likelihood list must be initialised using addLikelihood() prior to setting specific columns");
             }
         }
