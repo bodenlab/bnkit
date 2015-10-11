@@ -147,9 +147,10 @@ public class PhyloTree {
     /**
      * Utility method for recursively parse an embedded string on the Newick format.
      * @param str text on Newick format
+     * @param parent the parent of the current node
      * @return the root node of tree
      */
-    private static Node parseNewick(String str, Node parent) { //FIXME!!
+    private static Node parseNewick(String str, Node parent) {
         Node node = null;
         int start_index = str.indexOf('('); // start parenthesis
         int end_index = str.lastIndexOf(')'); // end parenthesis
