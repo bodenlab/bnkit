@@ -336,7 +336,7 @@ public class Analysis {
 
     /**
      * Creates a Bayesian network for each column in the alignment. This network is specified in network().
-     * (FIXME create method which has the network passed in?)
+     * (FIXME create method which has the network passed in?) Issue with copying the network
      * Each network is trained based on all transitions seen in phylogenetic tree (including ancestral sequence) for a
      * specific column in the alignment. Transitions are recorded using getTransitions().
      *
@@ -467,8 +467,14 @@ public class Analysis {
                 getTransitions(col, newNode, newChildren, store, root, visited); //recurse with child of interest as new parent
             }
             else { //we have reached the end of this branch
-                store.get(parentState).add(childState);
-                getTransitions(col, node, children, store, root, visited); //recurse with child of interest as new parent
+                if (store.containsKey(parentState)) { //you've seen the parent state before
+                    store.get(parentState).add(childState); //record parent -> child relationship
+                } else { //this is a new parent state to record
+                    List<Object> states = new ArrayList<>();
+                    states.add(childState);
+                    store.put(parentState, states); //record parent -> child relationship
+                }
+                getTransitions(col, node, children, store, root, visited); //recurse with same node to explore any other children
             }
         } else { //we are back tracking up the tree
             if (node != root) { //to handle root
