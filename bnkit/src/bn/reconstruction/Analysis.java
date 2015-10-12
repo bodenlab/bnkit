@@ -43,6 +43,7 @@ public class Analysis {
     /**
      * Constructor following on immediately from performing a reconstruction
      * Currently runs the methods to model transitions across all columns in the alignment
+     *
      * @param reconstruction
      */
     public Analysis(ASR reconstruction) {
@@ -54,16 +55,28 @@ public class Analysis {
         BNet[] models = createNtrainBN();
         inferEdgeValues(models); //Stored within each node
         transformLikelihood();
-        System.out.println();
+
+        //Write the output
+        for (int col = 0; col < aln.getWidth(); col++) {
+            Set<PhyloTree.Node> visited = new HashSet<>();
+            Collection<PhyloTree.Node> children = tree.getRoot().getChildren();
+            Collection<PhyloTree.Node> newChildren = new HashSet<>(children);
+            String output = "(";
+            String newick = constructNewick(col, tree.getRoot(), newChildren, visited, output);
+            System.out.println(col);
+            System.out.println(newick);
+            System.out.println();
+        }
     }
 
     /**
      * Constructor which assumes the reconstructed sequence and reconstructed tree have been saved and
      * can be loaded
+     *
      * @param file_tree
      * @param file_aln
      */
-    public Analysis(String file_tree, String file_aln){
+    public Analysis(String file_tree, String file_aln) {
         try {
             tree = PhyloTree.loadNewick(file_tree); //load tree - tree not in Newick
             PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
@@ -88,10 +101,11 @@ public class Analysis {
     /**
      * Constructor which takes the output from ASR
      * FIXME need to work on this
+     *
      * @param result_file
      */
-    public Analysis(String result_file, int type){
-        switch(type){
+    public Analysis(String result_file, int type) {
+        switch (type) {
             case 1:
                 //JSON output
                 break;
@@ -105,6 +119,7 @@ public class Analysis {
     /**
      * A method to explore all branches of a phylogenetic tree based on
      * EXTANT nodes.
+     *
      * @return map of branches keyed by leaf node
      */
     public Map<Object, List<Object>> exploreBranches() {
@@ -115,7 +130,7 @@ public class Analysis {
         //A branch is generated for each extant node in the tree
         PhyloTree.Node[] extNodes = getExtantNodes();
         for (int n = 0; n < extNodes.length; n++) {
-            String nodeLab = (String)extNodes[n].getLabel();
+            String nodeLab = (String) extNodes[n].getLabel();
             String nodeName = mapForNodes.get(nodeLab);
             BNode node = pbn.getBN().getNode(nodeName);
             List<BNode> ancs = pbn.getBN().getAncestors(node);
@@ -128,7 +143,7 @@ public class Analysis {
         //This makes it easier to extract sequence stored in the phyloTree structure
         Map<Object, List<Object>> modified = new HashMap<>();
         List<String> extant = new ArrayList<>();
-        for (int i = 0 ; i < extNodes.length; i++) {
+        for (int i = 0; i < extNodes.length; i++) {
             String n = replacePunct(extNodes[i].toString());
             extant.add(n);
         }
@@ -150,7 +165,7 @@ public class Analysis {
                 //FIXME there must be a better way to extract to node label!
                 for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
                     String value = e.getValue();
-                    if (value.equals(nodeName)){
+                    if (value.equals(nodeName)) {
                         nodeLabel = e.getKey();
                         continue;
                     }
@@ -167,6 +182,7 @@ public class Analysis {
     /**
      * A method to explore all branches of a phylogenetic tree based on
      * PROVIDED nodes.
+     *
      * @param nodes - list of nodes which represent the 'leafs' of the branches to be explored
      * @return map of branches keyed by leaf node
      */
@@ -176,7 +192,7 @@ public class Analysis {
         Map<Object, List<BNode>> result = new HashMap<>();
 
         for (int n = 0; n < nodes.length; n++) {
-            String nodeLab = (String)nodes[n].getLabel();
+            String nodeLab = (String) nodes[n].getLabel();
             String nodeName = mapForNodes.get(nodeLab);
             BNode node = pbn.getBN().getNode(nodeName);
             List<BNode> ancs = pbn.getBN().getAncestors(node);
@@ -189,7 +205,7 @@ public class Analysis {
         //This makes it easier to extract sequence stored in the phyloTree structure
         Map<Object, List<Object>> modified = new HashMap<>();
         List<String> extant = new ArrayList<>();
-        for (int i = 0 ; i < nodes.length; i++) {
+        for (int i = 0; i < nodes.length; i++) {
             String n = replacePunct(nodes[i].toString());
             extant.add(n);
         }
@@ -211,7 +227,7 @@ public class Analysis {
                 //FIXME there must be a better way to extract to node label!
                 for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
                     String value = e.getValue();
-                    if (value.equals(nodeName)){
+                    if (value.equals(nodeName)) {
                         nodeLabel = e.getKey();
                         continue;
                     }
@@ -227,6 +243,7 @@ public class Analysis {
     /**
      * Based on the branches of interest from exploreBranches(), generate an alignment for each branch including
      * ancestral sequence. Then calculate the entropy for each column in the alignment
+     *
      * @param branchMap - keyed by leaf node of branch
      * @return an array of entropy scores for each branch across the alignment
      */
@@ -239,16 +256,16 @@ public class Analysis {
             Object ext = b.getKey();
             List<Object> brNodes = b.getValue();
             PhyloTree.Node[] tNodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
-            for (PhyloTree.Node tNode: tNodes) {
+            for (PhyloTree.Node tNode : tNodes) {
                 if (brNodes.contains(tNode.getLabel())) {
-                    asrs.add((EnumSeq.Gappy<Enumerable>)tNode.getSequence());
+                    asrs.add((EnumSeq.Gappy<Enumerable>) tNode.getSequence());
                 }
             }
             EnumSeq.Alignment aln_asr = new EnumSeq.Alignment(asrs);
             //For each column in branch specific alignment (based on ancestors), calculate an entropy score
             Object[] row = new Object[aln_asr.getWidth() + 1]; //hard code branch name into array
             row[0] = ext; //Need to know which set of scores belongs to which branch
-            for (int i = 1; i < aln_asr.getWidth()+1; i++) {
+            for (int i = 1; i < aln_asr.getWidth() + 1; i++) {
                 Object[] col = aln_asr.getColumn(i);
                 double entropy = getShannonEntropy(col);
                 row[i] = entropy;
@@ -261,16 +278,17 @@ public class Analysis {
 
     /**
      * Take the 2D array generated by one of the branch processing methods and write it to a file
+     *
      * @param branchValues
-     * @param file_name - include only the base of the name - no file extensions
+     * @param file_name    - include only the base of the name - no file extensions
      */
     public void writeBranches(Object[][] branchValues, String file_name) {
         //save the results to a file
         try {
-            PrintWriter writer = new PrintWriter(file_name+".txt", "UTF-8");
+            PrintWriter writer = new PrintWriter(file_name + ".txt", "UTF-8");
             for (int b = 0; b < branchValues.length; b++) {
                 for (int d = 1; d < branchValues[b].length; d++) { //ignore the label in column 0
-                    if (d < branchValues[b].length -1) {
+                    if (d < branchValues[b].length - 1) {
                         writer.print(branchValues[b][d] + "\t");
                     } else {
                         writer.print(branchValues[b][d]);
@@ -279,10 +297,10 @@ public class Analysis {
                 writer.print("\n");
             }
             writer.close();
-            PrintWriter writerLab = new PrintWriter(file_name+"lab.txt", "UTF-8");
+            PrintWriter writerLab = new PrintWriter(file_name + "lab.txt", "UTF-8");
             for (int b = 0; b < branchValues.length; b++) {
                 for (int d = 0; d < branchValues[b].length; d++) { //include label in column 0
-                    if (d < branchValues[b].length -1) {
+                    if (d < branchValues[b].length - 1) {
                         writerLab.print(branchValues[b][d] + "\t");
                     } else {
                         writerLab.print(branchValues[b][d]);
@@ -291,8 +309,7 @@ public class Analysis {
                 writerLab.print("\n");
             }
             writerLab.close();
-        }
-        catch (FileNotFoundException fnf) {
+        } catch (FileNotFoundException fnf) {
             System.out.println(fnf.getStackTrace());
         } catch (UnsupportedEncodingException use) {
             System.out.println(use.getStackTrace());
@@ -302,6 +319,7 @@ public class Analysis {
     /**
      * Calculate the Shannon Entropy given a column
      * from an alignment
+     *
      * @param column
      * @return entropy
      */
@@ -311,10 +329,10 @@ public class Analysis {
         double entropy = 0;
         for (int k = 0; k < aacid.length; k++) {
             Object aa = aacid[k];
-            double count = (double)Collections.frequency(col, aa);
-            double prob = count/column.length;
-            if (prob > 0.0){
-                entropy = entropy + (prob*java.lang.Math.log(prob));
+            double count = (double) Collections.frequency(col, aa);
+            double prob = count / column.length;
+            if (prob > 0.0) {
+                entropy = entropy + (prob * java.lang.Math.log(prob));
             }
         }
         if (entropy != 0.0) {
@@ -333,7 +351,7 @@ public class Analysis {
      */
     public BNet[] createNtrainBN() {
         BNet[] columnModels = new BNet[aln.getWidth()];
-        Map<Object, Map<Object,List<Object>>> trainingData = new HashMap<>();
+        Map<Object, Map<Object, List<Object>>> trainingData = new HashMap<>();
         int edges = tree.toNodesBreadthFirst().length - 1; //edges = total nodes - 1
         for (int a = 0; a < aln.getWidth(); a++) { //for every column in alignment
             BNet curNet = network();//create fresh BN for modelling
@@ -373,11 +391,12 @@ public class Analysis {
     /**
      * Based on the trained network for each column, instantiate the parent and child node and get the likelihood of
      * the model in that state. Record this value for every edge, across every column
+     *
      * @param models
      */
     public void inferEdgeValues(BNet[] models) {
 
-        Map<Integer, Map<String,Double>> store = new HashMap<>();
+        Map<Integer, Map<String, Double>> store = new HashMap<>();
         for (int c = 0; c < models.length; c++) {
             PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //Explore all nodes to get all branches
             for (int n = 0; n < nodes.length; n++) {
@@ -408,6 +427,43 @@ public class Analysis {
      */
     public void transformLikelihood() {
 
+//        PhyloTree.Node[] nodes = tree.toNodesBreadthFirst();
+//        List<List<Double>> alignVals = new ArrayList<>();
+//        double max = 1000;
+//        double min = -1000000; //FIXME
+//        for (int c = 0; c < aln.getWidth(); c++) { //for every column in alignment
+//            List<Double> colVals = new ArrayList<>();
+//            for (int n = 0; n < nodes.length; n++) { //for every node in network get the value for the column
+//                if (nodes[n].getLikelihood().size() > 0) //if node is not root
+//                    colVals.add(nodes[n].getLikelihood(c));
+//            }
+//            double colMax = Collections.max(colVals);
+//            if (colMax > max)
+//                max = colMax;
+//            double colMin = Collections.min(colVals);
+//            if (colMin < min)
+//                min = colMin;
+//            alignVals.add(colVals);
+//        }
+//        for (int c = 0; c < aln.getWidth(); c++) {
+//            List<Double> colVals = alignVals.get(c);
+////            double max = Collections.max(colVals);
+////            double min = Collections.min(colVals);
+//            for (int n = 0; n < nodes.length; n++) { //for every node in network replace the llh value with transformed value
+//                if (nodes[n].getLikelihood().size() > 0) { //if node is not root
+//                    double cl = nodes[n].getLikelihood(c);
+//                    double transform = (max - cl) / (max - min); //treat max as new '0' value
+//                    if (Double.isNaN(transform)) { //all edges have equal likelihoods -> division by 0
+//                        transform = 0.01; //FIXME what is a good neutral branch size here?
+//                    }
+//                    if (transform == 0.0) {
+//                        transform = 0.01; //FIXME - can't have branch size equal to 0.0 either?
+//                    }
+//                    nodes[n].setLikelihood(transform, c);
+//                }
+//            }
+//        }
+
         PhyloTree.Node[] nodes = tree.toNodesBreadthFirst();
         for (int c = 0; c < aln.getWidth(); c++) { //for every column in alignment
             List<Double> colVals = new ArrayList<>();
@@ -420,16 +476,60 @@ public class Analysis {
             for (int n = 0; n < nodes.length; n++) { //for every node in network replace the llh value with transformed value
                 if (nodes[n].getLikelihood().size() > 0) { //if node is not root
                     double cl = nodes[n].getLikelihood(c);
-                    double transform = (cl - min) / (max - min);
+                    double transform = (max - cl) / (max - min); //treat max as new '0' value
                     if (Double.isNaN(transform)) { //all edges have equal likelihoods -> division by 0
-                        transform = 0.5; //FIXME what is a good neutral branch size here?
+                        transform = 0.01; //FIXME what is a good neutral branch size here?
                     }
-                    //FIXME - can't have branch size equal to 0.0 either
+                    if (transform == 0.0) {
+                        transform = 0.01; //FIXME - can't have branch size equal to 0.0 either?
+                    }
                     nodes[n].setLikelihood(transform, c);
                 }
             }
         }
+
     }
+
+    public String constructNewick(int col, PhyloTree.Node node, Collection<PhyloTree.Node> children, Set<PhyloTree.Node> visited, String output) {
+
+        if (children.iterator().hasNext()) {
+            PhyloTree.Node newNode = children.iterator().next(); //identify child of interest
+            children.remove(newNode);
+            visited.add(newNode); //add child node to visited list
+            if (newNode.getChildren().size() > 0) { //this child has children, recurse
+                Collection<PhyloTree.Node> nextChildren = newNode.getChildren(); //get next set of children to explore
+                Collection<PhyloTree.Node> newChildren = new HashSet<>(nextChildren);
+                output += "(";
+                return constructNewick(col, newNode, newChildren, visited, output);
+            } else { //we have reached the end of this branch
+                if (children.iterator().hasNext()) { //there is another child so we need a comma to separate them
+                    output += newNode.getLabel() + ":" + newNode.getLikelihood(col) + ",";
+                } else { //this is the last child so close brackets
+                    output += newNode.getLabel() + ":" + newNode.getLikelihood(col) + ")";
+                }
+                return constructNewick(col, node, children, visited, output); //recurse with same node to explore any other children
+            }
+        } else { //we are back tracking up the tree
+            if (node.getParent() != null) { //to handle root
+                PhyloTree.Node parent = node.getParent(); //identify parent from bnet in phylo tree
+                Collection<PhyloTree.Node> back = parent.getChildren(); //get the children of the parent of current node
+                visited.add(node); //add node to visited list
+                Collection<PhyloTree.Node> newChildren = new HashSet<>(back);
+                newChildren.removeAll(visited);
+                if (newChildren.iterator().hasNext()) {
+                    output += node.getLabel() + ":" + node.getLikelihood(col) + ",";
+                } else {
+                    output += node.getLabel() + ":" + node.getLikelihood(col) + ")";
+                }
+                return constructNewick(col, parent, newChildren, visited, output); //the parent goes back to being the node of interest
+                //potentially incorrect use of recursion...but it works
+            } else { //explored all branches so finish
+                output += node.getLabel();
+                return output;
+            }
+        }
+    }
+
 
     /**
      * Create the network for modelling transitions across the alignment
@@ -453,7 +553,6 @@ public class Analysis {
         bn.add(p,c,aap,aac);
         return bn;
     }
-
 
     /**
      * A recursive method to traverse the tree depth first and document all transitions from parent to child.
@@ -499,25 +598,8 @@ public class Analysis {
                 getTransitions(col, node, children, store, root, visited); //recurse with same node to explore any other children
             }
         } else { //we are back tracking up the tree
-            if (node != root) { //to handle root
-
-                //need to identify parent of current node - tricky when you're looking at a phylo tree not phylo BNet
-                String nodeLab = (String)node.getLabel();
-                String nodeName = mapForNodes.get(nodeLab); //get identifier of current node for bnet
-                BNode bNode = pbn.getBN().getNode(nodeName); //find current node in bnet of phylo tree
-                String bParent = bNode.getParents().get(0).getName(); //only ever single parent in phylo tree
-
-                //FIXME there must be a better way to extract to node label!
-                //get the node label of the parent of current node to enable back tracking
-                String parentLab = null;
-                for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
-                    String value = e.getValue();
-                    if (value.equals(bParent)){
-                        parentLab = e.getKey();
-                        break;
-                    }
-                }
-                PhyloTree.Node parent = tree.find(parentLab); //identify parent from bnet in phylo tree
+            if (node.getParent() != null) { //to handle root
+                PhyloTree.Node parent = node.getParent(); //identify parent from bnet in phylo tree
                 Collection<PhyloTree.Node> back = parent.getChildren(); //get the children of the parent of current node
                 visited.add(node); //add node to visited list
                 Collection<PhyloTree.Node> newChildren = new HashSet<>(back);
