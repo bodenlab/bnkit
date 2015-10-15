@@ -2,13 +2,16 @@ package bn.reconstruction;
 
 import bn.BNet;
 import bn.BNode;
+import bn.Distrib;
 import bn.Predef;
 import bn.alg.EM;
 import bn.alg.LearningAlg;
 import bn.alg.VarElim;
 import bn.ctmc.PhyloBNet;
 import bn.ctmc.matrix.JTT;
+import bn.file.BNBuf;
 import bn.node.CPT;
+import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.EnumVariable;
 import dat.Enumerable;
@@ -30,16 +33,6 @@ public class Analysis {
     private EnumSeq.Alignment<Enumerable> aln;
     private Map<String, String> mapForNodes;
 
-//    private List<EnumSeq.Gappy<Enumerable>> seqs;
-//    private PhyloBNet[] pbnets;
-//    private double[] R; //Rates at positions in alignment
-//    private EnumDistrib[] margin_distribs; //Marginal distributions for nodes
-//    private boolean use_sampled_rate = false;
-//    private String asr_root; //Reconstructed sequence
-//    private GammaDistrib gd; //Calculated gamma distribution
-//    private BNet[] models; //model that will be trained for each column in alignment
-//    private List<String> indexForNodes;
-
     /**
      * Constructor following on immediately from performing a reconstruction
      * Currently runs the methods to model transitions across all columns in the alignment
@@ -52,21 +45,30 @@ public class Analysis {
         aln = reconstruction.getAln();
         mapForNodes = reconstruction.getMapForNodes();
 
-        BNet[] models = createNtrainBN();
+        BNet trainedNet = learnParameters();
+        BNet[] models = createNtrainBN(trainedNet);
         inferEdgeValues(models); //Stored within each node
         transformLikelihood();
 
         //Write the output
-        for (int col = 0; col < aln.getWidth(); col++) {
-            Set<PhyloTree.Node> visited = new HashSet<>();
-            Collection<PhyloTree.Node> children = tree.getRoot().getChildren();
-            Collection<PhyloTree.Node> newChildren = new HashSet<>(children);
-            String output = "(";
-            String newick = constructNewick(col, tree.getRoot(), newChildren, visited, output);
-            System.out.println(col);
-            System.out.println(newick);
-            System.out.println();
+        try {
+            PrintWriter writer = new PrintWriter("newick_transformed.txt", "UTF-8");
+            for (int col = 0; col < aln.getWidth(); col++) {
+                List<PhyloTree.Node> visited = new ArrayList<>();
+                Collection<PhyloTree.Node> children = tree.getRoot().getChildren();
+                Collection<PhyloTree.Node> newChildren = new ArrayList<>(children);
+                String output = "(";
+                String newick = constructNewick(col, tree.getRoot(), newChildren, visited, output);
+                writer.println(col);
+                writer.println(newick);
+            }
+            writer.close();
+        } catch (FileNotFoundException fnf) {
+            System.out.println(fnf.getStackTrace());
+        } catch (UnsupportedEncodingException use) {
+            System.out.println(use.getStackTrace());
         }
+
     }
 
     /**
@@ -341,6 +343,123 @@ public class Analysis {
         return entropy;
     }
 
+    public BNet learnParameters() {
+        BNet net = network();
+
+        Map<Object, Map<Object, List<Object>>> trainingData = new HashMap<>();
+        int edges = tree.toNodesBreadthFirst().length - 1; //edges = total nodes - 1
+        //Generate all transitions across all columns in alignment
+        for (int a = 0; a < aln.getWidth(); a++) { //for every column in alignment
+            BNet curNet = network();//create fresh BN for modelling
+            PhyloTree.Node root = tree.getRoot();
+            Collection<PhyloTree.Node> children = root.getChildren();
+            Map<Object, List<Object>> store = new HashMap<>();
+            List<PhyloTree.Node> visited = new ArrayList<>();
+            Collection<PhyloTree.Node> newChildren = new ArrayList<>(children);
+            getTransitions(a, root, newChildren, store, root, visited);
+            trainingData.put(a, store);
+        }
+
+        //Transform this into a 2d array to be passed to the network storing ALL transitions
+        Object[][] columnTransitions = new Object[edges * aln.getWidth()][];
+        int e = 0;
+        for (Map.Entry<Object, Map<Object, List<Object>>> colTran : trainingData.entrySet()) {
+            Map<Object, List<Object>> store = colTran.getValue();
+            for (Map.Entry<Object, List<Object>> trans : store.entrySet()) {
+                Object aaParent = trans.getKey();
+                for (Object aaChild : trans.getValue()) {
+                    Object[] tran = {null, null, aaParent, aaChild};//data must reflect order of nodes passed to em.train
+                    columnTransitions[e] = tran;
+                    e++;
+                }
+            }
+        }
+
+        //Train the network with full set of transitions
+        List<BNode> bNodes = Arrays.asList(net.getNode("Parent"), net.getNode("Child"), net.getNode("AAparent"), net.getNode("AAchild"));
+        LearningAlg em = new EM(net);
+        em.train(columnTransitions, bNodes);
+        BNBuf.save(net, "full_network.out");
+        return net;
+    }
+
+    /**
+     * Creates a Bayesian network for each column in the alignment. This network structure is specified in network().
+     * When passing in a trainedNet, the distribution for AAparent and AAchild will be set and NOT TRAINED
+     * (FIXME create method which has the network passed in?) Issue with copying the network
+     * Each network is trained based on all transitions seen in phylogenetic tree (including ancestral sequence) for a
+     * specific column in the alignment. Transitions are recorded using getTransitions().
+     *
+     * @param trainedNet    a network that has parameters for aaParent and aaChild
+     * @return an array of trained Bayesian networks
+     */
+    public BNet[] createNtrainBN(BNet trainedNet) {
+        BNet[] columnModels = new BNet[aln.getWidth()];
+        Map<Object, Map<Object, List<Object>>> trainingData = new HashMap<>();
+        int edges = tree.toNodesBreadthFirst().length - 1; //edges = total nodes - 1
+
+        //Extract parameters for AAparent and AAchild
+        BNode aaPar = trainedNet.getNode("AAparent");
+        BNode aaChld = trainedNet.getNode("AAchild");
+        BNode parent = trainedNet.getNode("Parent");
+        BNode child = trainedNet.getNode("Child");
+
+        for (int a = 0; a < aln.getWidth(); a++) { //for every column in alignment
+            BNet curNet = network(); //generate a fresh network to store the new values
+            BNode aaParT = curNet.getNode("AAparent");
+            BNode aaChldT = curNet.getNode("AAchild");
+
+            for (String paramPar : parent.getVariable().getParams().split(";")) {
+                parent.setInstance(paramPar);
+                Object[] parKey = {parent.getInstance()};
+                Distrib aaParDistrib = aaPar.getDistrib(parKey);
+                aaParT.put(aaParDistrib, parKey);
+            }
+            for (String paramChld : child.getVariable().getParams().split(";")) {
+                child.setInstance(paramChld);
+                Object[] chldKey = {child.getInstance()};
+                Distrib aaChldDistrib = aaChld.getDistrib(chldKey);
+                aaChldT.put(aaChldDistrib, chldKey);
+            }
+
+            aaParT.setTrainable(false);
+            aaChldT.setTrainable(false);
+
+
+
+            PhyloTree.Node root = tree.getRoot();
+            Collection<PhyloTree.Node> children = root.getChildren();
+            Map<Object, List<Object>> store = new HashMap<>();
+            List<PhyloTree.Node> visited = new ArrayList<>();
+            Collection<PhyloTree.Node> newChildren = new ArrayList<>(children);
+            getTransitions(a, root, newChildren, store, root, visited);
+            trainingData.put(a, store);
+
+            Object[][] columnTransitions = new Object[edges][];
+            int e = 0;
+            for (Map.Entry<Object, List<Object>> trans : store.entrySet()) {
+                Object aaParent = trans.getKey();
+                for (Object aaChild : trans.getValue()) {
+                    Object[] tran = {null, null, aaParent, aaChild};//data must reflect order of nodes passed to em.train
+                    columnTransitions[e] = tran;
+                    e++;
+                }
+            }
+
+            System.out.println();
+            System.out.println(a);
+            System.out.println();
+
+            List<BNode> bNodes = Arrays.asList(curNet.getNode("Parent"), curNet.getNode("Child"), curNet.getNode("AAparent"), curNet.getNode("AAchild"));
+            LearningAlg em = new EM(curNet);
+            em.train(columnTransitions, bNodes);
+            columnModels[a] = curNet;
+            BNBuf.save(curNet, "col_" + a + "_network.out");
+            System.out.println();
+        }
+        return columnModels;
+    }
+
     /**
      * Creates a Bayesian network for each column in the alignment. This network is specified in network().
      * (FIXME create method which has the network passed in?) Issue with copying the network
@@ -358,8 +477,8 @@ public class Analysis {
             PhyloTree.Node root = tree.getRoot();
             Collection<PhyloTree.Node> children = root.getChildren();
             Map<Object, List<Object>> store = new HashMap<>();
-            Set<PhyloTree.Node> visited = new HashSet<>();
-            Collection<PhyloTree.Node> newChildren = new HashSet<>(children);
+            List<PhyloTree.Node> visited = new ArrayList<>();
+            Collection<PhyloTree.Node> newChildren = new ArrayList<>(children);
             getTransitions(a, root, newChildren, store, root, visited);
             trainingData.put(a, store);
 
@@ -368,7 +487,7 @@ public class Analysis {
             for (Map.Entry<Object, List<Object>> trans : store.entrySet()) {
                 Object aaParent = trans.getKey();
                 for (Object aaChild : trans.getValue()) {
-                    Object[] tran = {null, null, aaParent, aaChild};//nodes in curNet are ordered parent, aaparent, child, aachild - data must reflect this
+                    Object[] tran = {null, null, aaParent, aaChild};//data must reflect order of nodes passed to em.train
                     columnTransitions[e] = tran;
                     e++;
                 }
@@ -382,7 +501,7 @@ public class Analysis {
             LearningAlg em = new EM(curNet);
             em.train(columnTransitions, bNodes);
             columnModels[a] = curNet;
-//            BNBuf.save(curNet, "col_" + a + "_network.out");
+            BNBuf.save(curNet, "col_" + a + "_network.out");
             System.out.println();
         }
         return columnModels;
@@ -427,6 +546,8 @@ public class Analysis {
      */
     public void transformLikelihood() {
 
+//        List<Double> original = new ArrayList<>();
+//        List<Double> transformed = new ArrayList<>();
 //        PhyloTree.Node[] nodes = tree.toNodesBreadthFirst();
 //        List<List<Double>> alignVals = new ArrayList<>();
 //        double max = 1000;
@@ -447,23 +568,25 @@ public class Analysis {
 //        }
 //        for (int c = 0; c < aln.getWidth(); c++) {
 //            List<Double> colVals = alignVals.get(c);
-////            double max = Collections.max(colVals);
-////            double min = Collections.min(colVals);
 //            for (int n = 0; n < nodes.length; n++) { //for every node in network replace the llh value with transformed value
 //                if (nodes[n].getLikelihood().size() > 0) { //if node is not root
 //                    double cl = nodes[n].getLikelihood(c);
+//                    original.add(cl);
 //                    double transform = (max - cl) / (max - min); //treat max as new '0' value
 //                    if (Double.isNaN(transform)) { //all edges have equal likelihoods -> division by 0
 //                        transform = 0.01; //FIXME what is a good neutral branch size here?
 //                    }
-//                    if (transform == 0.0) {
-//                        transform = 0.01; //FIXME - can't have branch size equal to 0.0 either?
+//                    else {
+//                        transform += 0.01; //FIXME - can't have branch size equal to 0.0 either?
 //                    }
+//                    transformed.add(transform);
 //                    nodes[n].setLikelihood(transform, c);
 //                }
 //            }
 //        }
 
+        List<Double> original = new ArrayList<>();
+        List<Double> transformed = new ArrayList<>();
         PhyloTree.Node[] nodes = tree.toNodesBreadthFirst();
         for (int c = 0; c < aln.getWidth(); c++) { //for every column in alignment
             List<Double> colVals = new ArrayList<>();
@@ -476,21 +599,42 @@ public class Analysis {
             for (int n = 0; n < nodes.length; n++) { //for every node in network replace the llh value with transformed value
                 if (nodes[n].getLikelihood().size() > 0) { //if node is not root
                     double cl = nodes[n].getLikelihood(c);
+                    original.add(cl);
                     double transform = (max - cl) / (max - min); //treat max as new '0' value
                     if (Double.isNaN(transform)) { //all edges have equal likelihoods -> division by 0
                         transform = 0.01; //FIXME what is a good neutral branch size here?
                     }
-                    if (transform == 0.0) {
-                        transform = 0.01; //FIXME - can't have branch size equal to 0.0 either?
+                    else {
+                        transform += 0.01; //FIXME - can't have branch size equal to 0.0 either?
                     }
+                    transformed.add(transform);
                     nodes[n].setLikelihood(transform, c);
                 }
             }
         }
 
+        try {
+            PrintWriter writer = new PrintWriter("original.txt", "UTF-8");
+            for (double d : original) {
+                writer.print(d + "\n");
+            }
+            writer.close();
+
+            PrintWriter writerT = new PrintWriter("transform.txt", "UTF-8");
+            for (double d : transformed) {
+                writerT.print(d + "\n");
+            }
+            writer.close();
+            writerT.close();
+        } catch (FileNotFoundException fnf) {
+            System.out.println(fnf.getStackTrace());
+        } catch (UnsupportedEncodingException use) {
+            System.out.println(use.getStackTrace());
+        }
+
     }
 
-    public String constructNewick(int col, PhyloTree.Node node, Collection<PhyloTree.Node> children, Set<PhyloTree.Node> visited, String output) {
+    public String constructNewick(int col, PhyloTree.Node node, Collection<PhyloTree.Node> children, List<PhyloTree.Node> visited, String output) {
 
         if (children.iterator().hasNext()) {
             PhyloTree.Node newNode = children.iterator().next(); //identify child of interest
@@ -498,7 +642,7 @@ public class Analysis {
             visited.add(newNode); //add child node to visited list
             if (newNode.getChildren().size() > 0) { //this child has children, recurse
                 Collection<PhyloTree.Node> nextChildren = newNode.getChildren(); //get next set of children to explore
-                Collection<PhyloTree.Node> newChildren = new HashSet<>(nextChildren);
+                Collection<PhyloTree.Node> newChildren = new ArrayList<>(nextChildren);
                 output += "(";
                 return constructNewick(col, newNode, newChildren, visited, output);
             } else { //we have reached the end of this branch
@@ -514,7 +658,7 @@ public class Analysis {
                 PhyloTree.Node parent = node.getParent(); //identify parent from bnet in phylo tree
                 Collection<PhyloTree.Node> back = parent.getChildren(); //get the children of the parent of current node
                 visited.add(node); //add node to visited list
-                Collection<PhyloTree.Node> newChildren = new HashSet<>(back);
+                Collection<PhyloTree.Node> newChildren = new ArrayList<>(back);
                 newChildren.removeAll(visited);
                 if (newChildren.iterator().hasNext()) {
                     output += node.getLabel() + ":" + node.getLikelihood(col) + ",";
@@ -525,6 +669,7 @@ public class Analysis {
                 //potentially incorrect use of recursion...but it works
             } else { //explored all branches so finish
                 output += node.getLabel();
+                output += ";";
                 return output;
             }
         }
@@ -532,11 +677,13 @@ public class Analysis {
 
 
     /**
-     * Create the network for modelling transitions across the alignment
+     * Create the network for modelling transitions across the alignment.
+     * If aaParDistrib and aaChldDistrib are not null, set the distributions
+     * for the nodes and set nodes to not trainable
      * @return
      */
     private BNet network() {
-        String[] stringVars = {"1","2","3","4","5"};
+        String[] stringVars = {"1","2","3"};
         EnumVariable P = Predef.Nominal(stringVars, "Parent");
         EnumVariable C = Predef.Nominal(stringVars, "Child");
         EnumVariable AAP = Predef.AminoAcidExt("AAparent");
@@ -546,8 +693,6 @@ public class Analysis {
         CPT c = new CPT(C, P);
         CPT aap = new CPT(AAP, P);
         CPT aac = new CPT(AAC, C);
-
-//        aap.tieTo(aac);
 
         BNet bn = new BNet();
         bn.add(p,c,aap,aac);
@@ -565,7 +710,7 @@ public class Analysis {
      * @param visited record of which nodes have been visited
      * @return a map with parent as key and all possible children store in a list as the value
      */
-    private void getTransitions(int col, PhyloTree.Node node, Collection<PhyloTree.Node> children, Map<Object, List<Object>> store, PhyloTree.Node root, Set<PhyloTree.Node> visited) {
+    private void getTransitions(int col, PhyloTree.Node node, Collection<PhyloTree.Node> children, Map<Object, List<Object>> store, PhyloTree.Node root, List<PhyloTree.Node> visited) {
         //node = parent
         //newNode = child
         char parentState = node.getSequence().toString().charAt(col); //get state of parent
@@ -577,7 +722,7 @@ public class Analysis {
             visited.add(newNode); //add child node to visited list
             if (newNode.getChildren().size() > 0) { //this child has children, recurse
                 Collection<PhyloTree.Node> nextChildren = newNode.getChildren(); //get next set of children to explore
-                Collection<PhyloTree.Node> newChildren = new HashSet<>(nextChildren);
+                Collection<PhyloTree.Node> newChildren = new ArrayList<>(nextChildren);
                 if (store.containsKey(parentState)) { //you've seen the parent state before
                     store.get(parentState).add(childState); //record parent -> child relationship
                 } else { //this is a new parent state to record
@@ -602,7 +747,7 @@ public class Analysis {
                 PhyloTree.Node parent = node.getParent(); //identify parent from bnet in phylo tree
                 Collection<PhyloTree.Node> back = parent.getChildren(); //get the children of the parent of current node
                 visited.add(node); //add node to visited list
-                Collection<PhyloTree.Node> newChildren = new HashSet<>(back);
+                Collection<PhyloTree.Node> newChildren = new ArrayList<>(back);
                 newChildren.removeAll(visited);
                 getTransitions(col, parent, newChildren, store, root, visited); //the parent goes back to being the node of interest
                 //potentially incorrect use of recursion...but it works
