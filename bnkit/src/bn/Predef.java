@@ -86,7 +86,7 @@ public class Predef {
             return Predef.AminoAcid(varname);
         }
         if (typename.equalsIgnoreCase("Amino acid extended")) {
-            return Predef.AminoAcid(varname);
+            return Predef.AminoAcidExt(varname);
         }
         if (typename.equalsIgnoreCase("Nucleic acid")) {
             return Predef.NucleicAcid(varname);
