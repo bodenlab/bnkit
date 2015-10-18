@@ -59,7 +59,7 @@ public class Analysis {
                 Collection<PhyloTree.Node> newChildren = new ArrayList<>(children);
                 String output = "(";
                 String newick = constructNewick(col, tree.getRoot(), newChildren, visited, output);
-                writer.println(col);
+//                writer.println(col);
                 writer.println(newick);
             }
             writer.close();
@@ -380,6 +380,28 @@ public class Analysis {
         LearningAlg em = new EM(net);
         em.train(columnTransitions, bNodes);
         BNBuf.save(net, "full_network.out");
+
+        BNode aapar = net.getNode("AAparent");
+        BNode aachild = net.getNode("AAchild");
+
+        try {
+            PrintWriter writer = new PrintWriter("transition_llhs.txt", "UTF-8");
+            for (Object aap : Enumerable.aacid_ext.getValues()) {
+                aapar.setInstance(aap);
+                for (Object aac : Enumerable.aacid_ext.getValues()) {
+                    aachild.setInstance(aac);
+                    VarElim ve = new VarElim();
+                    ve.instantiate(net);
+                    double llh = ve.logLikelihood();
+                    writer.println(aap + "\t" + aac + "\t" + llh);
+                }
+            }
+            writer.close();
+        } catch (FileNotFoundException fnf) {
+            System.out.println(fnf.getStackTrace());
+        } catch (UnsupportedEncodingException use) {
+            System.out.println(use.getStackTrace());
+        }
         return net;
     }
 
@@ -454,8 +476,29 @@ public class Analysis {
             LearningAlg em = new EM(curNet);
             em.train(columnTransitions, bNodes);
             columnModels[a] = curNet;
-            BNBuf.save(curNet, "col_" + a + "_network.out");
-            System.out.println();
+            BNBuf.save(curNet, "network_col_" + a + ".out");
+
+            BNode aapar = curNet.getNode("AAparent");
+            BNode aachild = curNet.getNode("AAchild");
+
+            try {
+                PrintWriter writer = new PrintWriter("col_"+a+"_transition_llhs.txt", "UTF-8");
+                for (Object aap : Enumerable.aacid_ext.getValues()) {
+                    aapar.setInstance(aap);
+                    for (Object aac : Enumerable.aacid_ext.getValues()) {
+                        aachild.setInstance(aac);
+                        VarElim ve = new VarElim();
+                        ve.instantiate(curNet);
+                        double llh = ve.logLikelihood();
+                        writer.println(aap + "\t" + aac + "\t" + llh);
+                    }
+                }
+                writer.close();
+            } catch (FileNotFoundException fnf) {
+                System.out.println(fnf.getStackTrace());
+            } catch (UnsupportedEncodingException use) {
+                System.out.println(use.getStackTrace());
+            }
         }
         return columnModels;
     }
@@ -501,7 +544,7 @@ public class Analysis {
             LearningAlg em = new EM(curNet);
             em.train(columnTransitions, bNodes);
             columnModels[a] = curNet;
-            BNBuf.save(curNet, "col_" + a + "_network.out");
+            BNBuf.save(curNet, "network_col_" + a + ".out");
             System.out.println();
         }
         return columnModels;
