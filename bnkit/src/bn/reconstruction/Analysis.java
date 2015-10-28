@@ -47,7 +47,8 @@ public class Analysis {
 
         BNet trainedNet = learnParameters();
         BNet[] models = createNtrainBN(trainedNet);
-        inferEdgeValues(models); //Stored within each node
+//        inferEdgeValues(models); //Stored within each node
+        recordEdgeValues(models);
         transformLikelihood();
 
         //Write the output
@@ -360,20 +361,32 @@ public class Analysis {
             trainingData.put(a, store);
         }
 
-        //Transform this into a 2d array to be passed to the network storing ALL transitions
         Object[][] columnTransitions = new Object[edges * aln.getWidth()][];
-        int e = 0;
-        for (Map.Entry<Object, Map<Object, List<Object>>> colTran : trainingData.entrySet()) {
-            Map<Object, List<Object>> store = colTran.getValue();
-            for (Map.Entry<Object, List<Object>> trans : store.entrySet()) {
-                Object aaParent = trans.getKey();
-                for (Object aaChild : trans.getValue()) {
-                    Object[] tran = {null, null, aaParent, aaChild};//data must reflect order of nodes passed to em.train
-                    columnTransitions[e] = tran;
-                    e++;
+        try {
+            PrintWriter transitionWriter = new PrintWriter("raw_transitions.txt", "UTF-8");
+            //Transform this into a 2d array to be passed to the network storing ALL transitions
+
+            int e = 0;
+            for (Map.Entry<Object, Map<Object, List<Object>>> colTran : trainingData.entrySet()) {
+                Map<Object, List<Object>> store = colTran.getValue();
+                for (Map.Entry<Object, List<Object>> trans : store.entrySet()) {
+                    Object aaParent = trans.getKey();
+                    for (Object aaChild : trans.getValue()) {
+                        Object[] tran = {null, null, aaParent, aaChild};//data must reflect order of nodes passed to em.train
+                        columnTransitions[e] = tran;
+                        e++;
+                        transitionWriter.println(aaParent + "\t" + aaChild);
+                    }
                 }
             }
+            transitionWriter.close();
+        } catch (FileNotFoundException fnf) {
+            System.out.println(fnf.getStackTrace());
+        } catch (UnsupportedEncodingException use) {
+            System.out.println(use.getStackTrace());
         }
+
+
 
         //Train the network with full set of transitions
         List<BNode> bNodes = Arrays.asList(net.getNode("Parent"), net.getNode("Child"), net.getNode("AAparent"), net.getNode("AAchild"));
@@ -436,13 +449,18 @@ public class Analysis {
                 Object[] parKey = {parent.getInstance()};
                 Distrib aaParDistrib = aaPar.getDistrib(parKey);
                 aaParT.put(aaParDistrib, parKey);
-            }
-            for (String paramChld : child.getVariable().getParams().split(";")) {
-                child.setInstance(paramChld);
+
+                child.setInstance(paramPar);
                 Object[] chldKey = {child.getInstance()};
-                Distrib aaChldDistrib = aaChld.getDistrib(chldKey);
-                aaChldT.put(aaChldDistrib, chldKey);
+                aaChldT.put(aaParDistrib, chldKey);
+
             }
+//            for (String paramChld : child.getVariable().getParams().split(";")) {
+//                child.setInstance(paramChld);
+//                Object[] chldKey = {child.getInstance()};
+//                Distrib aaChldDistrib = aaChld.getDistrib(chldKey);
+//                aaChldT.put(aaChldDistrib, chldKey);
+//            }
 
             aaParT.setTrainable(false);
             aaChldT.setTrainable(false);
@@ -570,16 +588,68 @@ public class Analysis {
 
                     Object childState = child.getSequence().get()[c];
                     Object parentState = parent.getSequence().get()[c];
+                    char gap = '-';
+                    if (childState == null)
+                        childState = gap;
+                    if (parentState == null)
+                        parentState = gap;
                     BNet model = models[c];
                     model.getNode("AAparent").setInstance(parentState);
                     model.getNode("AAchild").setInstance(childState);
                     VarElim ve = new VarElim();
                     ve.instantiate(model);
                     double llh = ve.logLikelihood();
-                    child.addLikelihood(llh); //Child stores the likelihoods for the edge connecting it to its parent
-
+                    child.addLikelihood(llh); //Child stores the likelihoods for the edge connecting it to its
                 }
             }
+        }
+    }
+
+    public void recordEdgeValues(BNet[] models) {
+
+        try {
+            PrintWriter writer = new PrintWriter("col_llhs.txt", "UTF-8");
+
+            Map<Integer, Map<String, Double>> store = new HashMap<>();
+
+            PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //Explore all nodes to get all branches
+            for (int n = 0; n < nodes.length; n++) {
+                PhyloTree.Node child = nodes[n];
+                PhyloTree.Node parent = child.getParent(); //works for bifurcating trees as a child has a single parent
+                for (int c = 0; c < models.length; c++) {
+                    if (nodes[n].getParent() == null) {
+                        continue; //node is root so no branch to record
+                    } else {
+                        Object childState = child.getSequence().get()[c];
+                        Object parentState = parent.getSequence().get()[c];
+                        char gap = '-';
+                        if (childState == null)
+                            childState = gap;
+                        if (parentState == null)
+                            parentState = gap;
+                        BNet model = models[c];
+                        model.getNode("AAparent").setInstance(parentState);
+                        model.getNode("AAchild").setInstance(childState);
+                        VarElim ve = new VarElim();
+                        ve.instantiate(model);
+                        double llh = ve.logLikelihood();
+                        child.addLikelihood(llh); //Child stores the likelihoods for the edge connecting it to its
+                        if (c == 0) {
+                            writer.write(nodes[n].getLabel() + "\t" + llh);
+                        } else {
+                            writer.write("\t" + llh);
+                        }
+                    }
+                }
+                if (nodes[n].getParent() == null)
+                    continue; //node is root so no branch to record
+                writer.write("\n");
+            }
+            writer.close();
+        } catch (FileNotFoundException fnf) {
+            System.out.println(fnf.getStackTrace());
+        } catch (UnsupportedEncodingException use) {
+            System.out.println(use.getStackTrace());
         }
     }
 
@@ -726,7 +796,7 @@ public class Analysis {
      * @return
      */
     private BNet network() {
-        String[] stringVars = {"1","2","3"};
+        String[] stringVars = {"1","2","3", "4", "5", "6", "7"};
         EnumVariable P = Predef.Nominal(stringVars, "Parent");
         EnumVariable C = Predef.Nominal(stringVars, "Child");
         EnumVariable AAP = Predef.AminoAcidExt("AAparent");
