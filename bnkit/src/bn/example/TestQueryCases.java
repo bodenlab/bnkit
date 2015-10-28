@@ -88,8 +88,9 @@ public class TestQueryCases {
      */
     public void testQuery(Object[][] values, Variable[] vars, BNet bn, Variable[] qVars) {
 
-        Map<String, Map<Variable, Object>> store = new HashMap<>(); //to store results for Infer, MPE, LLH_WI and LLH_UD
+        Map<String, Map<Variable, Object>> store = new HashMap<>(); //to store results for Infer and MPE
         Map<String, Map<Variable, Object[]>> storeSample = new HashMap<>(); //sample case will return a different set of results
+        Map<String, Double> storeLLH = new HashMap<>(); //LLH_WI and LLH_UD will return a different set of results
         Set<Variable> setNodes = new LinkedHashSet<>(); //FIXME this could change with null values?
         for (int i = 0; i < values.length; i++) {
             // set variables and keys according to observations
@@ -132,23 +133,20 @@ public class TestQueryCases {
                     Query ql = ve.makeQuery(qVars);
                     CGTable cgl = (CGTable) ve.infer(ql);
                     result = infer(qVars, cgl);
-                    String queried = "";
                     for (Map.Entry<Variable, Object> e : result.entrySet()) {
                         BNode instantiate_me = bn.getNode(e.getKey());
                         instantiate_me.setInstance(e.getValue());
-                        queried = queried + instantiate_me.getVariable() + ";";
+                        obs = obs + instantiate_me.getVariable() + ";";
+                        setNodes.add(instantiate_me.getVariable());
                     }
                     CGVarElim veLI = new CGVarElim();
                     veLI.instantiate(bn);
-                    System.out.println("Set values: " + obs);
-                    System.out.println("Inferred values: " + queried);
-                    System.out.println("Likelihood of set and inferred values: " + veLI.likelihood());
+                    storeLLH.put(obs, veLI.likelihood());
                     continue;
                 case "LLH_UD":
                     CGVarElim veL = new CGVarElim();
                     veL.instantiate(bn);
-                    System.out.println("Set values: " + obs);
-                    System.out.println("Likelihood of set values: " + veL.likelihood());
+                    storeLLH.put(obs, veL.likelihood());
                     continue;
                 case "Sample":
                     Query qs = ve.makeQuery(qVars);
@@ -167,6 +165,12 @@ public class TestQueryCases {
                 break;
             case "Sample":
                 saveSample(storeSample, setNodes);
+                break;
+            case "LLH_WI":
+                saveLLHs(storeLLH, setNodes);
+                break;
+            case "LLH_UD":
+                saveLLHs(storeLLH, setNodes);
                 break;
         }
     }
@@ -455,6 +459,55 @@ public class TestQueryCases {
             for (int col = setNodes.size(); col < columns; col++) { //Record the query results
                 toPrint[position][col] = res.get(resKeys[col - setNodes.size()]);
             }
+            position ++;
+        }
+
+        try {
+            PrintWriter writer = new PrintWriter(setting + "_results.txt", "UTF-8");
+            for (int j = 0; j < states + 1 ; j++) {
+                for (int k = 0; k < columns; k++) {
+                    if (k == columns - 1)
+                        writer.write(toPrint[j][k] + "\n");
+                    else
+                        writer.write(toPrint[j][k] + "\t");
+                }
+            }
+            writer.close();
+        } catch (FileNotFoundException fnf) {
+            System.out.println(fnf.getStackTrace());
+        } catch (UnsupportedEncodingException use) {
+            System.out.println(use.getStackTrace());
+        }
+    }
+
+
+    public void saveLLHs(Map<String, Double> result, Set<Variable> setNodes) {
+
+        int columns = setNodes.size() + 1; //In this case only, all original and queried nodes become 'set'
+        Object[][] toPrint = new Object[states+1][columns];
+
+        //Initialize the header of the output
+        int s = 0;
+        for (Variable vsn : setNodes) { //Record the nodes with information
+            toPrint[0][s] = vsn;
+            s++;
+        }
+        toPrint[0][setNodes.size()] = "Likelihood";
+
+        //Record the information for every set instance and the result from the query
+        //In this case, formatted as a data frame that can be passed easily to R ggplot2
+        int position = 1; //Need to track where in the bigger array we should start adding new info
+        for (Map.Entry<String, Double> resEntry : result.entrySet()) {
+            String key = resEntry.getKey();
+            String[] obs = key.split(";");
+            double value = resEntry.getValue();
+
+            for (int e = 0; e < setNodes.size(); e++) { //Record the set instances
+                toPrint[position][e] = obs[e];
+            }
+
+            toPrint[position][setNodes.size()] = value;
+
             position ++;
         }
 
