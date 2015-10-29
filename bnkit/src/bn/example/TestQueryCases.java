@@ -402,7 +402,7 @@ public class TestQueryCases {
         }
 
         try {
-            PrintWriter writer = new PrintWriter(setting + "_results.txt", "UTF-8");
+            PrintWriter writer = new PrintWriter("micro_data/" + setting + "_results.txt", "UTF-8");
             for (int j = 0; j < (max * states) + 1 ; j++) {
                 for (int k = 0; k < columns; k++) {
                     if (k == columns - 1)
@@ -463,7 +463,7 @@ public class TestQueryCases {
         }
 
         try {
-            PrintWriter writer = new PrintWriter(setting + "_results.txt", "UTF-8");
+            PrintWriter writer = new PrintWriter("micro_data/" + setting + "_results.txt", "UTF-8");
             for (int j = 0; j < states + 1 ; j++) {
                 for (int k = 0; k < columns; k++) {
                     if (k == columns - 1)
@@ -512,7 +512,7 @@ public class TestQueryCases {
         }
 
         try {
-            PrintWriter writer = new PrintWriter(setting + "_results.txt", "UTF-8");
+            PrintWriter writer = new PrintWriter("micro_data/" + setting + "_results.txt", "UTF-8");
             for (int j = 0; j < states + 1 ; j++) {
                 for (int k = 0; k < columns; k++) {
                     if (k == columns - 1)

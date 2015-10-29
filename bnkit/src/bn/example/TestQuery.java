@@ -49,10 +49,11 @@ public class TestQuery {
             data_file = args[1];
             query = args[2];
             setting = args[3];
-            if (!setting.equals("Sample") || !setting.equals("Infer")) {
-                System.out.println("Usage: not using Sample or Infer so max value will be ignored");
-            } else {
+
+            if (setting.equals("Sample") || setting.equals("Infer")) {
                 max = Integer.parseInt(args[4]);
+            } else {
+                System.out.println("Usage: not using Sample or Infer so max value will be ignored");
             }
         } else {
             System.out.println("Usage: LoadNTrain <bn-file> <data-file> <query> <setting>");
