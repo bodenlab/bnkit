@@ -19,13 +19,11 @@ import dat.EnumVariable;
 import dat.Enumerable;
 import dat.PhyloTree;
 import dat.Variable;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
-import java.io.Writer;
+
+import java.io.*;
 import java.util.*;
 
+import dat.file.FastaWriter;
 import json.JSONObject;
 
 
@@ -38,15 +36,12 @@ public class ASR {
     private PhyloTree tree;
     private PhyloBNet pbn; //only to be used for navigating branches
     private List<EnumSeq.Gappy<Enumerable>> seqs;
+    private List<EnumSeq.Gappy<Enumerable>> allSeqs;
     private EnumSeq.Alignment<Enumerable> aln;
     private PhyloBNet[] pbnets;
     private double[] R; //Rates at positions in alignment
     private EnumDistrib[] margin_distribs; //Marginal distributions for nodes
     private boolean use_sampled_rate = false;
-    private String asr_root; //Reconstructed sequence 
-    private GammaDistrib gd; //Calculated gamma distribution
-    private BNet[] models; //model that will be trained for each column in alignment
-    
     
     private List<String> indexForNodes;
     private Map<String, String> mapForNodes;
@@ -56,16 +51,32 @@ public class ASR {
     private double sampled_rate = // sampled rate, copy from a previous 1.0-rate run
 	0.15599004226404184;
     
-    public ASR(String file_tree, String file_aln) {
+    public ASR(String file_tree, String file_aln, String inference) {
         loadData(file_tree, file_aln);
         createNetworks();
-        queryNetsMarg();
-        queryNetsJoint();
+        if (inference.equals("Joint")) {
+            queryNetsJoint();
+        } else if (inference.equals("Marginal")) {
+            queryNetsMarg();
+        }
+        getSequences();
+        GammaDistrib gd = calcGammaDistrib();
+    }
+
+    public ASR(String file_tree, String file_aln, String inference, String nodeLabel) {
+        loadData(file_tree, file_aln);
+        createNetworks();
+        if (inference.equals("Joint")) {
+            System.out.println("Using joint probability so node specification will be ignored");
+            queryNetsJoint();
+        } else if (inference.equals("Marginal")) {
+            queryNetsMarg(tree.find(nodeLabel));
+        }
         getSequences();
         calcGammaDistrib();
     }
-    
- /**
+
+    /**
   * Load the supplied tree and alignment files
   * Create phylogenetic tree, create node index, create node map
   * Store sequences and alignment
@@ -88,8 +99,19 @@ public class ASR {
                 mapForNodes.put(n.getLabel().toString(), replacePunct(n.toString()));
                 nodeToLabel.put(replacePunct(n.toString()), n.getLabel().toString());
             }
-            
-            seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);
+
+            BufferedReader aln_file = new BufferedReader(new FileReader(file_aln));
+
+            if (aln_file.readLine().startsWith("CLUSTAL")) {
+                seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);
+            } else if (aln_file.readLine().startsWith(">")) {
+                //FIXME - untested
+                Character gap = "-".charAt(0);
+                seqs = EnumSeq.Gappy.loadFasta(file_aln, Enumerable.aacid, gap);
+            } else {
+                throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+            }
+
             aln = new EnumSeq.Alignment<>(seqs);
             pbn = PhyloBNet.create(tree, new JTT());
             
@@ -109,7 +131,7 @@ public class ASR {
         
         String[] names = aln.getNames(); //seq_name_id - names of sequences
         List<String> labels = getLabels(names);
-            
+
         //Create network for each column in alignment
         //Instantiate nodes
         for (int col = 0; col < aln.getWidth(); col ++) {
@@ -148,20 +170,38 @@ public class ASR {
         for (int col = 0; col < aln.getWidth(); col ++) {
             PhyloBNet pbn = pbnets[col];
             BNet bn = pbn.getBN();
-            //FIXME
-            root = pbn.getRoot(); //Possibly in wrong location??
-            //Root can change in purge and collapse steps?
+            root = pbn.getRoot();
+            VarElim ve = new VarElim();
+            ve.instantiate(bn);
+
+            int purged_leaves = pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
+            int collapsed_nodes = pbn.collapseSingles();
+            
+            margin_distribs[col] = getMarginalDistrib(ve, root.getVariable());
+        }        
+    }
+
+    /**
+     * Query all networks in pbnets array using marginal probability and a
+     * specified node of interest.
+     * Populate margin_distribs for each column in alignment
+     * @param node to be queried
+     */
+    public void queryNetsMarg(PhyloTree.Node node) {
+        this.margin_distribs = new EnumDistrib[aln.getWidth()];
+        String nodeName = mapForNodes.get(node);
+        BNode bnode = pbn.getBN().getNode(nodeName);
+        for (int col = 0; col < aln.getWidth(); col ++) {
+            PhyloBNet pbn = pbnets[col];
+            BNet bn = pbn.getBN();
             VarElim ve = new VarElim();
             ve.instantiate(bn);
 
             int purged_leaves = pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
             int collapsed_nodes = pbn.collapseSingles();
 
-//            Variable testNode = bn.getAlphabetical().get(1).getVariable();
-//            EnumDistrib test = getMarginalDistrib(ve, testNode);
-            
-            margin_distribs[col] = getMarginalDistrib(ve, root.getVariable());
-        }        
+            margin_distribs[col] = getMarginalDistrib(ve, bnode.getVariable());
+        }
     }
     
     /**
@@ -208,9 +248,7 @@ public class ASR {
         BNode root = null;
         PhyloBNet pbn = pbnets[col];
         BNet bn = pbn.getBN();
-        //FIXME
-        root = pbn.getRoot(); //Possibly in wrong location??
-        //Root can change in purge and collapse steps?
+        root = pbn.getRoot();
         VarElim ve = new VarElim();
         ve.instantiate(bn);
 
@@ -264,7 +302,7 @@ public class ASR {
         return a;
     }
     
-    private Variable.Assignment[] getJointAssignment(VarElim ve, Variable queryNode) {
+    private Variable.Assignment[] getJointAssignment(VarElim ve, Variable[] queryNode) {
         Query q_joint = ve.makeMPE(queryNode);
         CGTable r_joint = (CGTable)ve.infer(q_joint);
         Variable.Assignment[] a = r_joint.getMPE();
@@ -272,8 +310,7 @@ public class ASR {
     }
     
     /**
-     * Extract sequences for internal nodes from the asr matrix
-     * Identify sequence of root node and print internal node results
+     * Extract sequences for all nodes from the asr matrix
      */
     public void getSequences(){
         //Set extant nodes
@@ -297,7 +334,9 @@ public class ASR {
                 asrs.add(myasr);
             }
         }
-        
+
+        allSeqs = asrs;
+
         String rootname = replacePunct(tree.getRoot().toString());
         PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
         //Create a new alignment from the reconstructed sequences
@@ -307,9 +346,7 @@ public class ASR {
             EnumSeq.Gappy<Enumerable> asr_seq = aln_asr.getEnumSeq(i);
             String nodename = asr_seq.getName();
             if (rootname.equals(nodename))
-                this.asr_root = asr_seq.toString();
                 nodes[i].setSequence(asr_seq);
-                //System.out.println(asr_seq.getName() + "\t" + asr_seq.toString());
                 
             //Not root and not leaf
             if (nodes[i].getChildren().toArray().length > 0){
@@ -322,23 +359,32 @@ public class ASR {
     /**
      * Estimates parameters of gamma distribution then creates a gamma distribution
      */
-    public void calcGammaDistrib(){
+    public GammaDistrib calcGammaDistrib(){
         //estimates parameters of gamma distribution
         double alpha = GammaDistrib.getAlpha(R);
         double beta = 1 / alpha;
 //        System.out.println("Gamma alpha = " + alpha + " beta = " + beta);
         //Creates a gamma distribution
-        this.gd = new GammaDistrib(alpha, 1/beta);
+        return new GammaDistrib(alpha, 1/beta);
     }
     
-    public boolean save(String filename) {
-        
+    public boolean save(String id) {
+
+        boolean j = saveJSON("JSON_output_" + id + ".txt");
+        boolean a = saveALN("aln_full_" + id + ".txt");
+        boolean t = saveTree("new_tree_" + id + ".txt");
+        boolean d = saveDistrib("distribution_" + id + ".txt");
+        boolean s = j && a && t && d;
+        return s;
+    }
+
+    public boolean saveJSON(String filename) {
         try{
             Writer writer = new PrintWriter(filename, "UTF-8");
-            
+
             //Create the top level object - reconstruction
             JSONObject recon = new JSONObject();
-        
+
             //Create and populate the root node object
             JSONObject root = new JSONObject();
             root.put("Sequence",tree.getRoot().getSequence().toString());
@@ -358,13 +404,13 @@ public class ASR {
 //                    double val = distr.get(aacid[a]);
 //                    position.put(aacid[a].toString(), val);
 //                }
-//                margDistribs.put(Integer.toString(k), position);                
+//                margDistribs.put(Integer.toString(k), position);
 //            }
 //            root.put("MarginalDistribs", margDistribs);
-            
+
             //Add the root information to the reconstruction object
             recon.put("Root", root);
-            
+
             //Create and populate the internal nodes object
             PhyloTree.Node[] nodes = getInternalNodes();
             for (PhyloTree.Node n: nodes) {
@@ -374,8 +420,8 @@ public class ASR {
 //                node.put("NewickRep",nodes[i].toString());
                 //Using append rather than put automatically creates an array
                 recon.append("ReconstructedNodes", node);
-            }  
-            
+            }
+
             //Create and populate the extant nodes object
             PhyloTree.Node[] exNodes = getExtantNodes();
             for (PhyloTree.Node n: exNodes) {
@@ -384,19 +430,19 @@ public class ASR {
                 node.put("Sequence", n.getSequence().toString());
 //                node.put("NewickRep",nodes[i].toString());
                 recon.append("ExtantNodes", node);
-            } 
-            
+            }
+
 //            //Create and populate the gamma information
 //            JSONObject gammaAB = new JSONObject();
 //            gammaAB.put("alpha", gd.getAlpha());
 //            gammaAB.put("beta", gd.getBeta());
 //            recon.put("gammaDistrib", gammaAB);
-            
+
             JSONObject fin = new JSONObject();
             fin.put("Reconstruction", recon);
             fin.write(writer);
             writer.close();
-            
+
         } catch (UnsupportedEncodingException uee) {
             uee.printStackTrace();
             return false;
@@ -409,7 +455,26 @@ public class ASR {
         }
         return true;
     }
-       
+
+    public boolean saveALN(String filename) {
+        try {
+            FastaWriter fw = new FastaWriter(filename);
+
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+
+        return true;
+    }
+
+    public boolean saveTree(String filename) {
+        return true;
+    }
+
+    public boolean saveDistrib(String filename){
+        return true;
+    }
+
     private PhyloTree.Node[] getInternalNodes(){
         String rootname = tree.getRoot().toString();
         PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
@@ -440,9 +505,7 @@ public class ASR {
         PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - seqs.size() - 1];
         return extNodes.toArray(intNodesA);
     }
-    
-    public String getAsrSeq(){ return asr_root; }
-    
+
     public PhyloTree getTree() {
         return tree;
     }
