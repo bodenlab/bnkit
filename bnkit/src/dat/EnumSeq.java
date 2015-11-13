@@ -122,6 +122,21 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
             r.close();
             return seqs;
         }
+
+        public static <T extends Enumerable> List<EnumSeq.Gappy<T>> loadFasta(String filename, T elementType, Character gap) throws IOException {
+            //FIXME - untested
+            List<EnumSeq.Gappy<T>> seqs = new ArrayList<>();
+            FastaReader r = new FastaReader(filename, elementType, gap);
+            EnumSeq.Gappy[] rseqs = r.loadGappy();
+            for (EnumSeq.Gappy rseq : rseqs) {
+                try {
+                    seqs.add((EnumSeq.Gappy<T>) rseq);
+                } catch (ClassCastException e) {
+                }
+            }
+            r.close();
+            return seqs;
+        }
         
     }
 
