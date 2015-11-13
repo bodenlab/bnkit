@@ -105,8 +105,8 @@ public class FastaReader {
         }
     }
 
-    protected EnumSeq extract(String[] seqDef) {
-        boolean gappy = false;
+    protected EnumSeq extract(String[] seqDef, boolean gappy) {
+//        boolean gappy = false;
         if (seqDef.length > 0) {
             StringTokenizer tok = new StringTokenizer(seqDef[0], " \t,;|");
             if (tok.hasMoreTokens()) {
@@ -191,7 +191,7 @@ public class FastaReader {
                     seqdef[i] = (String) def.get(i);
                 }
                 try {
-                    EnumSeq sbuf = extract(seqdef);
+                    EnumSeq sbuf = extract(seqdef, false);
                     sequences.add(sbuf);
                 } catch (RuntimeException e) {
                     System.err.println("Sequence \"" + seqdef[0].substring(1) + "\" is using an illegal symbol - " + e.getMessage());
@@ -202,6 +202,56 @@ public class FastaReader {
             }
         }
         EnumSeq[] seqarr = new EnumSeq[sequences.size()];
+        sequences.toArray(seqarr);
+        return seqarr;
+    }
+
+    /**
+     * Reads a file on the FASTA format.
+     * @return all sequences in the file
+     * @throws IOException if the file can not be read
+     */
+    public EnumSeq.Gappy[] loadGappy() throws IOException {
+        Pattern pattern = Pattern.compile(SEQ_FILE_SEPARATOR);
+        String line;
+        line = reader.readLine();
+        CURRENT_LINE++;
+        while (line != null) {
+            Matcher matcher = pattern.matcher(line);
+            if (matcher.find()) {
+                List<String> def = new ArrayList<>();
+                def.add(line);
+                line = reader.readLine();
+                CURRENT_LINE++;
+                while (line != null) {
+                    matcher = pattern.matcher(line);
+                    if (matcher.find()) {
+                        break;
+                    }
+                    String trimmed = line.trim();
+                    if (trimmed.length() > 0) {
+                        def.add(trimmed);
+                    }
+                    line = reader.readLine();
+                    CURRENT_LINE++;
+                }
+                String[] seqdef = new String[def.size()];
+                for (int i = 0; i < def.size(); i++) {
+                    seqdef[i] = (String) def.get(i);
+                }
+                try {
+                    EnumSeq sbuf = extract(seqdef, true);
+                    //FIXME - untested
+                    sequences.add(sbuf);
+                } catch (RuntimeException e) {
+                    System.err.println("Sequence \"" + seqdef[0].substring(1) + "\" is using an illegal symbol - " + e.getMessage());
+                }
+            } else {
+                line = reader.readLine();
+                CURRENT_LINE++;
+            }
+        }
+        EnumSeq.Gappy[] seqarr = new EnumSeq.Gappy[sequences.size()];
         sequences.toArray(seqarr);
         return seqarr;
     }
