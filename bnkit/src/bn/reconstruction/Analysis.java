@@ -32,6 +32,7 @@ public class Analysis {
     private PhyloBNet pbn; //only to be used for navigating branches
     private EnumSeq.Alignment<Enumerable> aln;
     private Map<String, String> mapForNodes;
+    private Map<Object, Map<Object, Integer>> transitions = new HashMap<>();
 
     /**
      * Constructor following on immediately from performing a reconstruction
@@ -51,6 +52,11 @@ public class Analysis {
         recordEdgeValues(models);
         transformLikelihood();
 
+//        Map<Object, List<Object>> branches = exploreBranches();
+//        recordBranchValues(branches);
+
+        getDistanceMatrix();
+
         //Write the output
         try {
             PrintWriter writer = new PrintWriter("newick_transformed.txt", "UTF-8");
@@ -69,6 +75,8 @@ public class Analysis {
         } catch (UnsupportedEncodingException use) {
             System.out.println(use.getStackTrace());
         }
+
+
 
     }
 
@@ -181,6 +189,117 @@ public class Analysis {
         return modified;
     }
 
+    public void getDistanceMatrix(){
+
+        PhyloTree.Node[] nodes = tree.toNodesBreadthFirst();
+        for (int i = 0; i < aln.getWidth(); i++) {
+            try {
+                PrintWriter writer = new PrintWriter("distanceMatrix_" + i + ".txt", "UTF-8");
+                Double[][] matrix = new Double[nodes.length][nodes.length + 1];//include row name
+                int l1 = 0;
+                for (PhyloTree.Node n1 : nodes) {
+                    int l2 = 0;
+                    for (PhyloTree.Node n2 : nodes) {
+                        double distance = getDistance(n1, n2, i);
+                        matrix[l1][l2] = distance;
+                        matrix[l2][l1] = distance;
+                        l2++;
+                    }
+                    l1++;
+                }
+                writer.write("col_" + i + "\t");
+                for (int a = 0; a < nodes.length; a++) { //write header
+                    if (a == nodes.length - 1) {
+                        writer.write((String)nodes[a].getLabel() + "\n");
+                    } else {
+                        writer.write((String) nodes[a].getLabel() + "\t");
+                    }
+                }
+                for (int j = 0; j < matrix.length; j++) {
+                    writer.write((String)nodes[j].getLabel() + "\t");
+                    for (int k = 1; k < matrix[j].length; k++) {
+                        if (k == matrix[j].length - 1) {
+                            writer.write(matrix[j][k - 1] + "\n");
+                        } else {
+                            writer.write(matrix[j][k - 1] + "\t");
+                        }
+                    }
+                }
+                writer.close();
+            } catch (FileNotFoundException fnf) {
+                System.out.println(fnf.getStackTrace());
+            } catch (UnsupportedEncodingException use) {
+                System.out.println(use.getStackTrace());
+            }
+        }
+    }
+
+    public Double getDistance(PhyloTree.Node n1, PhyloTree.Node n2, int col) {
+
+        if (n1.equals(n2)) {
+            return 0.0;
+        }
+
+        if (n1 == tree.getRoot()) {
+            PhyloTree.Node temp = n1;
+            n1 = n2;
+            n2 = temp;
+        }
+
+        String n1Lab = (String) n1.getLabel();
+        String n1Name = mapForNodes.get(n1Lab);
+        BNode node1 = pbn.getBN().getNode(n1Name);
+        List<BNode> n1Ancs = pbn.getBN().getAncestors(node1);
+        List<BNode> n1Decs = pbn.getBN().getDescendants(node1);
+
+        String n2Lab = (String) n2.getLabel();
+        String n2Name = mapForNodes.get(n2Lab);
+        BNode node2 = pbn.getBN().getNode(n2Name);
+        List<BNode> n2Ancs = pbn.getBN().getAncestors(node2);
+
+        boolean high;
+        boolean low;
+        boolean side;
+        double distance = 0.0;
+        if (n1Ancs.contains(node2)) {
+            low = true;
+            distance += n1.getLikelihood().get(col);
+            for (BNode n1a : n1Ancs) {
+                if (n1a.equals(node2)) { //Hit node of interest so don't add any more to distance
+                    break;
+                }
+                distance += BNodeToPhyloNode(n1a).getLikelihood().get(col);
+            }
+        } else if (n1Decs.contains(node2)) {
+            high = true;
+            //Need to look up from node 2 because of way likelihood is stored + you will have issues with parent having
+            //two children and picking the 'right' distance to add
+            distance += n2.getLikelihood().get(col);
+            for (BNode n2a : n2Ancs) {
+                if (n2a.equals(node1)) { //Hit node of interest so don't add any more to distance
+                    break;
+                }
+                distance += BNodeToPhyloNode(n2a).getLikelihood().get(col);
+            }
+        } else {
+            side = true;
+            //Node pair is on other side of tree so sum all ancestors of both nodes
+            distance += n1.getLikelihood().get(col);
+            for (BNode n1a : n1Ancs) {
+                if (!BNodeToPhyloNode(n1a).equals(tree.getRoot())) {
+                    distance += BNodeToPhyloNode(n1a).getLikelihood().get(col);
+                }
+            }
+            distance += n2.getLikelihood().get(col);
+            for (BNode n2a : n1Ancs) {
+                if (!BNodeToPhyloNode(n2a).equals(tree.getRoot())) {
+                    distance += BNodeToPhyloNode(n2a).getLikelihood().get(col);
+                }
+            }
+        }
+        return distance;
+    }
+
 
     /**
      * A method to explore all branches of a phylogenetic tree based on
@@ -219,22 +338,7 @@ public class Analysis {
             List<BNode> branch = res.getValue();
             List<Object> branchNodes = new ArrayList<>();
             for (BNode node : branch) {
-                String nodeTwo = node.toString();
-                String nodeName = null;
-                if (nodeTwo.contains("|")) {
-                    nodeName = nodeTwo.substring(3, nodeTwo.indexOf("|"));
-                } else {
-                    nodeName = nodeTwo.substring(3, nodeTwo.length() - 1);
-                }
-                String nodeLabel = null;
-                //FIXME there must be a better way to extract to node label!
-                for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
-                    String value = e.getValue();
-                    if (value.equals(nodeName)) {
-                        nodeLabel = e.getKey();
-                        continue;
-                    }
-                }
+                String nodeLabel = BNodeToPhyloNodeLab(node);
                 branchNodes.add(nodeLabel);
             }
             //Where the newly edited node labels are stored
@@ -376,6 +480,19 @@ public class Analysis {
                         columnTransitions[e] = tran;
                         e++;
                         transitionWriter.println(aaParent + "\t" + aaChild);
+
+                        //Count transition
+                        if (transitions.containsKey(aaParent)) {
+                            if (transitions.get(aaParent).containsKey(aaChild)) {
+                                transitions.get(aaParent).put(aaChild, transitions.get(aaParent).get(aaChild) + 1);
+                            } else {
+                                transitions.get(aaParent).put(aaChild, 1);
+                            }
+
+                        } else {
+                            transitions.put(aaParent, new HashMap<Object, Integer>());
+                            transitions.get(aaParent).put(aaChild, 1);
+                        }
                     }
                 }
             }
@@ -453,19 +570,10 @@ public class Analysis {
                 child.setInstance(paramPar);
                 Object[] chldKey = {child.getInstance()};
                 aaChldT.put(aaParDistrib, chldKey);
-
             }
-//            for (String paramChld : child.getVariable().getParams().split(";")) {
-//                child.setInstance(paramChld);
-//                Object[] chldKey = {child.getInstance()};
-//                Distrib aaChldDistrib = aaChld.getDistrib(chldKey);
-//                aaChldT.put(aaChldDistrib, chldKey);
-//            }
 
             aaParT.setTrainable(false);
             aaChldT.setTrainable(false);
-
-
 
             PhyloTree.Node root = tree.getRoot();
             Collection<PhyloTree.Node> children = root.getChildren();
@@ -486,9 +594,7 @@ public class Analysis {
                 }
             }
 
-            System.out.println();
             System.out.println(a);
-            System.out.println();
 
             List<BNode> bNodes = Arrays.asList(curNet.getNode("Parent"), curNet.getNode("Child"), curNet.getNode("AAparent"), curNet.getNode("AAchild"));
             LearningAlg em = new EM(curNet);
@@ -499,24 +605,24 @@ public class Analysis {
             BNode aapar = curNet.getNode("AAparent");
             BNode aachild = curNet.getNode("AAchild");
 
-            try {
-                PrintWriter writer = new PrintWriter("col_"+a+"_transition_llhs.txt", "UTF-8");
-                for (Object aap : Enumerable.aacid_ext.getValues()) {
-                    aapar.setInstance(aap);
-                    for (Object aac : Enumerable.aacid_ext.getValues()) {
-                        aachild.setInstance(aac);
-                        VarElim ve = new VarElim();
-                        ve.instantiate(curNet);
-                        double llh = ve.logLikelihood();
-                        writer.println(aap + "\t" + aac + "\t" + llh);
-                    }
-                }
-                writer.close();
-            } catch (FileNotFoundException fnf) {
-                System.out.println(fnf.getStackTrace());
-            } catch (UnsupportedEncodingException use) {
-                System.out.println(use.getStackTrace());
-            }
+//            try {
+//                PrintWriter writer = new PrintWriter("col_"+a+"_transition_llhs.txt", "UTF-8");
+//                for (Object aap : Enumerable.aacid_ext.getValues()) {
+//                    aapar.setInstance(aap);
+//                    for (Object aac : Enumerable.aacid_ext.getValues()) {
+//                        aachild.setInstance(aac);
+//                        VarElim ve = new VarElim();
+//                        ve.instantiate(curNet);
+//                        double llh = ve.logLikelihood();
+//                        writer.println(aap + "\t" + aac + "\t" + llh);
+//                    }
+//                }
+//                writer.close();
+//            } catch (FileNotFoundException fnf) {
+//                System.out.println(fnf.getStackTrace());
+//            } catch (UnsupportedEncodingException use) {
+//                System.out.println(use.getStackTrace());
+//            }
         }
         return columnModels;
     }
@@ -554,15 +660,13 @@ public class Analysis {
                 }
             }
 
-            System.out.println();
             System.out.println(a);
-            System.out.println();
 
             List<BNode> bNodes = Arrays.asList(curNet.getNode("Parent"), curNet.getNode("Child"), curNet.getNode("AAparent"), curNet.getNode("AAchild"));
             LearningAlg em = new EM(curNet);
             em.train(columnTransitions, bNodes);
             columnModels[a] = curNet;
-            BNBuf.save(curNet, "network_col_" + a + ".out");
+//            BNBuf.save(curNet, "network_col_" + a + ".out");
             System.out.println();
         }
         return columnModels;
@@ -658,45 +762,6 @@ public class Analysis {
      * a branch length
      */
     public void transformLikelihood() {
-
-//        List<Double> original = new ArrayList<>();
-//        List<Double> transformed = new ArrayList<>();
-//        PhyloTree.Node[] nodes = tree.toNodesBreadthFirst();
-//        List<List<Double>> alignVals = new ArrayList<>();
-//        double max = 1000;
-//        double min = -1000000; //FIXME
-//        for (int c = 0; c < aln.getWidth(); c++) { //for every column in alignment
-//            List<Double> colVals = new ArrayList<>();
-//            for (int n = 0; n < nodes.length; n++) { //for every node in network get the value for the column
-//                if (nodes[n].getLikelihood().size() > 0) //if node is not root
-//                    colVals.add(nodes[n].getLikelihood(c));
-//            }
-//            double colMax = Collections.max(colVals);
-//            if (colMax > max)
-//                max = colMax;
-//            double colMin = Collections.min(colVals);
-//            if (colMin < min)
-//                min = colMin;
-//            alignVals.add(colVals);
-//        }
-//        for (int c = 0; c < aln.getWidth(); c++) {
-//            List<Double> colVals = alignVals.get(c);
-//            for (int n = 0; n < nodes.length; n++) { //for every node in network replace the llh value with transformed value
-//                if (nodes[n].getLikelihood().size() > 0) { //if node is not root
-//                    double cl = nodes[n].getLikelihood(c);
-//                    original.add(cl);
-//                    double transform = (max - cl) / (max - min); //treat max as new '0' value
-//                    if (Double.isNaN(transform)) { //all edges have equal likelihoods -> division by 0
-//                        transform = 0.01; //FIXME what is a good neutral branch size here?
-//                    }
-//                    else {
-//                        transform += 0.01; //FIXME - can't have branch size equal to 0.0 either?
-//                    }
-//                    transformed.add(transform);
-//                    nodes[n].setLikelihood(transform, c);
-//                }
-//            }
-//        }
 
         List<Double> original = new ArrayList<>();
         List<Double> transformed = new ArrayList<>();
@@ -796,7 +861,8 @@ public class Analysis {
      * @return
      */
     private BNet network() {
-        String[] stringVars = {"1","2","3", "4", "5", "6", "7"};
+//        String[] stringVars = {"1","2","3", "4", "5", "6", "7"};
+        String[] stringVars = {"1","2","3"};
         EnumVariable P = Predef.Nominal(stringVars, "Parent");
         EnumVariable C = Predef.Nominal(stringVars, "Child");
         EnumVariable AAP = Predef.AminoAcidExt("AAparent");
@@ -899,6 +965,46 @@ public class Analysis {
         }
         PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - extNodes.size() - 1];
         return extNodes.toArray(intNodesA);
+    }
+
+    private String BNodeToPhyloNodeLab(BNode node){
+        String nodeString = node.toString();
+        String nodeName = null;
+        if (nodeString.contains("|")) {
+            nodeName = nodeString.substring(3, nodeString.indexOf("|"));
+        } else {
+            nodeName = nodeString.substring(3, nodeString.length() - 1);
+        }
+        String nodeLabel = null;
+        //FIXME there must be a better way to extract to node label!
+        for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
+            String value = e.getValue();
+            if (value.equals(nodeName)) {
+                nodeLabel = e.getKey();
+                continue;
+            }
+        }
+        return nodeLabel;
+    }
+
+    private PhyloTree.Node BNodeToPhyloNode(BNode node){
+        String nodeString = node.toString();
+        String nodeName = null;
+        if (nodeString.contains("|")) {
+            nodeName = nodeString.substring(3, nodeString.indexOf("|"));
+        } else {
+            nodeName = nodeString.substring(3, nodeString.length() - 1);
+        }
+        String nodeLabel = null;
+        //FIXME there must be a better way to extract to node label!
+        for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
+            String value = e.getValue();
+            if (value.equals(nodeName)) {
+                nodeLabel = e.getKey();
+                continue;
+            }
+        }
+        return tree.find(nodeLabel);
     }
 
     private static String replacePunct(String str) {
