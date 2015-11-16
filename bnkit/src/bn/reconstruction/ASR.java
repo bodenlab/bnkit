@@ -467,7 +467,9 @@ public class ASR {
             EnumSeq.Gappy<Enumerable> seq = (EnumSeq.Gappy) nodes[n].getSequence();
             String seqName = seq.getName();
             String seqLab = nodeToLabel.get(seqName);
-            seq.setName(seqLab + " " + seqName);
+            if (seqLab != null) {
+                seq.setName(seqLab + " " + seqName);
+            }
             allSeqs[n] = seq;
         }
         try {
@@ -484,6 +486,7 @@ public class ASR {
             Writer writer = new PrintWriter(filename, "UTF-8");
             String newick = tree.getRoot().toString();
             writer.write(newick);
+            writer.write(";\n");
             writer.close();
         } catch (UnsupportedEncodingException uee) {
             uee.printStackTrace();
