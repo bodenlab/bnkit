@@ -84,13 +84,7 @@ public class VarElim implements Inference {
         List<Variable> X = new ArrayList<>(); // Un-instantiated but relevant nodes (not d-separated from any query node), to-be summed out
         Q.addAll(Arrays.asList(qvars));
         List<BNode> rnl = null;
-        try {
-            rnl = bn.getDconnected(qvars); //relevant *ordered* node list, based on the concept of D-separation, and topological ordering
-
-        } catch (NullPointerException noe) {
-            System.out.println("Incorrect alignment");
-            noe.printStackTrace();
-        }
+        rnl = bn.getDconnected(qvars); //relevant *ordered* node list, based on the concept of D-separation, and topological ordering
         for (BNode node : rnl) {
             Variable var = node.getVariable();
             Object val = node.getInstance();
