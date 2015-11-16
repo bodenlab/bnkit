@@ -89,7 +89,11 @@ public class FastaWriter {
                 for (int i=0; i<str.length; i++) {
                     if (i % LINE_WIDTH == 0)
                         writer.newLine();
-                    writer.write(str[i].toString());
+                    try {
+                        writer.write(str[i].toString());
+                    } catch (NullPointerException npe) {
+                        writer.write("-"); //to catch gaps not stored in EnumSeq arr
+                    }
                 }
                 writer.newLine();
             } catch (IOException e) {
