@@ -14,24 +14,32 @@ public class runASR {
     
     /**
      * @param args
+     * tree_file - Newick string representation of
+     * aln_file - alignment file - clustal or fasta
+     * ID - identifier for Reconstruction
      */
     public static void main(String[] args) {
-        if(args.length < 2) {
-            System.out.println("Usage: <tree_file> <aln_file>");
-        } else if (args.length == 2) {
-            ASR asr = new ASR(args[0], args[1]);
-            asr.save("JSONoutput.txt");
-            Analysis test = new Analysis(asr); //the constructor currently handles all steps required
-//            test.createNtrainBN();
+        if(args.length < 4) {
+            System.out.println("Usage: <tree_file> <aln_file> <Inference> <ID> ");
+            System.out.println("Usage: <tree_file> <aln_file> <Inference> <nodeLabel> <ID> ");
+            System.exit(1);
+        } else if (args.length == 4) {
+            ASR asr = new ASR(args[0], args[1], args[2]);
+            if (args[2].equals("Joint"))
+                asr.save(args[3], true);
+            else
+                asr.save(args[3], false);
+//            Analysis test = new Analysis(asr); //the constructor currently handles all steps required
+        } else if (args.length == 5) {
+            ASR asr = new ASR(args[0], args[1], args[2], args[3]);
+            if (args[2].equals("Joint"))
+                asr.save(args[4], true);
+            else
+                asr.save(args[4], false);
         } else {
-            ASR asr = new ASR(args[0], args[1]);
-            asr.save(args[2]);
+            System.out.println("Usage: <tree_file> <aln_file> <Inference> <ID> ");
+            System.out.println("Usage: <tree_file> <aln_file> <Inference> <nodeLabel> <ID> ");
+            System.exit(1);
         }
     }
 }
-
-//"bnkit/data/test_tree.txt" "bnkit/data/test_aln.aln"
-//"bnkit/data/test_tree.txt" "bnkit/data/test_aln_jitter.txt"
-//"bnkit/data/CYP2F.nwk" "bnkit/data/CYP2F.aln"
-//"../soxb_tree.nwk" "../soxb_clustal.aln"
-//"../voordeckers_tree.txt" "../voordeckers_aln.txt"
