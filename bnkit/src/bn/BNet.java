@@ -23,18 +23,7 @@ import dat.EnumVariable;
 import dat.Variable;
 import dat.Enumerable;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.*;
 
 /**
  * Defines a Bayesian Network. The class will manage efficient access to the
@@ -630,16 +619,10 @@ public class BNet implements Serializable {
         //I think a query node can always be added once with a single direction and that will always work
         for (Variable q : query) {
             BNode qNode = this.getNode(q);
+            if (qNode == null) {
+                throw new NullPointerException("Invalid query: node " + q.toString() + " does not exist in this network");
+            }
             l.add(new NodeDirection(qNode, "up"));
-
-//     		if (qNode.isRoot()) {
-//     			l.add(new NodeDirection(qNode, "down"));
-//     		} else if (this.getChildren(qNode) == null) {
-//     			l.add(new NodeDirection(qNode, "up"));
-//     		} else {
-//     			l.add(new NodeDirection(qNode, "up"));
-//     			l.add(new NodeDirection(qNode, "down"));
-//     		}
         }
 
         Set<NodeDirection> v = new HashSet<NodeDirection>(); //node,direction marked as visited
