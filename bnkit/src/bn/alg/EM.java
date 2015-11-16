@@ -504,9 +504,9 @@ public class EM extends LearningAlg {
                 // copy previous LL (log-likelihood of data)
                 if (round <= 50) {
                     for (int i = 0; i < last_LL.length - 1; i++) {
-                        last_LL[i] = last_LL[i + 1];
+                        last_LL[i] = last_LL[i + 1]; // shuffle llhs through list - only ever record 5
                     }
-                    last_LL[last_LL.length - 1] = log_likelihood;
+                    last_LL[last_LL.length - 1] = log_likelihood; // add new log_likelihood
 //            		System.out.println(Arrays.toString(last_LL));
                 } else {
                     double mean_LL = last_LL[0] / last_LL.length;
@@ -525,9 +525,16 @@ public class EM extends LearningAlg {
                     }
                     last_LL[last_LL.length - 1] = log_likelihood;
 //                    if ((-mean_LL - -log_likelihood) < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
-                    if (sd_LL < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
-                    {
-                        EM_TERMINATE = true;
+                    if(mean_LL > 0) {
+                        if (sd_LL < (EM_CONVERGENCE_CRITERION * 0.01 * mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
+                        {
+                            EM_TERMINATE = true;
+                        }
+                    } else {
+                        if (sd_LL < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
+                        {
+                            EM_TERMINATE = true;
+                        }
                     }
                 }
 
