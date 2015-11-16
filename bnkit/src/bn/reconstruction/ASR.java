@@ -41,7 +41,6 @@ public class ASR {
     private double[] R; //Rates at positions in alignment
     private EnumDistrib[] margin_distribs; //Marginal distributions for nodes
     private boolean use_sampled_rate = false;
-    private boolean infSequence = false;
     
     private List<String> indexForNodes;
     private Map<String, String> mapForNodes;
@@ -57,7 +56,6 @@ public class ASR {
         if (inference.equals("Joint")) {
             queryNetsJoint();
             getSequences();
-            infSequence = true;
         } else if (inference.equals("Marginal")) {
             System.out.println("*Information*\nNo node specification: returning marginal distribution of root node");
             queryNetsMarg();
@@ -74,7 +72,6 @@ public class ASR {
             System.out.println("*Information*\nUsing joint probability so node specification will be ignored");
             queryNetsJoint();
             getSequences();
-            infSequence = true;
         } else if (inference.equals("Marginal")) {
             if (tree.find(nodeLabel) == null) {
                 System.out.println("Invalid node label - exiting");
@@ -307,12 +304,16 @@ public class ASR {
             CGTable r_marg = (CGTable)ve.infer(q_marg);
             d_marg = (EnumDistrib)r_marg.query(queryNode);
         } catch (NullPointerException npe) { //When node of interest has been removed from network of interest
-            npe.printStackTrace();
-            double[] empty = new double[Enumerable.aacid.size()];
-            for (int d = 0; d < Enumerable.aacid.size(); d++) {
-                empty[d] = 0.0;
+            if (npe.toString().contains("Invalid query")) {
+                double[] empty = new double[Enumerable.aacid.size()];
+                for (int d = 0; d < Enumerable.aacid.size(); d++) {
+                    empty[d] = 0.0;
+                }
+                d_marg = new EnumDistrib(Enumerable.aacid, empty);
+            } else {
+                npe.printStackTrace();
             }
-            d_marg = new EnumDistrib(Enumerable.aacid, empty);
+
         }
         return d_marg;
     }
@@ -341,7 +342,6 @@ public class ASR {
             tree.find(seq.getName()).setSequence(seq);
         }
 
-        int seqCount = 0;
         //Retrieve and store reconstructions for each node
         List<EnumSeq.Gappy<Enumerable>> asrs = new ArrayList<>();
         //asr_matrix stores joint reconstruction - MPE assignment of each internal node in each network
@@ -356,7 +356,6 @@ public class ASR {
                 myasr.setName(indexForNodes.get(row));
                 asrs.add(myasr);
             }
-            seqCount++;
         }
 
         String rootname = replacePunct(tree.getRoot().toString());
@@ -389,7 +388,7 @@ public class ASR {
         return new GammaDistrib(alpha, 1/beta);
     }
     
-    public boolean save(String id) {
+    public boolean save(String id, boolean infSequence) {
         if (infSequence) {
             saveJSON(id + "_JSON_output.txt");
             saveALN(id + "_aln_full.fa");
@@ -465,7 +464,11 @@ public class ASR {
         EnumSeq.Gappy<Enumerable>[] allSeqs = new EnumSeq.Gappy[nodes.length];
         for (int n = 0; n < nodes.length; n++) {
             //Update sequence name at this point
-            allSeqs[n] = (EnumSeq.Gappy) nodes[n].getSequence();
+            EnumSeq.Gappy<Enumerable> seq = (EnumSeq.Gappy) nodes[n].getSequence();
+            String seqName = seq.getName();
+            String seqLab = nodeToLabel.get(seqName);
+            seq.setName(seqLab + " " + seqName);
+            allSeqs[n] = seq;
         }
         try {
             FastaWriter fw = new FastaWriter(filename);
