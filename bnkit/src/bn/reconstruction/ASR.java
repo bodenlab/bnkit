@@ -307,6 +307,7 @@ public class ASR {
             CGTable r_marg = (CGTable)ve.infer(q_marg);
             d_marg = (EnumDistrib)r_marg.query(queryNode);
         } catch (NullPointerException npe) { //When node of interest has been removed from network of interest
+            npe.printStackTrace();
             double[] empty = new double[Enumerable.aacid.size()];
             for (int d = 0; d < Enumerable.aacid.size(); d++) {
                 empty[d] = 0.0;
