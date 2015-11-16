@@ -35,13 +35,13 @@ public class ASR {
     
     private PhyloTree tree;
     private PhyloBNet pbn; //only to be used for navigating branches
-    private List<EnumSeq.Gappy<Enumerable>> seqs;
-    private List<EnumSeq.Gappy<Enumerable>> allSeqs;
-    private EnumSeq.Alignment<Enumerable> aln;
+    private List<EnumSeq.Gappy<Enumerable>> seqs; //Ignores gaps in sequence
+    private EnumSeq.Alignment<Enumerable> aln; //Store gaps in sequence
     private PhyloBNet[] pbnets;
     private double[] R; //Rates at positions in alignment
     private EnumDistrib[] margin_distribs; //Marginal distributions for nodes
     private boolean use_sampled_rate = false;
+    private boolean infSequence = false;
     
     private List<String> indexForNodes;
     private Map<String, String> mapForNodes;
@@ -56,24 +56,35 @@ public class ASR {
         createNetworks();
         if (inference.equals("Joint")) {
             queryNetsJoint();
+            getSequences();
+            infSequence = true;
         } else if (inference.equals("Marginal")) {
+            System.out.println("*Information*\nNo node specification: returning marginal distribution of root node");
             queryNetsMarg();
+        } else {
+            System.out.println("Inference must be either 'Joint' or 'Marginal'");
+            System.exit(1);
         }
-        getSequences();
-        GammaDistrib gd = calcGammaDistrib();
     }
 
     public ASR(String file_tree, String file_aln, String inference, String nodeLabel) {
         loadData(file_tree, file_aln);
         createNetworks();
         if (inference.equals("Joint")) {
-            System.out.println("Using joint probability so node specification will be ignored");
+            System.out.println("*Information*\nUsing joint probability so node specification will be ignored");
             queryNetsJoint();
+            getSequences();
+            infSequence = true;
         } else if (inference.equals("Marginal")) {
+            if (tree.find(nodeLabel) == null) {
+                System.out.println("Invalid node label - exiting");
+                System.exit(1);
+            }
             queryNetsMarg(tree.find(nodeLabel));
+        } else {
+            System.out.println("Inference must be either 'Joint' or 'Marginal' - exiting");
+            System.exit(1);
         }
-        getSequences();
-        calcGammaDistrib();
     }
 
     /**
@@ -189,11 +200,12 @@ public class ASR {
      */
     public void queryNetsMarg(PhyloTree.Node node) {
         this.margin_distribs = new EnumDistrib[aln.getWidth()];
-        String nodeName = mapForNodes.get(node);
-        BNode bnode = pbn.getBN().getNode(nodeName);
+        String nodeName = mapForNodes.get(node.getLabel());
+//        BNode bnode = pbn.getBN().getNode(nodeName);
         for (int col = 0; col < aln.getWidth(); col ++) {
             PhyloBNet pbn = pbnets[col];
             BNet bn = pbn.getBN();
+            BNode bnode = pbn.getBN().getNode(nodeName);
             VarElim ve = new VarElim();
             ve.instantiate(bn);
 
@@ -289,9 +301,18 @@ public class ASR {
     }
     
     private EnumDistrib getMarginalDistrib(VarElim ve, Variable queryNode) {
-        Query q_marg = ve.makeQuery(queryNode);
-        CGTable r_marg = (CGTable)ve.infer(q_marg);
-        EnumDistrib d_marg = (EnumDistrib)r_marg.query(queryNode);
+        EnumDistrib d_marg = null;
+        try {
+            Query q_marg = ve.makeQuery(queryNode);
+            CGTable r_marg = (CGTable)ve.infer(q_marg);
+            d_marg = (EnumDistrib)r_marg.query(queryNode);
+        } catch (NullPointerException npe) { //When node of interest has been removed from network of interest
+            double[] empty = new double[Enumerable.aacid.size()];
+            for (int d = 0; d < Enumerable.aacid.size(); d++) {
+                empty[d] = 0.0;
+            }
+            d_marg = new EnumDistrib(Enumerable.aacid, empty);
+        }
         return d_marg;
     }
     
@@ -319,6 +340,7 @@ public class ASR {
             tree.find(seq.getName()).setSequence(seq);
         }
 
+        int seqCount = 0;
         //Retrieve and store reconstructions for each node
         List<EnumSeq.Gappy<Enumerable>> asrs = new ArrayList<>();
         //asr_matrix stores joint reconstruction - MPE assignment of each internal node in each network
@@ -333,9 +355,8 @@ public class ASR {
                 myasr.setName(indexForNodes.get(row));
                 asrs.add(myasr);
             }
+            seqCount++;
         }
-
-        allSeqs = asrs;
 
         String rootname = replacePunct(tree.getRoot().toString());
         PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
@@ -363,19 +384,19 @@ public class ASR {
         //estimates parameters of gamma distribution
         double alpha = GammaDistrib.getAlpha(R);
         double beta = 1 / alpha;
-//        System.out.println("Gamma alpha = " + alpha + " beta = " + beta);
         //Creates a gamma distribution
         return new GammaDistrib(alpha, 1/beta);
     }
     
     public boolean save(String id) {
-
-        boolean j = saveJSON("JSON_output_" + id + ".txt");
-        boolean a = saveALN("aln_full_" + id + ".txt");
-        boolean t = saveTree("new_tree_" + id + ".txt");
-        boolean d = saveDistrib("distribution_" + id + ".txt");
-        boolean s = j && a && t && d;
-        return s;
+        if (infSequence) {
+            saveJSON(id + "_JSON_output.txt");
+            saveALN(id + "_aln_full.fa");
+            saveTree(id + "_new_tree.txt");
+        } else {
+            saveDistrib(id + "_distribution.txt");
+        }
+        return true;
     }
 
     public boolean saveJSON(String filename) {
@@ -395,18 +416,6 @@ public class ASR {
                 rates.put(Integer.toString(j), R[j]);
             }
             root.put("Rates", rates);
-//            JSONObject margDistribs = new JSONObject();
-//            Object[] aacid = Enumerable.aacid.getValues();
-//            for (int k = 0; k < margin_distribs.length; k++) {
-//                EnumDistrib distr = margin_distribs[k];
-//                JSONObject position = new JSONObject();
-//                for (int a = 0; a < aacid.length; a++) {
-//                    double val = distr.get(aacid[a]);
-//                    position.put(aacid[a].toString(), val);
-//                }
-//                margDistribs.put(Integer.toString(k), position);
-//            }
-//            root.put("MarginalDistribs", margDistribs);
 
             //Add the root information to the reconstruction object
             recon.put("Root", root);
@@ -432,12 +441,6 @@ public class ASR {
                 recon.append("ExtantNodes", node);
             }
 
-//            //Create and populate the gamma information
-//            JSONObject gammaAB = new JSONObject();
-//            gammaAB.put("alpha", gd.getAlpha());
-//            gammaAB.put("beta", gd.getBeta());
-//            recon.put("gammaDistrib", gammaAB);
-
             JSONObject fin = new JSONObject();
             fin.put("Reconstruction", recon);
             fin.write(writer);
@@ -456,23 +459,81 @@ public class ASR {
         return true;
     }
 
-    public boolean saveALN(String filename) {
+    public void saveALN(String filename) {
+        PhyloTree.Node[] nodes = tree.toNodesBreadthFirst();
+        EnumSeq.Gappy<Enumerable>[] allSeqs = new EnumSeq.Gappy[nodes.length];
+        for (int n = 0; n < nodes.length; n++) {
+            //Update sequence name at this point
+            allSeqs[n] = (EnumSeq.Gappy) nodes[n].getSequence();
+        }
         try {
             FastaWriter fw = new FastaWriter(filename);
-
+            fw.save(allSeqs);
+            fw.close();
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }
-
-        return true;
     }
 
-    public boolean saveTree(String filename) {
-        return true;
+    public void saveTree(String filename) {
+        try {
+            Writer writer = new PrintWriter(filename, "UTF-8");
+            String newick = tree.getRoot().toString();
+            writer.write(newick);
+            writer.close();
+        } catch (UnsupportedEncodingException uee) {
+            uee.printStackTrace();
+        } catch (FileNotFoundException fnf) {
+            fnf.printStackTrace();
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
     }
 
-    public boolean saveDistrib(String filename){
-        return true;
+    public void saveDistrib(String filename){
+        try {
+            Writer writer = new PrintWriter(filename, "UTF-8");
+            Object[] aacid = Enumerable.aacid_ext.getValues();
+            Object[][] margMatrix = new Object[aacid.length][margin_distribs.length + 1];
+            writer.write("columns\t");
+            for (int i = 1; i < margin_distribs.length; i++) { //write header
+                if (i == margin_distribs.length - 1)
+                    writer.write(i + "\n");
+                else
+                    writer.write(i + "\t");
+            }
+            for (int j = 0; j < aacid.length; j++) { //fill in row names
+                margMatrix[j][0] = aacid[j];
+            }
+            for (int k = 1; k < margin_distribs.length + 1; k++) {
+                EnumDistrib distr = margin_distribs[k-1];
+                for (int a = 0; a < aacid.length; a++) {
+                    if (aacid[a].equals('-')) {
+                        Object na = "NA";
+                        margMatrix[a][k] = na;
+                    } else {
+                        double val = distr.get(aacid[a]);
+                        margMatrix[a][k] = val;
+                    }
+                }
+            }
+            for (int j = 0; j < aacid.length; j++) {
+                for (int k = 0; k < margMatrix[j].length; k++) {
+                    if (k == margMatrix[j].length - 1) {
+                        writer.write(margMatrix[j][k] + "\n");
+                    } else {
+                        writer.write(margMatrix[j][k] + "\t");
+                    }
+                }
+            }
+            writer.close();
+        } catch (UnsupportedEncodingException uee) {
+            uee.printStackTrace();
+        } catch (FileNotFoundException fnf) {
+            fnf.printStackTrace();
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
     }
 
     private PhyloTree.Node[] getInternalNodes(){
