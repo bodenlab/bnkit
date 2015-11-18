@@ -394,6 +394,7 @@ public class ASR {
             saveALN(id + "_aln_full.fa");
             saveTree(id + "_new_tree.txt");
         } else {
+            saveTree(id + "_new_tree.txt");
             saveDistrib(id + "_distribution.txt");
         }
         return true;
