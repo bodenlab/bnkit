@@ -466,10 +466,14 @@ public class ASR {
         for (int n = 0; n < nodes.length; n++) {
             //Update sequence name at this point
             EnumSeq.Gappy<Enumerable> seq = (EnumSeq.Gappy) nodes[n].getSequence();
-            String seqName = seq.getName();
-            String seqLab = nodeToLabel.get(seqName);
+
+            String seqName = nodes[n].toString();
+            String seqLab = nodes[n].getLabel().toString();
+            if (seqLab.charAt((seqLab.length()-1)) == '_') { //Remove trailing underscore from internal nodes
+                seqLab = seqLab.substring(0, seqLab.length()-1);
+            }
             if (seqLab != null) {
-                seq.setName(seqLab + " " + seqName);
+                seq.setName(seqLab + " " + seqName + ";"); //Newick strings require a ';' to indicate completion
             }
             allSeqs[n] = seq;
         }
