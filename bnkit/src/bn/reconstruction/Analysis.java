@@ -31,7 +31,6 @@ public class Analysis {
     private PhyloTree tree;
     private PhyloBNet pbn; //only to be used for navigating branches
     private EnumSeq.Alignment<Enumerable> aln;
-    private Map<String, String> mapForNodes;
     private Map<Object, Map<Object, Integer>> transitions = new HashMap<>();
 
     /**
@@ -44,7 +43,6 @@ public class Analysis {
         tree = reconstruction.getTree();
         pbn = reconstruction.getPbn();
         aln = reconstruction.getAln();
-        mapForNodes = reconstruction.getMapForNodes();
 
         BNet trainedNet = learnParameters();
         BNet[] models = createNtrainBN(trainedNet);
@@ -91,10 +89,6 @@ public class Analysis {
         try {
             tree = PhyloTree.loadNewick(file_tree); //load tree - tree not in Newick
             PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
-            mapForNodes = new HashMap<>(); // Shortname --> Newick string for subtree
-            for (PhyloTree.Node n : nodes) {
-                mapForNodes.put(n.getLabel().toString(), replacePunct(n.toString()));
-            }
 
             List<EnumSeq.Gappy<Enumerable>> seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);
             aln = new EnumSeq.Alignment<>(seqs);
@@ -133,7 +127,7 @@ public class Analysis {
      *
      * @return map of branches keyed by leaf node
      */
-    public Map<Object, List<Object>> exploreBranches() {
+    public Map<Object, List<BNode>> exploreBranches() {
 
         //Structure to store the set of branches in the tree
         Map<Object, List<BNode>> result = new HashMap<>();
@@ -141,52 +135,33 @@ public class Analysis {
         //A branch is generated for each extant node in the tree
         PhyloTree.Node[] extNodes = getExtantNodes();
         for (int n = 0; n < extNodes.length; n++) {
-            String nodeLab = (String) extNodes[n].getLabel();
-            String nodeName = mapForNodes.get(nodeLab);
-            BNode node = pbn.getBN().getNode(nodeName);
+            String nodeLab = extNodes[n].getLabel().toString();
+            BNode node = pbn.getBN().getNode(nodeLab);
             List<BNode> ancs = pbn.getBN().getAncestors(node);
             result.put(nodeLab, ancs);
         }
+        return result;
+    }
 
-        //This part is up for debate - currently each node in the branch is recorded
-        //using the BNet node name not the phyloTree label
-        //This converts them all to phyloTree labels
-        //This makes it easier to extract sequence stored in the phyloTree structure
-        Map<Object, List<Object>> modified = new HashMap<>();
-        List<String> extant = new ArrayList<>();
-        for (int i = 0; i < extNodes.length; i++) {
-            String n = replacePunct(extNodes[i].toString());
-            extant.add(n);
-        }
+    /**
+     * A method to explore all branches of a phylogenetic tree based on
+     * PROVIDED nodes.
+     *
+     * @param nodes - list of nodes which represent the 'leaves' of the branches to be explored
+     * @return map of branches keyed by leaf node
+     */
+    public Map<Object, List<BNode>> exploreBranches(PhyloTree.Node[] nodes) {
 
-        //Convert from BNode to phylo tree label
-        for (Map.Entry<Object, List<BNode>> res : result.entrySet()) {
-            Object key = res.getKey();
-            List<BNode> branch = res.getValue();
-            List<Object> branchNodes = new ArrayList<>();
-            for (BNode node : branch) {
-                String nodeTwo = node.toString();
-                String nodeName = null;
-                if (nodeTwo.contains("|")) {
-                    nodeName = nodeTwo.substring(3, nodeTwo.indexOf("|"));
-                } else {
-                    nodeName = nodeTwo.substring(3, nodeTwo.length() - 1);
-                }
-                String nodeLabel = null;
-                //FIXME there must be a better way to extract to node label!
-                for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
-                    String value = e.getValue();
-                    if (value.equals(nodeName)) {
-                        nodeLabel = e.getKey();
-                        continue;
-                    }
-                }
-                branchNodes.add(nodeLabel);
-            }
-            //Where the newly edited node labels are stored
-            modified.put(key, branchNodes);
+        //Structure to store the set of branches in the tree
+        Map<Object, List<BNode>> result = new HashMap<>();
+
+        for (int n = 0; n < nodes.length; n++) {
+            String nodeLab = (String) nodes[n].getLabel();
+            BNode node = pbn.getBN().getNode(nodeLab);
+            List<BNode> ancs = pbn.getBN().getAncestors(node);
+            result.put(nodeLab, ancs);
         }
-        return modified;
+        return result;
     }
 
     public void getDistanceMatrix(){
@@ -195,7 +170,7 @@ public class Analysis {
         for (int i = 0; i < aln.getWidth(); i++) {
             try {
                 PrintWriter writer = new PrintWriter("distanceMatrix_" + i + ".txt", "UTF-8");
-                Double[][] matrix = new Double[nodes.length][nodes.length + 1];//include row name
+                Double[][] matrix = new Double[nodes.length][nodes.length];//include row name
                 int l1 = 0;
                 for (PhyloTree.Node n1 : nodes) {
                     int l2 = 0;
@@ -217,11 +192,11 @@ public class Analysis {
                 }
                 for (int j = 0; j < matrix.length; j++) {
                     writer.write((String)nodes[j].getLabel() + "\t");
-                    for (int k = 1; k < matrix[j].length; k++) {
+                    for (int k = 0; k < matrix[j].length; k++) {
                         if (k == matrix[j].length - 1) {
-                            writer.write(matrix[j][k - 1] + "\n");
+                            writer.write(matrix[j][k] + "\n");
                         } else {
-                            writer.write(matrix[j][k - 1] + "\t");
+                            writer.write(matrix[j][k] + "\t");
                         }
                     }
                 }
@@ -247,14 +222,12 @@ public class Analysis {
         }
 
         String n1Lab = (String) n1.getLabel();
-        String n1Name = mapForNodes.get(n1Lab);
-        BNode node1 = pbn.getBN().getNode(n1Name);
+        BNode node1 = pbn.getBN().getNode(n1Lab);
         List<BNode> n1Ancs = pbn.getBN().getAncestors(node1);
         List<BNode> n1Decs = pbn.getBN().getDescendants(node1);
 
         String n2Lab = (String) n2.getLabel();
-        String n2Name = mapForNodes.get(n2Lab);
-        BNode node2 = pbn.getBN().getNode(n2Name);
+        BNode node2 = pbn.getBN().getNode(n2Lab);
         List<BNode> n2Ancs = pbn.getBN().getAncestors(node2);
 
         boolean high;
@@ -268,7 +241,7 @@ public class Analysis {
                 if (n1a.equals(node2)) { //Hit node of interest so don't add any more to distance
                     break;
                 }
-                distance += BNodeToPhyloNode(n1a).getLikelihood().get(col);
+                distance += tree.find(n1a.getName()).getLikelihood().get(col);
             }
         } else if (n1Decs.contains(node2)) {
             high = true;
@@ -279,72 +252,25 @@ public class Analysis {
                 if (n2a.equals(node1)) { //Hit node of interest so don't add any more to distance
                     break;
                 }
-                distance += BNodeToPhyloNode(n2a).getLikelihood().get(col);
+                distance += tree.find(n2a.getName()).getLikelihood().get(col);
             }
         } else {
             side = true;
             //Node pair is on other side of tree so sum all ancestors of both nodes
             distance += n1.getLikelihood().get(col);
             for (BNode n1a : n1Ancs) {
-                if (!BNodeToPhyloNode(n1a).equals(tree.getRoot())) {
-                    distance += BNodeToPhyloNode(n1a).getLikelihood().get(col);
+                if (!tree.find(n1a.getName()).equals(tree.getRoot())) {
+                    distance += tree.find(n1a.getName()).getLikelihood().get(col);
                 }
             }
             distance += n2.getLikelihood().get(col);
             for (BNode n2a : n1Ancs) {
-                if (!BNodeToPhyloNode(n2a).equals(tree.getRoot())) {
-                    distance += BNodeToPhyloNode(n2a).getLikelihood().get(col);
+                if (!tree.find(n2a.getName()).equals(tree.getRoot())) {
+                    distance +=tree.find(n2a.getName()).getLikelihood().get(col);
                 }
             }
         }
         return distance;
-    }
-
-
-    /**
-     * A method to explore all branches of a phylogenetic tree based on
-     * PROVIDED nodes.
-     *
-     * @param nodes - list of nodes which represent the 'leafs' of the branches to be explored
-     * @return map of branches keyed by leaf node
-     */
-    public Map<Object, List<Object>> exploreBranches(PhyloTree.Node[] nodes) {
-
-        //Structure to store the set of branches in the tree
-        Map<Object, List<BNode>> result = new HashMap<>();
-
-        for (int n = 0; n < nodes.length; n++) {
-            String nodeLab = (String) nodes[n].getLabel();
-            String nodeName = mapForNodes.get(nodeLab);
-            BNode node = pbn.getBN().getNode(nodeName);
-            List<BNode> ancs = pbn.getBN().getAncestors(node);
-            result.put(nodeLab, ancs);
-        }
-
-        //This part is up for debate - currently each node in the branch is recorded
-        //using the BNet node name not the phyloTree label
-        //This converts them all to phyloTree labels
-        //This makes it easier to extract sequence stored in the phyloTree structure
-        Map<Object, List<Object>> modified = new HashMap<>();
-        List<String> extant = new ArrayList<>();
-        for (int i = 0; i < nodes.length; i++) {
-            String n = replacePunct(nodes[i].toString());
-            extant.add(n);
-        }
-
-        //Convert from BNode to phylo tree label
-        for (Map.Entry<Object, List<BNode>> res : result.entrySet()) {
-            Object key = res.getKey();
-            List<BNode> branch = res.getValue();
-            List<Object> branchNodes = new ArrayList<>();
-            for (BNode node : branch) {
-                String nodeLabel = BNodeToPhyloNodeLab(node);
-                branchNodes.add(nodeLabel);
-            }
-            //Where the newly edited node labels are stored
-            modified.put(key, branchNodes);
-        }
-        return modified;
     }
 
     /**
@@ -600,7 +526,7 @@ public class Analysis {
             LearningAlg em = new EM(curNet);
             em.train(columnTransitions, bNodes);
             columnModels[a] = curNet;
-            BNBuf.save(curNet, "network_col_" + a + ".out");
+//            BNBuf.save(curNet, "network_col_" + a + ".out");
 
             BNode aapar = curNet.getNode("AAparent");
             BNode aachild = curNet.getNode("AAchild");
@@ -965,46 +891,6 @@ public class Analysis {
         }
         PhyloTree.Node[] intNodesA = new PhyloTree.Node[nodes.length - extNodes.size() - 1];
         return extNodes.toArray(intNodesA);
-    }
-
-    private String BNodeToPhyloNodeLab(BNode node){
-        String nodeString = node.toString();
-        String nodeName = null;
-        if (nodeString.contains("|")) {
-            nodeName = nodeString.substring(3, nodeString.indexOf("|"));
-        } else {
-            nodeName = nodeString.substring(3, nodeString.length() - 1);
-        }
-        String nodeLabel = null;
-        //FIXME there must be a better way to extract to node label!
-        for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
-            String value = e.getValue();
-            if (value.equals(nodeName)) {
-                nodeLabel = e.getKey();
-                continue;
-            }
-        }
-        return nodeLabel;
-    }
-
-    private PhyloTree.Node BNodeToPhyloNode(BNode node){
-        String nodeString = node.toString();
-        String nodeName = null;
-        if (nodeString.contains("|")) {
-            nodeName = nodeString.substring(3, nodeString.indexOf("|"));
-        } else {
-            nodeName = nodeString.substring(3, nodeString.length() - 1);
-        }
-        String nodeLabel = null;
-        //FIXME there must be a better way to extract to node label!
-        for (Map.Entry<String, String> e : mapForNodes.entrySet()) {
-            String value = e.getValue();
-            if (value.equals(nodeName)) {
-                nodeLabel = e.getKey();
-                continue;
-            }
-        }
-        return tree.find(nodeLabel);
     }
 
     private static String replacePunct(String str) {
