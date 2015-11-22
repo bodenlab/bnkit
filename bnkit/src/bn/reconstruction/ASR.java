@@ -43,8 +43,6 @@ public class ASR {
     private boolean use_sampled_rate = false;
     
     private List<String> indexForNodes;
-    private Map<String, String> mapForNodes;
-    private Map<String, String> nodeToLabel;
     //Joint reconstruction of tree
     private Object[][] asr_matrix; //storage of all reconstructed sequences
     private double sampled_rate = // sampled rate, copy from a previous 1.0-rate run
@@ -74,7 +72,7 @@ public class ASR {
             getSequences();
         } else if (inference.equals("Marginal")) {
             if (tree.find(nodeLabel) == null) {
-                System.out.println("Invalid node label - exiting");
+                System.out.println("Invalid node label" + nodeLabel + " - exiting");
                 System.exit(1);
             }
             queryNetsMarg(tree.find(nodeLabel));
@@ -96,16 +94,12 @@ public class ASR {
             tree = PhyloTree.loadNewick(file_tree); //load tree - tree not in Newick
             PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
             indexForNodes = new ArrayList<>(); // Newick string for subtree
-            mapForNodes = new HashMap<>(); // Shortname --> Newick string for subtree
-            nodeToLabel = new HashMap<>(); //convert underscore punctuation to decimal
             for (PhyloTree.Node n : nodes) {
                 //n string format internal 'N0_'
                 //n string format extant (no children) 'seq_name_id'
                 //n.toString() recursive Newick representation node and children
                 //creates subtrees?
-                indexForNodes.add(replacePunct(n.toString())); 
-                mapForNodes.put(n.getLabel().toString(), replacePunct(n.toString()));
-                nodeToLabel.put(replacePunct(n.toString()), n.getLabel().toString());
+                indexForNodes.add(n.getLabel().toString()); //link node to row number (index) in various matrices
             }
 
             BufferedReader aln_file = new BufferedReader(new FileReader(file_aln));
@@ -157,12 +151,8 @@ public class ASR {
 
             // set variables according to alignment
             for (int i = 0; i < labels.size(); i ++) {
-                String shortname = labels.get(i);
-                String longname = mapForNodes.get(shortname);
-                if (longname != null) {
-                    BNode bnode = pbn.getBN().getNode(longname);
-                    bnode.setInstance(column[i]);
-                }
+                BNode bnode = pbn.getBN().getNode(labels.get(i));
+                bnode.setInstance(column[i]);
             }
         }
         this.pbnets = pbnets;
@@ -197,7 +187,7 @@ public class ASR {
      */
     public void queryNetsMarg(PhyloTree.Node node) {
         this.margin_distribs = new EnumDistrib[aln.getWidth()];
-        String nodeName = mapForNodes.get(node.getLabel());
+        String nodeName = node.getLabel().toString();
 //        BNode bnode = pbn.getBN().getNode(nodeName);
         for (int col = 0; col < aln.getWidth(); col ++) {
             PhyloBNet pbn = pbnets[col];
@@ -235,7 +225,7 @@ public class ASR {
             for (Variable.Assignment a0 : getJointAssignment(ve)) {
                 EnumVariable asr_var = (EnumVariable)a0.var;
                 Object asr_val = a0.val;
-                int index = indexForNodes.indexOf(replacePunct(asr_var.getName()));
+                int index = indexForNodes.indexOf(asr_var.getName());
                 if (index >= 0) 
                     //index = current node
                     //col = position in alignment
@@ -285,7 +275,7 @@ public class ASR {
         for (Variable.Assignment a0 : getJointAssignment(ve)) {
             EnumVariable asr_var = (EnumVariable)a0.var;
             Object asr_val = a0.val;
-            int index = indexForNodes.indexOf(replacePunct(asr_var.getName()));
+            int index = indexForNodes.indexOf(asr_var.getName());
             if (index >= 0) 
                 //index = current node
                 //col = position in alignment
@@ -348,7 +338,7 @@ public class ASR {
         for (int row = 0; row < asr_matrix.length; row ++) { 
             Object[] asr_obj = asr_matrix[row]; //retrieve MP sequence for node/row
             if (asr_obj[0] == null) { //extant node so have to manually retrieve sequence
-                EnumSeq.Gappy<Enumerable> extSeq = (EnumSeq.Gappy<Enumerable>) tree.find(nodeToLabel.get(indexForNodes.get(row))).getSequence();
+                EnumSeq.Gappy<Enumerable> extSeq = (EnumSeq.Gappy<Enumerable>) tree.find(indexForNodes.get(row)).getSequence();
                 asrs.add(extSeq);
             } else { //reconstructed node so get sequence from matrix
                 EnumSeq.Gappy<Enumerable> myasr = new EnumSeq.Gappy<>(Enumerable.aacid_alt);
@@ -358,7 +348,7 @@ public class ASR {
             }
         }
 
-        String rootname = replacePunct(tree.getRoot().toString());
+        String rootname = tree.getRoot().toString();
         PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
         //Create a new alignment from the reconstructed sequences
         //Print reconstruction for each internal node
@@ -468,10 +458,7 @@ public class ASR {
             EnumSeq.Gappy<Enumerable> seq = (EnumSeq.Gappy) nodes[n].getSequence();
 
             String seqName = nodes[n].toString();
-            String seqLab = nodes[n].getLabel().toString();
-            if (seqLab.charAt((seqLab.length()-1)) == '_') { //Remove trailing underscore from internal nodes
-                seqLab = seqLab.substring(0, seqLab.length()-1);
-            }
+            String seqLab = seq.getName();
             if (seqLab != null) {
                 seq.setName(seqLab + " " + seqName + ";"); //Newick strings require a ';' to indicate completion
             }
@@ -592,8 +579,6 @@ public class ASR {
     public EnumSeq.Alignment<Enumerable> getAln() {
         return aln;
     }
-
-    public  Map<String, String> getMapForNodes() { return mapForNodes; }
     
     //FIXME: Can you update the pbnets array without modifying the aln. Where
     //do the two interact?
@@ -661,10 +646,6 @@ public class ASR {
                 labels.add(names[i]);
         }
         return labels;
-    }
-
-    private static String replacePunct(String str) {
-        return str.replace('.', '_');
     }
 
 }
