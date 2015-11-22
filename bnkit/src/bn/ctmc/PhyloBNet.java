@@ -82,8 +82,8 @@ public class PhyloBNet {
         PhyloBNet pbn = new PhyloBNet(model);
         pbn.rate = rate;
         Node root = tree.getRoot();
-//        EnumVariable rvar = Predef.AminoAcid(root.getLabel().toString());
-        EnumVariable rvar = Predef.AminoAcid(replacePunct(root.toString()));
+        EnumVariable rvar = Predef.AminoAcid(root.getLabel().toString());
+//        EnumVariable rvar = Predef.AminoAcid(root.toString());
         pbn.bnroot = new SubstNode(rvar, model);
         pbn.addBNode(pbn.bnroot);
         pbn.createNodesForSubtree(root, rvar);
@@ -159,10 +159,6 @@ public class PhyloBNet {
         else
             return 0;
     }
-    
-    private static String replacePunct(String str) {
-        return str.replace('.', '_');
-    }
 
     private void createNodesForSubtree(Node pnode, EnumVariable evar) {
         Collection<Node> children = pnode.getChildren();
@@ -170,8 +166,8 @@ public class PhyloBNet {
             leaves.add(evar);
         } else {
             for (Node child : children) {
-//                EnumVariable cvar = Predef.AminoAcid(child.getLabel().toString());
-                EnumVariable cvar = Predef.AminoAcid(replacePunct(child.toString()));
+                EnumVariable cvar = Predef.AminoAcid(child.getLabel().toString());
+//                EnumVariable cvar = Predef.AminoAcid(child.toString());
                 SubstNode cnode = new SubstNode(cvar, evar, model, child.getDistance() * this.rate);
                 this.addBNode(cnode);
                 createNodesForSubtree(child, cvar);
