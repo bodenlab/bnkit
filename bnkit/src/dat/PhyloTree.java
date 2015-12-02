@@ -248,7 +248,8 @@ public class PhyloTree {
         private double[] scores = null; 
         private int[][] traceback = null; 
         private Double dist = null; // optional distance (from this node to its parent)
-        private List<Double> likelihood = new ArrayList<>(); //Every node has a single parent (bar root) so it can carry the value for the edge
+        private List<Double> modelProb = new ArrayList<>(); //Every node has a single parent (bar root) so it can carry
+        // the value for the edge
         private Node parent;
         /**
          * Construct node from label/label.
@@ -272,28 +273,28 @@ public class PhyloTree {
             return value;
         }
 
-        public List<Double> getLikelihood() { return likelihood; }
+        public List<Double> getModelProb() { return modelProb; }
 
-        public Double getLikelihood(int c) { return likelihood.get(c); }
+        public Double getModelProb(int c) { return modelProb.get(c); }
 
         /**
-         * When adding likelihood values you must iterate over the alignment in order so each value is added in
+         * When adding modelProb values you must iterate over the alignment in order so each value is added in
          * the position corresponding to the column it represents
-         * @param likelihood
+         * @param probability
          */
-        public void addLikelihood(Double likelihood) { this.likelihood.add(likelihood); }
+        public void addModelProb(Double probability) { this.modelProb.add(probability); }
 
         /**
-         * Can only be used after the initial assignment of all likelihood values (using addLikelihood()) otherwise the list will be unpopulated
+         * Can only be used after the initial assignment of all modelProb values (using addLikelihood()) otherwise the list will be unpopulated
          * and you will get an indexOutOfBoundsException
-         * @param likelihood
+         * @param modelProb
          * @param column
          */
-        public void setLikelihood(Double likelihood, int column) {
+        public void setModelProb(Double modelProb, int column) {
             try {
-                this.likelihood.set(column, likelihood);
+                this.modelProb.set(column, modelProb);
             } catch (IndexOutOfBoundsException iob) {
-                System.out.println("Likelihood list must be initialised using addLikelihood() prior to setting specific columns");
+                System.out.println("Model probability list must be initialised using addModelProb() prior to setting specific columns");
             }
         }
 
