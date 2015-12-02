@@ -3,6 +3,7 @@ package bn.reconstruction;
 import bn.BNet;
 import bn.BNode;
 import bn.ctmc.PhyloBNet;
+import bn.ctmc.SubstNode;
 import bn.ctmc.matrix.JTT;
 import dat.EnumSeq;
 import dat.Enumerable;
@@ -113,17 +114,28 @@ public class Analysis {
             for (int c = 0; c < aln.getWidth(); c++) {
                 Object childState = child.getSequence().get()[c];
                 Object parentState = parent.getSequence().get()[c];
-//                char gap = '-';
-//                if (childState == null)
-//                    childState = gap;
-//                if (parentState == null)
-//                    parentState = gap;
-//                BNode aapar = model.getNode(parent.getLabel().toString());
-                BNode aachd = model.getNode(child.getLabel().toString());
-                Object[] ap = {parentState};
-                double prob = aachd.get(ap, childState);
-
-                child.addModelProb(prob); //Child stores the likelihoods for the edge connecting it to its
+                SubstNode aachd = (SubstNode) model.getNode(child.getLabel().toString());
+                double prob = 0.0;
+                if (childState == null && parentState == null) {
+                    //FIXME - issues with gap character
+                    System.out.println();
+                } else if (childState == null) { //childState is gap and has to be handled
+                    double[][] probs = aachd.getModel().getProbs(aachd.getTime()); //get probability matrix for node
+                    int index = aachd.getModel().getDomain().getIndex(parentState); //get index of parent state
+                    double[] colProb = probs[index];
+                    for (int i = 0; i < colProb.length; i++) {
+                        if (i == index)
+                            continue;
+                        prob += colProb[i];
+                    }
+                } else if (parentState == null){
+                    //FIXME - issues with gap character
+                    System.out.println();
+                } else {
+                    Object[] ap = {parentState};
+                    prob = aachd.get(ap, childState);
+                }
+                child.addModelProb(prob); //Child stores the likelihoods for the edge connecting it to its parent
             }
         }
     }
@@ -416,8 +428,6 @@ public class Analysis {
         }
         return entropy;
     }
-
-
 
     private PhyloTree.Node[] getInternalNodes(){
         String rootname = tree.getRoot().toString();
