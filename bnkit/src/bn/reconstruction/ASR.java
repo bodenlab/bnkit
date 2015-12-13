@@ -95,23 +95,41 @@ public class ASR {
             PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
             indexForNodes = new ArrayList<>(); // Newick string for subtree
             for (PhyloTree.Node n : nodes) {
-                //n string format internal 'N0_'
-                //n string format extant (no children) 'seq_name_id'
-                //n.toString() recursive Newick representation node and children
-                //creates subtrees?
                 indexForNodes.add(n.getLabel().toString()); //link node to row number (index) in various matrices
             }
 
             BufferedReader aln_file = new BufferedReader(new FileReader(file_aln));
 
-            if (aln_file.readLine().startsWith("CLUSTAL")) {
+            String line = aln_file.readLine();
+            if (line.startsWith("CLUSTAL")) {
                 seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);
-            } else if (aln_file.readLine().startsWith(">")) {
-                //FIXME - untested
+            } else if (line.startsWith(">")) {
                 Character gap = "-".charAt(0);
                 seqs = EnumSeq.Gappy.loadFasta(file_aln, Enumerable.aacid, gap);
             } else {
                 throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+            }
+
+            //Duplicate extant node names not allowed - will influence reconstruction outcomes
+            PhyloTree.Node[] extNodes = getExtantNodes();
+            Set<String> eNodes = new HashSet<>();
+            for (PhyloTree.Node en : extNodes) {
+                if (!eNodes.add(en.getLabel().toString())) {
+                    throw new RuntimeException("Extant node names must be unique - " + en.getLabel().toString() + " is duplicated");
+                }
+            }
+            //Duplicate sequence names not allowed - will influence reconstruction outcomes
+            Set<String> seqNames = new HashSet<>();
+            for (EnumSeq s : seqs) {
+                if (!seqNames.add(s.getName())) {
+                    throw new RuntimeException("Sequence names must be unique - " + s.getName() + " is duplicated");
+                }
+            }
+            //Check whether the provided sequences match up to the provided tree - seqs.size() is used to monitor extant
+            //sequences
+            if (!eNodes.equals(seqNames)) {
+                throw new RuntimeException("The sequence names in the provided alignment must all have a match" +
+                        " in the provided tree");
             }
 
             aln = new EnumSeq.Alignment<>(seqs);
@@ -334,10 +352,11 @@ public class ASR {
 
         //Retrieve and store reconstructions for each node
         List<EnumSeq.Gappy<Enumerable>> asrs = new ArrayList<>();
+        List<PhyloTree.Node> extant = Arrays.asList(getExtantNodes());
         //asr_matrix stores joint reconstruction - MPE assignment of each internal node in each network
         for (int row = 0; row < asr_matrix.length; row ++) { 
             Object[] asr_obj = asr_matrix[row]; //retrieve MP sequence for node/row
-            if (asr_obj[0] == null) { //extant node so have to manually retrieve sequence
+            if (extant.contains(tree.find(indexForNodes.get(row)))) { //extant node so try to manually retrieve sequence
                 EnumSeq.Gappy<Enumerable> extSeq = (EnumSeq.Gappy<Enumerable>) tree.find(indexForNodes.get(row)).getSequence();
                 asrs.add(extSeq);
             } else { //reconstructed node so get sequence from matrix
