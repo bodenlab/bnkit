@@ -10,7 +10,9 @@ import bn.BNode;
 import bn.Predef;
 import bn.alg.*;
 import bn.ctmc.PhyloBNet;
+import bn.ctmc.SubstNode;
 import bn.ctmc.matrix.JTT;
+import bn.ctmc.matrix.gap;
 import bn.node.CPT;
 import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
@@ -37,7 +39,8 @@ public class ASR {
     private PhyloBNet pbn; //only to be used for navigating branches
     private List<EnumSeq.Gappy<Enumerable>> seqs; //Ignores gaps in sequence
     private EnumSeq.Alignment<Enumerable> aln; //Store gaps in sequence
-    private PhyloBNet[] pbnets;
+//    private PhyloBNet[] pbnets;
+//    private PhyloBNet[] pbgapnets;
     private double[] R; //Rates at positions in alignment
     private EnumDistrib[] margin_distribs; //Marginal distributions for nodes
     private boolean use_sampled_rate = false;
@@ -50,13 +53,13 @@ public class ASR {
     
     public ASR(String file_tree, String file_aln, String inference) {
         loadData(file_tree, file_aln);
-        createNetworks();
+        PhyloBNet[] pbnets = createNetworks();
         if (inference.equals("Joint")) {
-            queryNetsJoint();
+            queryNetsJoint(pbnets);
             getSequences();
         } else if (inference.equals("Marginal")) {
             System.out.println("*Information*\nNo node specification: returning marginal distribution of root node");
-            queryNetsMarg();
+            queryNetsMarg(pbnets);
         } else {
             System.out.println("Inference must be either 'Joint' or 'Marginal'");
             System.exit(1);
@@ -65,17 +68,17 @@ public class ASR {
 
     public ASR(String file_tree, String file_aln, String inference, String nodeLabel) {
         loadData(file_tree, file_aln);
-        createNetworks();
+        PhyloBNet[] pbnets = createNetworks();
         if (inference.equals("Joint")) {
             System.out.println("*Information*\nUsing joint probability so node specification will be ignored");
-            queryNetsJoint();
+            queryNetsJoint(pbnets);
             getSequences();
         } else if (inference.equals("Marginal")) {
             if (tree.find(nodeLabel) == null) {
                 System.out.println("Invalid node label" + nodeLabel + " - exiting");
                 System.exit(1);
             }
-            queryNetsMarg(tree.find(nodeLabel));
+            queryNetsMarg(pbnets, tree.find(nodeLabel));
         } else {
             System.out.println("Inference must be either 'Joint' or 'Marginal' - exiting");
             System.exit(1);
@@ -144,8 +147,10 @@ public class ASR {
      * Using the stored alignment, create a PhyloBNet representing each column
      * in alignment. These networks will be queried to reconstruct ancestral
      * sequences. Populate pbnets array with networks.
+     * pbnets array networks are instantiated with sequence from aln
+     * pbgapnets array networks are instantiated with reduced gap/character alphabet
      */
-    public void createNetworks(){
+    public PhyloBNet[] createNetworks(){
         //Each column/position in alignment/sequence gets a network
         PhyloBNet[] pbnets = new PhyloBNet[aln.getWidth()];
         
@@ -155,32 +160,57 @@ public class ASR {
         //Create network for each column in alignment
         //Instantiate nodes
         for (int col = 0; col < aln.getWidth(); col ++) {
+            System.out.println(col);
             Object[] gaps = aln.getGapColumn(col); // array with true for gap, false for symbol
             Object[] column = aln.getColumn(col);  // array for symbols, null for gaps
             tree.setContentByParsimony(names, gaps);
             PhyloBNet pbn;
-            if (use_sampled_rate)
+            PhyloBNet pbnGap;
+            if (use_sampled_rate) {
                 pbn = PhyloBNet.create(tree, new JTT(), sampled_rate);
-            else
+                pbnGap = PhyloBNet.createGap(tree, new gap(), sampled_rate);
+            } else {
                 //creates BNet beginning with root then recursively
                 //traversing subtrees
                 pbn = PhyloBNet.create(tree, new JTT());
+                pbnGap = PhyloBNet.createGap(tree, new gap());
+            }
             pbnets[col] = pbn;
 
-            // set variables according to alignment
             for (int i = 0; i < labels.size(); i ++) {
-                BNode bnode = pbn.getBN().getNode(labels.get(i));
-                bnode.setInstance(column[i]);
+                BNode bnode = pbn.getBN().getNode(labels.get(i));// set node according to alignment
+                BNode bnodeG = pbnGap.getBN().getNode(labels.get(i));// set node according to gap or character
+                if (column[i] == null) {
+                    bnode.setInstance(column[i]);// set node according to alignment
+                    SubstNode sbnode = (SubstNode) bnode;
+                    sbnode.setGap(true);
+                    bnodeG.setInstance('G');// set node as gap
+                } else {
+                    bnode.setInstance(column[i]);// set node according to alignment
+                    bnodeG.setInstance('C');// set node as character
+                }
+            }
+
+            // Determine which internal nodes should be gaps based on gap evolutionary model
+            Variable.Assignment[] states = queryGapNetJoint(pbnGap);
+            for (Variable.Assignment a0 : states) {
+                EnumVariable asr_var = (EnumVariable)a0.var;
+                Object asr_val = a0.val;
+                SubstNode bnode = (SubstNode)pbn.getBN().getNode(asr_var.getName());
+                if (asr_val.equals('G'))
+                    bnode.setGap(true);
+                else
+                    bnode.setGap(false);
             }
         }
-        this.pbnets = pbnets;
+        return(pbnets);
     }
     
     /**
      * Query all networks in pbnets array using marginal probability
      * Populate margin_distribs for each column in alignment
      */
-    public void queryNetsMarg() {
+    public void queryNetsMarg(PhyloBNet[] pbnets) {
         this.margin_distribs = new EnumDistrib[aln.getWidth()];
         BNode root = null;
         for (int col = 0; col < aln.getWidth(); col ++) {
@@ -190,8 +220,8 @@ public class ASR {
             VarElim ve = new VarElim();
             ve.instantiate(bn);
 
-            int purged_leaves = pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
-            int collapsed_nodes = pbn.collapseSingles();
+            pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
+            pbn.collapseSingles();
             
             margin_distribs[col] = getMarginalDistrib(ve, root.getVariable());
         }        
@@ -203,7 +233,7 @@ public class ASR {
      * Populate margin_distribs for each column in alignment
      * @param node to be queried
      */
-    public void queryNetsMarg(PhyloTree.Node node) {
+    public void queryNetsMarg(PhyloBNet[] pbnets, PhyloTree.Node node) {
         this.margin_distribs = new EnumDistrib[aln.getWidth()];
         String nodeName = node.getLabel().toString();
 //        BNode bnode = pbn.getBN().getNode(nodeName);
@@ -214,8 +244,8 @@ public class ASR {
             VarElim ve = new VarElim();
             ve.instantiate(bn);
 
-            int purged_leaves = pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
-            int collapsed_nodes = pbn.collapseSingles();
+            pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
+            pbn.collapseSingles();
 
             margin_distribs[col] = getMarginalDistrib(ve, bnode.getVariable());
         }
@@ -227,7 +257,7 @@ public class ASR {
      * Populate rate matrix with calculated rate for each position in alignment
      *
      */
-    public void queryNetsJoint() {
+    public void queryNetsJoint(PhyloBNet[] pbnets) {
         // joint reconstruction for tree
         this.asr_matrix = new Object[indexForNodes.size()][aln.getWidth()];
         this.R = new double[aln.getWidth()]; //Rate matrix
@@ -237,8 +267,9 @@ public class ASR {
             VarElim ve = new VarElim();
             ve.instantiate(bn);
 
-            int purged_leaves = pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
-            int collapsed_nodes = pbn.collapseSingles();
+            //introduce 'gap' tag to detect locations we think are truly gaps
+            pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
+            pbn.collapseSingles();
             
             for (Variable.Assignment a0 : getJointAssignment(ve)) {
                 EnumVariable asr_var = (EnumVariable)a0.var;
@@ -259,9 +290,10 @@ public class ASR {
     /**
      * Query a specific column in the alignment using marginal probability
      * Update marginal distribution for column
-     * @param col 
+     * @param col
+     * @return EnumDistrib describing the marginal distribution for the column given the root node
      */
-    public void queryNetMarg(int col) {
+    public EnumDistrib queryNetMarg(PhyloBNet[] pbnets, int col) {
         BNode root = null;
         PhyloBNet pbn = pbnets[col];
         BNet bn = pbn.getBN();
@@ -269,40 +301,24 @@ public class ASR {
         VarElim ve = new VarElim();
         ve.instantiate(bn);
 
-        int purged_leaves = pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
-        int collapsed_nodes = pbn.collapseSingles();
+        pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
+        pbn.collapseSingles();
 
-        margin_distribs[col] = getMarginalDistrib(ve, root.getVariable());
+        return(getMarginalDistrib(ve, root.getVariable()));
     }
     
     /**
      * Query a specific column in the alignment using MPE
      * Update ASR for column
      * Update rate for column
-     * @param col - column in alignment
+     *
      */
-    public void queryNetJoint(int col) {
-        PhyloBNet pbn = pbnets[col];
+    public Variable.Assignment[] queryGapNetJoint(PhyloBNet pbn) {
         BNet bn = pbn.getBN();
         VarElim ve = new VarElim();
         ve.instantiate(bn);
-
-        int purged_leaves = pbn.purgeGaps(); //Remove leaves with gap (i.e. uninstantiated)
-        int collapsed_nodes = pbn.collapseSingles();
             
-        for (Variable.Assignment a0 : getJointAssignment(ve)) {
-            EnumVariable asr_var = (EnumVariable)a0.var;
-            Object asr_val = a0.val;
-            int index = indexForNodes.indexOf(asr_var.getName());
-            if (index >= 0) 
-                //index = current node
-                //col = position in alignment
-                asr_matrix[index][col] = asr_val;
-            BNode node = bn.getNode(asr_var);
-            node.setInstance(asr_val);
-        }
-        R[col] = pbn.getRate(); //calculates rate based on evidence provided
-        //All nodes instantiated with MPE - rate across entire tree?  
+        return(getJointAssignment(ve));
     }
     
     private EnumDistrib getMarginalDistrib(VarElim ve, Variable queryNode) {
@@ -599,43 +615,43 @@ public class ASR {
         return aln;
     }
     
-    //FIXME: Can you update the pbnets array without modifying the aln. Where
-    //do the two interact?
-    /**
-     * Get the array of pbnets representing the alignment
-     * @return array of pbnets
-     */
-    public PhyloBNet[] getPbnets() {
-        return pbnets;
-    }
-    /**
-     * Unlikely to be used
-     * Set the array of pbnets representing the alignment
-     * @param pbnets 
-     */
-    public void setPbnets(PhyloBNet[] pbnets) {
-        this.pbnets = pbnets;
-    }
-    /**
-     * Update a particular pbnet in the pbnet array
-     * Use: when modifying single column in alignment, update array of networks
-     * @param index
-     * @param pbnet 
-     */
-    public void setPbnet(int index, PhyloBNet pbnet) {
-        pbnets[index] = pbnet;
-    }
-    /**
-     * Remove a specific pbnet from the array
-     * Use: when removing a column from an alignment, update array of networks
-     * @param index 
-     */
-    public void removePbnet(int index) {
-        PhyloBNet[] pbnetsNew = new PhyloBNet[pbnets.length - 1];
-        List<PhyloBNet> list = new ArrayList<PhyloBNet>(Arrays.asList(pbnets));
-        list.remove(index);
-        pbnets = list.toArray(pbnetsNew);
-    }
+//    //FIXME: Can you update the pbnets array without modifying the aln. Where
+//    //do the two interact?
+//    /**
+//     * Get the array of pbnets representing the alignment
+//     * @return array of pbnets
+//     */
+//    public PhyloBNet[] getPbnets() {
+//        return pbnets;
+//    }
+//    /**
+//     * Unlikely to be used
+//     * Set the array of pbnets representing the alignment
+//     * @param pbnets
+//     */
+//    public void setPbnets(PhyloBNet[] pbnets) {
+//        this.pbnets = pbnets;
+//    }
+//    /**
+//     * Update a particular pbnet in the pbnet array
+//     * Use: when modifying single column in alignment, update array of networks
+//     * @param index
+//     * @param pbnet
+//     */
+//    public void setPbnet(int index, PhyloBNet pbnet) {
+//        pbnets[index] = pbnet;
+//    }
+//    /**
+//     * Remove a specific pbnet from the array
+//     * Use: when removing a column from an alignment, update array of networks
+//     * @param index
+//     */
+//    public void removePbnet(int index) {
+//        PhyloBNet[] pbnetsNew = new PhyloBNet[pbnets.length - 1];
+//        List<PhyloBNet> list = new ArrayList<PhyloBNet>(Arrays.asList(pbnets));
+//        list.remove(index);
+//        pbnets = list.toArray(pbnetsNew);
+//    }
         
     public double[] getRates(){
         return R;
