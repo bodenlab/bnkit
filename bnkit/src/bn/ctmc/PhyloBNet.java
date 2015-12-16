@@ -60,7 +60,7 @@ public class PhyloBNet {
     protected void addBNode(BNode node) {
         bn.add(node);
     }
-    
+
     /**
      * Construct a BN for specified phylogenetic tree using supplied model.
      * @param tree phylogenetic tree
@@ -214,7 +214,7 @@ public class PhyloBNet {
 //                EnumVariable cvar = Predef.AminoAcid(child.toString());
                 SubstNode cnode = new SubstNode(cvar, evar, model, child.getDistance() * this.rate);
                 this.addBNode(cnode);
-                createNodesForSubtree(child, cvar);
+                createNodesForSubtreeGap(child, cvar);
             }
         }
     }
