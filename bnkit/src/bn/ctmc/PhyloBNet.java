@@ -89,6 +89,35 @@ public class PhyloBNet {
         pbn.createNodesForSubtree(root, rvar);
         return pbn;
     }
+
+    /**
+     * Construct a BN for specified phylogenetic tree using supplied model.
+     * @param tree phylogenetic tree
+     * @param model evolutionary model
+     * @return the phylogenetic Bayesian network
+     */
+    public static PhyloBNet createGap(PhyloTree tree, SubstModel model) {
+        return createGap(tree, model, 1.0);
+    }
+
+    /**
+     * Construct a BN for specified phylogenetic tree using supplied model and GAP CHARACTER ALPHABET
+     * @param tree phylogenetic tree
+     * @param model evolutionary model
+     * @param rate the evolutionary rate to be applied
+     * @return the phylogenetic Bayesian network
+     */
+    public static PhyloBNet createGap(PhyloTree tree, SubstModel model, double rate) {
+        PhyloBNet pbn = new PhyloBNet(model);
+        pbn.rate = rate;
+        Node root = tree.getRoot();
+        EnumVariable rvar = Predef.GapCharacter(root.getLabel().toString());
+//        EnumVariable rvar = Predef.AminoAcid(root.toString());
+        pbn.bnroot = new SubstNode(rvar, model);
+        pbn.addBNode(pbn.bnroot);
+        pbn.createNodesForSubtreeGap(root, rvar);
+        return pbn;
+    }
     
     /**
      * Get variables that are found at the leaf nodes.
@@ -167,6 +196,21 @@ public class PhyloBNet {
         } else {
             for (Node child : children) {
                 EnumVariable cvar = Predef.AminoAcid(child.getLabel().toString());
+//                EnumVariable cvar = Predef.AminoAcid(child.toString());
+                SubstNode cnode = new SubstNode(cvar, evar, model, child.getDistance() * this.rate);
+                this.addBNode(cnode);
+                createNodesForSubtree(child, cvar);
+            }
+        }
+    }
+
+    private void createNodesForSubtreeGap(Node pnode, EnumVariable evar) {
+        Collection<Node> children = pnode.getChildren();
+        if (children.isEmpty()) {
+            leaves.add(evar);
+        } else {
+            for (Node child : children) {
+                EnumVariable cvar = Predef.GapCharacter(child.getLabel().toString());
 //                EnumVariable cvar = Predef.AminoAcid(child.toString());
                 SubstNode cnode = new SubstNode(cvar, evar, model, child.getDistance() * this.rate);
                 this.addBNode(cnode);
