@@ -53,7 +53,8 @@ public class Predef {
     }
 
     public static String[] getVariableTypes() {
-        return new String[]{"Boolean", "String", "Number", "Real", "Amino acid", "Amino acid extended", "Nucleic acid", "Distrib"};
+        return new String[]{"Boolean", "String", "Number", "Real", "Amino acid", "Amino acid extended", "Gap character",
+                "Nucleic acid", "Distrib"};
     }
 
     public static boolean isEnumerable(String typename) {
@@ -87,6 +88,9 @@ public class Predef {
         }
         if (typename.equalsIgnoreCase("Amino acid extended")) {
             return Predef.AminoAcidExt(varname);
+        }
+        if (typename.equalsIgnoreCase("Gap character")) {
+            return Predef.GapCharacter(varname);
         }
         if (typename.equalsIgnoreCase("Nucleic acid")) {
             return Predef.NucleicAcid(varname);
@@ -202,6 +206,13 @@ public class Predef {
                         return ch;
                     }       break;
                 }
+                case "Gap character":
+                {
+                    Character ch = vstr.charAt(0);
+                    if (var.getDomain().isValid(ch)) {
+                        return ch;
+                    }       break;
+                }
                 case "String":
                     if (var.getDomain().isValid(vstr)) {
                         return vstr;
@@ -263,6 +274,16 @@ public class Predef {
         var.setPredef("Amino acid extended");
         StringBuilder sbuf = new StringBuilder("");
         for (Object v : Enumerable.aacid_ext.getValues()) {
+            sbuf.append(v).append(";");
+        }
+        var.setParams(sbuf.toString());
+        return var;
+    }
+    public static EnumVariable GapCharacter(String name) {
+        EnumVariable var = new EnumVariable(Enumerable.gap_character, name);
+        var.setPredef("Gap character");
+        StringBuilder sbuf = new StringBuilder("");
+        for (Object v : Enumerable.gap_character.getValues()) {
             sbuf.append(v).append(";");
         }
         var.setParams(sbuf.toString());
