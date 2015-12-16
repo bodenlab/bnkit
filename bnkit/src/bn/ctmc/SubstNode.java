@@ -48,7 +48,8 @@ public class SubstNode implements BNode, TiedNode {
     private final List<EnumVariable> parentAsList;
     private SubstModel model;
     private final Object[] values;
-    
+    private boolean gap;
+
     private double time = 0.0;
     private Object instance = null;
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
@@ -88,6 +89,13 @@ public class SubstNode implements BNode, TiedNode {
     @Override
     public String getName() {
         return getVariable().toString();
+    }
+
+    public boolean getGap() {
+        return gap;
+    }
+    public void setGap(boolean gap) {
+        this.gap = gap;
     }
 
     public String toString() {
@@ -563,8 +571,7 @@ public class SubstNode implements BNode, TiedNode {
 		// TODO Auto-generated method stub
 		
 	}
-        
-        
+
     public static void main0(String[] args) {
         // here are all the variables, representing the sequence at a position
         EnumVariable r1 = Predef.AminoAcid("R1");
