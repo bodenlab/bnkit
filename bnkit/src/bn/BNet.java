@@ -480,12 +480,10 @@ public class BNet implements Serializable {
             return node;
         } else {
             for (String nodename : nodesByName.keySet()) {
-                String[] parts = nodename.split("\\.");
-                if (parts.length >= 2) {
-                    if (parts[0].equals(name)) {
-                        return nodesByName.get(nodename);
-                    }
-                }
+                int s = nodename.lastIndexOf(".");
+                String nname = nodename.substring(0, s);
+                if (nname.equals(name))
+                    return nodesByName.get(nodename);
             }
             return null;
         }
