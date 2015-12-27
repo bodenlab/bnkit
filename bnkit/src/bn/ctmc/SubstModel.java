@@ -38,12 +38,23 @@ public abstract class SubstModel {
     private EnumTable<EnumDistrib> table = null;
 
     /**
-     * 
+     * Create time reversible evolutionary model.
      * @param F stationary base frequencies
      * @param Q Q matrix (general reversible model)
      * @param alphabet the values that substitutable variables can take, listed strictly in the order of the array and matrix
      */
     public SubstModel(double[] F, double[][] Q, Enumerable alphabet) {
+        this(F, Q, alphabet, true);
+    }
+    
+    /**
+     * Create evolutionary model.
+     * @param F stationary base frequencies
+     * @param Q Q matrix (general reversible model)
+     * @param alphabet the values that substitutable variables can take, listed strictly in the order of the array and matrix
+     * @param time_reversible set to true if model is time reversible (Qij == Qji)
+     */
+    public SubstModel(double[] F, double[][] Q, Enumerable alphabet, boolean time_reversible) {
         if (Q.length != F.length)
             throw new IllegalArgumentException("Invalid size of either Q or F");
         if (alphabet.size() != F.length)
@@ -53,10 +64,19 @@ public abstract class SubstModel {
         for (int i = 0; i < Q.length; i ++)  {
             if (Q[i].length != F.length)
                 throw new IllegalArgumentException("Q must be a square matrix");
-            for (int j = i + 1; j < Q[i].length; j ++) {
-                double q = Q[i][j];
-                R[i][j] = q*F[j];
-                R[j][i] = q*F[i];
+            if (time_reversible) {
+                for (int j = i + 1; j < Q[i].length; j ++) {
+                    double q = Q[i][j];
+                    R[i][j] = q*F[j];
+                    R[j][i] = q*F[i];
+                }
+            } else { // time is *not* reversible
+                for (int j = 0; j < Q[i].length; j ++) {
+                    if (i == j)
+                        continue;
+                    double q = Q[i][j];
+                    R[i][j] = q*F[j]; // FIXME: check so that it is not F[i]
+                }
             }
         }
         this.alpha = alphabet;
@@ -185,10 +205,14 @@ public abstract class SubstModel {
     }
     
     public static void main(String[] argv) {
+        SubstModel sm_gap = new gap();
         SubstModel sm_wag = new WAG();
         SubstModel sm_lg = new LG();
         SubstModel sm_jtt = new JTT();
         SubstModel sm_dh = new Dayhoff();
+
+        System.out.println("R (Gap)");
+        bn.math.Matrix.print(sm_gap.getR());
 
         System.out.println("R (Dayhoff)");
         bn.math.Matrix.print(sm_dh.getR());
@@ -197,16 +221,23 @@ public abstract class SubstModel {
         System.out.println("\nR (LG)");
         bn.math.Matrix.print(sm_lg.getR());
 
-        double time = 1.0;
-        System.out.println("\n\nTransition probabilities of R (WAG) @ time = " + time);
-        double[][] prob = sm_wag.getProbs(time);
+        double time = .1;
+        System.out.println("\n\nTransition probabilities of R (Gap) @ time = " + time);
+        double[][] prob = sm_gap.getProbs(time);
         bn.math.Matrix.print(prob);
+
+        System.out.println("\n\nTransition probabilities of R (WAG) @ time = " + time);
+        prob = sm_wag.getProbs(time);
+        bn.math.Matrix.print(prob);
+        
         System.out.println("\nTransition probabilities of R (LG) @ time = " + time);
         prob = sm_lg.getProbs(time);
         bn.math.Matrix.print(prob);
+        
         System.out.println("\nTransition probabilities of R (JTT) @ time = " + time);
         prob = sm_jtt.getProbs(time);
         bn.math.Matrix.print(prob);
+        
         System.out.println("\nTransition probabilities of R (Dayhoff) @ time = " + time);
         prob = sm_dh.getProbs(time);
         bn.math.Matrix.print(prob);
