@@ -20,7 +20,7 @@ public class gap extends SubstModel {
             {-6.61, 6.61}};
 
     public gap() {
-        super (F, Q, new Enumerable(S));
+        super (F, Q, new Enumerable(S), false);
     }
 
     public String getName() { return "gap"; }
