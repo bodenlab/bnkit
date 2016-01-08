@@ -141,5 +141,24 @@ public class TriangularDistrib implements Distrib, Serializable {
             return upper - Math.sqrt((1.0 - U) * (upper - lower) * (upper - mode));
     }
     
+    /**
+     * Create a density matching specified samples.
+     * @param samples samples
+     * @return a new distribution matching the samples (not necessarily optimal).
+     */
+    public static TriangularDistrib probe(double[] samples) {
+        if (samples.length < 2) 
+            throw new RuntimeException("Invalid sample");
+        double min = Double.POSITIVE_INFINITY, max = Double.NEGATIVE_INFINITY, mean = 0;
+        for (int i = 0; i < samples.length; i ++) {
+            if (samples[i] < min)
+                min = samples[i];
+            if (samples[i] > max)
+                max = samples[i];
+            mean += samples[i] / samples.length;
+        }
+        return new TriangularDistrib(min, max, mean);
+    }
+    
     
 }

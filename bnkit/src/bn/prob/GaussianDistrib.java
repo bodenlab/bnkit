@@ -100,11 +100,11 @@ public class GaussianDistrib implements Distrib, Serializable {
         return Double.valueOf(mu + (sigma * Math.sin(2 * Math.PI * V) * Math.sqrt((-2 * Math.log(U)))));
     }
 
-    protected void setMean(double mean) {
+    public void setMean(double mean) {
         mu = mean;
     }
 
-    protected void setVariance(double variance) {
+    public void setVariance(double variance) {
         sigmaSquared = variance;
 
         if (sigmaSquared <= 0) {
@@ -143,6 +143,23 @@ public class GaussianDistrib implements Distrib, Serializable {
             return new GaussianDistrib(samples[choose] - mean, myrand.nextDouble() * (max - mean));
         else 
             return new GaussianDistrib(mean - samples[choose], myrand.nextDouble() * (mean - min));
+    }
+    
+    /**
+     * Create a density based on the specified samples.
+     * @param samples samples
+     * @return a new distribution for the samples.
+     */
+    public static GaussianDistrib estimate(double[] samples) {
+        double mean = 0;
+        for (int i = 0; i < samples.length; i ++) {
+            mean += samples[i] / samples.length;
+        }
+        double diff = 0;
+        for (int i = 0; i < samples.length; i ++) {
+            diff += (mean - samples[i]) * (mean - samples[i]);
+        }
+        return new GaussianDistrib(mean, diff / samples.length);
     }
     
     /**
