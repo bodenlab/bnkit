@@ -151,6 +151,8 @@ public class GaussianDistrib implements Distrib, Serializable {
      * @return a new distribution for the samples.
      */
     public static GaussianDistrib estimate(double[] samples) {
+        if (samples.length == 0)
+            return null;
         double mean = 0;
         for (int i = 0; i < samples.length; i ++) {
             mean += samples[i] / samples.length;
@@ -159,6 +161,8 @@ public class GaussianDistrib implements Distrib, Serializable {
         for (int i = 0; i < samples.length; i ++) {
             diff += (mean - samples[i]) * (mean - samples[i]);
         }
+        if (diff == 0)
+            return null;
         return new GaussianDistrib(mean, diff / samples.length);
     }
     
