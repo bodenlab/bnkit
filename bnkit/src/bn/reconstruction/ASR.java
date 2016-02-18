@@ -66,6 +66,57 @@ public class ASR {
         }
     }
 
+    /**
+     * For using the new gap model - incomplete and untested
+     * @param file_tree
+     * @param file_aln
+     * @param inference
+     * @param Q
+     * @param F
+     */
+    public ASR(String file_tree, String file_aln, String inference, double[][] Q, double[] F) {
+        loadData(file_tree, file_aln);
+//        PhyloBNet[] pbnets = createNetworks(Q, F);
+        PhyloBNet[] pbnets = createNetworks();
+        if (inference.equals("Joint")) {
+            queryNetsJoint(pbnets);
+            getSequences();
+        } else if (inference.equals("Marginal")) {
+            System.out.println("*Information*\nNo node specification: returning marginal distribution of root node");
+            queryNetsMarg(pbnets);
+        } else {
+            System.out.println("Inference must be either 'Joint' or 'Marginal'");
+            System.exit(1);
+        }
+
+        Character gap = "-".charAt(0);
+        List<EnumSeq.Gappy<Enumerable>> knownSeqs = null;
+        try {
+//            knownSeqs = EnumSeq.Gappy.loadFasta("bnkit/data/cyp2f_aln_full.fa", Enumerable.aacid, gap);
+            knownSeqs = EnumSeq.Gappy.loadFasta("bnkit/data/simprot/cyp2f_r3.aln", Enumerable.aacid, gap);
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+        double mismatches = 0.0;
+        double comparisons = 0.0;
+
+        for (EnumSeq.Gappy ks : knownSeqs) {
+            String kName = ks.getName();
+            EnumSeq ts = tree.find(kName).getSequence();
+            String tName = ts.getName();
+            if (kName.equals(tName)) {
+                for (int i = 0; i < ts.length(); i++) {
+                    comparisons++;
+                    if (!(ks.get()[i] == ts.get()[i])){
+                        mismatches ++;
+                    }
+                }
+            }
+        }
+        double results = 1-(mismatches/comparisons);
+        System.out.println(results);
+    }
+
     public ASR(String file_tree, String file_aln, String inference, String nodeLabel) {
         loadData(file_tree, file_aln);
         PhyloBNet[] pbnets = createNetworks();
@@ -160,7 +211,6 @@ public class ASR {
         //Create network for each column in alignment
         //Instantiate nodes
         for (int col = 0; col < aln.getWidth(); col ++) {
-            System.out.println(col);
             Object[] gaps = aln.getGapColumn(col); // array with true for gap, false for symbol
             Object[] column = aln.getColumn(col);  // array for symbols, null for gaps
             tree.setContentByParsimony(names, gaps);
@@ -197,6 +247,8 @@ public class ASR {
                 EnumVariable asr_var = (EnumVariable)a0.var;
                 Object asr_val = a0.val;
                 SubstNode bnode = (SubstNode)pbn.getBN().getNode(asr_var.getName());
+                if (bnode == null)
+                    System.out.println();
                 if (asr_val.equals('G'))
                     bnode.setGap(true);
                 else
@@ -205,6 +257,64 @@ public class ASR {
         }
         return(pbnets);
     }
+
+//    public PhyloBNet[] createNetworks(double[][] Q, double[] F){
+//        //Each column/position in alignment/sequence gets a network
+//        PhyloBNet[] pbnets = new PhyloBNet[aln.getWidth()];
+//
+//        String[] names = aln.getNames(); //seq_name_id - names of sequences
+//        List<String> labels = getLabels(names);
+//
+//        //Create network for each column in alignment
+//        //Instantiate nodes
+//        for (int col = 0; col < aln.getWidth(); col ++) {
+////            System.out.println(col);
+//            Object[] gaps = aln.getGapColumn(col); // array with true for gap, false for symbol
+//            Object[] column = aln.getColumn(col);  // array for symbols, null for gaps
+//            tree.setContentByParsimony(names, gaps);
+//            PhyloBNet pbn;
+//            PhyloBNet pbnGap;
+//            if (use_sampled_rate) {
+//                pbn = PhyloBNet.create(tree, new JTT(), sampled_rate);
+//                pbnGap = PhyloBNet.createGap(tree, new gap(Q, F), sampled_rate);
+//            } else {
+//                //creates BNet beginning with root then recursively
+//                //traversing subtrees
+//                pbn = PhyloBNet.create(tree, new JTT());
+//                pbnGap = PhyloBNet.createGap(tree, new gap(Q, F));
+//            }
+//            pbnets[col] = pbn;
+//
+//            for (int i = 0; i < labels.size(); i ++) {
+//                BNode bnode = pbn.getBN().getNode(labels.get(i));// set node according to alignment
+//                BNode bnodeG = pbnGap.getBN().getNode(labels.get(i));// set node according to gap or character
+//                if (column[i] == null) {
+//                    bnode.setInstance(column[i]);// set node according to alignment
+//                    SubstNode sbnode = (SubstNode) bnode;
+//                    sbnode.setGap(true);
+//                    bnodeG.setInstance('G');// set node as gap
+//                } else {
+//                    bnode.setInstance(column[i]);// set node according to alignment
+//                    bnodeG.setInstance('C');// set node as character
+//                }
+//            }
+//
+//            // Determine which internal nodes should be gaps based on gap evolutionary model
+//            Variable.Assignment[] states = queryGapNetJoint(pbnGap);
+//            for (Variable.Assignment a0 : states) {
+//                EnumVariable asr_var = (EnumVariable)a0.var;
+//                Object asr_val = a0.val;
+//                SubstNode bnode = (SubstNode)pbn.getBN().getNode(asr_var.getName());
+//                if (bnode == null)
+//                    System.out.println();
+//                if (asr_val.equals('G'))
+//                    bnode.setGap(true);
+//                else
+//                    bnode.setGap(false);
+//            }
+//        }
+//        return(pbnets);
+//    }
     
     /**
      * Query all networks in pbnets array using marginal probability
@@ -415,9 +525,10 @@ public class ASR {
     
     public boolean save(String id, boolean infSequence) {
         if (infSequence) {
-            saveJSON(id + "_JSON_output.txt");
+//            saveJSON(id + "_JSON_output.txt");
             saveALN(id + "_aln_full.fa");
             saveTree(id + "_new_tree.txt");
+            saveRate(id + "_rates.txt");
         } else {
             saveTree(id + "_new_tree.txt");
             saveDistrib(id + "_distribution.txt");
@@ -560,6 +671,21 @@ public class ASR {
                     }
                 }
             }
+            writer.close();
+        } catch (UnsupportedEncodingException uee) {
+            uee.printStackTrace();
+        } catch (FileNotFoundException fnf) {
+            fnf.printStackTrace();
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+    }
+
+    public void saveRate(String filename) {
+        try {
+            Writer writer = new PrintWriter(filename, "UTF-8");
+            String rates = R.toString();
+            writer.write(rates);
             writer.close();
         } catch (UnsupportedEncodingException uee) {
             uee.printStackTrace();
