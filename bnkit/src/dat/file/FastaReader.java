@@ -24,10 +24,7 @@ package dat.file;
 import dat.EnumSeq;
 import dat.Enumerable;
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.StringTokenizer;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,6 +51,11 @@ public class FastaReader {
     public static String SEQ_FILE_SEPARATOR="\\>";
 
     private List<EnumSeq> sequences=null; // holds all sequences in store
+
+    public Enumerable getAlphabet() {
+        return alphabet;
+    }
+
     private Enumerable alphabet=null; // the alphabet type by which all sequences conform to
 
     /** if an error occurs, the current line number will be stored here. */
@@ -63,9 +65,82 @@ public class FastaReader {
     private BufferedReader reader=null;
     private Character gapSymbol = null;
     public boolean CONVERT_TO_UPPERCASE = true;
-    
+
     /**
-     * Opens a file on the FASTA format. 
+     * The alphabets that will be tested for compliance if sequences are read without supplied alphabet.
+     * Presented in order of preference.
+     */
+    public static Enumerable[] checkAlphabetsInOrder = new Enumerable [] {
+            Enumerable.nacid,
+            Enumerable.nacidwn,
+            Enumerable.nacidRNA,
+            Enumerable.nacidwnRNA,
+            Enumerable.aacid,
+            Enumerable.aacidwx};
+
+    /**
+     * Opens a file on the FASTA format.
+     * This constructor makes an educated guess on what the alphabet is; it checks in order
+     * DNA, DNA with N, RNA, RNA with N, Amino Acid and the resorts to create its own.
+     * It will recognise a (separate) gap character ('-' by default), and not include it as part of the alphabet.
+     * @param filename the filename
+     * @throws IOException if the file can not be found
+     */
+    public FastaReader(String filename) throws IOException {
+        this(filename, '-');
+    }
+
+    /**
+     * Opens a file on the FASTA format.
+     * This constructor makes an educated guess on what the alphabet is; it checks in order
+     * DNA, DNA with N, RNA, RNA with N, Amino Acid and the resorts to create its own.
+     * It will recognise a (separate) gap character ('-' by default), and not include it as part of the alphabet.
+     * @param filename the filename
+     * @param gapSymbol the gap character
+     * @throws IOException if the file can not be found
+     */
+    public FastaReader(String filename, Character gapSymbol) throws IOException {
+        this.gapSymbol = gapSymbol;
+        try {
+            FileReader freader=new FileReader(filename);
+            reader=new BufferedReader(freader);
+            String line = reader.readLine();
+            Set<Object> charset = new HashSet<>();
+            while (line != null) {
+                String myline = line.trim();
+                if (!myline.startsWith(">"))
+                    for (Character ch : myline.toCharArray())
+                        charset.add(ch);
+                line = reader.readLine();
+            }
+            reader.close();
+            freader.close();
+            for (Enumerable alpha : checkAlphabetsInOrder) {
+                boolean valid = true;
+                for (Object ch : charset) {
+                    if (ch != gapSymbol && !Enumerable.aacid.isValid(ch)) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid) { // we are happy with this alphabet
+                    this.alphabet = alpha;
+                    break;
+                }
+            }
+            if (this.alphabet == null)
+                this.alphabet = new Enumerable(charset.toArray());
+            freader=new FileReader(filename);
+            reader=new BufferedReader(freader);
+            sequences=new ArrayList<>();
+        } catch (FileNotFoundException e) {
+            reader=null;
+            throw new IOException(e.getMessage());
+        }
+    }
+
+    /**
+     * Opens a file on the FASTA format.
      * @param filename the filename
      * @param alpha the symbol alphabet to use
      * @throws IOException if the file can not be found
