@@ -496,9 +496,9 @@ public class SecondaryStructurePredictor {
 		Iterator<Character[]> iterator = data.iterator();
 		while(iterator.hasNext()) {
 			Character[] record = iterator.next();
-			int parentIdx = parent.getIndex(record[features.size()]);
+			int parentIdx = parent.getIndices(record[features.size()]);
 			for(int i = 0; i < features.size(); i++) {
-				int valueIdx = features.get(i).getIndex(record[i]);
+				int valueIdx = features.get(i).getIndices(record[i]);
 				result[i][parentIdx][valueIdx] ++;
 			}
 		}
