@@ -155,10 +155,14 @@ public class DenseFactor extends AbstractFactor {
     public int setLogValue(double value) {
         if (this.getSize() != 1)
             throw new DenseFactorRuntimeException("Table has variables that must be used to index access");
+        if (Double.isNaN(value) || value == LOG0) { // trying to set cell to NaN (should not happen) or to LOG0 (does happen)
+            if (map[0] != LOG0) // there was a value previously
+                occupied --;    // so table is now smaller
+            map[0] = LOG0;      // revert to LOG0 even if NaN
+            return 0;
+        }
         if (value != LOG0 && map[0] == LOG0)
             occupied ++;
-        else if (value == LOG0 && map[0] != LOG0)
-            occupied --;
         map[0] = value;
         return 0;
     }
@@ -176,10 +180,14 @@ public class DenseFactor extends AbstractFactor {
     public int setLogValue(int key_index, double value) {
         if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
+        if (Double.isNaN(value) || value == LOG0) { // trying to set cell to NaN (should not happen) or to LOG0 (does happen)
+            if (map[key_index] != LOG0) // there was a value previously
+                occupied --;    // so table is now smaller
+            map[key_index] = LOG0;      // revert to LOG0 even if NaN
+            return key_index;
+        }
         if (value != LOG0 && map[key_index] == LOG0)
             occupied ++;
-        else if (value == LOG0 && map[key_index] != LOG0)
-            occupied --;
         map[key_index] = value;
         return key_index;
     }
