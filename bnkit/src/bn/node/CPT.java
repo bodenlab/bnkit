@@ -363,9 +363,22 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     /**
      * Make a Factor out of this CPT. If a variable is instantiated it will
      * be factored out.
-     * If a parent is not relevant, it will not be included in the factor
+     * If a parent is not relevant, it will not be included in the factor.
      *
-     * @param relevant only include relevant nodes, with instantiations if available
+     * Note: In some instances, the CPT is poorly populated with distributions.
+     * This introduces the possibility that NO entries are selected for the FT.
+     * There appears no principled way to resolve this scenario.
+     * Currently, this is managed by creating a reduced FT with only the current variable,
+     * ASSUMING that a priori the assignment of values to the variable is described by
+     * a uniform distribution.
+     *
+     * TODO: consider the case when the above is true, and there are other, not-selected
+     * entries; use other distributions to create a more realistic distribution for the
+     * null case.
+     *
+     * TODO: Fix GDT and other node types in an analogous manner.
+     *
+     * @param relevant Only include relevant nodes, with instantiations if available
      * @return factor of CPT considering if parents are relevant (rel)
      */
     @Override
@@ -406,7 +419,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                     missing = i;
                     break;
                 }
-            // set factor to be "evidenced" is there was an evidence used
+            // set factor to be "evidenced" if there was evidence used
             if (varinstance != null) {
                 ft.evidenced = true;
             } else {
@@ -419,6 +432,22 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             }
             int[] indices = table.getIndices(searchcpt);
             Object[] fkey = new Object[evars.length];
+            if (indices.length == 0) { // The are no entries in CPT that match the search key (which itself indicates the state of parents)
+                // create a new, reduced FT with only myvar, since there is no relationship with parents evident from the entries
+                ft = new DenseFactor(new Variable[] {myvar});
+                fkey = new Object[1];
+                if (varinstance != null) { // the variable for this CPT is instantiated
+                    fkey[0] = varinstance;
+                    ft.setValue(fkey, 1.0 / dom.size());
+                } else {
+                    for (int j = 0; j < dom.size(); j++) {
+                        fkey[0] = dom.get(j);
+                        Double p = 1.0 / dom.size();
+                        ft.setValue(fkey, p); //add one entry for each possible instantiation to create uniform outcome
+                    }
+                }
+                return ft;
+            }
             for (int index : indices) {
                 EnumDistrib d = table.getValue(index);
                 if (d != null) { // there is a distribution associated with this entry in the CPT
@@ -446,24 +475,26 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                 sumout.toArray(sumout_arr);
             	ft = Factorize.getMargin(ft, sumout_arr);
             }
-            // Factorize.exitIfInvalid(ft, this.toString());
             return ft;
         } else { // no parents, just a prior
+            EnumDistrib d = this.prior;
             if (varinstance != null) { // instantiated prior
                 AbstractFactor ft = new DenseFactor();
-                ft.setValue(this.prior.get(varinstance));
-                // Factorize.exitIfInvalid(ft, this.toString());
+                if (d == null)
+                    ft.setValue(1.0/dom.size());
+                else
+                    ft.setValue(d.get(varinstance));
                 return ft;
             }
             AbstractFactor ft = new DenseFactor(myvar);
             Object[] newkey = new Object[1];
-            EnumDistrib d = this.prior;
             for (int j = 0; j < dom.size(); j++) {
                 newkey[0] = dom.get(j);
-                Double p = d.get(j);
-                ft.setValue(newkey, p);
+                if (d == null)
+                    ft.setValue(newkey, 1.0/dom.size());
+                else
+                    ft.setValue(newkey, d.get(j));
             }
-            // Factorize.exitIfInvalid(ft, this.toString());
             return ft;
         }
     }
@@ -729,13 +760,13 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
 
     /**
      * Count this observation. Note that for it (E-step in EM) to affect the
-     * CPT, {@link bn.CPT#maximizeInstance()} must be called.
+     * CPT, {@link CPT#maximizeInstance()} must be called.
      *
      * @param key the setting of the parent variables in the observation
      * @param value the setting of the CPT variable
      * @param prob the expectation of seeing this observation (1 if we actually
      * see it, otherwise the probability)
-     * @see bn.CPT#maximizeInstance()
+     * @see CPT#maximizeInstance()
      */
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
@@ -753,13 +784,13 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     
     /**
      * Count this observation. Note that for it (E-step in EM) to affect the
-     * CPT, {@link bn.CPT#maximizeInstance()} must be called.
+     * CPT, {@link CPT#maximizeInstance()} must be called.
      * Probability of observation is 1.0 (the value is definitely being observed, 
      * as opposed to expected with a probability).
      *
      * @param key the setting of the parent variables in the observation
      * @param value the setting of the CPT variable
-     * @see bn.CPT#maximizeInstance()
+     * @see CPT#maximizeInstance()
      */
     @Override
     public void countInstance(Object[] key, Object value) {
@@ -774,7 +805,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
 
     /**
      * Take stock of all observations counted via
-     * {@link bn.CPT#countInstance(Object[], Object, Double)}, ie implement the
+     * {@link CPT#countInstance(Object[], Object, Double)}, ie implement the
      * M-step locally.
      */
     @Override
@@ -1034,10 +1065,10 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
         EnumVariable v2 = Predef.Boolean();
         EnumVariable v3 = Predef.Boolean();
 
-        CPT cpt1 = new CPT(v1, new EnumVariable[]{v2, v3});
+        CPT cpt1 = new CPT(v1, v2, v3);
         cpt1.put(new Object[]{true, false}, new EnumDistrib(v1.getDomain(), new double[]{1, 0}));
         cpt1.print();
-        CPT cpt3 = new CPT(v1, new EnumVariable[]{v2, v3});
+        CPT cpt3 = new CPT(v1, v2, v3);
         cpt3.put(new Object[]{true, false}, new EnumDistrib(v1.getDomain(), new double[]{0.4, 0.6}));
         cpt3.print();
         cpt3.tieTo(cpt1);
@@ -1045,8 +1076,8 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
         cpt1.put(new Object[]{true, false}, new EnumDistrib(v1.getDomain(), new double[]{0.3, 0.7}));
         cpt1.print();
         cpt3.print();
-        CPT cpt4 = new CPT(v1, new EnumVariable[]{v2, v3});
-        CPT cpt5 = new CPT(v1, new EnumVariable[]{v2, v3});
+        CPT cpt4 = new CPT(v1, v2, v3);
+        CPT cpt5 = new CPT(v1, v2, v3);
         cpt5.print();
         cpt5.tieTo(cpt4);
         cpt4.countInstance(new Object[]{true, false}, true);
