@@ -16,8 +16,8 @@ public class gap extends SubstModel {
 
     public static double [][] Q = {
             // G   C
-            {0.54, -0.54},
-            {-6.61, 6.61}};
+            {-0.54, 0.54},
+            {6.61, -6.61}};
 
     public gap() {
         super (F, Q, new Enumerable(S), false);

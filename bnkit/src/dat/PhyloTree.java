@@ -162,6 +162,10 @@ public class PhyloTree {
             } else { // there's a distance
                 node = new Node(str.substring(0, split_index));
                 double dist = Double.parseDouble(str.substring(split_index + 1, str.length()));
+                if (dist == 0.0) {
+                    dist = 0.00001;
+                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                }
                 node.setDistance(dist);
                 node.setParent(parent);
             }
@@ -183,6 +187,10 @@ public class PhyloTree {
                 else
                     node = new Node("N" + count);
                 double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()));
+                if (dist == 0.0) {
+                    dist = 0.00001;
+                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                }
                 node.setDistance(dist);
                 node.setParent(parent);
                 count +=1;
