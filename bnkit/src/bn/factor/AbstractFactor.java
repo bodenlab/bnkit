@@ -18,14 +18,12 @@
 package bn.factor;
 
 import bn.Distrib;
+import bn.JDF;
 import dat.EnumTable;
 import dat.EnumVariable;
-import bn.JDF;
 import dat.Variable;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
+
+import java.util.*;
 
 /**
  * Table for storing and retrieving doubles based on Enumerable keys.
@@ -39,7 +37,7 @@ import java.util.Set;
  * finding indices, or keys. See {@see bn.factor.Factorize} for numerical operations on factors.
  * 
  * The class is sensitive to the order of variables, and exposes the user to some
- * details so caution must be exercised. Of specific importance is that the table stores the 
+ * details so caution must be exercised. Of specific importance is that the table stores the
  * natural logarithm of each factor, so that operations can be performed entirely in log space,
  * to avoid numerical issues, e.g. underflow.
  * 
@@ -50,7 +48,9 @@ import java.util.Set;
  *
  * @author mikael
  */
-public abstract class AbstractFactor {
+public abstract class AbstractFactor implements Iterable<Integer> {
+    @Override
+    abstract public Iterator<Integer> iterator();
 
     protected final static double LOG0 = Double.NEGATIVE_INFINITY;
     protected static boolean isLOG0(double x) { return Double.isInfinite(x); }
@@ -67,7 +67,7 @@ public abstract class AbstractFactor {
     public boolean evidenced = false;
 
     /**
-     * Construct a new table without any variables. 
+     * Construct a new table without any variables.
      * This type of factor is used when all variables are summed out. 
      * They can appear as part of products to "scale" its opposite.
      */
@@ -279,7 +279,22 @@ public abstract class AbstractFactor {
                 return true;
         return false;
     }
-    
+
+    /**
+     * Find index of the specified variable.
+     * @param var variable
+     * @return index in factor (positive if enumerable, negative if non-enumerable)
+     */
+    public int getVariableIndex(Variable var) {
+        for (int i = 0; i < nEVars; i ++)
+            if (evars[i].equals(var))
+                return i;
+        for (int i = 0; i < nNVars; i ++)
+            if (nvars[i].equals(var))
+                return -i;
+        throw new RuntimeException("Invalid variable " + var + " for factor");
+    }
+
     /**
      * Get the theoretical number of entries in this table. Note this number is
      * always equal to the actual number of entries, but some may never have been explicitly
@@ -426,7 +441,7 @@ public abstract class AbstractFactor {
     }
 
     /**
-     * Takes an entry index of the current table and a revised ordering of variables, 
+     * Takes an entry index of the current table and a revised ordering of variables,
      * to determine the index in the re-ordered table.
      * Note that the number of variables is expected to be the same.
      *
@@ -450,7 +465,7 @@ public abstract class AbstractFactor {
     }
     
     /**
-     * Takes an entry index of the current table and a revised ordering of variables, 
+     * Takes an entry index of the current table and a revised ordering of variables,
      * to determine the index in the re-ordered table.
      * Note that the number of variables is expected to be the same.
      *

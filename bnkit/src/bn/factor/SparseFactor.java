@@ -18,14 +18,13 @@
 package bn.factor;
 
 import bn.Distrib;
-import dat.EnumTable;
 import bn.JDF;
+import dat.EnumTable;
 import dat.Variable;
-import java.util.ArrayList;
+
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -46,13 +45,18 @@ public class SparseFactor extends AbstractFactor {
 
     private final EnumTable<Double> fac;      // the factors for each permutation of the enumerable variables
     private Double fac_atomic = null;         // the factor when there are no enumerable variables
-    private EnumTable<JDF>    jdf = null;     // the densities for each permutation of the enumerables
+    private EnumTable<JDF> jdf = null;     // the densities for each permutation of the enumerables
     private JDF jdf_atomic = null;            // the JDF when there are no enumerable variables
     private EnumTable<Set<Variable.Assignment>> ass = null; // the traced variable assignments
     private Set<Variable.Assignment> ass_atomic = null;     // the traced variable assignment when there are no enumerables
 
+    @Override
+    public Iterator<Integer> iterator() {
+        return fac.iterator();
+    }
+
     /**
-     * Construct a new table without any variables. 
+     * Construct a new table without any variables.
      * This type of factor is used when all variables are summed out. 
      * They can appear as part of products to "scale" its opposite.
      */

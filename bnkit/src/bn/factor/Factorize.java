@@ -17,17 +17,13 @@
  */
 package bn.factor;
 
-import dat.EnumVariable;
-import bn.prob.GaussianDistrib;
 import bn.JDF;
 import bn.Predef;
+import bn.prob.GaussianDistrib;
+import dat.EnumVariable;
 import dat.Variable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
+
+import java.util.*;
 
 /**
  * This class is intended to coordinate and implement high-level operations on factors.
@@ -358,7 +354,7 @@ public class Factorize {
         AbstractFactor X = getProduct(node.x);
         AbstractFactor Y = getProduct(node.y);
         AbstractFactor f = getProduct(X, Y);
-        exitIfInvalid(f, "getProduct");
+        //exitIfInvalid(f, "getProduct");
         node.setFactor(f);
         return f;
     }
@@ -1162,6 +1158,121 @@ public class Factorize {
             }
         }
         return Y;
+    }
+
+    private static class NominateTree {
+        final Variable[] vars;
+        int N;
+        NominateTree(Variable... vars) {
+            this.vars = vars;
+        }
+        Set<Variable[]> nominate(int N) {
+            if (N > vars.length)
+                throw new RuntimeException("Invalid N=" + N + " exceeds number of variables in factor");
+            this.N = N;
+            Set<Integer> set = getBinary(0, 0);
+            Set<Variable[]> all = new HashSet<>();
+            for (Integer b : set) {
+                Variable[] list = new Variable[vars.length - N];
+                int idx = 0;
+                for (int i = 1; i <= vars.length; i ++) {
+                    if ((b & (1 << i)) == 0) // not set, so sum-out
+                        list[idx ++] = vars[i - 1];
+                }
+                all.add(list);
+            }
+            return all;
+        }
+        Set<Integer> getBinary(int n, int b) {
+            Set<Integer> ret = new HashSet<>();
+            if (n == N) {
+                ret.add(b);
+            } else {
+                for (int i = 1; i <= vars.length; i ++) {
+                    if ((b & (1 << i)) != 0) // already set
+                        continue;
+                    int bb = b;
+                    bb |= (1 << i);
+                    ret.addAll(getBinary(n + 1, bb));
+                }
+            }
+            return ret;
+        }
+    }
+
+    /**
+     * Decompose a factor into N-term sub-factors.
+     * @param f the factor
+     * @param N the number of variables in the decomposed factors
+     * @return an array of sub-factors
+     */
+    public static AbstractFactor[] decompose(AbstractFactor f, int N) {
+        NominateTree ntree = new NominateTree(f.evars);
+        Set<Variable[]> permut = ntree.nominate(N);
+        if (permut == null)
+            return null;
+        AbstractFactor[] ff = new AbstractFactor[permut.size()];
+        int cnt = 0;
+        for (Variable[] one : permut) {
+            ff[cnt] = Factorize.getMargin(f, one);
+            cnt += 1;
+        }
+        return ff;
+    }
+
+    private static double log2(double x) {
+        return Math.log(x) / Math.log(2);
+    }
+
+    /**
+     * Determine the Mutual Information (en.wikipedia.org/wiki/Mutual_information)
+     * between all pairs of variables in the factor.
+     * The matrix is ordered by variables as ordered in the factor.
+     * @param f the factor
+     * @return the standard mutual information score
+     */
+    public static double[][] getMIMatrix(AbstractFactor f) {
+        double[][] ret = new double[f.nEVars][f.nEVars];
+        AbstractFactor[] f1 = decompose(f, 1);
+        Map<Variable, Integer> f1map = new HashMap<>();
+        for (int i = 0; i < f.nEVars; i ++) {
+            Variable v1 = f.evars[i];
+            for (int k = 0; k < f1.length; k ++) {
+                if (f1[k].hasVariable(v1)) {
+                    f1map.put(v1, k);
+                    break;
+                }
+            }
+        }
+        AbstractFactor[] f2 = decompose(f, 2);
+        for (int i = 0; i < f.nEVars; i ++) {
+            Variable v1 = f.evars[i];
+            for (int j = 0; j < i; j ++) {
+                Variable v2 = f.evars[j];
+                AbstractFactor myf2 = null;
+                for (int k = 0; k < f2.length; k++) {
+                    if (f2[k].hasVariable(v1) && f2[k].hasVariable(v2)) {
+                        myf2 = f2[k];
+                        break;
+                    }
+                }
+                if (myf2 == null)
+                    throw new RuntimeException("Factor decomposition error in getMIMatrix");
+                // loop through all possible assignments of v1 and v2, to calculate MI
+                double sum = 0;
+                for (int index : myf2) {
+                    Object[] values = myf2.getKey(index);
+                    double p_joint = myf2.getValue(index);
+                    int v1idx = f1map.get(myf2.evars[0]);
+                    double p_1 = f1[v1idx].getValue(new Object[] {values[0]});
+                    int v2idx = f1map.get(myf2.evars[1]);
+                    double p_2 = f1[v2idx].getValue(new Object[] {values[1]});
+                    sum += p_joint * log2(p_joint / (p_1 * p_2));
+                }
+                ret[i][j] = sum;
+            }
+        }
+        return ret;
     }
 
     /**

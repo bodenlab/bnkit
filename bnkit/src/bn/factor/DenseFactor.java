@@ -18,15 +18,13 @@
 package bn.factor;
 
 import bn.Distrib;
-import dat.EnumVariable;
-import bn.prob.GaussianDistrib;
 import bn.JDF;
 import bn.Predef;
+import bn.prob.GaussianDistrib;
+import dat.EnumVariable;
 import dat.Variable;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+
+import java.util.*;
 
 /**
  * Table for storing and retrieving doubles based on Enumerable keys.
@@ -40,7 +38,7 @@ import java.util.Set;
  * grow exponentially with number of variables.
  * 
  * The class is sensitive to the order of variables, and exposes the user to 
- * details so caution must be exercised. Of specific importance is that the table stores the 
+ * details so caution must be exercised. Of specific importance is that the table stores the
  * natural logarithm of each factor, so that operations can be performed entirely in log space,
  * to avoid numerical issues, e.g. underflow.
  * 
@@ -57,7 +55,7 @@ public class DenseFactor extends AbstractFactor {
     protected int occupied = 0; // number of entries that are occupied
     
     /**
-     * Construct a new table without any variables. 
+     * Construct a new table without any variables.
      * This type of factor is used when all variables are summed out. 
      * They can appear as part of products to "scale" its opposite.
      */
@@ -469,11 +467,39 @@ public class DenseFactor extends AbstractFactor {
         }
         return my_idx;
     }
-    
-    
+
+
+    @Override
+    public Iterator<Integer> iterator() {
+        return new FactorIterator();
+    }
+
+    private class FactorIterator implements Iterator<Integer> {
+        private int index = 0;
+        @Override
+        public boolean hasNext() {
+            int size = getSize();
+            if (index < size) {
+                do {
+                    if (map[index] != LOG0)
+                        return true;
+                    index ++;
+                } while (index < size);
+            }
+            return false;
+        }
+
+        @Override
+        public Integer next() {
+            if (hasNext())
+                return index ++;
+            throw new NoSuchElementException();
+        }
+    }
+
     public static void main(String[] args) {
         long seed = 1;
-        java.util.Random random = new java.util.Random(seed);
+        Random random = new Random(seed);
 
         Factorize.VERBOSE = false;
         EnumVariable x1 = Predef.Boolean("X1");

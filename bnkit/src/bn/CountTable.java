@@ -17,8 +17,11 @@
  */
 package bn;
 
-import dat.EnumVariable;
+import bn.factor.AbstractFactor;
+import bn.factor.DenseFactor;
 import dat.EnumTable;
+import dat.EnumVariable;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,8 +40,10 @@ public class CountTable implements Serializable {
     private double totalCount = 0.0;
 
     public final EnumTable<Double> table; // table of counts
+    private AbstractFactor ftable = null; // factor table
 
     public CountTable(EnumVariable[] variables) {
+        ftable = new DenseFactor(variables);
         List<EnumVariable> list = new ArrayList<>(variables.length);
         list.addAll(Arrays.asList(variables));
         table = new EnumTable<>(list);
@@ -74,7 +79,16 @@ public class CountTable implements Serializable {
     public boolean hasParents() {
         return (table != null);
     }
-    
+
+    public AbstractFactor getFactor() {
+        double total = getTotal();
+        for (int idx : table) {
+            Object[] key = table.getKey(idx);
+            ftable.setValue(key, table.getValue(idx) / total);
+        }
+        return ftable;
+    }
+
     public void put(Object[] key, double count) {
         table.setValue(key, count);
         this.totalNeedsUpdate = true;
