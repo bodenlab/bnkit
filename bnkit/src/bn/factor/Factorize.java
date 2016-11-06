@@ -1269,7 +1269,7 @@ public class Factorize {
                     double p_2 = f1[v2idx].getValue(new Object[] {values[1]});
                     sum += p_joint * log2(p_joint / (p_1 * p_2));
                 }
-                ret[i][j] = sum;
+                ret[i][j] = ret[j][i] = sum;
             }
         }
         return ret;

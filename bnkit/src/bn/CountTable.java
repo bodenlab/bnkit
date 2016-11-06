@@ -106,7 +106,18 @@ public class CountTable implements Serializable {
     public int getIndex(Object[] key) {
         return table.getIndex(key);
     }
-    
+
+    public double sum(int[] indices) {
+        double sum = 0;
+        for (int idx : indices)
+            sum += get(idx);
+        return sum;
+    }
+
+    public double sum(Object[] key) {
+        return sum(getIndices(key));
+    }
+
     synchronized public void count(Object[] key, double count) {
         int index = table.getIndex(key);
         count(index, count);
