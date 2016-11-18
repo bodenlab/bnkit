@@ -17,12 +17,7 @@
  */
 package dat;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Table for storing and retrieving data of arbitrary types <E> based on
@@ -31,7 +26,12 @@ import java.util.Set;
  * @author mikael
  * @param <E>
  */
-public class EnumTable<E> {
+public class EnumTable<E> implements Iterable<Integer> {
+
+    @Override
+    public Iterator<Integer> iterator() {
+        return map.keySet().iterator();
+    }
 
     protected final Map<Integer, E> map;
     public final int nParents;
