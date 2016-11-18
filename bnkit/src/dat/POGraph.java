@@ -168,17 +168,6 @@ public class POGraph {
 	}
 
 	/**
-	 * Set the inferred base character and the inference probability, of the current node.
-	 *
-	 * @param base	inferred base character
-	 * @param prob	probability of inference
-	 */
-	public void setBase(char base, double prob) {
-		if (current != null)
-			current.setBase(base, prob);
-	}
-
-	/**
 	 * Get the possible base characters in the current node.
 	 *
 	 * @return	list of base characters
@@ -216,17 +205,6 @@ public class POGraph {
 		if (current == null || current.getBase() == 0)
 			return null;
 		return current.getBase();
-	}
-
-	/**
-	 * Get the base character inference probability of the current node. Returns null if it is not set.
-	 *
-	 * @return	base character inference probability or null
-	 */
-	public Double getCurrentBaseProb() {
-		if (current == null || current.getBase() == 0)
-			return null;
-		return current.getBaseProb();
 	}
 
 	/**
@@ -528,8 +506,7 @@ public class POGraph {
 		// if next is still null, haven't found the starting character in the set of starting nodes
 		if (next == null)
 			return false;
-		boolean found = findSequencePath(bases, next, 0);
-		return found;
+		return findSequencePath(bases, next, 0);
 	}
 
 	/**
@@ -888,7 +865,6 @@ public class POGraph {
     private class Node {
     	final private int ID;									// alignment ID 
     	private char base;										// base character
-		private double prob = 1.0;								// probability of chosen base, if applicable
     	private List<Node> prevNodes;							// list of neighbouring previous nodes
     	private List<Node> nextNodes;							// list of neighbouring next nodes
 		private List<SeqCharMap> seqChars;						// map of sequence Ids and their base character
@@ -1048,16 +1024,6 @@ public class POGraph {
     		this.base = base;
     	}
 
-		/**
-		 * Set the inferred base character and probability of inference.
-		 *
-		 * @param base	inferred base character
-		 * @param prob	inference probability
-		 */
-		private void setBase(char base, double prob) {
-			this.base = base;
-			this.prob = prob;
-		}
 
     	/**
     	 * Get the inferred base character.
@@ -1066,12 +1032,6 @@ public class POGraph {
     	 */
 		private char getBase(){ return base; }
 
-		/**
-		 * Get the base inference probability.
-		 *
-		 * @return	inference probability
-		 */
-		private double getBaseProb() { return prob; }
 
     	/**
     	 *  Generates string representation of the Node.
