@@ -13,6 +13,7 @@ import bn.ctmc.matrix.JTT;
 import bn.ctmc.matrix.gap;
 import bn.prob.EnumDistrib;
 import dat.*;
+import dat.file.AlnWriter;
 import dat.file.FastaWriter;
 
 /**
@@ -31,58 +32,95 @@ public class ASRPOG {
 	private List<String> ancestralSeqLabels;							// Ancestral sequences labels (internal nodes of phylogenetic tree structure)
 	private POGraph pogAlignment;										// partial order alignment graph structure template
 	private EnumDistrib[] marginalDistributions; 						// Marginal distributions for nodes if doing a marginal reconstruction
+	private String marginalNode = null;									// Label of node to perform marginal reconstruction (if applicable)
 	private Map<String, List<Inference>> ancestralInferences;			// stores updates to the POGStructure for the ancestral node <node label, changes>
 	private double[] rates = null; 										// Rates at positions in alignment
 
 	/**
 	 * Infer ancestral sequences given an alignment file (fasta or aln).
 	 *
+	 * @param alignmentFile		filepath to the sequence alignment (expected extension .fa, .fasta or .aln)
+	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 */
+	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference) {
+		performASR("", treeFile, alignmentFile, jointInference, false);
+	}
+
+	/**
+	 * Infer ancestral sequences given an alignment file (fasta or aln).
+	 *
+	 * @param alignmentFile		filepath to the sequence alignment (expected extension .fa, .fasta or .aln)
+	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param maxParsimonyGaps	flag for indicating gap inference using maximum parsimony (true: maximum parsimony or false: maximum likelihood)
+	 */
+	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, boolean maxParsimonyGaps) {
+		performASR("", treeFile, alignmentFile, jointInference, maxParsimonyGaps);
+	}
+
+	/**
+	 * Infer ancestral sequences given an alignment file (fasta or aln).
+	 *
 	 * @param alignmentFile	filepath to the sequence alignment (expected extension .fa, .fasta or .aln)
 	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
-	 * @param inference		type of inference ('joint' or 'marginal')
+	 * @param marginalNode	node label for maginal inference
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, String inference) {
-		this("", treeFile, alignmentFile, inference);
+	public ASRPOG(String alignmentFile, String treeFile, String marginalNode) {
+		this.marginalNode = marginalNode;
+		performASR("", treeFile, alignmentFile, false, false);
 	}
 
 	/**
 	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
-	 * 
+	 *
+	 * @param pog				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 */
+	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference) {
+		performASR(pog, treeFile, sequenceFile, jointInference, false);
+	}
+
+	/**
+	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 *
+	 * @param pog				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param maxParsimonyGaps	flag for indicating gap inference using maximum parsimony (true: maximum parsimony or false: maximum likelihood)
+	 */
+	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean maxParsimonyGaps) {
+		performASR(pog, treeFile, sequenceFile, jointInference, maxParsimonyGaps);
+	}
+
+	/**
+	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 *
+	 * @param pog			POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param sequenceFile	filepath to the sequences (expected extension .fa, .fasta or .aln)
-	 * @param pog			POG dot string or filepath to the partial order alignment graph (expected extension .dot)
-	 * @param inference		type of inference ('joint' or 'marginal')
+	 * @param marginalNode	node label for maginal inference
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, String inference) {
-		loadData(treeFile, sequenceFile);
-		if (pog.equals(""))	// load graph structure from alignment file
-			pog = sequenceFile;
-		pogAlignment = new POGraph(pog, sequenceFile);
-		pog = null;
+	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode) {
+		this.marginalNode = marginalNode;
+		performASR(pog, treeFile, sequenceFile, false, false);
+	}
 
-		// perform inference
-		if (inference.equalsIgnoreCase("joint")) {
-			marginalDistributions = null;
-			queryBNJoint();
-		} else {
-			System.out.println("No node was specified for the marginal inference: inferring the root node");
-			queryBNMarginal(phyloTree.getRoot().getLabel().toString());
-		}
-
-		// save sequence information in internal nodes of the phylogenetic tree
-		for (EnumSeq.Gappy<Enumerable> extant : extantSequences)
-			phyloTree.find(extant.getName()).setSequence(extant);
-		for (String phyloNodeLabel : ancestralSeqLabels) {
-			EnumSeq.Gappy<Enumerable> seq = new EnumSeq.Gappy<>(Enumerable.aacid_ext);
-			seq.setName(phyloNodeLabel);
-			String s = getAncestor(phyloNodeLabel).getSupportedSequence();
-			seq.setInfo(s);
-			Object[] chars = new Object[s.length()];
-			for (int c = 0; c < s.length(); c++)
-				chars[c] = s.toCharArray()[c];
-			seq.set(chars);
-			phyloTree.find(phyloNodeLabel).setSequence(seq);
-		}
+	/**
+	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 *
+	 * @param pog			POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile	filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param marginalNode	node label for maginal inference
+	 * @param maxParsimonyGaps	flag for indicating gap inference using maximum parsimony (true: maximum parsimony or false: maximum likelihood)
+	 */
+	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean maxParsimonyGaps) {
+		this.marginalNode = marginalNode;
+		performASR(pog, treeFile, sequenceFile, false, maxParsimonyGaps);
 	}
 
 	/**
@@ -104,11 +142,7 @@ public class ASRPOG {
 	public void saveGraph(String filepath, String nodeLabel) {
 		// save partial order graph alignment to text file
 		POGraph ancestor = getAncestor(nodeLabel);
-		try {
-			ancestor.saveToDot(filepath + nodeLabel);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		ancestor.saveToDot(filepath + nodeLabel);
 	}
 	
 	/**
@@ -128,10 +162,13 @@ public class ASRPOG {
 	 */
 	public void saveSupportedAncestors(String filepath){
 		Map<String, String> ancestralSeqs = new HashMap<>();
-		for (String phyloNodeLabel : ancestralSeqLabels)
-			ancestralSeqs.put(phyloNodeLabel, phyloTree.find(phyloNodeLabel).getSequence().toString());
+		if (marginalNode == null)
+			for (String phyloNodeLabel : ancestralSeqLabels)
+				ancestralSeqs.put(phyloNodeLabel, phyloTree.find(phyloNodeLabel).getSequence().toString());
+		else
+			ancestralSeqs.put(marginalNode, phyloTree.find(marginalNode).getSequence().toString());
 		try {
-			BufferedWriter bw = new BufferedWriter(new FileWriter(filepath + ".fa", false));
+			BufferedWriter bw = new BufferedWriter(new FileWriter(filepath + "_recon.fa", false));
 			for (String node : ancestralSeqs.keySet()) {
 				bw.write(">" + node);
 				bw.newLine();
@@ -140,8 +177,6 @@ public class ASRPOG {
 				bw.newLine();
 			}
 			bw.close();
-			MSA msa = new MSA(filepath + ".fa");
-			msa.saveMSA(filepath + ".aln");
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}
@@ -150,11 +185,13 @@ public class ASRPOG {
 	/**
 	 * Save ASR information; ALN, tree, rates, marginal distribution (if applicable).
 	 *
-	 * @param filepath	filename to save ASR
+	 * @param filepath		filename to save ASR
+	 * @param infSequence   sequences inferred (true) or marginal (false)
+	 * @param format		format to save alignment to, "fasta" or "clustal"
 	 */
-	public void save(String filepath, boolean infSequence) {
+	public void save(String filepath, boolean infSequence, String format) {
 		if (infSequence) {
-			saveALN(filepath + "_aln_full.fa");
+			saveALN(filepath + "_aln_full", format);
 			saveTree(filepath + "_new_tree.txt");
 			saveRate(filepath + "_rates.txt");
 		} else {
@@ -165,9 +202,11 @@ public class ASRPOG {
 
 	/**
 	 * Save ALN
+	 *
 	 * @param filepath	filepath to save ALN
+	 * @param format	format to save ALN, "clustal" or "fasta", default: fasta
 	 */
-	public void saveALN(String filepath) {
+	public void saveALN(String filepath, String format) {
 		PhyloTree.Node[] nodes = phyloTree.toNodesBreadthFirst();
 		EnumSeq.Gappy<Enumerable>[] allSeqs = new EnumSeq.Gappy[nodes.length];
 		for (int n = 0; n < nodes.length; n++) {
@@ -179,9 +218,15 @@ public class ASRPOG {
 			allSeqs[n] = seq;
 		}
 		try {
-			FastaWriter fw = new FastaWriter(filepath);
-			fw.save(allSeqs);
-			fw.close();
+			if (format.equalsIgnoreCase("clustal")) {
+				AlnWriter aw = new AlnWriter(filepath + ".aln");
+				aw.save(allSeqs);
+				aw.close();
+			} else {
+				FastaWriter fw = new FastaWriter(filepath + ".fa");
+				fw.save(allSeqs);
+				fw.close();
+			}
 		} catch (IOException ioe) {
 			ioe.printStackTrace();
 		}
@@ -214,6 +259,11 @@ public class ASRPOG {
 		}
 	}
 
+	/**
+	 * Save marginal distribution
+	 *
+	 * @param filename	filepath to save distribution
+	 */
 	public void saveDistrib(String filename){
 		try {
 			Writer writer = new PrintWriter(filename, "UTF-8");
@@ -260,26 +310,6 @@ public class ASRPOG {
 		}
 	}
 
-    /**
-     * TODO: REMOVE, THIS IS FOR TESTING ONLY!
-     * @return
-     */
-	public String getRootSequence() {
-		POGraph ancestor = getAncestor(phyloTree.getRoot().getLabel().toString());
-        return ancestor.getSupportedSequence();
-    }
-
-	/**
-	 * Identifies if the character sequence can be fully traversed in the graph.
-	 *
-	 * @param sequence	character sequence to check
-	 * @return	true/false if sequence can be traversed in the graph
-	 */
-	public boolean testSequenceMembership(String sequence){
-		POGraph ancestor = getAncestor(phyloTree.getRoot().getLabel().toString());
-		return ancestor.checkSequenceMembership(sequence);
-	}
-
 	/**
 	 * Save the phylogenetic tree with the ancestral nodes entered.
 	 *
@@ -304,6 +334,55 @@ public class ASRPOG {
 	/* ****************************************************************************************************************************************************
 	 * 																PRIVATE METHODS
 	 * ****************************************************************************************************************************************************/
+
+	/**
+	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 *
+	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile	filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param pog			POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param parsimony		flag to identify gaps in reconstruction using parsimony (true) or maximum likelihood (false)
+	 */
+	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean parsimony) throws RuntimeException {
+		loadData(treeFile, sequenceFile);
+		if (pog.equals(""))	// load graph structure from alignment file
+			pog = sequenceFile;
+		pogAlignment = new POGraph(pog, sequenceFile);
+		pog = null;
+
+		// perform inference
+		if (jointInference) {
+			marginalDistributions = null;
+			queryBNJoint(parsimony);
+		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
+			queryBNMarginal(marginalNode, parsimony);
+		} else {
+			if (marginalNode == null)
+				System.out.println("No node was specified for the marginal inference: inferring the root node");
+			else
+				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction.");
+			marginalNode = phyloTree.getRoot().getLabel().toString();
+			queryBNMarginal(phyloTree.getRoot().getLabel().toString(), parsimony);
+		}
+	}
+
+	/**
+	 * Set the sequence of the given ancestral node.
+	 *
+	 * @param phyloNodeLabel	label of ancestral node
+	 */
+	private void populateTreeNodeSeq(String phyloNodeLabel) {
+		EnumSeq.Gappy<Enumerable> seq = new EnumSeq.Gappy<>(Enumerable.aacid_ext);
+		seq.setName(phyloNodeLabel);
+		String s = getAncestor(phyloNodeLabel).getSupportedSequence();
+		seq.setInfo(s);
+		Object[] chars = new Object[s.length()];
+		for (int c = 0; c < s.length(); c++)
+			chars[c] = s.toCharArray()[c];
+		seq.set(chars);
+		phyloTree.find(phyloNodeLabel).setSequence(seq);
+	}
 
 	/**
 	 * Generates the ancestor by applying the inference changes stored in the ancestralInferences log.
@@ -357,6 +436,8 @@ public class ASRPOG {
 			for (PhyloTree.Node node : nodes)
 				if (node.getChildren().toArray().length == 0)
 					extNodes.add(node);
+				else
+					ancestralSeqLabels.add((String) node.getLabel());
 
 			Set<String> eNodes = new HashSet<>();
 			for (PhyloTree.Node en : extNodes)
@@ -378,7 +459,11 @@ public class ASRPOG {
 			if (!eNodes.equals(seqNames))
 				throw new RuntimeException("The sequence names in the provided alignment must all have a match" +
 						" in the provided tree");
-			
+
+			// save sequence information in internal nodes of the phylogenetic tree
+			for (EnumSeq.Gappy<Enumerable> extant : extantSequences)
+				phyloTree.find(extant.getName()).setSequence(extant);
+
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
@@ -437,8 +522,10 @@ public class ASRPOG {
 	
 	/**
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using joint inference.
+	 *
+	 * @param gapParsimony	flag to identify gaps using parsimony (true) or maximum likelihood (false)
 	 */
-	private void queryBNJoint(){
+	private void queryBNJoint(boolean gapParsimony){
 		rates = new double[pogAlignment.getNumNodes()]; //Rate matrix
 
 		// infer base/gap of each aligned node 
@@ -454,10 +541,29 @@ public class ASRPOG {
 
 			// get gap or character inference at phylogenetic nodes
 			Map<String, Character> phyloGaps = new HashMap<>();
-			ve.instantiate(createGapNetwork().getBN());
-			Variable.Assignment[] gapAssignments = getJointAssignment(ve);
-			for (Variable.Assignment varassign : gapAssignments)
-				phyloGaps.put(varassign.var.getName(), (char) varassign.val);
+			if (gapParsimony) {
+				// construct string[] of extant names and object[] of C/G at the appropriate leaf nodes
+				// i.e. all sequences in the current node will have a character, every other extant will be a gap
+				String[] extants = new String[extantSequences.size()];
+				Character[] bases = new Character[extantSequences.size()];
+				Map<Integer, Character> nodeSeqs = pogAlignment.getSequenceCharacterMapping();
+				for (int seqId = 0; seqId < extantSequences.size(); seqId++) {
+					extants[seqId] = extantSequences.get(seqId).getName();
+					if (nodeSeqs.containsKey(seqId))
+						bases[seqId] = 'C';
+					else
+						bases[seqId] = 'G';
+				}
+				phyloTree.setContentByParsimony(extants, bases);
+				// get assigned internal bases
+				for (String phyloNode : ancestralSeqLabels)
+					phyloGaps.put(phyloNode, (char) phyloTree.find(phyloNode).getValue());
+			} else {
+				ve.instantiate(createGapNetwork().getBN());
+				Variable.Assignment[] gapAssignments = getJointAssignment(ve);
+				for (Variable.Assignment varassign : gapAssignments)
+					phyloGaps.put(varassign.var.getName(), (char) varassign.val);
+			}
 			if (phyloGaps.values().contains('C')) {
 				PhyloBNet charNet = createCharacterNetwork();
 				rates[nodeId] = charNet.getRate();
@@ -465,11 +571,9 @@ public class ASRPOG {
 				charAssignments = getJointAssignment(ve);
 			}
 
+
 			// for each node in the phylogenetic tree, if character is inferred at position, set inferred base, otherwise gap is inferred, remove from alignment
 			for (String phyloNode : phyloGaps.keySet()) {
-				if (!ancestralSeqLabels.contains(phyloNode))
-					ancestralSeqLabels.add(phyloNode);
-
 				if (phyloGaps.get(phyloNode) == 'C') {
 					// infer base character
 					Character base = null;
@@ -478,7 +582,6 @@ public class ASRPOG {
 							base = (char) varassign.val;
 							break;
 						}
-
 					if (!ancestralInferences.containsKey(phyloNode))
 						ancestralInferences.put(phyloNode, new ArrayList<>());
 					ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base));
@@ -490,14 +593,19 @@ public class ASRPOG {
 				}
 			}
 		}
+
+		// save sequence information in internal nodes of the phylogenetic tree
+		for (String phyloNodeLabel : ancestralSeqLabels)
+			populateTreeNodeSeq(phyloNodeLabel);
 	}
 
 	/**
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using marginal inference.
 	 *
-	 * @param phyloNode	ancestral node to perform marginal reconstruction of
+	 * @param phyloNode		ancestral node to perform marginal reconstruction of
+	 * @param gapParsimony	flag to identify gaps using parsimony (true) or maximum likelihood (false)
 	 */
-	private void queryBNMarginal(String phyloNode) {
+	private void queryBNMarginal(String phyloNode, boolean gapParsimony) {
 		marginalDistributions = new EnumDistrib[pogAlignment.getNumNodes()];
 
 		// infer base/gap of each aligned node
@@ -509,24 +617,39 @@ public class ASRPOG {
 
 			// check if gap or character inference at phylogenetic node
 			Character base = null;
-			PhyloBNet phyloNet = createGapNetwork();
-			ve.instantiate(phyloNet.getBN());
-			for (EnumVariable pNode : phyloNet.getInternal())
-				if (pNode.getName().equalsIgnoreCase(phyloNode)) {
-					EnumDistrib gapAssignments = getMarginalDistrib(ve, pNode);
-					base = (Character) gapAssignments.getMax();
-					break;
+			if (gapParsimony) {
+				// construct string[] of extant names and object[] of C/G at the appropriate leaf nodes
+				// i.e. all sequences in the current node will have a character, every other extant will be a gap
+				String[] extants = new String[extantSequences.size()];
+				Character[] bases = new Character[extantSequences.size()];
+				Map<Integer, Character> nodeSeqs = pogAlignment.getSequenceCharacterMapping();
+				for (int seqId = 0; seqId < extantSequences.size(); seqId++) {
+					extants[seqId] = extantSequences.get(seqId).getName();
+					if (nodeSeqs.containsKey(seqId))
+						bases[seqId] = 'C';
+					else
+						bases[seqId] = 'G';
 				}
+				phyloTree.setContentByParsimony(extants, bases);
+				// get assigned internal bases
+				base = (Character) phyloTree.find(phyloNode).getValue();
+			} else {
+				PhyloBNet phyloNet = createGapNetwork();
+				ve.instantiate(phyloNet.getBN());
+				for (EnumVariable pNode : phyloNet.getInternal())
+					if (pNode.getName().equalsIgnoreCase(phyloNode)) {
+						EnumDistrib gapAssignments = getMarginalDistrib(ve, pNode);
+						base = (Character) gapAssignments.getMax();
+						break;
+					}
+			}
 
 			// if character is inferred at position, set inferred base, otherwise gap is inferred, remove from alignment
-			if (!ancestralSeqLabels.contains(phyloNode))
-				ancestralSeqLabels.add(phyloNode);
-
 			if (base == 'C') {
 				// infer base character
 				base = null;
 
-				phyloNet = createCharacterNetwork();
+				PhyloBNet phyloNet = createCharacterNetwork();
 				ve.instantiate(phyloNet.getBN());
 				// get character variable representing current phylogenetic tree node using marginal probability
 				EnumVariable charNode = phyloNet.getInternal().get(0);
@@ -549,6 +672,11 @@ public class ASRPOG {
 				ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), '-'));
 			}
 		}
+
+		// save sequence information in internal nodes of the phylogenetic tree
+		populateTreeNodeSeq(marginalNode);
+		ancestralSeqLabels = new ArrayList<>();
+		ancestralSeqLabels.add(marginalNode);
 	}
 
 	/**
@@ -601,6 +729,7 @@ public class ASRPOG {
     private class Inference {
     	int pogId;
     	char base;
+
     	public Inference(int id, char ch){
     		pogId = id;
     		base = ch;

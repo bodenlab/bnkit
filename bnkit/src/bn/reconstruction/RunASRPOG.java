@@ -16,7 +16,7 @@ public class RunASRPOG {
 	 *
 	 *  @param args
 	 *
-	 *  1.  string representation (i.e. from POGraph.toString()) or filepath of partial order alignment graph structure (filetype .txt).
+	 *  1.  string representation (i.e. from POGraph.toString()) or filepath of partial order alignment graph structure (filetype .dot).
 	 *  	If this is not specified, then a sequence fasta file (-s flag) must be specified. If the specified sequence file is in
 	 *  	.aln format, the reconstruction will use this as an alignment, otherwise the sequences will be aligned using a partial
 	 *  	order alignment graph for the reconstruction.

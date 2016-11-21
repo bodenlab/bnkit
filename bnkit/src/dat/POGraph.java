@@ -245,12 +245,7 @@ public class POGraph {
 			// set the previous node and next node pointers
 			if (seqNodeMap.get(seqId).indexOf(current) == 0) {
 				// first node, only affects next node pointers
-				Node nextNode = null;
-				try {
-					nextNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1);
-				} catch (IndexOutOfBoundsException e) {
-					e.getMessage();
-				}
+				Node nextNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1);
 				nextNode.removePrevNode(current);
 			} else if (seqNodeMap.get(seqId).indexOf(current) == seqNodeMap.get(seqId).size() - 1) {
 				// final node, only affect previous node pointers
