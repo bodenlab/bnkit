@@ -123,7 +123,7 @@ public class RunASRPOG {
 	}
 
 	private static void exit(String message){
-		if (!message.isEmpty())
+		if (message != null || !message.isEmpty())
 			System.out.println(message + "\n");
 		System.exit(1);
 	}

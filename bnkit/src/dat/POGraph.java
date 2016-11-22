@@ -25,7 +25,7 @@ public class POGraph {
 	private Map<Integer, Node> nodes;				// map of node ID and nodes in the structure (for fast node retrieval)
 	private Node current;							// pointer to the current node
 	private Map<Integer, List<Node>> seqNodeMap;	// map of sequence ID and the order of structure nodes it traverses
-	private List<Node> startingNodes;				// list of initial nodes
+	private Node initialNode = null;				// initial node (null node), points to the first actual nodes as 'next' nodes
 	private Map<Integer, String> sequences;			// map of sequence ID and sequence label
 
 	/**
@@ -33,7 +33,7 @@ public class POGraph {
 	 */
 	public POGraph() {
 		sequences = new HashMap<>();
-		startingNodes = new ArrayList<>();
+		initialNode = new Node();
 		nodes = new HashMap<>();
 		seqNodeMap = new HashMap<>();
 		current = null;
@@ -90,20 +90,15 @@ public class POGraph {
 		this();
 		this.sequences.putAll(copy.sequences);
 		IdentityHashMap<Node,Node> map = new IdentityHashMap<>();
-		for (Node startNode : copy.startingNodes) {
-			Node nodeCopy = startNode.copy(map);
-			this.startingNodes.add(nodeCopy);
-			this.nodes.put(nodeCopy.getID(), nodeCopy);
-		}
-		for (Node node : this.startingNodes)
-			for (Node next : node.getNextNodes())
-				addNode(next);
+		this.initialNode = copy.initialNode.copy(map);
+		for (Node node : this.initialNode.getNextNodes())
+			addNode(node);
 		for (Integer seqId : copy.seqNodeMap.keySet()) {
 			this.seqNodeMap.put(seqId, new ArrayList<>());
 			for (Node node : copy.seqNodeMap.get(seqId))
 				this.seqNodeMap.get(seqId).add(this.nodes.get(node.getID()));
 		}
-		this.current = startingNodes.get(0);
+		this.current = initialNode.getNextNodes().get(0);
 	}
 
 	/**
@@ -123,8 +118,10 @@ public class POGraph {
 				// find next ID number
 				current = new Node(nodes.size());
 				nodes.put(current.getID(), current);
-				if (baseInd == 0)
-					startingNodes.add(current);
+				if (baseInd == 0) {
+					initialNode.addNextNode(current);
+					current.addPrevNode(initialNode);
+				}
 			}
 			current.addSequence(id, bases[baseInd]);
 			seqnodes.add(current);
@@ -264,7 +261,17 @@ public class POGraph {
 		}
 
 		nodes.remove(current.getID(), current);
-		current = startingNodes.get(0);
+		current = initialNode.getNextNodes().get(0);
+	}
+
+	/**
+	 * Add new empty node to partial order graph. Sets the current pointer to this node.
+	 */
+	public void addNode() {
+		int nextId = Collections.max(nodes.keySet()) + 1;
+		Node nextNode = new Node(nextId);
+		nodes.put(nextId, nextNode);
+		current = nextNode;
 	}
 	
 	/**
@@ -686,10 +693,12 @@ public class POGraph {
 
 		// find starting nodes
 		for (Node node : nodes.values())
-			if (node.getPreviousNodes().isEmpty())
-				startingNodes.add(node);
+			if (node.getPreviousNodes().isEmpty()) {
+				initialNode.addNextNode(node);
+				node.addPrevNode(initialNode);
+			}
 
-		return startingNodes.get(0);
+		return initialNode.getNextNodes().get(0);
 	}
 
 	/**
@@ -700,7 +709,7 @@ public class POGraph {
 	private Node loadPOGraph(List<EnumSeq.Gappy<Enumerable>> seqs) {
 		// input:	seqLabel	sequence(with gap character)
 		// each Node is a column of the aln file
-		startingNodes = new ArrayList<>();
+		initialNode = new Node();
 		nodes = new HashMap<>();
 		seqNodeMap = new HashMap<>();
 
@@ -736,11 +745,13 @@ public class POGraph {
 		}
 
 		// find starting nodes
-		for (Node node : nodes.values()) {
-			if (node.getPreviousNodes().isEmpty())
-				startingNodes.add(node);
-		}
-		return startingNodes.get(0);
+		for (Node node : nodes.values())
+			if (node.getPreviousNodes().isEmpty()) {
+				initialNode.addNextNode(node);
+				node.addPrevNode(initialNode);
+			}
+
+		return initialNode.getNextNodes().get(0);
 	}
 
 
@@ -858,7 +869,7 @@ public class POGraph {
 	 * a single node.
      */
     private class Node {
-    	final private int ID;									// alignment ID 
+    	private Integer ID = null;								// alignment ID
     	private char base;										// base character
     	private List<Node> prevNodes;							// list of neighbouring previous nodes
     	private List<Node> nextNodes;							// list of neighbouring next nodes
@@ -868,11 +879,20 @@ public class POGraph {
     	/**
     	 * Constructor
     	 */
-    	public Node(int ID) {
-    		this.ID = ID;
-    		this.prevNodes = new ArrayList<>();
-    		this.nextNodes = new ArrayList<>();
+    	public Node() {
+			this.prevNodes = new ArrayList<>();
+			this.nextNodes = new ArrayList<>();
 			this.seqChars = new ArrayList<>();
+		}
+
+		/**
+		 * Constructor
+		 *
+		 * @param ID Node id
+		 */
+    	public Node(Integer ID) {
+			this();
+    		this.ID = ID;
     	}
 
     	/**
@@ -905,7 +925,7 @@ public class POGraph {
 		 *
     	 * @return	Alignment ID
     	 */
-    	private int getID(){
+    	private Integer getID(){
     		return this.ID;
     	}
 
@@ -1034,9 +1054,9 @@ public class POGraph {
     	 * @return		String representation in reduced dot format
     	 */
     	public String toString() {
-    		String sb = "\"" + Integer.toString(ID) + "\"" + "[label=\"" + base + "\"];\n";
+    		String sb = "\"" + ((ID == null) ? "null" : Integer.toString(ID)) + "\"" + "[label=\"" + base + "\"];\n";
     		for (Node nextNode : getNextNodes())
-    			sb += "\"" + Integer.toString(ID) + "\"->\"" + Integer.toString(nextNode.getID())+ "\"" + "[]\n;";
+    			sb += "\"" + ((ID == null) ? "null" : Integer.toString(ID)) + "\"->\"" + Integer.toString(nextNode.getID())+ "\"" + "[]\n;";
     		return sb;
     	}
 
