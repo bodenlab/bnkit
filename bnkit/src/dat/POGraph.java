@@ -42,7 +42,8 @@ public class POGraph {
 	/**
 	 * Constructor to initialise partial order graph.
 	 *
-	 * @param structure		Dot representation of partial order graph or filepath to representation
+	 * @param structure		Dot representation of partial order graph or filepath to representation, if given aligned
+	 *                      sequences (.aln, .fa, .fasta), constructs a graph from the aligned sequences
 	 * @param seqPath		File path to sequences
 	 */
 	public POGraph(String structure, String seqPath) {
@@ -146,7 +147,39 @@ public class POGraph {
 		current = nodes.get(nodeID);
 		return (current != null);
 	}
-	
+
+	/**
+	 * Reset the node pointer to the initial (null) node.
+	 *
+	 * @return	indication of whether setting the node succeeded or not
+	 */
+	public boolean reset(){
+		current = initialNode;
+		return (current != null);
+	}
+
+	/**
+	 * Get the mapping of sequence ID and sequence label.
+	 *
+	 * @return	map of sequence ID and label
+	 */
+	public Map<Integer, String> getSequences(){ return sequences; }
+
+	/**
+	 * Get the mapping of sequence ID and the list of ordered Node IDs that it traverses.
+	 *
+	 * @return	map of sequence ID and ordered node IDs
+	 */
+	public Map<Integer, ArrayList<Integer>> getSequenceNodeMapping() {
+		Map<Integer, ArrayList<Integer>> seqNodeMapping = new HashMap<>();
+		for (Integer seqId : seqNodeMap.keySet()) {
+			seqNodeMapping.put(seqId, new ArrayList<>());
+			for (Node node : seqNodeMap.get(seqId))
+				seqNodeMapping.get(seqId).add(node.getID());
+		}
+		return seqNodeMapping;
+	}
+
 	/**
 	 * Get the mapping between sequence ID and base character for the current node.
 	 * 
@@ -263,16 +296,6 @@ public class POGraph {
 		nodes.remove(current.getID(), current);
 		current = initialNode.getNextNodes().get(0);
 	}
-
-	/**
-	 * Add new empty node to partial order graph. Sets the current pointer to this node.
-	 */
-	public void addNode() {
-		int nextId = Collections.max(nodes.keySet()) + 1;
-		Node nextNode = new Node(nextId);
-		nodes.put(nextId, nextNode);
-		current = nextNode;
-	}
 	
 	/**
 	 * Get a list of IDs of the nodes in the graph.
@@ -345,6 +368,20 @@ public class POGraph {
 	}
 
 	/**
+	 * Get the number of out edges of the current node.
+	 *
+	 * @return number of out edges
+	 */
+	public int getNumEdgesOut() { return current.getNextNodes().size(); }
+
+	/**
+	 * Get the number of in edges of the current node.
+	 *
+	 * @return number of in edges
+	 */
+	public int getNumEdgesIn() { return current.getPreviousNodes().size(); }
+
+	/**
 	 * Get the out path of sequences from the node.
 	 *
 	 * @param 	node	Node to get sequence outpath from
@@ -374,6 +411,43 @@ public class POGraph {
 		}
 
 		return nextNodeSeqs;
+	}
+
+	/**
+	 * Uses Dijkstra's algorithm to calculate the minimum path distance (number of edges traversed) between the node
+	 * with the given ID and every other node in the graph.
+	 *
+	 * @param nodeId	ID of starting node
+	 * @return	minimum number of edges to traverse from node (ID) to every other node <node ID, distance>
+	 */
+	public Map<Integer, Integer> minDistance(int nodeId) {
+		Map<Integer, Integer> edgeCount = new HashMap<>();
+		final int MAXDIST = Integer.MAX_VALUE;
+
+		// initialise distance
+		for (Integer node : nodes.keySet())
+			if (node == nodeId)
+				edgeCount.put(node, 0);	// 0 distance from nodeId to nodeId
+			else
+				edgeCount.put(node, MAXDIST);
+
+		findDist(nodes.get(nodeId), edgeCount);
+
+		return edgeCount;
+	}
+
+	/**
+	 * Recursive function to calculate minimum distance to node.
+	 *
+	 * @param currNode	Node to cound distance from
+	 * @param distance	Map to keep track of minimum distance for the node IDs
+	 */
+	private void findDist(Node currNode, Map<Integer,Integer> distance) {
+		for (Node nextNode : currNode.getNextNodes())
+			if (distance.get(nextNode.getID()) > distance.get(currNode.getID()) + 1)
+				distance.put(nextNode.getID(), distance.get(currNode.getID()) + 1);
+		for (Node nextNode : currNode.getNextNodes())
+			findDist(nextNode, distance);
 	}
 
 	/**
@@ -430,7 +504,7 @@ public class POGraph {
 					String alignedNodes = "[";
 					rankedNodes.add(node);
 					for (Node alignedNode : node.getAlignedNodes()) {
-						alignedNodes += alignedNode.getID() + alignedNode.getBase() + " ";
+						alignedNodes += alignedNode.getID() + " ";
 						rankedNodes.add(alignedNode);
 					}
 					alignedNodes += "]";
@@ -441,7 +515,7 @@ public class POGraph {
 			// if the base value of the node has not been instantiated, replace the base value with all possible values in the node
 			Map<Node, String> nodeToLabel = getNodeLabels();
 			for (Node node : nodes.values()) {
-				dw.writeNode(Integer.toString(node.getID()) + nodeToLabel.get(node), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
+				dw.writeNode(Integer.toString(node.getID()), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
 							"\"" + (node.getBase()==0?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"");
 				for (Node next : node.getNextNodes()) {
 					// find the number of sequences that traverse to the next node and calculate the weighting and percentage
@@ -460,7 +534,7 @@ public class POGraph {
 					//dw.writeEdge(Integer.toString(node.getID())+nodeToLabel.get(node), Integer.toString(next.getID())+nodeToLabel.get(next), "fontsize", 12,
 					//		"fontcolor", "darkgray", "penwidth", (numSeqs > 20 ? 8 : numSeqs/3 + 1), "dir", "forward", "arrowhead", "empty", "label",
 					//		String.format("\"%.1f", percent) + "%\"", "sequences", "\""+sb.toString()+"\"");
-					dw.writeEdge(Integer.toString(node.getID())+nodeToLabel.get(node), Integer.toString(next.getID())+nodeToLabel.get(next), "fontsize", 12,
+					dw.writeEdge(Integer.toString(node.getID()), Integer.toString(next.getID()), "fontsize", 12,
 							"fontcolor", "darkgray", "penwidth", (numSeqs > 20 ? 8 : numSeqs/3 + 1), "dir", "forward", "label",
 							String.format("\"%.1f", percent) + "%\"", "sequences", "\""+sb.toString()+"\"");
 				}
@@ -1090,6 +1164,7 @@ public class POGraph {
 		private class SeqCharMap {
     		int seqId;
 			char base;
+
 			private SeqCharMap(int id, char c) {
 				seqId = id;
 				base = c;
