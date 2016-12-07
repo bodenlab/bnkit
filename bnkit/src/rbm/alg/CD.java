@@ -18,23 +18,28 @@
  */
 package rbm.alg;
 
-import dat.Variable;
+import dat.EnumVariable;
 import rbm.AbstractRBM;
+import rbm.BooleanRBM;
+
+import java.util.Random;
 
 /**
  * Contrastive Divergence
  * @author mikael
  */
-public class CD {
+public class CD<T extends AbstractRBM> {
     
-    private final AbstractRBM rbm;
-    
-    public CD(AbstractRBM rbm) {
+    private final T rbm;
+    private final Random rand;
+
+    public CD(T rbm, long seed) {
         this.rbm = rbm;
+        this.rand = new Random(seed);
     }
     
     /**
-     * Use the probability of state to determine gradient of objective function. If false, use state itself.
+     * Use the probability of state (mean field) to determine gradient of objective function. If false, use state itself.
      * See Hinton G, A Practical Guide to Training Restricted Boltzmann Machines. UTML TR 2010–003, University of Toronto.
      */
     public boolean USE_PROB_GRADIENT = true;
@@ -43,15 +48,53 @@ public class CD {
      * Mini-batches are groups of data points for which a weight update is executed.
      * See section 4 in Hinton G, A Practical Guide to Training Restricted Boltzmann Machines. UTML TR 2010–003, University of Toronto.
      */
-    public int MINIBATCH_SIZE = 10; 
-    
+    public int MINIBATCH_SIZE = 100;
+    public double LEARNING_RATE = 0.01;
+    public double MOMENTUM = 0.90;
     
     /**
      * Train the RBM using the specified data, when mapped to the specified variables.
+     * If variables are not given, all inputs are used.
+     * Specific data values that are null represent "absent value", and are not included in training.
      * @param data
      * @param vars 
      */
-    public void train(Object[][] data, Variable[] vars) {
-        
+    public void train(Object[][] data, EnumVariable[] vars) {
+        System.out.println("Number of data points: " + data.length);
+        if (vars != null)
+            rbm.setLinked(vars);
+        Double[][] prev = null;
+        Object[][] minibatch = new Object[MINIBATCH_SIZE][];
+        for (int round = 0; round < data.length; round ++) {
+            for (int p = 0; p < MINIBATCH_SIZE; p ++)
+                minibatch[p] = data[rand.nextInt(data.length)];
+            Double[][] delta = rbm.getCDGradient(minibatch, 1);
+            for (int j = 0; j < delta.length; j ++) {
+                for (int i = 0; i < delta[j].length; i ++) {
+                    if (delta[j][i] == null)
+                        continue;
+                    if (delta[j][i] != null && prev == null)
+                        delta[j][i] *= LEARNING_RATE;
+                    else if (delta[j][i] != null && prev[j][i] != null)
+                        delta[j][i] = prev[j][i] * MOMENTUM + delta[j][i] * LEARNING_RATE;
+                    else
+                        delta[j][i] = 0.0;
+                }
+            }
+            rbm.setCDGradient(delta);
+            prev = delta;
+            if (round % 100 == 0)
+                System.out.printf("%05d:\t%10.3f\n", round, rbm.err);
+        }
+
+    }
+
+    /**
+     * Train the RBM using the specified data.
+     * Specific data values that are null represent "absent value", and are not included in training.
+     * @param data
+     */
+    public void train(Object[][] data) {
+        train(data, null);
     }
 }

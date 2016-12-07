@@ -20,6 +20,9 @@ package rbm;
 
 import bn.prob.EnumDistrib;
 import dat.EnumVariable;
+
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Random;
 
 /**
@@ -65,9 +68,74 @@ public abstract class AbstractRBM {
     public EnumDistrib[] getHiddenDistribs() {
         return Ph;
     }
-    
+
+    private HashMap<EnumVariable, Integer> visvarmap = null;
+    private HashMap<EnumVariable, Integer> hidvarmap = null;
+
+    public int getVisibleIndex(EnumVariable var) {
+        if (v == null)
+            return -1;
+        if (visvarmap == null) {
+            visvarmap = new HashMap<>();
+            for (int i = 0; i < v.length; i ++)
+                visvarmap.put(var, i);
+        }
+        Integer index = visvarmap.get(var);
+        if (index != null)
+            return index.intValue();
+        return -1;
+    }
+
+    public int getHiddenIndex(EnumVariable var) {
+        if (h == null)
+            return -1;
+        if (hidvarmap == null) {
+            hidvarmap = new HashMap<>();
+            for (int i = 0; i < h.length; i ++)
+                hidvarmap.put(var, i);
+        }
+        Integer index = hidvarmap.get(var);
+        if (index != null)
+            return index.intValue();
+        return -1;
+    }
+
+    public void setLinked(EnumVariable[] inputvars) {
+        // assume all hidden nodes are linked
+        int[] visidx = new int[inputvars.length];
+        for (int i = 0; i < inputvars.length; i ++) {
+            int idx = getVisibleIndex(inputvars[i]);
+            if (idx != -1)
+                visidx[i] = idx;
+        }
+        for (int j = 0; j < h.length; j ++) {
+            Arrays.fill(lnk[j], false);
+            for (int i = 0; i < visidx.length; i ++)
+                lnk[j][visidx[i]] = true;
+        }
+    }
+
+    public void setLinked(EnumVariable[] inputvars, EnumVariable[] hidvars) {
+        throw new RuntimeException("Not yet implemented");
+    }
+
+    public EnumDistrib assignVisible(int index, Object value) {
+        Object[] values = Pv[index].getDomain().getValues();
+        double[] probs = new double[values.length];
+        for (int i = 0; i < probs.length; i ++)
+            probs[i] = (values[i].equals(value)) ? 1 : 0;
+        Pv[index].set(probs);
+        return Pv[index];
+    }
+
     public abstract Object[] encode(Object[] input);
     
     public abstract Object[] decode(Object[] hidden);
-    
+
+    public double err = -Double.MAX_VALUE;
+
+    public abstract Double[][] getCDGradient(Object[][] minibatch, int niter);
+    public abstract void setCDGradient(Double[][] delta);
+
+
 }

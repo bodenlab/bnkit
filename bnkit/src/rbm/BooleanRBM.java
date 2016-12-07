@@ -18,9 +18,12 @@
  */
 package rbm;
 
+import bn.Predef;
 import bn.prob.EnumDistrib;
 import dat.EnumVariable;
 import dat.Enumerable;
+
+import java.io.*;
 import java.util.Random;
 
 /**
@@ -28,11 +31,14 @@ import java.util.Random;
  * @author mikael
  */
 public class BooleanRBM extends AbstractRBM {
-    
+
     private final double[][] w;     // weights
     private final double[]   a;     // bias on visible
     private final double[]   b;     // bias on hidden
-        
+//    private final double[][] w;     // weights
+//    private final double[]   a;     // bias on visible
+//    private final double[]   b;     // bias on hidden
+
     /**
      * Set the SD for random weights (around mean 0)
      */
@@ -75,11 +81,41 @@ public class BooleanRBM extends AbstractRBM {
         }
     }
 
+    public void save(String filename) throws IOException {
+        PrintWriter writer = new PrintWriter(filename, "UTF-8");
+        writer.printf("w\t");
+        for (int i = 0; i < getNVisible(); i ++)
+            writer.printf("%s\t", v[i].getName());
+        writer.println();
+        for (int j = 0; j < getNHidden(); j ++) {
+            writer.printf("%s\t", h[j].getName());
+            for (int i = 0; i < getNVisible(); i ++) {
+                writer.printf("%f\t", w[j][i]);
+            }
+            writer.println();
+        }
+        writer.printf("a\t");
+        for (int i = 0; i < getNVisible(); i ++)
+            writer.printf("%f\t", a[i]);
+        writer.println();
+        writer.printf("b\n");
+        for (int j = 0; j < getNHidden(); j ++)
+            writer.printf("%s\t%f\n", h[j].getName(), b[j]);
+        writer.close();
+    }
+
     public double logistic(double x) {
         double y = 1.0 / (1.0 + Math.exp(-x));
         return y;
     }
-    
+
+    public void setVisible(Object[] input) {
+        for (int i = 0; i < v.length; i ++) {
+            if (input[i] != null)
+                assignVisible(i, input[i]);
+        }
+    }
+
     @Override
     public Object[] encode(Object[] input) {
         Object[] hinst = new Object[this.h.length];
@@ -88,7 +124,7 @@ public class BooleanRBM extends AbstractRBM {
             for (int i = 0; i < v.length; i ++) {
                 if (input[i] != null && lnk[j][i]) {
                     if ((Boolean)input[i])
-                        net +=  w[j][i];
+                        net += w[j][i];
                 }
             }
             double p = logistic(net + b[j]);
@@ -115,13 +151,153 @@ public class BooleanRBM extends AbstractRBM {
         }
         return vinst;
     }
-    
-    public Object[] encodedecode(Object[] clamp) {
+
+    @Override
+    public Double[][] getCDGradient(Object[][] minibatch, int niter) {
+        Double[][] sum = new Double[getNHidden() + 1][getNVisible() + 1]; // plus one to include biases
+        int[][] cnt = new int[getNHidden() + 1][getNVisible() + 1];
+        err = 0;
+        // TODO: multi-thread the following iteration
+        for (int p = 0; p < minibatch.length; p ++) {
+            Object[] input0 = minibatch[p];
+            Object[] hidd0 = encode(input0);
+            // positive signal
+            double[][] pos = new double[getNHidden() + 1][getNVisible() + 1];
+            for (int i = 0; i < getNVisible(); i ++) {
+                boolean doneHidBias = false; // do it once only
+                if (minibatch[p][i] != null) {
+                    for (int j = 0; j < getNHidden(); j ++) {
+                        if (!doneHidBias) {
+                            cnt[j][getNVisible()] ++;
+                            sum[j][getNVisible()] = 0.0;
+                            pos[j][getNVisible()] = Ph[j].get(0);
+                        }
+                        cnt[j][i] ++;
+                        sum[j][i] = 0.0;
+                        pos[j][i] = ((Boolean)input0[i]) ? Ph[j].get(0) : 0.0;
+                    }
+                    if (!doneHidBias)
+                        doneHidBias = true;
+                    cnt[getNHidden()][i] ++;
+                    sum[getNHidden()][i] = 0.0;
+                    pos[getNHidden()][i] = ((Boolean)input0[i]) ? 1 : 0;
+                }
+            }
+            for (int n = 0; n < niter; n ++) {
+                Object[] input1 = decode_restricted(hidd0, input0);
+                for (int i = 0; i < input0.length; i ++) {
+                    double x0 = (Boolean)input0[i] ? 1 : 0;
+                    double p1 = this.Pv[i].get(0);
+                    err += Math.sqrt((x0 - p1)*(x0 - p1));
+                }
+                Object[] hidd1 = encode(input1);
+            }
+            for (int i = 0; i < getNVisible(); i ++) {
+                boolean doneHidBias = false; // do it once only
+                if (minibatch[p][i] != null) {
+                    for (int j = 0; j < getNHidden(); j ++) {
+                        if (!doneHidBias) {
+                            double neg = Ph[j].get(0);
+                            sum[j][getNVisible()] += pos[j][getNVisible()] - neg;
+                        }
+                        double neg = Pv[i].get(0) * Ph[j].get(0);
+                        sum[j][i] += pos[j][i] - neg;
+                    }
+                    if (!doneHidBias)
+                        doneHidBias = true;
+                    double neg = Pv[i].get(0);
+                    sum[getNHidden()][i] += pos[getNHidden()][i] - neg;
+                }
+            }
+        }
+        // find average, given counts
+        for (int i = 0; i < getNVisible() + 1; i ++) {
+            for (int j = 0; j < getNHidden() + 1; j ++) {
+                if (cnt[j][i] > 0)
+                    sum[j][i] /= cnt[j][i];
+                else
+                    sum[j][i] = null;
+            }
+        }
+        //System.out.println("\t" + err);
+        return sum;
+    }
+
+    @Override
+    public void setCDGradient(Double[][] delta) {
+        for (int j = 0; j < getNHidden() + 1; j ++) {
+            for (int i = 0; i < getNVisible() + 1; i ++) {
+                if (delta[j][i] != null) {
+                    if (j == getNHidden())
+                        a[i] += delta[j][i];
+                    else if (i == getNVisible())
+                        b[j] += delta[j][i];
+                    else
+                        w[j][i] += delta[j][i];
+                }
+            }
+        }
+    }
+
+    public Object[] encode_decode_clamped(Object[] clamp) {
+        return encode_decode_clamped(clamp, 0);
+    }
+
+    public Object[] encode_decode_clamped(Object[] clamp, int niter) {
         Object[] hinst = encode(clamp);
         Object[] vinst = decode(hinst);
         Object[] decoded = new Object[this.v.length];
-        for (int i = 0; i < vinst.length; i ++)
+        for (int i = 0; i < vinst.length; i++)
             decoded[i] = (clamp[i] == null ? vinst[i] : clamp[i]);
+        for (int n = 0; n < niter; n ++) {
+            hinst = encode(decoded);
+            vinst = decode(hinst);
+            for (int i = 0; i < vinst.length; i++)
+                decoded[i] = (clamp[i] == null ? vinst[i] : clamp[i]);
+        }
         return decoded;
     }
+
+    public Object[] encode_decode_restricted(Object[] input) {
+        return encode_decode_restricted(input, 0);
+    }
+
+    private Object[] decode_restricted(Object[] hinst, Object[] input) {
+        Object[] vinst = decode(hinst);
+        Object[] decoded = new Object[this.v.length];
+        for (int i = 0; i < vinst.length; i ++)
+            decoded[i] = (input[i] == null ? null : vinst[i]);
+        return decoded;
+    }
+
+    public Object[] encode_decode_restricted(Object[] input, int niter) {
+        Object[] hinst = encode(input);
+        Object[] vinst = decode(hinst);
+        Object[] decoded = new Object[this.v.length];
+        for (int i = 0; i < vinst.length; i ++)
+            decoded[i] = (input[i] == null ? null : vinst[i]);
+        for (int n = 0; n < niter; n ++) {
+            hinst = encode(decoded);
+            vinst = decode(hinst);
+            for (int i = 0; i < vinst.length; i++)
+                decoded[i] = (input[i] == null ? null : vinst[i]);
+        }
+        return decoded;
+    }
+
+    public Object[] encode_decode_full(Object[] input) {
+        return encode_decode_full(input, 0);
+    }
+
+    public Object[] encode_decode_full(Object[] input, int niter) {
+        Object[] hinst = encode(input);
+        Object[] vinst = decode(hinst);
+        for (int n = 0; n < niter; n ++) {
+            hinst = encode(vinst);
+            vinst = decode(hinst);
+        }
+        return vinst;
+    }
+
+
 }
