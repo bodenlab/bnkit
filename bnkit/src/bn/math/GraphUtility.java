@@ -47,6 +47,17 @@ public class GraphUtility {
     }
 
     /**
+     * Perform the union operation on the set of graphs loaded in the class and save as the given filepath.
+     *
+     * @param filepath  filepath to save resulting structure
+     */
+    public void savePerformUnion(String filepath) {
+        POGraph result = union();
+        result.saveSequences(filepath + "_union", "fasta");
+        result.saveToDot(filepath + "_union");
+    }
+
+    /**
      * Perform the union operation on the set of graphs loaded in the class.
      *
      * @return  Partial order graph representation of the union of all stored graphs
@@ -85,6 +96,17 @@ public class GraphUtility {
         }
 
         return g1;
+    }
+
+    /**
+     * Perform the intersection operation on the set of graphs loaded in the class and save as the given filepath.
+     *
+     * @param filepath  filepath to save resulting structure
+     */
+    public void savePerformIntersection(String filepath) {
+        POGraph result = intersection();
+        result.saveSequences(filepath + "_intersection", "fasta");
+        result.saveToDot(filepath + "_intersection");
     }
 
     /**
@@ -136,6 +158,17 @@ public class GraphUtility {
         }
 
         return g1;
+    }
+
+    /**
+     * Perform the intersection operation on the set of graphs loaded in the class and save as the given filepath.
+     *
+     * @param filepath  filepath to save resulting structure
+     */
+    public void savePerformComplement(String filepath) {
+        POGraph result = complement();
+        result.saveSequences(filepath + "_complement", "fasta");
+        result.saveToDot(filepath + "_complement");
     }
 
     /**
