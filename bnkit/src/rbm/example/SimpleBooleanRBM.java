@@ -21,40 +21,31 @@ package rbm.example;
 import bn.file.DataBuf;
 import dat.EnumVariable;
 import rbm.BooleanRBM;
+import rbm.alg.CD;
+
+import java.io.IOException;
 
 /**
- *
+ * This uses the MNIST digits in a Boolean form (grabbed here: http://cs.nyu.edu/%7Eroweis/data.html).
+ * The RBM is trained to self-associate digits, i.e. to encode/decode via a hidden layer.
  * @author mikael
  */
 public class SimpleBooleanRBM {
     
-    static BooleanRBM rbm = new BooleanRBM(5,2);
+    static BooleanRBM rbm = new BooleanRBM(28 * 28,20);
 
     public static void main(String[] args) {
         
         EnumVariable[] vars = rbm.getVisibleVars();
-        Object[][] data = DataBuf.load("/Users/mikael/simhome/rbm/example.txt", vars, false);
-        for (int c = 0; c < data[0].length; c ++) {
-            System.out.print(vars[c].getName() + "\t");
+        Object[][] data = DataBuf.load("/Users/mikael/simhome/rbm/btrn.txt", vars, false);
+        CD<BooleanRBM> trn = new CD<>(rbm, 1);
+        try {
+            rbm.save("/Users/mikael/simhome/rbm/before.tsv");
+            trn.train(data);
+            rbm.save("/Users/mikael/simhome/rbm/after.tsv");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        System.out.println();
-        for (int r = 0; r < data.length; r ++) {
-            for (int c = 0; c < data[r].length; c ++) {
-                System.out.print(data[r][c] + "\t");
-            }
-            System.out.print("==>\t");
-            Object[] hid = rbm.encode(data[r]);
-            for (int h = 0; h < hid.length; h ++) {
-                System.out.print(hid[h] + "\t");
-            }
-            System.out.print("==>\t");
-            Object[] recoded = rbm.decode(hid);
-            for (int i = 0; i < recoded.length; i ++) {
-                System.out.print(recoded[i] + "\t");
-            }
-            System.out.println();
-            
-        }
-        
+
     }
 }
