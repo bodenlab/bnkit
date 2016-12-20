@@ -361,7 +361,7 @@ public class ASRPOG {
 			if (marginalNode == null)
 				System.out.println("No node was specified for the marginal inference: inferring the root node");
 			else
-				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction.");
+				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
 			marginalNode = phyloTree.getRoot().getLabel().toString();
 			queryBNMarginal(phyloTree.getRoot().getLabel().toString(), parsimony);
 		}

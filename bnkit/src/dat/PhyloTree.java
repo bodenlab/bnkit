@@ -40,7 +40,7 @@ import java.util.Set;
 public class PhyloTree {
     
     final private Node root; // the root of the tree
-    static int count;
+   // static int count = 0;
     
     /**
      * Private constructor for tree from a root with all nodes connected off that.
@@ -101,7 +101,7 @@ public class PhyloTree {
     public Node getRoot() {
         return root;
     }
-    
+
     /**
      * Find the node with the specified label.
      * @param content label or label
@@ -145,12 +145,22 @@ public class PhyloTree {
     }
     
     /**
-     * Utility method for recursively parse an embedded string on the Newick format.
+     * Utility method to parse an embedded string on the Newick format.
      * @param str text on Newick format
      * @param parent the parent of the current node
      * @return the root node of tree
      */
     private static Node parseNewick(String str, Node parent) {
+        return parseNewick(str, parent, 0);
+    }
+
+    /**
+     * Utility method for recursively parse an embedded string on the Newick format.
+     * @param str text on Newick format
+     * @param parent the parent of the current node
+     * @return the root node of tree
+     */
+    private static Node parseNewick(String str, Node parent, int count) {
         Node node = null;
         int start_index = str.indexOf('('); // start parenthesis
         int end_index = str.lastIndexOf(')'); // end parenthesis
@@ -200,7 +210,7 @@ public class PhyloTree {
             while (comma != -1) {
                 String process_me = embed.substring(0, comma);
                 //GOING TO HAVE TO PASS PARENT NODE WITH RECURSION TO RECORD IT
-                node.addChild(parseNewick(process_me, node)); //pass the current node down as the parent
+                node.addChild(parseNewick(process_me, node, count)); //pass the current node down as the parent
                 if (comma + 1 > embed.length())
                     break;
                 embed = embed.substring(comma + 1);

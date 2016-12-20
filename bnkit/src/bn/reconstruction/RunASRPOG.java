@@ -92,7 +92,7 @@ public class RunASRPOG {
 						MSA msa = new MSA(sequencePath);
 						asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
 					} else if (marginalNode != null)
-						asr = new ASRPOG(sequencePath, treePath, marginalNode, mp);
+						asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, mp);
 					else
 						asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), mp);
 				} else if (marginalNode != null)
