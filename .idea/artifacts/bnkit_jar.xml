@@ -1,10 +1,8 @@
 <component name="ArtifactManager">
-  <artifact type="jar" build-on-make="true" name="bnkit:jar">
+  <artifact type="jar" name="bnkit:jar">
     <output-path>$PROJECT_DIR$/out/artifacts/bnkit_jar</output-path>
-    <root id="archive" name="bnkit_jar.jar">
-      <element id="archive" name="bnkit.jar">
-        <element id="module-output" name="bnkit" />
-      </element>
+    <root id="archive" name="bnkit2.jar">
+      <element id="module-output" name="bnkit2" />
     </root>
   </artifact>
 </component>

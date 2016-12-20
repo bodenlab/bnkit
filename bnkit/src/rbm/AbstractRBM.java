@@ -137,5 +137,65 @@ public abstract class AbstractRBM {
     public abstract Double[][] getCDGradient(Object[][] minibatch, int niter);
     public abstract void setCDGradient(Double[][] delta);
 
+    public Object[] encode_decode_clamped(Object[] clamp) {
+        return encode_decode_clamped(clamp, 0);
+    }
+
+    public Object[] encode_decode_clamped(Object[] clamp, int niter) {
+        Object[] hinst = encode(clamp);
+        Object[] vinst = decode(hinst);
+        Object[] decoded = new Object[this.v.length];
+        for (int i = 0; i < vinst.length; i++)
+            decoded[i] = (clamp[i] == null ? vinst[i] : clamp[i]);
+        for (int n = 0; n < niter; n ++) {
+            hinst = encode(decoded);
+            vinst = decode(hinst);
+            for (int i = 0; i < vinst.length; i++)
+                decoded[i] = (clamp[i] == null ? vinst[i] : clamp[i]);
+        }
+        return decoded;
+    }
+
+    public Object[] encode_decode_restricted(Object[] input) {
+        return encode_decode_restricted(input, 0);
+    }
+
+    public Object[] decode_restricted(Object[] hinst, Object[] input) {
+        Object[] vinst = decode(hinst);
+        Object[] decoded = new Object[this.v.length];
+        for (int i = 0; i < vinst.length; i ++)
+            decoded[i] = (input[i] == null ? null : vinst[i]);
+        return decoded;
+    }
+
+    public Object[] encode_decode_restricted(Object[] input, int niter) {
+        Object[] hinst = encode(input);
+        Object[] vinst = decode(hinst);
+        Object[] decoded = new Object[this.v.length];
+        for (int i = 0; i < vinst.length; i ++)
+            decoded[i] = (input[i] == null ? null : vinst[i]);
+        for (int n = 0; n < niter; n ++) {
+            hinst = encode(decoded);
+            vinst = decode(hinst);
+            for (int i = 0; i < vinst.length; i++)
+                decoded[i] = (input[i] == null ? null : vinst[i]);
+        }
+        return decoded;
+    }
+
+    public Object[] encode_decode_full(Object[] input) {
+        return encode_decode_full(input, 0);
+    }
+
+    public Object[] encode_decode_full(Object[] input, int niter) {
+        Object[] hinst = encode(input);
+        Object[] vinst = decode(hinst);
+        for (int n = 0; n < niter; n ++) {
+            hinst = encode(vinst);
+            vinst = decode(hinst);
+        }
+        return vinst;
+    }
+
 
 }

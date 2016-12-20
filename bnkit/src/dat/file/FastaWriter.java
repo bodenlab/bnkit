@@ -84,6 +84,10 @@ public class FastaWriter {
     public void save(EnumSeq[] collection) throws IOException {
         for (int s=0; s<collection.length; s++) {
             Object[] str=collection[s].get();
+            if (str == null) {
+                System.err.println("No sequence for " + collection[s].getName());
+                continue;
+            }
             try { 
                 writer.write(defline(collection[s]));
                 for (int i=0; i<str.length; i++) {
@@ -104,7 +108,7 @@ public class FastaWriter {
     
     /**
      * Closes the file so that it can be read by others.
-     * @throws BioSeqIOException if the close operation fails
+     * @throws IOException if the close operation fails
      */
     public void close() throws IOException {
         try {

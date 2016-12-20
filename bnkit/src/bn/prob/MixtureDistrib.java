@@ -346,15 +346,24 @@ public class MixtureDistrib implements Distrib {
         return current.sample();
     }
     
+//    @Override
+//    public String toString() {
+//        StringBuilder sb = new StringBuilder("mixture size: " + distribs.size() + "\n");
+//        //for (Map.Entry<Distrib, Double> entry : mixture.entrySet())
+//        for(int i = 0; i < distribs.size(); i++)
+//            sb.append("weight: " + String.format("%4.2f", weights.get(i)) + "; distrib: " + distribs.get(i) + "\n");
+//        return sb.toString();
+//    }
+
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("mixture size: " + distribs.size() + "\n");
+        StringBuilder sb = new StringBuilder("^" + distribs.size());
         //for (Map.Entry<Distrib, Double> entry : mixture.entrySet())
-        for(int i = 0; i < distribs.size(); i++) 
-            sb.append("weight: " + String.format("%4.2f", weights.get(i)) + "; distrib: " + distribs.get(i) + "\n");
+        for(int i = 0; i < distribs.size(); i++)
+            sb.append("{" + distribs.get(i) + "*" + String.format("%4.2f", weights.get(i)) + "}");
         return sb.toString();
     }
-    
+
     public String toXMLString() {
     	StringBuilder sb = new StringBuilder("<MixtureModels>\n");
     	for(int i = 0; i < distribs.size(); i++) {

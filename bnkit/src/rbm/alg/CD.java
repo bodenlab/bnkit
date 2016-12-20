@@ -65,7 +65,7 @@ public class CD<T extends AbstractRBM> {
             rbm.setLinked(vars);
         Double[][] prev = null;
         Object[][] minibatch = new Object[MINIBATCH_SIZE][];
-        for (int round = 0; round < data.length; round ++) {
+        for (int round = 0; round < data.length / 2; round ++) {
             for (int p = 0; p < MINIBATCH_SIZE; p ++)
                 minibatch[p] = data[rand.nextInt(data.length)];
             Double[][] delta = rbm.getCDGradient(minibatch, 1);

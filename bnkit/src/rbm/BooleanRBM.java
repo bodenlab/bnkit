@@ -24,6 +24,8 @@ import dat.EnumVariable;
 import dat.Enumerable;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -32,12 +34,9 @@ import java.util.Random;
  */
 public class BooleanRBM extends AbstractRBM {
 
-    private final double[][] w;     // weights
-    private final double[]   a;     // bias on visible
-    private final double[]   b;     // bias on hidden
-//    private final double[][] w;     // weights
-//    private final double[]   a;     // bias on visible
-//    private final double[]   b;     // bias on hidden
+    private  double[][] w;     // weights
+    private  double[]   a;     // bias on visible
+    private  double[]   b;     // bias on hidden
 
     /**
      * Set the SD for random weights (around mean 0)
@@ -81,9 +80,118 @@ public class BooleanRBM extends AbstractRBM {
         }
     }
 
+    private void setWeights(List<Double[]> weights) {
+        this.a = new double[v.length];
+        this.b = new double[h.length];
+        this.w = new double[h.length][v.length];
+        this.lnk = new boolean[h.length][v.length];
+        for (int j = 0; j < weights.size(); j ++) {
+            for (int i = 0; i < weights.get(j).length; i ++) {
+                if (weights.get(j)[i] == null)
+                    this.lnk[j][i] = false;
+                else {
+                    this.w[j][i] = weights.get(j)[i];
+                    this.lnk[j][i] = true;
+                }
+            }
+        }
+    }
+
+    public BooleanRBM(File file) throws IOException {
+        BufferedReader br = new BufferedReader(new FileReader(file));
+        String line = br.readLine();
+        Character collecting = '?';
+        int collectCount = 0;
+        int nVis = 0;
+        int nHid = 0;
+        List<Double[]> weights = new ArrayList<>();
+        List<String> hidvars = new ArrayList<>();
+        while (line != null) {
+            String[] words = line.split("\t");
+            if (words[0].startsWith("*w")) {
+                collecting = 'w';
+                collectCount = 0;
+            } else if (words[0].startsWith("*a")) {
+                if (collecting == 'w') {
+                    nHid = weights.size();
+                    this.h = new EnumVariable[nHid];
+                    this.Ph = new EnumDistrib[nHid];
+                    for (int j = 0; j < nHid; j ++) {
+                        this.h[j] = new EnumVariable(Enumerable.bool, hidvars.get(j));
+                        this.h[j].setPredef("Boolean");
+                        this.Ph[j] = new EnumDistrib(Enumerable.bool);
+                    }
+                    setWeights(weights);
+                }
+                collecting = 'a';
+                collectCount = 0;
+            } else if (words[0].startsWith("*b")) {
+                if (collecting == 'w') {
+                    nHid = weights.size();
+                    this.h = new EnumVariable[nHid];
+                    this.Ph = new EnumDistrib[nHid];
+                    for (int j = 0; j < nHid; j ++) {
+                        this.h[j] = new EnumVariable(Enumerable.bool, hidvars.get(j));
+                        this.h[j].setPredef("Boolean");
+                        this.Ph[j] = new EnumDistrib(Enumerable.bool);
+                    }
+                    setWeights(weights);
+                }
+                collecting = 'b';
+                collectCount = 0;
+            }
+
+            if (collecting.equals('w')) {
+                if (collectCount == 0) { // header: create variables
+                    nVis = words.length - 1;
+                    this.v = new EnumVariable[nVis];
+                    this.Pv = new EnumDistrib[nVis];
+                    for (int i = 0; i < nVis; i ++) {
+                        this.v[i] = new EnumVariable(Enumerable.bool, words[1 + i]);
+                        this.v[i].setPredef("Boolean");
+                        this.Pv[i] = new EnumDistrib(Enumerable.bool);
+                    }
+                    collectCount = 1;
+                } else { // instantiate weights
+                    Double[] hidw = new Double[nVis]; // the weights for one hidden node
+                    hidvars.add(words[0]);
+                    for (int i = 0; i < nVis; i ++) {
+                        try {
+                            hidw[i] = Double.parseDouble(words[1 + i]);
+                        } catch (NumberFormatException e) {
+                            hidw[i] = null;
+                        }
+                    }
+                    weights.add(hidw);
+                    collectCount += 1;
+                }
+            } else if (collecting.equals('a')) {
+                if (collectCount == 0 && this.a != null) { // header: instantiate biases
+                    for (int i = 0; i < nVis; i++) {
+                        this.a[i] = Double.parseDouble(words[1 + i]);
+                    }
+                    collectCount = 1;
+                }
+            } else if (collecting.equals('b')) {
+                if (collectCount == 0 && this.b != null) { // header: do nothing
+                    collectCount = 1;
+                } else if (words[0].equals(this.h[collectCount - 1].getName())) {
+                    this.b[collectCount - 1] = Double.parseDouble(words[1]);
+                    collectCount += 1;
+                }
+            }
+            line = br.readLine();
+        }
+        rand = new Random(RANDOM_SEED);
+    }
+
+    public BooleanRBM(String filename) throws IOException {
+        this(new File(filename));
+    }
+
     public void save(String filename) throws IOException {
         PrintWriter writer = new PrintWriter(filename, "UTF-8");
-        writer.printf("w\t");
+        writer.printf("*w\t");
         for (int i = 0; i < getNVisible(); i ++)
             writer.printf("%s\t", v[i].getName());
         writer.println();
@@ -94,11 +202,11 @@ public class BooleanRBM extends AbstractRBM {
             }
             writer.println();
         }
-        writer.printf("a\t");
+        writer.printf("*a\t");
         for (int i = 0; i < getNVisible(); i ++)
             writer.printf("%f\t", a[i]);
         writer.println();
-        writer.printf("b\n");
+        writer.printf("*b\n");
         for (int j = 0; j < getNHidden(); j ++)
             writer.printf("%s\t%f\n", h[j].getName(), b[j]);
         writer.close();
@@ -107,6 +215,13 @@ public class BooleanRBM extends AbstractRBM {
     public double logistic(double x) {
         double y = 1.0 / (1.0 + Math.exp(-x));
         return y;
+    }
+
+    public double softmax(double[] x, int j) {
+        double denom = 0;
+        for (int i = 0; i < x.length; i ++)
+            denom += Math.exp(x[i]);
+        return Math.exp(x[j]) / denom;
     }
 
     public void setVisible(Object[] input) {
@@ -164,20 +279,17 @@ public class BooleanRBM extends AbstractRBM {
             // positive signal
             double[][] pos = new double[getNHidden() + 1][getNVisible() + 1];
             for (int i = 0; i < getNVisible(); i ++) {
-                boolean doneHidBias = false; // do it once only
                 if (minibatch[p][i] != null) {
                     for (int j = 0; j < getNHidden(); j ++) {
-                        if (!doneHidBias) {
+                        if (i == 0) { // do this only for one round
                             cnt[j][getNVisible()] ++;
                             sum[j][getNVisible()] = 0.0;
                             pos[j][getNVisible()] = Ph[j].get(0);
                         }
                         cnt[j][i] ++;
                         sum[j][i] = 0.0;
-                        pos[j][i] = ((Boolean)input0[i]) ? Ph[j].get(0) : 0.0;
+                        pos[j][i] = ((Boolean)input0[i]) ? 1 /*true*/ * Ph[j].get(0) : 0.0;
                     }
-                    if (!doneHidBias)
-                        doneHidBias = true;
                     cnt[getNHidden()][i] ++;
                     sum[getNHidden()][i] = 0.0;
                     pos[getNHidden()][i] = ((Boolean)input0[i]) ? 1 : 0;
@@ -193,18 +305,15 @@ public class BooleanRBM extends AbstractRBM {
                 Object[] hidd1 = encode(input1);
             }
             for (int i = 0; i < getNVisible(); i ++) {
-                boolean doneHidBias = false; // do it once only
                 if (minibatch[p][i] != null) {
                     for (int j = 0; j < getNHidden(); j ++) {
-                        if (!doneHidBias) {
+                        if (i == 0) { // do this one round only
                             double neg = Ph[j].get(0);
                             sum[j][getNVisible()] += pos[j][getNVisible()] - neg;
                         }
                         double neg = Pv[i].get(0) * Ph[j].get(0);
                         sum[j][i] += pos[j][i] - neg;
                     }
-                    if (!doneHidBias)
-                        doneHidBias = true;
                     double neg = Pv[i].get(0);
                     sum[getNHidden()][i] += pos[getNHidden()][i] - neg;
                 }
@@ -237,66 +346,6 @@ public class BooleanRBM extends AbstractRBM {
                 }
             }
         }
-    }
-
-    public Object[] encode_decode_clamped(Object[] clamp) {
-        return encode_decode_clamped(clamp, 0);
-    }
-
-    public Object[] encode_decode_clamped(Object[] clamp, int niter) {
-        Object[] hinst = encode(clamp);
-        Object[] vinst = decode(hinst);
-        Object[] decoded = new Object[this.v.length];
-        for (int i = 0; i < vinst.length; i++)
-            decoded[i] = (clamp[i] == null ? vinst[i] : clamp[i]);
-        for (int n = 0; n < niter; n ++) {
-            hinst = encode(decoded);
-            vinst = decode(hinst);
-            for (int i = 0; i < vinst.length; i++)
-                decoded[i] = (clamp[i] == null ? vinst[i] : clamp[i]);
-        }
-        return decoded;
-    }
-
-    public Object[] encode_decode_restricted(Object[] input) {
-        return encode_decode_restricted(input, 0);
-    }
-
-    private Object[] decode_restricted(Object[] hinst, Object[] input) {
-        Object[] vinst = decode(hinst);
-        Object[] decoded = new Object[this.v.length];
-        for (int i = 0; i < vinst.length; i ++)
-            decoded[i] = (input[i] == null ? null : vinst[i]);
-        return decoded;
-    }
-
-    public Object[] encode_decode_restricted(Object[] input, int niter) {
-        Object[] hinst = encode(input);
-        Object[] vinst = decode(hinst);
-        Object[] decoded = new Object[this.v.length];
-        for (int i = 0; i < vinst.length; i ++)
-            decoded[i] = (input[i] == null ? null : vinst[i]);
-        for (int n = 0; n < niter; n ++) {
-            hinst = encode(decoded);
-            vinst = decode(hinst);
-            for (int i = 0; i < vinst.length; i++)
-                decoded[i] = (input[i] == null ? null : vinst[i]);
-        }
-        return decoded;
-    }
-
-    public Object[] encode_decode_full(Object[] input) {
-        return encode_decode_full(input, 0);
-    }
-
-    public Object[] encode_decode_full(Object[] input, int niter) {
-        Object[] hinst = encode(input);
-        Object[] vinst = decode(hinst);
-        for (int n = 0; n < niter; n ++) {
-            hinst = encode(vinst);
-            vinst = decode(hinst);
-        }
-        return vinst;
     }
 
 

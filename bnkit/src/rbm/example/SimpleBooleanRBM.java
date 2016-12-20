@@ -32,15 +32,18 @@ import java.io.IOException;
  */
 public class SimpleBooleanRBM {
     
-    static BooleanRBM rbm = new BooleanRBM(28 * 28,20);
-
     public static void main(String[] args) {
-        
-        EnumVariable[] vars = rbm.getVisibleVars();
-        Object[][] data = DataBuf.load("/Users/mikael/simhome/rbm/btrn.txt", vars, false);
-        CD<BooleanRBM> trn = new CD<>(rbm, 1);
+
+        //BooleanRBM rbm = new BooleanRBM(28 * 28,20);
         try {
+            BooleanRBM rbm = new BooleanRBM("/Users/mikael/simhome/rbm/after.tsv");
+
+            EnumVariable[] vars = rbm.getVisibleVars();
+            Object[][] data = DataBuf.load("/Users/mikael/simhome/rbm/btrn.txt", vars, false);
+            CD<BooleanRBM> trn = new CD<>(rbm, 1);
             rbm.save("/Users/mikael/simhome/rbm/before.tsv");
+            trn.train(data);
+            rbm.save("/Users/mikael/simhome/rbm/halfway.tsv");
             trn.train(data);
             rbm.save("/Users/mikael/simhome/rbm/after.tsv");
         } catch (IOException e) {

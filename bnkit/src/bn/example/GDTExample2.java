@@ -114,7 +114,7 @@ public class GDTExample2 {
         // Put all the nodes into the Bayesian network data structure
         // The BNet class manages efficient access to the nodes, based on the structure.
         BNet bn = new BNet();
-	bn.add(b, e, c, a, j, m, s, r, n);
+	    bn.add(b, e, c, a, j, m, s, r, n);
 
         // Once in the BNet, variables (through the nodes) can be instantiated to values from their respective domains.
         b.setInstance(false);
@@ -160,7 +160,7 @@ public class GDTExample2 {
         
         ApproxInference ve1 = new ApproxInference();
         ve1.instantiate(bn);
-        ve1.setIterations(1000);
+        ve1.setIterations(10000);
         Query q = ve1.makeQuery(new Variable[] {M,E,N,R,S});
         //Query q = ve1.makeQuery(new Variable[] {S});
         CGTable qr = (CGTable) ve1.infer(q);

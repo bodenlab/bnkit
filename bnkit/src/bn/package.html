@@ -85,12 +85,15 @@ You can add them one-by-one, or together.
     BNet bn = new BNet();
     bn.add(b, e, s, a, j, m);
 </pre>
-If want to, you can specify the Bayesian network in an XML file. This will impose some limitations as all variable and node types need to be pre-defined as discussed earlier. 
+If you want to, you can specify the Bayesian network in an XML file. This will impose some limitations as all variable and node types need to be pre-defined as discussed earlier.
 Indeed, these limitations apply if you want to save your network too. Here's how you could save the definitions above to a file "bn_example.xml".
 <pre>
     file.BNBuf.save(bn, "bn_example.xml");
 </pre>
-If you are interested in how you can write your own XML files, please look in this file. The format is relatively straightforward.
+If you are interested in how you can write your own XML files, please look in this file. The format is relatively straightforward. This is how you then open it.
+<pre>
+    BNet my_bn = file.BNBuf.load("bn_example.xml");
+</pre>
 
         <h3>Make inference</h3>
         
@@ -105,7 +108,7 @@ Then finally, we use an inference engine (that should implement the interface {@
 To enable optimisations to occur inside the inference engine, we provide query variables to it, and the engine come up with a useful representation.
 (In some applications, the same query may be posed many times, but with different evidence, or vice versa.)
 <pre>
-    alg.CGVarElim ve = new alg.VarElim();
+    alg.VarElim ve = new alg.VarElim();
     ve.instantiate(bn);
     alg.Query q = ve.makeQuery(B);
 </pre>
