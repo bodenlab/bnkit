@@ -126,6 +126,14 @@ public class CPTPseudo extends CPT{
     }
 
     /**
+     * Set the pseudo matrix
+     * @param pseudo
+     */
+    public void setPseudo(PseudoMatrix pseudo){
+        this.pseudoMatrix = pseudo;
+    }
+
+    /**
      * Provide a non-unique string representation of this CPTPseudo.
      */
     @Override
@@ -178,13 +186,13 @@ public class CPTPseudo extends CPT{
 
     /**
      * Count this observation. Note that for it (E-step in EM) to affect the
-     * CPT, {@link bn.CPT#maximizeInstance()} must be called.
+     * CPT, {@link CPTPseudo#maximizeInstance()} must be called.
      *
      * @param key the setting of the parent variables in the observation
      * @param value the setting of the CPT variable
      * @param prob the expectation of seeing this observation (1 if we actually
      * see it, otherwise the probability)
-     * @see bn.CPT#maximizeInstance()
+     * @see CPTPseudo#maximizeInstance()
      */
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
@@ -202,7 +210,7 @@ public class CPTPseudo extends CPT{
                 //then create new key of length 1
                 Object[] newKey = new Object[1];
                 for (int j = 0; j < cdom.size(); j++) { //go through child domain
-                    Object co = new Object[]{cdom.get(j)}; // child observation
+                    Object co = cdom.get(j); // child observation
                     double obsCount = this.pseudoMatrix.getValue(0, j); //the count for the child observation
                     newKey[0] = co;
                     count.count(newKey, obsCount);
@@ -251,11 +259,12 @@ public class CPTPseudo extends CPT{
     /**
      * Prob can be set to 1.0 because when counted the value is being observed??
      * Count this observation. Note that for it (E-step in EM) to affect the
-     * CPT, {@link bn.CPT#maximizeInstance()} must be called.
+     * CPT, {@link @see CPTPseudo#maximizeInstance()} must be called.
      *
      * @param key the setting of the parent variables in the observation
      * @param value the setting of the CPT variable
-     * @see bn.CPT#maximizeInstance()
+     *
+     * @see CPTPseudo#maximizeInstance()
      */
     @Override
     public void countInstance(Object[] key, Object value) {
