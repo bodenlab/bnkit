@@ -154,7 +154,7 @@ public class EM extends LearningAlg {
 
         for (BNode node : bn.getNodes()) {
             if (node.isTrainable()) {
-                node.randomize(System.currentTimeMillis());
+                node.randomize(seed);
             }
         }
 
