@@ -481,7 +481,15 @@ public class BNet implements Serializable {
         } else {
             for (String nodename : nodesByName.keySet()) {
                 int s = nodename.lastIndexOf(".");
-                String nname = nodename.substring(0, s);
+                /*
+                FIXME? We get an index error if the nodename has no added index number. The below if check
+                is a fix but does not address the root cause
+                 */
+                String nname;
+                if (s < 0)
+                    nname = nodename;
+                else
+                    nname = nodename.substring(0, s);
                 if (nname.equals(name))
                     return nodesByName.get(nodename);
             }

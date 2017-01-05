@@ -876,7 +876,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             int nrows = table.getSize();
             for (int i = 0; i < nrows; i++) {
                 if (!table.hasValue(i))
-                    table.setValue(i, EnumDistrib.random(var.getDomain()));
+                    table.setValue(i, EnumDistrib.random(var.getDomain(), rand.nextLong()));
             }
         }
     }
