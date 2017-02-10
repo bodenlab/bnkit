@@ -151,7 +151,7 @@ public class ASRPOG {
 	 * @param filepath	Output filepath
 	 */
 	public void saveMSAGraph(String filepath) {
-		pogAlignment.saveToDot(filepath + "/MSA");
+		pogAlignment.saveToDot(filepath + "MSA");
 	}
 
 	/**
@@ -338,11 +338,11 @@ public class ASRPOG {
 	/**
 	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
 	 *
-	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
-	 * @param sequenceFile	filepath to the sequences (expected extension .fa, .fasta or .aln)
-	 * @param pog			POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param pog				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
-	 * @param parsimony		flag to identify gaps in reconstruction using parsimony (true) or maximum likelihood (false)
+	 * @param parsimony			flag to identify gaps in reconstruction using parsimony (true) or maximum likelihood (false)
 	 */
 	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean parsimony) throws RuntimeException {
 		loadData(treeFile, sequenceFile);
@@ -382,6 +382,7 @@ public class ASRPOG {
 			chars[c] = s.toCharArray()[c];
 		seq.set(chars);
 		phyloTree.find(phyloNodeLabel).setSequence(seq);
+		System.out.println(phyloNodeLabel + ": sequence " + seq.toString());
 	}
 
 	/**
@@ -490,10 +491,14 @@ public class ASRPOG {
 				SubstNode snode = (SubstNode)phyloBN.getBN().getNode(extantSequences.get(extantSeq).getName());
 				snode.setGap(true);
 			}
+
+		// remove all nodes that are 'gaps'
+		phyloBN.purgeGaps();
 		
 		return phyloBN;
 	}
-	
+
+
 	/**
 	 * Create gap/character Bayesian network for node in the partial order alignment graph. 
 	 * 

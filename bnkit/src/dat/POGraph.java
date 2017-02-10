@@ -536,7 +536,7 @@ public class POGraph {
 					//		String.format("\"%.1f", percent) + "%\"", "sequences", "\""+sb.toString()+"\"");
 					dw.writeEdge(Integer.toString(node.getID()), Integer.toString(next.getID()), "fontsize", 12,
 							"fontcolor", "darkgray", "penwidth", (numSeqs > 20 ? 8 : numSeqs/3 + 1), "dir", "forward", "label",
-							String.format("\"%.1f", percent) + "%\"", "sequences", "\""+sb.toString()+"\"");
+							String.format("\"%.0f", percent) + "%\"", "sequences", "\""+sb.toString()+"\"");
 				}
 			}
 			dw.close();

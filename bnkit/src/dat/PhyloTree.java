@@ -47,9 +47,7 @@ public class PhyloTree {
      * Use factory methods to construct trees.
      * @param root root node
      */
-    private PhyloTree(Node root) {
-        this.root = root;
-    }
+    private PhyloTree(Node root) { this.root = root; }
 
     /**
      * String representation in the Newick format.
@@ -151,7 +149,7 @@ public class PhyloTree {
      * @return the root node of tree
      */
     private static Node parseNewick(String str, Node parent) {
-        return parseNewick(str, parent, 0);
+        return parseNewick(str, parent, new ArrayList<>(), 0);
     }
 
     /**
@@ -160,7 +158,7 @@ public class PhyloTree {
      * @param parent the parent of the current node
      * @return the root node of tree
      */
-    private static Node parseNewick(String str, Node parent, int count) {
+    private static Node parseNewick(String str, Node parent, ArrayList<Integer> nodeIds, int count) {
         Node node = null;
         int start_index = str.indexOf('('); // start parenthesis
         int end_index = str.lastIndexOf(')'); // end parenthesis
@@ -185,32 +183,34 @@ public class PhyloTree {
             String tail = str.substring(end_index + 1, str.length());
             int split_index = tail.indexOf(':'); // check if a distance is specified
             if (split_index == -1) { // no distance
-                if(tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty())
+                if(!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty())
                     node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1));
                 else
                     node = new Node("N" + count);
                 node.setParent(parent);
-                count += 1;
             } else { // there's a distance
                 if(tail.substring(0, split_index) != null && !tail.substring(0, split_index).isEmpty())
                     node = new Node("N" + count + "_" + tail.substring(0, split_index));
                 else
                     node = new Node("N" + count);
-                double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()));
+                double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()).replace(";",""));
                 if (dist == 0.0) {
                     dist = 0.00001;
                     System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
                 }
                 node.setDistance(dist);
                 node.setParent(parent);
-                count +=1;
             }
+            nodeIds.add(count);
             // find where the commas are, and create children of node
             int comma = getComma(embed);
             while (comma != -1) {
                 String process_me = embed.substring(0, comma);
                 //GOING TO HAVE TO PASS PARENT NODE WITH RECURSION TO RECORD IT
-                node.addChild(parseNewick(process_me, node, count)); //pass the current node down as the parent
+                // get unique ID to pass through
+                while (nodeIds.contains(count))
+                    count++;
+                node.addChild(parseNewick(process_me, node, nodeIds, count)); //pass the current node down as the parent
                 if (comma + 1 > embed.length())
                     break;
                 embed = embed.substring(comma + 1);
