@@ -86,7 +86,7 @@ public class RunASRPOG {
 				usage("A partial order alignment graph structure or filepath must be input as a parameter, or a sequence fasta filepath must be specified using the [-s] parameter.");
 			
 			// generate a partial order alignment graph if the alignment has not been specified
-			try {
+			//try {
 				if (poagRepresentation.isEmpty()) {
 					if (performAlignment) {
 						MSA msa = new MSA(sequencePath);
@@ -99,9 +99,9 @@ public class RunASRPOG {
 					asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, mp);
 				else
 					asr = new ASRPOG(poagRepresentation, treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
-			} catch (RuntimeException e) {
-				exit(e.getMessage());
-			}
+			//} catch (RuntimeException e) {
+			//	exit(e.getMessage());
+			//}
 
 			if (!outputPath.isEmpty()) {
 				if (dotFile)
@@ -123,8 +123,7 @@ public class RunASRPOG {
 	}
 
 	private static void exit(String message){
-		if (message != null || !message.isEmpty())
-			System.out.println(message + "\n");
+		System.err.println(message + "\n");
 		System.exit(1);
 	}
 

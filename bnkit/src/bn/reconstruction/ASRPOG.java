@@ -1,9 +1,6 @@
 package bn.reconstruction;
 
 
-import java.io.*;
-import java.util.*;
-
 import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
@@ -15,6 +12,9 @@ import bn.prob.EnumDistrib;
 import dat.*;
 import dat.file.AlnWriter;
 import dat.file.FastaWriter;
+
+import java.io.*;
+import java.util.*;
 
 /**
  * Reconstruct ancestral sequences using partial order graphs to represent indels. Each node of the resulting phylogenetic tree
@@ -511,16 +511,12 @@ public class ASRPOG {
 			// for all extant sequences, if sequence is in this alignment, find where the location is in the phylogenetic tree and assign character,
 			// otherwise assign gap marker
 			for (int extantSeq = 0; extantSeq < extantSequences.size(); extantSeq++)
-			    try {
-                    if (sequenceCharacterMapping.containsKey(extantSeq))
-                        // find where the sequence is in the BN and set the base character
-                        phyloBN.getBN().getNode(extantSequences.get(extantSeq).getName()).setInstance('C');
-                    else
-                        // sequence is not part of character inference, set to gap
-                        phyloBN.getBN().getNode(extantSequences.get(extantSeq).getName()).setInstance('G');
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+			    if (sequenceCharacterMapping.containsKey(extantSeq))
+					// find where the sequence is in the BN and set the base character
+					phyloBN.getBN().getNode(extantSequences.get(extantSeq).getName()).setInstance('C');
+				else
+					// sequence is not part of character inference, set to gap
+					phyloBN.getBN().getNode(extantSequences.get(extantSeq).getName()).setInstance('G');
 		
 			return phyloBN;
 		}
@@ -579,18 +575,25 @@ public class ASRPOG {
 
 			// for each node in the phylogenetic tree, if character is inferred at position, set inferred base, otherwise gap is inferred, remove from alignment
 			for (String phyloNode : phyloGaps.keySet()) {
+				Character base = null;
 				if (phyloGaps.get(phyloNode) == 'C') {
 					// infer base character
-					Character base = null;
 					for (Variable.Assignment varassign : charAssignments)
 						if (phyloNode.equals(varassign.var.getName())) {
 							base = (char) varassign.val;
 							break;
 						}
-					if (!ancestralInferences.containsKey(phyloNode))
-						ancestralInferences.put(phyloNode, new ArrayList<>());
-					ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base));
-				} else {
+					// base will be null (but not set as a 'gap') if an ancestor needed to be pruned, and this node was
+					// subsequently pruned with it
+					if (base != null) {
+						if (!ancestralInferences.containsKey(phyloNode))
+							ancestralInferences.put(phyloNode, new ArrayList<>());
+						ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base));
+
+					}
+				}
+
+				if (base == null){
 					// gap, remove from alignment
 					if (!ancestralInferences.containsKey(phyloNode))
 						ancestralInferences.put(phyloNode, new ArrayList<>());
