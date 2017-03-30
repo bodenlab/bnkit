@@ -1,12 +1,11 @@
 package dat;
 
-import java.io.*;
-import java.util.*;
-
-import bn.reconstruction.MSA;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
+
+import java.io.*;
+import java.util.*;
 
 /**
  * Implementation of a partial order graph. POGraph stores:
@@ -17,7 +16,7 @@ import dat.file.FastaWriter;
  * 		- mapping between sequences and an ordered list of Nodes that the sequence traverses
  * 		- list of starting nodes
  * 		- mapping between sequence ID and sequence label
- * 
+ *
  * @author Gabe, Marnie
  *
  */
@@ -40,7 +39,8 @@ public class POGraph {
 	}
 
 	/**
-	 * Constructor to initialise partial order graph.
+	 * Constructor to initialise partial order graph using a dot structure and loading the associated sequences from
+	 * a fasta file.
 	 *
 	 * @param structure		Dot representation of partial order graph or filepath to representation, if given aligned
 	 *                      sequences (.aln, .fa, .fasta), constructs a graph from the aligned sequences
@@ -79,6 +79,17 @@ public class POGraph {
 			current = loadPOGraph(seqs);
 		} else
 			// load graph from a dot file
+			current = loadPOGraph(structure);
+	}
+
+	/**
+	 * Constructor to initialise a partial order graph using a dot structure.
+	 *
+	 * @param structure		Dot representation of partial order graph
+	 */
+	public POGraph(String structure) {
+		this();
+		if (structure.endsWith(".dot"))
 			current = loadPOGraph(structure);
 	}
 
@@ -159,6 +170,23 @@ public class POGraph {
 	}
 
 	/**
+	 * Get the out edge weights of the current node. Weights based on total sequence support.
+	 *
+	 * @return	mapping between next node ID and the edge weight to that node
+	 */
+	public Map<Integer, Double> getEdgeWeights(){
+		HashMap<Integer, Double> edgeWeights = new HashMap<>();
+		for (Integer nextId : getNextIDs())
+			try {
+				Map<Integer, List<Integer>> s = getSequencesOutEdges();
+				edgeWeights.put(nextId, 1.0 * getSequencesOutEdges().get(nextId).size() / sequences.size());
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		return edgeWeights;
+	}
+
+	/**
 	 * Get the mapping of sequence ID and sequence label.
 	 *
 	 * @return	map of sequence ID and label
@@ -170,8 +198,8 @@ public class POGraph {
 	 *
 	 * @return	map of sequence ID and ordered node IDs
 	 */
-	public Map<Integer, ArrayList<Integer>> getSequenceNodeMapping() {
-		Map<Integer, ArrayList<Integer>> seqNodeMapping = new HashMap<>();
+	public Map<Integer, List<Integer>> getSequenceNodeMapping() {
+		Map<Integer, List<Integer>> seqNodeMapping = new HashMap<>();
 		for (Integer seqId : seqNodeMap.keySet()) {
 			seqNodeMapping.put(seqId, new ArrayList<>());
 			for (Node node : seqNodeMap.get(seqId))
@@ -198,7 +226,7 @@ public class POGraph {
 	}
 
 	/**
-	 * Get the possible base characters in the current node.
+	 * Get the unique possible base characters in the current node.
 	 *
 	 * @return	list of base characters
 	 */
@@ -307,6 +335,15 @@ public class POGraph {
 	}
 
 	/**
+	 * Get a list of base characters in the current node (note: can have repeats).
+	 *
+	 * @return	List of base characters in current node.
+	 */
+	public List<Character> getCurrentBasesNotUnique() {
+		return new ArrayList<>(current.getSeqCharMapping().values());
+	}
+
+	/**
 	 * Save sequences represented in the partial order graph in fasta or clustal format.
 	 *
 	 * @param filepath	file path to save sequences
@@ -382,34 +419,45 @@ public class POGraph {
 	public int getNumEdgesIn() { return current.getPreviousNodes().size(); }
 
 	/**
+	 * Set the probability distribution of the current node.
+	 *
+	 * @param dist	Character probability distribution {(Character, Double)}
+	 */
+	public void setCharacterDistribution(HashMap<Character, Double> dist) {
+		current.setCharacterDistribution(dist);
+	}
+
+	/**
+	 * Get the character probability distribution of the current node.
+	 *
+	 * @return	probability distribution of the characters in the current node {(Character, Double)}
+	 */
+	public Map<Character, Double> getCharacterDistribution() {
+		return current.getDistribution();
+	}
+
+	/**
 	 * Get the out path of sequences from the node.
 	 *
 	 * @param 	node	Node to get sequence outpath from
-	 * @return	Map of (next) nodeId and a list of sequences that traverse to that node
+	 * @return	Map of (next) nodeId and a list of sequence IDs that traverse to that node
 	 */
 	private Map<Integer, List<Integer>> getSequencesOutEdges(Node node){
 		Map<Integer, List<Integer>> nextNodeSeqs = new HashMap<>();
-
-		for (Integer seqId : node.getSeqIds()) {
-			// for all sequences in the current node, identify the direct next node
-			Node next = null;
-			for (Node n : node.getNextNodes()) {
-				if (n.getSeqIds().contains(seqId))
-					next = n;
-				// check if there is a previous node of node that also contains the sequence
-				for (Node prev : n.getPreviousNodes())
-					if (prev != node && prev.getSeqIds().contains(seqId)) {
-						next = null;
-						break;
-					}
-			}
-			if (next != null) {
-				if (!nextNodeSeqs.containsKey(next.getID()))
-					nextNodeSeqs.put(next.getID(), new ArrayList<>());
-				nextNodeSeqs.get(next.getID()).add(seqId);
-			}
-		}
-
+		Map<Integer, List<Integer>> seqNodeMap = getSequenceNodeMapping();
+		for (Integer seqId : node.getSeqIds())
+			for (Node nextNode : node.getNextNodes())
+				// check if sequence is in the next node
+				if (nextNode.getSeqIds().contains(seqId))
+					// check that there are no nodes between node and nextNode
+					for (int i = 0; i < seqNodeMap.get(seqId).size() - 1; i++)
+						if (seqNodeMap.get(seqId).get(i) == node.getID() && seqNodeMap.get(seqId).get(i+1) ==
+								nextNode.getID()) {
+							if (!nextNodeSeqs.containsKey(nextNode.getID()))
+								nextNodeSeqs.put(nextNode.getID(), new ArrayList<>());
+							nextNodeSeqs.get(nextNode.getID()).add(seqId);
+							break;
+						}
 		return nextNodeSeqs;
 	}
 
@@ -515,8 +563,15 @@ public class POGraph {
 			// if the base value of the node has not been instantiated, replace the base value with all possible values in the node
 			Map<Node, String> nodeToLabel = getNodeLabels();
 			for (Node node : nodes.values()) {
+				// format node character distribution, if available
+				HashMap<Character, Double> dist = node.getDistribution();
+				String distStr = "\"";
+				if (dist != null)
+					for (Character base : dist.keySet())
+						distStr += base + ":" + String.format("%.0e", dist.get(base)) + " ";
+				distStr = distStr.trim() + "\"";
 				dw.writeNode(Integer.toString(node.getID()), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
-							"\"" + (node.getBase()==0?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"");
+							"\"" + (node.getBase()==0?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr);
 				for (Node next : node.getNextNodes()) {
 					// find the number of sequences that traverse to the next node and calculate the weighting and percentage
 					StringBuilder sb = new StringBuilder();
@@ -531,9 +586,6 @@ public class POGraph {
 					if (numSeqs > 0)
 						sb.replace(sb.length()-1, sb.length(), "");
 					float percent = (100.1f * numSeqs / seqNodeMap.keySet().size());
-					//dw.writeEdge(Integer.toString(node.getID())+nodeToLabel.get(node), Integer.toString(next.getID())+nodeToLabel.get(next), "fontsize", 12,
-					//		"fontcolor", "darkgray", "penwidth", (numSeqs > 20 ? 8 : numSeqs/3 + 1), "dir", "forward", "arrowhead", "empty", "label",
-					//		String.format("\"%.1f", percent) + "%\"", "sequences", "\""+sb.toString()+"\"");
 					dw.writeEdge(Integer.toString(node.getID()), Integer.toString(next.getID()), "fontsize", 12,
 							"fontcolor", "darkgray", "penwidth", (numSeqs > 20 ? 8 : numSeqs/3 + 1), "dir", "forward", "label",
 							String.format("\"%.0f", percent) + "%\"", "sequences", "\""+sb.toString()+"\"");
@@ -671,15 +723,27 @@ public class POGraph {
 					if (elements.length > 1) {
 						String nodeId = elements[0].replace("\"","");
 						int pogId = Integer.parseInt(nodeId);
+						HashMap<Character, Double> dist = null;
 						Character base = null;
 						elements = elements[1].split("[,]+");
 						for (String el : elements)
 							if (el.contains("label")) {
+								// load node label
 								elements = el.split("[\"]+");
 								base = elements[1].toCharArray()[0];
-								break;
+							} else if (el.contains("distribution")) {
+								// load node character distribution, expects "char:prob char:prob ... "
+								elements = el.split("[\" ]+");
+								dist = new HashMap<>();
+								for (String cp : elements)
+									if (cp.contains(":")) {
+										String[] els = cp.split("[:]+");
+										dist.put(els[0].toCharArray()[0], Double.parseDouble(els[1]));
+									}
 							}
 						nodes.put(pogId, new Node(pogId));
+						if (dist != null)
+							nodes.get(pogId).setCharacterDistribution(dist);
 						inputNodeToPONode.put(nodeId, pogId);
 						nodeCharMap.put(nodeId, base);
 					}
@@ -701,10 +765,11 @@ public class POGraph {
 				lineCount = 0;
 				line = lines[++lineCount];
 			}
+			Integer seqId = -1;
 			while (line != null) {
 				line = line.replace("\t", "");
-				String[] elements = line.split("[->]+");
-				if (elements.length > 1) {
+				if (line.contains("->")) {
+					String[] elements = line.split("[->]+");
 					String fromId = elements[0].replace("\"","");
 					int fromNodeId = Integer.parseInt(fromId);
 					elements = elements[1].split("[\\[]+");
@@ -717,7 +782,10 @@ public class POGraph {
 						if (elements[el].contains("sequences")) {
 							elements = elements[el+1].split("[,]+");
 							for (String seq : elements) {
-								int seqId = getSequenceID(seq);
+								if (getSequenceID(seq) == null)
+									sequences.put(++seqId, seq);
+								else
+									seqId = getSequenceID(seq);
 								nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeCharMap.get(fromId));
 								nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeCharMap.get(toId));
 								if (!seqNodeMap.containsKey(seqId))
@@ -882,7 +950,7 @@ public class POGraph {
 	 *
 	 * @return 	list of IDs of sorted nodes
 	 */
-	private List<Integer> topologicalSort() {
+	public List<Integer> topologicalSort() {
 		List<Integer> sortedList = new ArrayList<>();
 		Set<Integer> completed = new HashSet<>();
 
@@ -949,6 +1017,7 @@ public class POGraph {
     	private List<Node> nextNodes;							// list of neighbouring next nodes
 		private List<SeqCharMap> seqChars;						// map of sequence Ids and their base character
 		private List<Node> alignedTo = null;					// list of nodes that are aligned with this node
+		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
     	
     	/**
     	 * Constructor
@@ -1019,6 +1088,24 @@ public class POGraph {
 			if (alignedTo == null)
 				alignedTo = new ArrayList<>();
 			alignedTo.add(node);
+		}
+
+		/**
+		 * Set the probability distribution of characters in this node.
+		 *
+		 * @param dist	distribution {(Character, probability)}
+		 */
+		public void setCharacterDistribution(HashMap<Character, Double> dist) {
+			this.distribution = new HashMap<>(dist);
+		}
+
+		/**
+		 * Get the distribution of characters in this node.
+		 *
+		 * @return distribution {(Character, probability)}
+		 */
+		public HashMap<Character, Double> getDistribution() {
+			return this.distribution;
 		}
 
     	/**
