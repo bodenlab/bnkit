@@ -638,6 +638,21 @@ public class POGraph {
 	}
 
 	/**
+	 * Get the label of the current node. If a single character label is not populated, gets a string of the unique
+	 * characters in the node.
+	 *
+	 * @return	node label
+	 */
+	public String getCurrentLabel() {
+		Character base = this.getCurrentBase();
+		String output = (base == 0) ? "" : base + "";
+		if (base == 0)
+			for (Character c : this.getCurrentBases())
+				output += c;
+		return output;
+	}
+
+	/**
 	 * String representation of the partial order alignment graph.
 	 * 
 	 * @return	String representation as dot format

@@ -26,6 +26,7 @@ public class POGraphTests {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         for (Integer nodeId : apiGraph.getNodeIDs()) {
+            System.out.println(Integer.toString(nodeId) + ":" + apiGraph.getLabel(nodeId));
             HashMap<Integer, Double> edgeWeights = new HashMap<>(apiGraph.getOutEdgeWeights(nodeId));
             for (Integer nextId : edgeWeights.keySet())
                 System.out.println(Integer.toString(nodeId) + " -> " + Integer.toString(nextId) + ":" + Double.toString

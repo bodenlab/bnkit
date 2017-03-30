@@ -76,9 +76,9 @@ public class PartialOrderGraph {
      * @param id    ID of current node
      * @return      Character state of node, or null
      */
-    public Character getCharacter(int id) {
+    public String getLabel(int id) {
         graph.setCurrent(id);
-        return graph.getCurrentBase();
+        return graph.getCurrentLabel();
     }
 
     /**
