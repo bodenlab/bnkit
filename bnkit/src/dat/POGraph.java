@@ -177,12 +177,7 @@ public class POGraph {
 	public Map<Integer, Double> getEdgeWeights(){
 		HashMap<Integer, Double> edgeWeights = new HashMap<>();
 		for (Integer nextId : getNextIDs())
-			try {
-				Map<Integer, List<Integer>> s = getSequencesOutEdges();
-				edgeWeights.put(nextId, 1.0 * getSequencesOutEdges().get(nextId).size() / sequences.size());
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			edgeWeights.put(nextId, 1.0 * getSequencesOutEdges().get(nextId).size() / sequences.size());
 		return edgeWeights;
 	}
 
@@ -439,7 +434,7 @@ public class POGraph {
 	/**
 	 * Get the out path of sequences from the node.
 	 *
-	 * @param 	node	Node to get sequence outpath from
+	 * @param 	node	Node to get sequence out-path from
 	 * @return	Map of (next) nodeId and a list of sequence IDs that traverse to that node
 	 */
 	private Map<Integer, List<Integer>> getSequencesOutEdges(Node node){
@@ -449,7 +444,7 @@ public class POGraph {
 			for (Node nextNode : node.getNextNodes())
 				// check if sequence is in the next node
 				if (nextNode.getSeqIds().contains(seqId))
-					// check that there are no nodes between node and nextNode
+					// check that there are no nodes between node and nextNode for seqId
 					for (int i = 0; i < seqNodeMap.get(seqId).size() - 1; i++)
 						if (seqNodeMap.get(seqId).get(i) == node.getID() && seqNodeMap.get(seqId).get(i+1) ==
 								nextNode.getID()) {
@@ -780,7 +775,6 @@ public class POGraph {
 				lineCount = 0;
 				line = lines[++lineCount];
 			}
-			Integer seqId = -1;
 			while (line != null) {
 				line = line.replace("\t", "");
 				if (line.contains("->")) {
@@ -797,10 +791,11 @@ public class POGraph {
 						if (elements[el].contains("sequences")) {
 							elements = elements[el+1].split("[,]+");
 							for (String seq : elements) {
-								if (getSequenceID(seq) == null)
-									sequences.put(++seqId, seq);
-								else
-									seqId = getSequenceID(seq);
+								Integer seqId = getSequenceID(seq);
+								if (seqId == null) {
+									seqId = sequences.size()+1;
+									sequences.put(seqId, seq);
+								}
 								nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeCharMap.get(fromId));
 								nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeCharMap.get(toId));
 								if (!seqNodeMap.containsKey(seqId))
