@@ -565,11 +565,16 @@ public class POGraph {
 					for (Character base : dist.keySet())
 						distStr += base + ":" + String.format("%.0e", dist.get(base)) + " ";
 				distStr = distStr.trim() + "\"";
+				StringBuilder sb = new StringBuilder();
+				for (Integer seqId : seqNodeMap.keySet())
+					if (seqNodeMap.get(seqId).contains(node))
+						sb.append(sequences.get(seqId) + ":" + node.seqChars.get(seqId) + ";");
+				sb.replace(sb.length()-1, sb.length(),"");
 				dw.writeNode(Integer.toString(node.getID()), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
-							"\"" + (node.getBase()==0?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr);
+							"\"" + (node.getBase()==0?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
 				for (Node next : node.getNextNodes()) {
 					// find the number of sequences that traverse to the next node and calculate the weighting and percentage
-					StringBuilder sb = new StringBuilder();
+					sb = new StringBuilder();
 					int numSeqs = 0;
 					for (Integer seqId : seqNodeMap.keySet())
 						if (seqNodeMap.get(seqId).contains(node) && seqNodeMap.get(seqId).indexOf(node)+1 < seqNodeMap.get(seqId).size() &&
@@ -640,8 +645,8 @@ public class POGraph {
 	 */
 	public String getCurrentLabel() {
 		Character base = this.getCurrentBase();
-		String output = (base == 0) ? "" : base + "";
-		if (base == 0)
+		String output = (base == null) ? "" : base + "";
+		if (base == null)
 			for (Character c : this.getCurrentBases())
 				output += c;
 		return output;
@@ -722,8 +727,9 @@ public class POGraph {
 			line = lines[lineCount];
 		}
 		// parse graph structure
-		Map<String, Integer> inputNodeToPONode = new HashMap<>();		// Mapping of input nodes and which PO graph nodes they are stored in
-		Map<String, Character> nodeCharMap = new HashMap<>();			// Mapping of input nodes and their base characters
+		Map<String, Integer> inputNodeToPONode = new HashMap<>();				// Mapping of input nodes and which PO graph nodes they are stored in
+		Map<String, Character> nodeCharMap = new HashMap<>();					// Mapping of input nodes and their base characters
+		Map<Integer, Map<String, Character>> nodeSeqCharMap = new HashMap<>();	// Mapping of input nodes, the sequences in that node and their base characters from the aln
 		try {
 			// load all nodes
 			while (line != null) {
@@ -740,7 +746,8 @@ public class POGraph {
 							if (el.contains("label")) {
 								// load node label
 								elements = el.split("[\"]+");
-								base = elements[1].toCharArray()[0];
+								if (elements[1].toCharArray().length == 1)
+									base = elements[1].toCharArray()[0];
 							} else if (el.contains("distribution")) {
 								// load node character distribution, expects "char:prob char:prob ... "
 								elements = el.split("[\" ]+");
@@ -750,6 +757,12 @@ public class POGraph {
 										String[] els = cp.split("[:]+");
 										dist.put(els[0].toCharArray()[0], Double.parseDouble(els[1]));
 									}
+							} else if (el.contains("sequences")) {
+								nodeSeqCharMap.put(pogId, new HashMap<>());
+								el = el.replace("\"", "");
+								String seqs = el.split("[=]")[1];
+								for (String seq : seqs.split("[;]+"))
+									nodeSeqCharMap.get(pogId).put(seq.split("[:]+")[0], seq.split("[:]+")[1].toCharArray()[0]);
 							}
 						nodes.put(pogId, new Node(pogId));
 						if (dist != null)
@@ -796,8 +809,9 @@ public class POGraph {
 									seqId = sequences.size()+1;
 									sequences.put(seqId, seq);
 								}
-								nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeCharMap.get(fromId));
-								nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeCharMap.get(toId));
+								// TODO: Base character for MSA (if base is null)
+								nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeSeqCharMap.get(fromNodeId).get(seq));
+								nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeSeqCharMap.get(toNodeId).get(seq));
 								if (!seqNodeMap.containsKey(seqId))
 									seqNodeMap.put(seqId, new ArrayList<>());
 								if (!seqNodeMap.get(seqId).contains(nodes.get(fromNodeId)))
@@ -1025,8 +1039,8 @@ public class POGraph {
     	private char base;										// base character
     	private List<Node> prevNodes;							// list of neighbouring previous nodes
     	private List<Node> nextNodes;							// list of neighbouring next nodes
-		private List<SeqCharMap> seqChars;						// map of sequence Ids and their base character
 		private List<Node> alignedTo = null;					// list of nodes that are aligned with this node
+		private HashMap<Integer, Character> seqChars;			// map of sequence Ids and their base character
 		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
     	
     	/**
@@ -1035,7 +1049,7 @@ public class POGraph {
     	public Node() {
 			this.prevNodes = new ArrayList<>();
 			this.nextNodes = new ArrayList<>();
-			this.seqChars = new ArrayList<>();
+			this.seqChars = new HashMap<>();
 		}
 
 		/**
@@ -1062,8 +1076,8 @@ public class POGraph {
 				if (this.getAlignedNodes() != null)
 					for (Node node : this.alignedTo)
 						copy.addAlignedNode(node.copy(map));
-				for (SeqCharMap sc : this.seqChars)
-					copy.addSequence(sc.seqId, sc.base);
+				for (Integer sc : this.seqChars.keySet())
+					copy.addSequence(sc, seqChars.get(sc));
 				map.put(this, copy);
 				for (Node node: this.prevNodes)
 					copy.addPrevNode(node.copy(map));
@@ -1179,10 +1193,10 @@ public class POGraph {
 				this.base = base;
 			if (base != this.base)
 				this.base = 0;
-			for (SeqCharMap map : seqChars)
-				if (map.seqId == seqId)
+			for (Integer sqId : seqChars.keySet())
+				if (sqId == seqId)
 					return;
-			this.seqChars.add(new SeqCharMap(seqId, base));
+			this.seqChars.put(seqId, base);
 		}
 
     	/**
@@ -1238,8 +1252,8 @@ public class POGraph {
 		 */
 		private List<Integer> getSeqIds(){
     		List<Integer> ids = new ArrayList<>();
-			for (SeqCharMap sc : seqChars)
-				ids.add(sc.seqId);
+			for (Integer sc : seqChars.keySet())
+				ids.add(sc);
 			return ids;
 		}
 
@@ -1250,25 +1264,9 @@ public class POGraph {
 		 */
 		private Map<Integer,Character> getSeqCharMapping(){
 			Map<Integer, Character> mapping = new HashMap<>();
-			for (SeqCharMap sc : seqChars)
-				mapping.put(sc.seqId, sc.base);
+			for (Integer sc : seqChars.keySet())
+				mapping.put(sc, seqChars.get(sc));
 			return mapping;
-		}
-
-		/**
-		 * Helper class to store sequence and base character mapping.
-		 */
-		private class SeqCharMap {
-    		int seqId;
-			char base;
-
-			private SeqCharMap(int id, char c) {
-				seqId = id;
-				base = c;
-			}
-			public String toString(){
-				return Integer.toString(seqId) + "(" + base + ")";
-			}
 		}
 
     }

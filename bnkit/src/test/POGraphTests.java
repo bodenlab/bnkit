@@ -21,6 +21,14 @@ public class POGraphTests {
     }
 
     @Test
+    @DisplayName("MSA PO Graph test")
+    public void MSAPOGraph(){
+        String filepath = "src/test/resources/testPOGraphMSAMed.dot";
+        PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
+        System.out.println(apiGraph.getLabel(0));
+    }
+
+    @Test
     @DisplayName("Small PO Graph test edge weights")
     public void smallPOGraphEdgeWeights(){
         String filepath = "src/test/resources/testPOGraphSmall.dot";
