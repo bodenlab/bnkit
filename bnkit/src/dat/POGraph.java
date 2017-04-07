@@ -255,7 +255,7 @@ public class POGraph {
 	 * @return	base character or null
 	 */
 	public Character getCurrentBase() {
-		if (current == null || current.getBase() == 0)
+		if (current == null || current.getBase() == null)
 			return null;
 		return current.getBase();
 	}
@@ -606,7 +606,7 @@ public class POGraph {
 	private Map<Node, String> getNodeLabels() {
 		Map<Node, String> nodeToLabel = new HashMap<>();
 		for (Node node : nodes.values())
-			if (node.getBase() == 0) {
+			if (node.getBase() == null) {
 				String label = "";
 				for (Character base : node.getSeqCharMapping().values())
 					if (!label.contains(base.toString()))
@@ -728,7 +728,6 @@ public class POGraph {
 		}
 		// parse graph structure
 		Map<String, Integer> inputNodeToPONode = new HashMap<>();				// Mapping of input nodes and which PO graph nodes they are stored in
-		Map<String, Character> nodeCharMap = new HashMap<>();					// Mapping of input nodes and their base characters
 		Map<Integer, Map<String, Character>> nodeSeqCharMap = new HashMap<>();	// Mapping of input nodes, the sequences in that node and their base characters from the aln
 		try {
 			// load all nodes
@@ -746,8 +745,9 @@ public class POGraph {
 							if (el.contains("label")) {
 								// load node label
 								elements = el.split("[\"]+");
-								if (elements[1].toCharArray().length == 1)
-									base = elements[1].toCharArray()[0];
+								String label = elements[1].replaceAll("\"", "");
+								if (label.length() == 1)
+									base = label.toCharArray()[0];
 							} else if (el.contains("distribution")) {
 								// load node character distribution, expects "char:prob char:prob ... "
 								elements = el.split("[\" ]+");
@@ -765,10 +765,10 @@ public class POGraph {
 									nodeSeqCharMap.get(pogId).put(seq.split("[:]+")[0], seq.split("[:]+")[1].toCharArray()[0]);
 							}
 						nodes.put(pogId, new Node(pogId));
+						nodes.get(pogId).setBase(base);
 						if (dist != null)
 							nodes.get(pogId).setCharacterDistribution(dist);
 						inputNodeToPONode.put(nodeId, pogId);
-						nodeCharMap.put(nodeId, base);
 					}
 				}
 				if (reader != null)
@@ -910,12 +910,24 @@ public class POGraph {
 				}
 		}
 
-		// find starting nodes
-		for (Node node : nodes.values())
+		for (Node node : nodes.values()) {
+			// find starting nodes
 			if (node.getPreviousNodes().isEmpty()) {
 				initialNode.addNextNode(node);
 				node.addPrevNode(initialNode);
 			}
+			// for all nodes, if only one unique character, set as base
+			Character baseChar = null;
+			for (Character b : node.getSeqCharMapping().values())
+				if (baseChar == null)
+					baseChar = b;
+				else if (b != baseChar) {
+					baseChar = null;
+					break;
+				}
+			if (node.getBase() == null)
+				node.setBase(baseChar);
+		}
 
 		return initialNode.getNextNodes().get(0);
 	}
@@ -1036,7 +1048,7 @@ public class POGraph {
      */
     private class Node {
     	private Integer ID = null;								// alignment ID
-    	private char base;										// base character
+    	private Character base;									// base character
     	private List<Node> prevNodes;							// list of neighbouring previous nodes
     	private List<Node> nextNodes;							// list of neighbouring next nodes
 		private List<Node> alignedTo = null;					// list of nodes that are aligned with this node
@@ -1191,8 +1203,6 @@ public class POGraph {
 		private void addSequence(int seqId, char base){
 			if (this.seqChars.isEmpty())
 				this.base = base;
-			if (base != this.base)
-				this.base = 0;
 			for (Integer sqId : seqChars.keySet())
 				if (sqId == seqId)
 					return;
@@ -1220,7 +1230,7 @@ public class POGraph {
     	 * 
     	 * @param base	inferred base character
     	 */
-		private void setBase(char base) {
+		private void setBase(Character base) {
     		this.base = base;
     	}
 
@@ -1230,7 +1240,7 @@ public class POGraph {
     	 * 
     	 * @return	inferred base character
     	 */
-		private char getBase(){ return base; }
+		private Character getBase(){ return base; }
 
 
     	/**
