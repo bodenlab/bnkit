@@ -1201,8 +1201,6 @@ public class POGraph {
 		 * @param base	Base character of sequence
 		 */
 		private void addSequence(int seqId, char base){
-			if (this.seqChars.isEmpty())
-				this.base = base;
 			for (Integer sqId : seqChars.keySet())
 				if (sqId == seqId)
 					return;

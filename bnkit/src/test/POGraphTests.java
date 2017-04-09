@@ -25,7 +25,8 @@ public class POGraphTests {
     public void MSAPOGraph(){
         String filepath = "src/test/resources/testPOGraphMSAMed.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
-        System.out.println(apiGraph.getLabel(0));
+        for (Integer id : apiGraph.getNodeIDs())
+            System.out.println(apiGraph.getLabel(id));
     }
 
     @Test
