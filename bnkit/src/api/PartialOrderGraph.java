@@ -59,6 +59,19 @@ public class PartialOrderGraph {
         return ids;
     }
 
+
+    /**
+     * Get the characters in the node with the given ID.
+     *
+     * @param id    ID of current node
+     * @return      Map of sequence characters
+     */
+    public Map<Integer, Character> getSeqChars(int id) {
+        graph.setCurrent(id);
+        return new HashMap<>(graph.getSequenceCharacterMapping());
+    }
+
+
     /**
      * Get the weights of the out edges of the node with the given ID.
      *
