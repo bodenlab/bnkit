@@ -236,6 +236,15 @@ public class POGraph {
 	}
 
 	/**
+	 * Get a list of base characters in the current node (note: can have repeats).
+	 *
+	 * @return	List of base characters in current node.
+	 */
+	public List<Character> getCurrentBasesNotUnique() {
+		return new ArrayList<>(current.getSeqCharMapping().values());
+	}
+
+	/**
 	 * Get the number of nodes in the graph.
 	 *
 	 * @return	number of nodes in the structure.
@@ -327,15 +336,6 @@ public class POGraph {
 	 */
 	public List<Integer> getNodeIDs(){
 		return new ArrayList<>(nodes.keySet());
-	}
-
-	/**
-	 * Get a list of base characters in the current node (note: can have repeats).
-	 *
-	 * @return	List of base characters in current node.
-	 */
-	public List<Character> getCurrentBasesNotUnique() {
-		return new ArrayList<>(current.getSeqCharMapping().values());
 	}
 
 	/**
