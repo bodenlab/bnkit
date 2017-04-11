@@ -7,7 +7,6 @@ package poag;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -50,7 +49,10 @@ public class PathGen {
     Integer[] sorted;
     public int goalID;
     public int startID;
-    
+    private int xNode; // Used for the node placement
+    HashMap<Integer, Node> nodes;
+
+    ArrayList<Integer> totalNodeList;
      /**
      * The queue entry currently being processed.
      */
@@ -62,15 +64,33 @@ public class PathGen {
     public PathGen(PartialOrderGraph poag) {
         this.poag = poag;
         size = poag.getNodeIDs().length;
+        nodes = new HashMap<>();
         searchedList = initSearchList();
-        gaps = new LinkedList<>(); 
+        gaps = new LinkedList<>();
+        // Get path depths fills everything out
+        HashMap<Integer, List<Integer>> pathDepths = getPathDepths();
+        updateXcoord();
+        
+    }
+    
+    /**
+     * Changes the x value -> to be that of the ID 
+     * This needs to change.
+     */
+   private void updateXcoord() {
+        // BE CAREFUL THIS COULD BE BAD LATER ON
+        int x = 0;
+        Set<Integer> ns = nodes.keySet();
+        for (int i: ns) {
+            nodes.get(i).setX(x);
+            x ++;
+        }
     }
     
     public void initAStarSearch(Integer startNode, Integer goalNode) {
         int queueSize = 10000; //Arbitary should change.
         this.goalNode = goalNode;
         this.startNode = startNode;
-
         
         costPenalty = 101; // The max cost is 100 (if the chance is 100% we get 
         // a cost of a move = 1, as every move should have some penalty 
@@ -287,6 +307,96 @@ public class PathGen {
         public int compare(QueueTiny<Object> o1, QueueTiny<Object> o2) {
             return Double.compare(o1.totalCost + o1.heuristicEstimate, 
                     o2.totalCost + o2.heuristicEstimate);
+        }
+    }
+    
+    
+    /**
+     * Returns a map of paths and the depth at which these occur
+     * @return paths
+     */
+    public HashMap<Integer, List<Integer>>  getPathDepths() {
+        Integer[] nodeys = poag.getNodeIDs();
+        int numNodes = nodeys.length;
+        xNode = numNodes;
+        HashMap<Integer, List<Integer>> paths = new HashMap<>();
+        int depth = 0;
+         // want there to be a distinct x position for each node
+        // This gets the main path which will be centered
+        resetSearchList();
+        initAStarSearch(startID, goalID);
+        List<Integer> path = getMainPath();
+        paths.put(depth, path);
+        addNodes(path, depth);
+        // Now we need to get each of the subsequent paths
+        // A depth will be associated for each itteration - this will be
+        // visualised as further away from the central line.
+        depth ++;
+        
+        int prevGapStart = 10000000; // Something large (note this needs to be done better)
+        int gapEnd = 0;
+        int gapStart = 0;
+        while (!gaps.isEmpty()) {
+            // Get the next gap from the FIFO gap queue set up in the POAG
+            Integer[] gap = gaps.remove();
+            gapStart = gap[0];
+            gapEnd = gap[1];
+            
+            // Set up the AStar search environment with the start and end 
+            // This also clears the searched nodes in the search map
+            resetSearchList();
+            initAStarSearch(gapStart, gapEnd);
+            path = getMainPath();
+            
+            // If the path was null we don't want to add it - see code below
+            // for alternative method (ugly with nested while loops to step
+            // through the gap.
+            if (path == null) {
+                //System.err.println("depth: " + depth + " Path: was none for gap: " + Arrays.toString(gap));
+                continue;
+            }
+            //System.err.println("Depth: " + depth + ", Path: " + path);  
+            paths.put(depth, path);
+            addNodes(path, depth);
+            // Check if we have reached the end of the first itteration of gaps
+            // We can tell this because the gaps will start again from the 
+            // End of the path.
+            if (gapStart > prevGapStart) {
+                depth ++;
+            }
+            
+            prevGapStart = gapStart;
+        }
+
+        // Reset the nodes to have correct x coords
+        return paths;
+    }
+    
+    
+    private void addNodes(List<Integer> path, int depth) {
+        int id;
+
+        for (int i: path) {
+            // Sanity check that we aren't trying to add duplicate nodes
+            if (xNode < 0) {
+                return;
+            }
+            id = i;
+            Node n = nodes.get(id);
+            if (n == null) {
+                // if we don't have the node already then we want to add it
+                n = new Node(id, xNode, depth, poag.getCharacterDistribution(id), poag.getOutEdgeWeights(id), poag.getSeqChars(id));
+                xNode --; // Need to take one away from x
+            } else { // Need to reset the x coord of it
+                n.setX(xNode);
+            }
+            // Otherwise, check if the depth is smaller for this one as we always
+            // want the smallest depth, keep the origional x
+            if (n.getY() > depth) {
+                n.setY(depth);
+            }
+
+            nodes.put(id, n);
         }
     }
 }

@@ -22,13 +22,14 @@ public class POAGJson {
     HashMap<Integer, Node> nodes;
     HashMap<Integer, Integer> xcoords;
     JSONObject jsonMap;
-
-    public POAGJson(PartialOrderGraph poag, HashMap<Integer, Node> nodes) {
+    PathGen pathGen;
+    
+    public POAGJson(PartialOrderGraph poag) {
         this.poag = poag;
-        this.nodes = nodes;
+        pathGen = new PathGen(poag);
+        this.nodes = pathGen.nodes;
         jsonMap = new JSONObject();
         xcoords = new HashMap<>();
-
     }
 
     /**
@@ -73,7 +74,7 @@ public class POAGJson {
         return graph;
     }
 
-    public void toJSON() {
+    public JSONObject toJSON() {
         JSONObject nodesJSON = new JSONObject();
         int x;
         int y;
@@ -124,7 +125,8 @@ public class POAGJson {
         jsonMap.put("nodes", nodesJSON);
         jsonMap.put("edges", reactions);
 
-        System.err.println(jsonMap);
+        return jsonMap;
     }
 
+    
 }
