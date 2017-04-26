@@ -1,9 +1,12 @@
 import api.PartialOrderGraph;
-import org.junit.jupiter.api.*;
+import dat.POGraph;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Functions to test the partial order graph implementation (api and code).
@@ -17,7 +20,7 @@ public class POGraphTests {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println("Consensus sequence: " + apiGraph.getConsensusSequence());
-        assertEquals("PNAR", apiGraph.getConsensusSequence());
+        assertEquals("PMMR", apiGraph.getConsensusSequence());
     }
 
     @Test
@@ -51,6 +54,17 @@ public class POGraphTests {
         for (Integer id : ids)
             System.out.println(id);
         assertArrayEquals(new Integer[]{0,1,2,3,4,5}, ids);
+    }
+
+    @Test
+    @DisplayName("Convert PO Graph to API PartialOrderGraph")
+    public void graphToAPITest(){
+        String filepath = "src/test/resources/small.aln";
+        POGraph graph = new POGraph(filepath);
+        PartialOrderGraph apiGraph = new PartialOrderGraph(graph);
+        System.out.println(graph.toString());
+        System.out.println(apiGraph.toString());
+        assertEquals(graph.toString(), apiGraph.toString());
     }
 
 }

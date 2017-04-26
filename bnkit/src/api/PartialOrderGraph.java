@@ -21,6 +21,8 @@ public class PartialOrderGraph {
         graph = new POGraph();
     }
 
+    public PartialOrderGraph(POGraph graph) { this.graph = graph; }
+
     public PartialOrderGraph(String dotStructure) {
         graph = new POGraph(dotStructure);
     }
@@ -114,5 +116,14 @@ public class PartialOrderGraph {
         Integer[] ids = new Integer[graph.getNumNodes()];
         graph.topologicalSort().toArray(ids);
         return ids;
+    }
+
+    /**
+     * String representation of partial order graph.
+     *
+     * @return      String representation
+     */
+    public String toString() {
+        return graph.toString();
     }
 }

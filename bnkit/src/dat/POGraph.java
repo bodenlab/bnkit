@@ -49,37 +49,7 @@ public class POGraph {
 	public POGraph(String structure, String seqPath) {
 		this();
 		// load sequences
-		List<EnumSeq.Gappy<Enumerable>> seqs = new ArrayList<>();
-		try {
-			BufferedReader seqfile = new BufferedReader(new FileReader(seqPath));
-			String line = null;
-			line = seqfile.readLine();
-			if (line.startsWith("CLUSTAL")) {
-				seqs = EnumSeq.Gappy.loadClustal(seqPath, Enumerable.aacid_ext);
-			} else if (line.startsWith(">")) {
-				seqs = EnumSeq.Gappy.loadFasta(seqPath, Enumerable.aacid_ext, '-');
-			} else {
-				throw new RuntimeException("Alignment should be in Clustal or Fasta format");
-			}
-			seqfile.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		for (Integer seqId = 0; seqId < seqs.size(); seqId++)
-			sequences.put(seqId, seqs.get(seqId).getName());
-
-		if (structure.endsWith(".aln") || structure.endsWith(".fa") || structure.endsWith(".fasta")) {
-			int seqLen = seqs.get(0).toString().length();
-			for (Integer seqId = 0; seqId < seqs.size(); seqId++)
-				// check that all sequences have the same length (i.e. check that they are aligned)
-				if (seqs.get(seqId).toString().length() != seqLen)
-					throw new RuntimeException("Aligned sequences must have the same length.");
-			// load graph from aligned sequences
-			current = loadPOGraph(seqs);
-		} else
-			// load graph from a dot file
-			current = loadPOGraph(structure);
+		loadSequencesWithStructure(structure, seqPath);
 	}
 
 	/**
@@ -91,6 +61,8 @@ public class POGraph {
 		this();
 		if (structure.endsWith(".dot"))
 			current = loadPOGraph(structure);
+		else
+			loadSequencesWithStructure(structure, structure);
 	}
 
 	/**
@@ -595,6 +567,47 @@ public class POGraph {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Load the partial order graph using the specified structure and sequences.
+	 *
+	 * @param structure		Dot representation of partial order graph or filepath to representation, if given aligned
+	 *                      sequences (.aln, .fa, .fasta), constructs a graph from the aligned sequences
+	 * @param seqPath		File path to sequences
+	 */
+	private void loadSequencesWithStructure(String structure, String seqPath) {
+		List<EnumSeq.Gappy<Enumerable>> seqs = new ArrayList<>();
+		try {
+			BufferedReader seqfile = new BufferedReader(new FileReader(seqPath));
+			String line = null;
+			line = seqfile.readLine();
+			if (line.startsWith("CLUSTAL")) {
+				seqs = EnumSeq.Gappy.loadClustal(seqPath, Enumerable.aacid_ext);
+			} else if (line.startsWith(">")) {
+				seqs = EnumSeq.Gappy.loadFasta(seqPath, Enumerable.aacid_ext, '-');
+			} else {
+				throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+			}
+			seqfile.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		for (Integer seqId = 0; seqId < seqs.size(); seqId++)
+			sequences.put(seqId, seqs.get(seqId).getName());
+
+		if (structure.endsWith(".aln") || structure.endsWith(".fa") || structure.endsWith(".fasta")) {
+			int seqLen = seqs.get(0).toString().length();
+			for (Integer seqId = 0; seqId < seqs.size(); seqId++)
+				// check that all sequences have the same length (i.e. check that they are aligned)
+				if (seqs.get(seqId).toString().length() != seqLen)
+					throw new RuntimeException("Aligned sequences must have the same length.");
+			// load graph from aligned sequences
+			current = loadPOGraph(seqs);
+		} else
+			// load graph from a dot file
+			current = loadPOGraph(structure);
 	}
 
 	/**
