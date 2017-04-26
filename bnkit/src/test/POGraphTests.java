@@ -20,7 +20,7 @@ public class POGraphTests {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println("Consensus sequence: " + apiGraph.getConsensusSequence());
-        assertEquals("PMAR", apiGraph.getConsensusSequence());
+        assertEquals("PNAR", apiGraph.getConsensusSequence());
     }
 
     @Test
@@ -58,8 +58,8 @@ public class POGraphTests {
     }
 
     @Test
-    @DisplayName("PO Graph versus PartialOrderGraph API")
-    public void comparePOGraphAndAPI(){
+    @DisplayName("Convert PO Graph to API PartialOrderGraph")
+    public void graphToAPITest(){
         String filepath = "src/test/resources/small.aln";
         POGraph graph = new POGraph(filepath);
         PartialOrderGraph apiGraph = new PartialOrderGraph(graph);

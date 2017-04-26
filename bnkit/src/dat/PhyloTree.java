@@ -160,6 +160,7 @@ public class PhyloTree {
      */
     private static Node parseNewick(String str, Node parent, ArrayList<Integer> nodeIds, int count) {
         Node node = null;
+        str = str.replace("\t","");
         int start_index = str.indexOf('('); // start parenthesis
         int end_index = str.lastIndexOf(')'); // end parenthesis
         if (start_index == -1 && end_index == -1) { // we are at leaf (no parentheses)
@@ -168,7 +169,8 @@ public class PhyloTree {
                 node = new Node(str);
                 node.setParent(parent);
             } else { // there's a distance
-                node = new Node(str.substring(0, split_index));
+                String label = str.substring(0, split_index).trim();
+                node = new Node(label.contains("|") ? label.substring(0, label.indexOf('|')).trim() : label);
                 double dist = Double.parseDouble(str.substring(split_index + 1, str.length()));
                 if (dist == 0.0) {
                     dist = 0.00001;
