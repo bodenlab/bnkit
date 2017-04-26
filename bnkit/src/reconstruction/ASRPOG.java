@@ -1,6 +1,7 @@
 package reconstruction;
 
 
+import api.PartialOrderGraph;
 import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
@@ -198,6 +199,25 @@ public class ASRPOG {
 			saveTree(filepath + "_new_tree.txt");
 			saveDistrib(filepath + "_distribution.txt");
 		}
+	}
+
+	/**
+	 * Get a graph representation of the given ancestral node.
+	 *
+	 * @param nodeLabel		Label of ancestor
+	 * @return				Graph representation of inferred ancestor
+	 */
+	public PartialOrderGraph getGraph(String nodeLabel) {
+		return new PartialOrderGraph(this.getAncestor(nodeLabel));
+	}
+
+	/**
+	 * Get a graph representation of the multiple sequence alignment.
+	 *
+	 * @return			Graph representation of multiple sequence alignment
+	 */
+	public PartialOrderGraph getMSAGraph() {
+		return new PartialOrderGraph(this.pogAlignment);
 	}
 
 	/**

@@ -25,6 +25,10 @@ public class PartialOrderGraph {
         graph = new POGraph(dotStructure);
     }
 
+    public PartialOrderGraph(POGraph pograph) {
+        graph = pograph;
+    }
+
     /**
      * Get the sequence with the most edge support through the graph. Support is based on maximizing immediate edge
      * weights.
@@ -101,5 +105,14 @@ public class PartialOrderGraph {
         Integer[] ids = new Integer[graph.getNumNodes()];
         graph.topologicalSort().toArray(ids);
         return ids;
+    }
+
+    /**
+     * Return string representation of PO Graph.
+     *
+     * @return      String representation
+     */
+    public String toString() {
+        return graph.toString();
     }
 }
