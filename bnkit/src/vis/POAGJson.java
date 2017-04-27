@@ -3,14 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package poag;
+package vis;
+
+import api.PartialOrderGraph;
+import json.JSONArray;
+import json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import json.JSONArray;
-import json.JSONObject;
-import api.PartialOrderGraph;
 
 /**
  *

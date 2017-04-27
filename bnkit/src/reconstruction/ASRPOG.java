@@ -382,6 +382,8 @@ public class ASRPOG {
 	 */
 	private POGraph getAncestor(String label) {
 		POGraph ancestor = new POGraph(pogAlignment);
+		if (label.equalsIgnoreCase("root"))
+			label = (String)phyloTree.getRoot().getLabel();
 		for (Inference inferredBase : ancestralInferences.get(label))
 			if (ancestor.setCurrent(inferredBase.pogId))
 				if (inferredBase.base == '-')

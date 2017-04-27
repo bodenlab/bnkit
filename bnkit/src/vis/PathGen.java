@@ -3,20 +3,11 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package poag;
+package vis;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Set;
 import api.PartialOrderGraph;
+
+import java.util.*;
 
 /**
  *

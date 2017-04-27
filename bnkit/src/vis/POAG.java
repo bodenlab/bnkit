@@ -3,11 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package poag;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
+package vis;
 import api.PartialOrderGraph;
 
 /**
@@ -16,7 +12,7 @@ import api.PartialOrderGraph;
  */
 public class POAG {
     
-    PartialOrderGraph poag; 
+    PartialOrderGraph poag;
     PathGen pathGen;
 
     
@@ -25,7 +21,7 @@ public class POAG {
      */
     public static void main(String[] args) {
         String dotPath = "/home/ariane/Documents/bodenlab/bnkit/bnkit/src/test/resources/testPOGraphMSAMed.dot"; //"/home/ariane/NetBeansProjects/POAG/src/poag/testPOGraphLarge.dot"; //new PartialOrderGraph("/home/ariane/Documents/stemformatics/biojs_alignment/data/defaultMSA.dot");
-        POAG pg = new POAG(dotPath);
+        //poag.POAG pg = new poag.POAG(dotPath);
     }
     
     

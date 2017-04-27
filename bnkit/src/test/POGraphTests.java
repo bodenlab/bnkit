@@ -20,7 +20,7 @@ public class POGraphTests {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println("Consensus sequence: " + apiGraph.getConsensusSequence());
-        assertEquals("PNAR", apiGraph.getConsensusSequence());
+        assertEquals("PMAR", apiGraph.getConsensusSequence());
     }
 
     @Test
