@@ -791,6 +791,7 @@ public class POGraph {
 					String[] elements = line.split("[\\[]+");
 					if (elements.length > 1) {
 						String nodeId = elements[0].replace("\"","");
+                                                
                                                 // Split on character and numeric sequences, take the first numeric seuqence as the ID
                                                 nodeId = nodeId.split("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)")[0];
 						int pogId = Integer.parseInt(nodeId);
