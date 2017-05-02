@@ -24,7 +24,7 @@ public class POAGJson {
     HashMap<Integer, Integer> xcoords;
     JSONObject jsonMap;
     PathGen pathGen;
-    
+
     public POAGJson(PartialOrderGraph poag) {
         this.poag = poag;
         pathGen = new PathGen(poag);
@@ -38,7 +38,7 @@ public class POAGJson {
      * in a format so that a pie chart can easily be rendered on the
      * JavaScript side
      * @param map
-     * @return 
+     * @return
      */
     private JSONObject seq2JSON(Map<Character, Integer> map) {
         JSONObject chars = new JSONObject();
@@ -46,10 +46,10 @@ public class POAGJson {
         int numChars = map.size();
         for (Map.Entry<Character, Integer> list : map.entrySet()) {
 
-                JSONObject bar = new JSONObject();
-                bar.put("label", list.getKey().toString());
-                bar.put("value", list.getValue());
-                bars.put(bar);
+            JSONObject bar = new JSONObject();
+            bar.put("label", list.getKey().toString());
+            bar.put("value", list.getValue());
+            bars.put(bar);
         }
         chars.put("chars", bars);
         return chars;
@@ -58,7 +58,7 @@ public class POAGJson {
     /**
      * Returns a JSON representation of the histogram,
      * @param map
-     * @return 
+     * @return
      */
     private JSONObject map2JSON(Map<Character, Double> map) {
         JSONObject graph = new JSONObject();
@@ -76,9 +76,10 @@ public class POAGJson {
     }
 
     public JSONObject toJSON() {
-        JSONObject nodesJSON = new JSONObject();
+        JSONArray nodesJSON = new JSONArray();
         int x;
         int y;
+        int max_depth = 0;
         JSONObject reactions = new JSONObject();
         Node n;
         Set<Integer> ns = nodes.keySet();
@@ -90,13 +91,24 @@ public class POAGJson {
             y = n.getY();
             int id = n.getID();
             String nid = "node-" + id;
+            // Extra things for the multi view poag
+            thisNode.put("class", ""); // Some sort of class
+            thisNode.put("id", id);
+            thisNode.put("start", x);
+            thisNode.put("end", x);
+            thisNode.put("lane", y);
 
+            // Ones needed for tthe actual poag
             thisNode.put("label", poag.getLabel(id));
             thisNode.put("x", x);
             thisNode.put("y", y);
             thisNode.put("graph", map2JSON(n.getGraph()));
             thisNode.put("seq", seq2JSON(n.getSeq()));
-            nodesJSON.put(nid, thisNode);
+            nodesJSON.put(thisNode);
+            //Check if it is the max depth
+            if (y > max_depth) {
+                max_depth = y;
+            }
             // Need to get the out egdes into JSON reaction object
             Map<Integer, Double> outedges = n.getOutedges();
             for (Map.Entry<Integer, Double> outNodes : outedges.entrySet()) {
@@ -123,11 +135,12 @@ public class POAGJson {
             }
             // Want to add each of the edge weights to the reaction nodes
         }
+        JSONObject metadata = new JSONObject();
         jsonMap.put("nodes", nodesJSON);
         jsonMap.put("edges", reactions);
-
+        jsonMap.put("max_depth", max_depth);
         return jsonMap;
     }
 
-    
+
 }
