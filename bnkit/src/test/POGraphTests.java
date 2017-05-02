@@ -1,7 +1,9 @@
 import api.PartialOrderGraph;
 import dat.POGraph;
+import json.JSONObject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import vis.POAGJson;
 
 import java.util.HashMap;
 
@@ -66,6 +68,16 @@ public class POGraphTests {
         System.out.println(graph.toString());
         System.out.println(apiGraph.toString());
         assertEquals(graph.toString(), apiGraph.toString());
+    }
+
+    @Test
+    @DisplayName("Convert PO Graph to JSON")
+    public void graphToJSONTest() {
+        String filepath = "src/test/resources/small.aln";
+        PartialOrderGraph graph = new PartialOrderGraph(new POGraph(filepath, filepath));
+        POAGJson json = new POAGJson(graph);
+        JSONObject obj = json.toJSON();
+        System.out.println(obj.toString());
     }
 
 }

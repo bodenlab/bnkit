@@ -17,6 +17,7 @@ public class ASRTests {
         String nwkfilepath = "src/test/resources/small.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true);
         PartialOrderGraph graph = asr.getGraph("root");
+      //  asr.saveMSAGraph();
         System.out.println(graph.toString());
     }
 }

@@ -104,7 +104,8 @@ public class PartialOrderGraph {
      */
     public Map<Character, Double> getCharacterDistribution(int id) {
         graph.setCurrent(id);
-        return new HashMap<>(graph.getCharacterDistribution());
+        Map<Character, Double> dist = graph.getCharacterDistribution();
+        return (dist == null) ? null :  new HashMap<>(graph.getCharacterDistribution());
     }
 
     /**
@@ -119,11 +120,7 @@ public class PartialOrderGraph {
     }
 
     /**
-<<<<<<< HEAD
-     * Return string representation of PO Graph.
-=======
      * String representation of partial order graph.
->>>>>>> piegraph
      *
      * @return      String representation
      */

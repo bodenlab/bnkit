@@ -584,7 +584,7 @@ public class POGraph {
 						sb.append(sequences.get(seqId) + ":" + node.seqChars.get(seqId) + ";");
 				sb.replace(sb.length()-1, sb.length(),"");
 				dw.writeNode(Integer.toString(node.getID()), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
-							"\"" + (node.getBase()==0?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
+							"\"" + (node.getBase()==null?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
 				for (Node next : node.getNextNodes()) {
 					// find the number of sequences that traverse to the next node and calculate the weighting and percentage
 					sb = new StringBuilder();
@@ -1195,6 +1195,16 @@ public class POGraph {
 		 * @return distribution {(Character, probability)}
 		 */
 		public HashMap<Character, Double> getDistribution() {
+			if (distribution != null)
+				return distribution;
+			distribution = new HashMap<>();
+			for (Character b : seqChars.values())
+				if (distribution.containsKey(b))
+					distribution.put(b, distribution.get(b) + 1.0);
+				else
+					distribution.put(b, 1.0);
+			for (Character b : distribution.keySet())
+				distribution.put(b, distribution.get(b) / seqChars.size());
 			return this.distribution;
 		}
 
