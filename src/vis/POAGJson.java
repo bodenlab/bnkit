@@ -93,8 +93,6 @@ public class POAGJson {
             // Extra things for the multi view poag
             thisNode.put("class", ""); // Some sort of class
             thisNode.put("id", id);
-            thisNode.put("start", x);
-            thisNode.put("end", x);
             thisNode.put("lane", y);
             
             // Ones needed for tthe actual poag
