@@ -279,8 +279,15 @@ public class POGraph {
 			// set the previous node and next node pointers
 			if (seqNodeMap.get(seqId).indexOf(current) == 0) {
 				// first node, only affects next node pointers
-				Node nextNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1);
-				nextNode.removePrevNode(current);
+				// check if this is also the last node for this sequence
+				if (seqNodeMap.get(seqId).size() == 1) {
+					seqNodeMap.remove(seqId);
+					System.err.println("Warning: " + sequences.get(seqId) + " removed from inference.");
+					continue;
+				} else {
+					Node nextNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1);
+					nextNode.removePrevNode(current);
+				}
 			} else if (seqNodeMap.get(seqId).indexOf(current) == seqNodeMap.get(seqId).size() - 1) {
 				// final node, only affect previous node pointers
 				Node prevNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) - 1);
@@ -296,7 +303,13 @@ public class POGraph {
 			}
 			seqNodeMap.get(seqId).remove(current);
 		}
-
+		if (initialNode.getNextNodes().contains(current)) {
+			for (Node nextNode : current.getNextNodes()) {
+				initialNode.addNextNode(nextNode);
+				nextNode.addPrevNode(initialNode);
+			}
+			initialNode.getNextNodes().remove(current);
+		}
 		nodes.remove(current.getID(), current);
 		current = initialNode.getNextNodes().get(0);
 	}
@@ -582,6 +595,8 @@ public class POGraph {
 				for (Integer seqId : seqNodeMap.keySet())
 					if (seqNodeMap.get(seqId).contains(node))
 						sb.append(sequences.get(seqId) + ":" + node.seqChars.get(seqId) + ";");
+				if (sb.toString() == "")
+					sb.toString();
 				sb.replace(sb.length()-1, sb.length(),"");
 				dw.writeNode(Integer.toString(node.getID()), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
 							"\"" + (node.getBase()==null?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
@@ -964,7 +979,14 @@ public class POGraph {
 				}
 		}
 
-		for (Node node : nodes.values()) {
+		List<Node> nodelist = new ArrayList<>(nodes.values());
+		for (Node node : nodelist) {
+			// if no sequences in node, remove (i.e. was a full gap column in aln)
+			if (node.getSeqCharMapping().size() == 0) {
+				setCurrent(node.getID());
+				removeNode();
+				continue;
+			}
 			// find starting nodes
 			if (node.getPreviousNodes().isEmpty()) {
 				initialNode.addNextNode(node);

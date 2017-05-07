@@ -13,10 +13,12 @@ public class ASRTests {
     @Test
     @DisplayName("Get ancestral partial order graph")
     public void getAncestralGraphTest() throws IOException {
-        String alnfilepath = "src/test/resources/small.aln";
-        String nwkfilepath = "src/test/resources/small.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true);
-        PartialOrderGraph graph = asr.getGraph("root");
+        String alnfilepath = "src/test/resources/large.aln";
+        String nwkfilepath = "src/test/resources/large.nwk";
+        ASRPOG asr = new ASRPOG(null, nwkfilepath, alnfilepath, "N3_72.0", true);
+        PartialOrderGraph msa = asr.getMSAGraph();
+        PartialOrderGraph graph = asr.getGraph("N3_72.0");
+        System.out.println(msa.toString());
         System.out.println(graph.toString());
     }
 }

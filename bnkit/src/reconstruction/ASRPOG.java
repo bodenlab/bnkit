@@ -35,7 +35,7 @@ public class ASRPOG {
 	private EnumDistrib[] marginalDistributions; 						// Marginal distributions for nodes if doing a marginal reconstruction
 	private String marginalNode = null;									// Label of node to perform marginal reconstruction (if applicable)
 	private Map<String, List<Inference>> ancestralInferences;			// stores updates to the POGStructure for the ancestral node <node label, changes>
-	private double[] rates = null; 										// Rates at positions in alignment
+	private Double[] rates = null; 										// Rates at positions in alignment
 
 	/**
 	 * Infer ancestral sequences given an alignment file (fasta or aln).
@@ -252,14 +252,14 @@ public class ASRPOG {
 	 */
 	public void saveRate(String filename) throws IOException {
 		if (rates == null)
-			rates = new double[]{};
+			rates = new Double[]{};
 		Writer writer = new PrintWriter(filename, "UTF-8");
 		for (Integer nodeId : pogAlignment.getNodeIDs()) {
 			pogAlignment.setCurrent(nodeId);
 			writer.write(pogAlignment.getCurrentId() + ":");
 			for (Character base : pogAlignment.getCurrentBases())
 				writer.write(base + ",");
-			writer.write(" " + Double.toString(rates[nodeId]) + "\n");
+			writer.write(" " + (rates[nodeId] == null ? "NA" : Double.toString(rates[nodeId])) + "\n");
 		}
 		writer.close();
 	}
@@ -335,7 +335,7 @@ public class ASRPOG {
 	 */
 	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean parsimony) throws RuntimeException, IOException {
 		loadData(treeFile, sequenceFile);
-		if (pog.equals(""))	// load graph structure from alignment file
+		if (pog == null || pog.equals(""))	// load graph structure from alignment file
 			pog = sequenceFile;
 		pogAlignment = new POGraph(pog, sequenceFile);
 		pog = null;
@@ -533,10 +533,10 @@ public class ASRPOG {
 	 * @param gapParsimony	flag to identify gaps using parsimony (true) or maximum likelihood (false)
 	 */
 	private void queryBNJoint(boolean gapParsimony){
-		rates = new double[pogAlignment.getNumNodes()]; //Rate matrix
 
 		// infer base/gap of each aligned node 
 		List<Integer> nodeIDs = pogAlignment.getNodeIDs();
+		rates = new Double[nodeIDs.get(nodeIDs.size()-1) + 1]; //Rate matrix
 		for (Integer nodeId : nodeIDs) {
 			pogAlignment.setCurrent(nodeId);
 
