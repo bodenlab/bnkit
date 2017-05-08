@@ -40,7 +40,6 @@ public class PathGen {
     Integer[] sorted;
     public int goalID;
     public int startID;
-    private int xNode; // Used for the node placement
     HashMap<Integer, Node> nodes;
 
     ArrayList<Integer> totalNodeList;
@@ -60,6 +59,46 @@ public class PathGen {
         gaps = new LinkedList<>();
         // Get path depths fills everything out
         HashMap<Integer, List<Integer>> pathDepths = getPathDepths();
+        // Here we want to add in any nodes which we may have missed at the
+        // start of the POAG. There may be multiple starting nodes.
+    }
+
+    public Integer choose_starting_node() {
+        // Performing a topological sort sometimes causes the ordering between
+        // the MSA and the inferred graph to differ. Instead assume that it is
+        // already sorted.
+        sorted = poag.getNodeIDs();
+        ArrayList<Integer> startingNodeIds = new ArrayList<>();
+        Double maxOutWeight = 0.0;
+        Integer maxOutWeightID = sorted[0];
+        Integer currNodeId = sorted[0];
+        Map<Integer, Double> nodeOutWeights;
+        for (int i = 0; i < size; i ++) {
+            currNodeId = sorted[i];
+            Integer[] prevs = poag.getPreviousNodeIDs(currNodeId);
+            if (prevs[0] == null) {
+                nodeOutWeights = poag.getOutEdgeWeights(currNodeId);
+                // Add it to our starting node ids
+                startingNodeIds.add(currNodeId);
+                for(Map.Entry<Integer, Double> out : nodeOutWeights.entrySet()) {
+                    Double outWeight = out.getValue();
+                    if (outWeight > maxOutWeight) {
+                        maxOutWeightID = currNodeId; // set the id to be that
+                        // with the largest out weight
+                    }
+                }
+            }
+        }
+        // Add the nodes which won't be part of the main path with a depth of 1
+        int depth = 1;
+        for (Integer id: startingNodeIds) {
+            if (id != currNodeId) {
+                Node n = new Node(id, id, depth, poag.getCharacterDistribution(id), poag.getOutEdgeWeights(id), poag.getSeqChars(id));
+                nodes.put(id, n);
+            }
+        }
+        // Return the node with the highest out weight
+        return currNodeId;
     }
 
 
@@ -210,11 +249,8 @@ public class PathGen {
             // Means there is a gap so add it to the gaps
             if (prevId - currId != 1) {
                 addGaps(currId, prevId);
-                //System.err.println("Gap: " + prevId + " and " + currId);
             }
         }
-        //Collections.reverse(pathReverse);
-        // System.out.println(pathReverse);
         return pathReverse;
     }
 
@@ -271,7 +307,9 @@ public class PathGen {
         // sorted = poag.sort();
         sorted = poag.getNodeIDs();
         goalID = sorted[sorted.length - 1];
-        startID = sorted[0];
+        // Choose the starting node and add those which won't be covered by the
+        // search path to the list
+        startID = choose_starting_node();
         for (int i = 0; i < size; i ++) {
             search.put(sorted[i], 1);
         }
@@ -299,7 +337,7 @@ public class PathGen {
     public HashMap<Integer, List<Integer>>  getPathDepths() {
         Integer[] nodeys = poag.getNodeIDs();
         int numNodes = nodeys.length;
-        xNode = numNodes;
+
         HashMap<Integer, List<Integer>> paths = new HashMap<>();
         int depth = 0;
         // want there to be a distinct x position for each node
