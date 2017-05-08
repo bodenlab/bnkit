@@ -93,7 +93,8 @@ public class PathGen {
                     if (outWeight > maxOutWeight) {
                         currNodeId = sorted[i];
                         maxOutWeightID = currNodeId; // set the id to be that 
-                        // with the largest out weight
+                        maxOutWeight = outWeight; // with the largest out weight
+                        
                     }
                 }
             }
@@ -101,7 +102,7 @@ public class PathGen {
         // Add the nodes which won't be part of the main path with a depth of 1
         int depth = 1;
         for (Integer id: startingNodeIds) {
-            if (id != currNodeId) {
+            if (id != maxOutWeightID) {
                 Node n = new Node(id, id, depth, poag.getCharacterDistribution(id), poag.getOutEdgeWeights(id), poag.getSeqChars(id));
                 nodes.put(id, n);
             }
