@@ -84,7 +84,8 @@ public class PathGen {
         Map<Integer, Double> nodeOutWeights;
         for (int i = 0; i < size; i ++) {
             currNodeId = sorted[i];
-            if (poag.getPreviousNodeIDs(currNodeId).length < 1) {
+            Integer[] prevs = poag.getPreviousNodeIDs(currNodeId);
+            if (prevs[0] == null) {
                 nodeOutWeights = poag.getOutEdgeWeights(currNodeId);
                 // Add it to our starting node ids
                 startingNodeIds.add(currNodeId);
