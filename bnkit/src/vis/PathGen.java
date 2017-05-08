@@ -260,8 +260,9 @@ public class PathGen {
                 // If the gap size is two we know we're just going to want to 
                 // add the node one out from the two (add one to the depth)
                 if (prevId - currId == 2) {
-                    int gapNodeId = prevId + 1;
+                    int gapNodeId = currId + 1;
                     int prevY = depth + 1;
+                    System.err.println("" + Arrays.toString(poag.getNodeIDs()));
                     Node n = new Node(gapNodeId, gapNodeId, prevY, poag.getCharacterDistribution(gapNodeId), poag.getOutEdgeWeights(gapNodeId), poag.getSeqChars(gapNodeId));
                     nodes.put(gapNodeId, n);
                 } else {
