@@ -5,6 +5,7 @@
  */
 package vis;
 import api.PartialOrderGraph;
+import json.JSONObject;
 
 /**
  *
@@ -12,7 +13,7 @@ import api.PartialOrderGraph;
  */
 public class POAG {
     
-    PartialOrderGraph poag;
+    PartialOrderGraph poag; 
     PathGen pathGen;
 
     
@@ -20,8 +21,8 @@ public class POAG {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        String dotPath = "/home/ariane/Documents/bodenlab/bnkit/bnkit/src/test/resources/testPOGraphMSAMed.dot"; //"/home/ariane/NetBeansProjects/POAG/src/poag/testPOGraphLarge.dot"; //new PartialOrderGraph("/home/ariane/Documents/stemformatics/biojs_alignment/data/defaultMSA.dot");
-        //poag.POAG pg = new poag.POAG(dotPath);
+        String dotPath = "/home/ariane/Documents/bodenlab/data/MSA.dot"; //"/home/ariane/Documents/bodenlab/bnkit/bnkit/src/test/resources/testPOGraphMed.dot"; //"/home/ariane/NetBeansProjects/POAG/src/poag/testPOGraphLarge.dot"; //new PartialOrderGraph("/home/ariane/Documents/stemformatics/biojs_alignment/data/defaultMSA.dot");
+        POAG pg = new POAG(dotPath);
     }
     
     
@@ -29,7 +30,9 @@ public class POAG {
         poag = new PartialOrderGraph(dotPath);
         // Call poagJSON on a poag 
         POAGJson poagJson = new POAGJson(poag);
-        System.err.println(poagJson.toJSON());
+        JSONObject jobj = poagJson.toJSON();
+        String jsonText = jobj.toString();
+        System.out.println(jsonText);
     }
 }
     

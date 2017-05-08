@@ -5,13 +5,12 @@
  */
 package vis;
 
-import api.PartialOrderGraph;
-import json.JSONArray;
-import json.JSONObject;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import json.JSONArray;
+import json.JSONObject;
+import api.PartialOrderGraph;
 
 /**
  *
@@ -24,7 +23,7 @@ public class POAGJson {
     HashMap<Integer, Integer> xcoords;
     JSONObject jsonMap;
     PathGen pathGen;
-
+    
     public POAGJson(PartialOrderGraph poag) {
         this.poag = poag;
         pathGen = new PathGen(poag);
@@ -38,7 +37,7 @@ public class POAGJson {
      * in a format so that a pie chart can easily be rendered on the
      * JavaScript side
      * @param map
-     * @return
+     * @return 
      */
     private JSONObject seq2JSON(Map<Character, Integer> map) {
         JSONObject chars = new JSONObject();
@@ -46,10 +45,10 @@ public class POAGJson {
         int numChars = map.size();
         for (Map.Entry<Character, Integer> list : map.entrySet()) {
 
-            JSONObject bar = new JSONObject();
-            bar.put("label", list.getKey().toString());
-            bar.put("value", list.getValue());
-            bars.put(bar);
+                JSONObject bar = new JSONObject();
+                bar.put("label", list.getKey().toString());
+                bar.put("value", list.getValue());
+                bars.put(bar);
         }
         chars.put("chars", bars);
         return chars;
@@ -58,7 +57,7 @@ public class POAGJson {
     /**
      * Returns a JSON representation of the histogram,
      * @param map
-     * @return
+     * @return 
      */
     private JSONObject map2JSON(Map<Character, Double> map) {
         JSONObject graph = new JSONObject();
@@ -95,7 +94,7 @@ public class POAGJson {
             thisNode.put("class", ""); // Some sort of class
             thisNode.put("id", id);
             thisNode.put("lane", y);
-
+            
             // Ones needed for tthe actual poag
             thisNode.put("label", poag.getLabel(id));
             thisNode.put("x", x);
@@ -140,5 +139,5 @@ public class POAGJson {
         return jsonMap;
     }
 
-
+    
 }
