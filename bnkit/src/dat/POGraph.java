@@ -595,8 +595,6 @@ public class POGraph {
 				for (Integer seqId : seqNodeMap.keySet())
 					if (seqNodeMap.get(seqId).contains(node))
 						sb.append(sequences.get(seqId) + ":" + node.seqChars.get(seqId) + ";");
-				if (sb.toString() == "")
-					sb.toString();
 				sb.replace(sb.length()-1, sb.length(),"");
 				dw.writeNode(Integer.toString(node.getID()), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
 							"\"" + (node.getBase()==null?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
@@ -806,6 +804,7 @@ public class POGraph {
 					String[] elements = line.split("[\\[]+");
 					if (elements.length > 1) {
 						String nodeId = elements[0].replace("\"","");
+						nodeId = nodeId.replaceAll("[^\\d]", "");
 						int pogId = Integer.parseInt(nodeId);
 						HashMap<Character, Double> dist = null;
 						Character base = null;
@@ -857,14 +856,18 @@ public class POGraph {
 				lineCount = 0;
 				line = lines[++lineCount];
 			}
+
+			// load all edges
 			while (line != null) {
 				line = line.replace("\t", "");
 				if (line.contains("->")) {
 					String[] elements = line.split("[->]+");
 					String fromId = elements[0].replace("\"","");
+					fromId = fromId.replaceAll("[^\\d]", "");
 					int fromNodeId = Integer.parseInt(fromId);
 					elements = elements[1].split("[\\[]+");
 					String toId = elements[0].replace("\"","");
+					toId = toId.replaceAll("[^\\d]", "");
 					int toNodeId = Integer.parseInt(toId);
 					inputNodeToPONode.put(toId, toNodeId);
 					int toPOGID = inputNodeToPONode.get(toId);

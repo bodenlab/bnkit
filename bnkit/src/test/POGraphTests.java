@@ -35,6 +35,14 @@ public class POGraphTests {
     }
 
     @Test
+    @DisplayName("Load Graph test")
+    public void LoadPOGraph(){
+        String filepath = "src/test/resources/testPOGraphMSAFourLevels.dot";
+        PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
+        System.out.println(apiGraph.toString());
+    }
+
+    @Test
     @DisplayName("Small PO Graph test edge weights")
     public void smallPOGraphEdgeWeights(){
         String filepath = "src/test/resources/testPOGraphSmall.dot";
@@ -73,8 +81,8 @@ public class POGraphTests {
     @Test
     @DisplayName("Convert PO Graph to JSON")
     public void graphToJSONTest() {
-        String filepath = "src/test/resources/small.aln";
-        PartialOrderGraph graph = new PartialOrderGraph(new POGraph(filepath, filepath));
+        String filepath = "src/test/resources/tmp.dot";
+        PartialOrderGraph graph = new PartialOrderGraph(filepath);
         POAGJson json = new POAGJson(graph);
         JSONObject obj = json.toJSON();
         System.out.println(obj.toString());
