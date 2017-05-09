@@ -61,6 +61,18 @@ public class PartialOrderGraph {
         return ids;
     }
 
+    /**
+     * Get the IDs of the previous nodes of the node with the given ID.
+     *
+     * @param id    ID of current node
+     * @return      IDs of 'previous' nodes
+     */
+    public Integer[] getPreviousNodeIDs(int id) {
+        graph.setCurrent(id);
+        Integer[] ids = new Integer[graph.getPrevIDs().size()];
+        graph.getPrevIDs().toArray(ids);
+        return ids;
+    }
 
     /**
      * Get the characters in the node with the given ID.
