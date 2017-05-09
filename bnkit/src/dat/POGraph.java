@@ -828,7 +828,7 @@ public class POGraph {
 							} else if (el.contains("sequences")) {
 								nodeSeqCharMap.put(pogId, new HashMap<>());
 								el = el.replace("\"", "");
-								String seqs = el.split("[=]")[1];
+								String seqs = el.split("sequences=")[1];
 								for (String seq : seqs.split("[;]+"))
 									nodeSeqCharMap.get(pogId).put(seq.split("[:]+")[0], seq.split("[:]+")[1].toCharArray()[0]);
 							}
@@ -861,7 +861,7 @@ public class POGraph {
 			while (line != null) {
 				line = line.replace("\t", "");
 				if (line.contains("->")) {
-					String[] elements = line.split("[->]+");
+					String[] elements = line.split("->");
 					String fromId = elements[0].replace("\"","");
 					fromId = fromId.replaceAll("[^\\d]", "");
 					int fromNodeId = Integer.parseInt(fromId);

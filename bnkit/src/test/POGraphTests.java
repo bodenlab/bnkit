@@ -81,7 +81,7 @@ public class POGraphTests {
     @Test
     @DisplayName("Convert PO Graph to JSON")
     public void graphToJSONTest() {
-        String filepath = "src/test/resources/tmp.dot";
+        String filepath = "src/test/resources/testPOGraphMSAFourLevels.dot";
         PartialOrderGraph graph = new PartialOrderGraph(filepath);
         POAGJson json = new POAGJson(graph);
         JSONObject obj = json.toJSON();
