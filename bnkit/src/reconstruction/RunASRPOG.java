@@ -88,16 +88,23 @@ public class RunASRPOG {
 			// generate a partial order alignment graph if the alignment has not been specified
 			//try {
 				if (poagRepresentation.isEmpty()) {
-					if (performAlignment) {
-						MSA msa = new MSA(sequencePath);
-						asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
-					} else if (marginalNode != null)
+					System.out.println("got here");
+
+					 if (marginalNode != null)
 						asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, mp);
 					else
 						asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), mp);
-				} else if (marginalNode != null)
-					asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, mp);
-				else
+				}
+				else if (marginalNode != null)
+				    asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, mp);
+				else {
+                    if (performAlignment) {
+                        System.out.println("got here sucka");
+
+                        MSA msa = new MSA(sequencePath);
+                        asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
+                    }
+                }
 					asr = new ASRPOG(poagRepresentation, treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
 			//} catch (RuntimeException e) {
 			//	exit(e.getMessage());

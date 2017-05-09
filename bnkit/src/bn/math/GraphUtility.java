@@ -369,7 +369,7 @@ public class GraphUtility {
      */
     private Map<Integer, Object[]> constructGappySequences(POGraph graph, List<Integer> nodeIndex, int seqLen){
         // construct gappy sequences as strings
-        Map<Integer, ArrayList<Integer>> graphSeqNodeMap = graph.getSequenceNodeMapping();
+        Map<Integer, List<Integer>> graphSeqNodeMap = graph.getSequenceNodeMapping();
         Map<Integer, Object[]> mergedSequencesAln = new HashMap<>();
 
         for (Integer seqId : graphSeqNodeMap.keySet()) {
