@@ -5,9 +5,18 @@
  */
 package vis;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Set;
 import api.PartialOrderGraph;
-
-import java.util.*;
 
 /**
  *
@@ -251,10 +260,14 @@ public class PathGen {
                 // If the gap size is two we know we're just going to want to 
                 // add the node one out from the two (add one to the depth)
                 if (prevId - currId == 2) {
-                    int gapNodeId = prevId + 1;
+                    int gapNodeId = currId + 1;
                     int prevY = depth + 1;
-                    Node n = new Node(gapNodeId, gapNodeId, prevY, poag.getCharacterDistribution(gapNodeId), poag.getOutEdgeWeights(gapNodeId), poag.getSeqChars(gapNodeId));
-                    nodes.put(gapNodeId, n);
+                    try {
+                        Node n = new Node(gapNodeId, gapNodeId, prevY, poag.getCharacterDistribution(gapNodeId), poag.getOutEdgeWeights(gapNodeId), poag.getSeqChars(gapNodeId));
+                        nodes.put(gapNodeId, n);
+                    } catch (Exception e) {
+                        System.err.println(e + " Node: " + gapNodeId + " removed during inferrence");
+                    }
                 } else {
                     addGaps(currId, prevId);
                 }
@@ -264,8 +277,12 @@ public class PathGen {
             if (prevId - currId == 2) {
                 int gapNodeId = prevId + 1;
                 int prevY = depth + 1;
-                Node n = new Node(gapNodeId, gapNodeId, prevY, poag.getCharacterDistribution(gapNodeId), poag.getOutEdgeWeights(gapNodeId), poag.getSeqChars(gapNodeId));
-                nodes.put(gapNodeId, n);
+                try {
+                        Node n = new Node(gapNodeId, gapNodeId, prevY, poag.getCharacterDistribution(gapNodeId), poag.getOutEdgeWeights(gapNodeId), poag.getSeqChars(gapNodeId));
+                        nodes.put(gapNodeId, n);
+                    } catch (Exception e) {
+                        System.err.println(e + " Node: " + gapNodeId + " removed during inferrence");
+                    }
             } else {
                 addGaps(currId, prevId);
             }
