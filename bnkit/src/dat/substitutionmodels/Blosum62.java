@@ -25,7 +25,7 @@ package dat.substitutionmodels;
  * V  0 -3 -3 -3 -1 -2 -2 -3 -3  3  1 -2  1 -1 -2 -2  0 -3 -1  4
  */
 
-final public class Blosum62 {
+final public class Blosum62 extends SubstitutionModel {
 
     /*
      * Array representation of Blosum-62 matrix
