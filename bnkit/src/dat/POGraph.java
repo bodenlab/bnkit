@@ -525,10 +525,6 @@ public class POGraph {
 	 * @return	most supported sequence of base characters
 	 */
 	public String getSupportedSequence() {
-		int maxId = 0;
-		for (Integer nodeId : nodes.keySet())
-			if (nodeId > maxId)
-				maxId = nodeId;
 		String seq = "";
 		current = null;
 
