@@ -270,6 +270,10 @@ public class ASRPOG {
 	 * @param filename	filepath to save distribution
 	 */
 	public void saveDistrib(String filename) throws IOException {
+		if (marginalNode == null) {
+			System.err.println("Marginal reconstruction has not been performed. Cannot save distribution.");
+			return;
+		}
 		POGraph ancestor = getAncestor(marginalNode);
 		Writer writer = new PrintWriter(filename + "_dist.tsv", "UTF-8");
 		Object[] aacid = Enumerable.aacid.getValues();
