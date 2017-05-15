@@ -21,7 +21,7 @@ public class POAG {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        String dotPath = "/home/ariane/Documents/bodenlab/data/MSA.dot"; //"/home/ariane/Documents/bodenlab/bnkit/bnkit/src/test/resources/testPOGraphMed.dot"; //"/home/ariane/NetBeansProjects/POAG/src/poag/testPOGraphLarge.dot"; //new PartialOrderGraph("/home/ariane/Documents/stemformatics/biojs_alignment/data/defaultMSA.dot");
+        String dotPath = "/home/ariane/Documents/bodenlab/data/N0_32.0.dot"; //"/home/ariane/Documents/bodenlab/bnkit/bnkit/src/test/resources/testPOGraphMed.dot"; //"/home/ariane/NetBeansProjects/POAG/src/poag/testPOGraphLarge.dot"; //new PartialOrderGraph("/home/ariane/Documents/stemformatics/biojs_alignment/data/defaultMSA.dot");
         POAG pg = new POAG(dotPath);
     }
     

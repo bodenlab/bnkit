@@ -55,7 +55,8 @@ public class PartialOrderGraph {
      * @return      IDs of 'next' nodes
      */
     public Integer[] getNextNodeIDs(int id) {
-        graph.setCurrent(id);
+        if (!graph.setCurrent(id))
+            return null;
         Integer[] ids = new Integer[graph.getNextIDs().size()];
         graph.getNextIDs().toArray(ids);
         return ids;
@@ -68,7 +69,8 @@ public class PartialOrderGraph {
      * @return      IDs of 'previous' nodes
      */
     public Integer[] getPreviousNodeIDs(int id) {
-        graph.setCurrent(id);
+        if (!graph.setCurrent(id))
+            return null;
         Integer[] ids = new Integer[graph.getPrevIDs().size()];
         graph.getPrevIDs().toArray(ids);
         return ids;
@@ -81,7 +83,8 @@ public class PartialOrderGraph {
      * @return      Map of sequence characters
      */
     public Map<Integer, Character> getSeqChars(int id) {
-        graph.setCurrent(id);
+        if (!graph.setCurrent(id))
+            return null;
         return new HashMap<>(graph.getSequenceCharacterMapping());
     }
 
@@ -93,7 +96,8 @@ public class PartialOrderGraph {
      * @return      Map between next node ID and edge weight
      */
     public Map<Integer, Double> getOutEdgeWeights(int id) {
-        graph.setCurrent(id);
+        if (!graph.setCurrent(id))
+            return null;
         return new HashMap<>(graph.getEdgeWeights());
     }
 
@@ -104,7 +108,8 @@ public class PartialOrderGraph {
      * @return      Character state of node, or null
      */
     public String getLabel(int id) {
-        graph.setCurrent(id);
+        if (!graph.setCurrent(id))
+            return null;
         return graph.getCurrentLabel();
     }
 
@@ -115,7 +120,8 @@ public class PartialOrderGraph {
      * @return      Map between character and probability
      */
     public Map<Character, Double> getCharacterDistribution(int id) {
-        graph.setCurrent(id);
+        if (!graph.setCurrent(id))
+            return null;
         Map<Character, Double> dist = graph.getCharacterDistribution();
         return (dist == null) ? null :  new HashMap<>(graph.getCharacterDistribution());
     }

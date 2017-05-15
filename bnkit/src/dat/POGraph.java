@@ -525,10 +525,6 @@ public class POGraph {
 	 * @return	most supported sequence of base characters
 	 */
 	public String getSupportedSequence() {
-		int maxId = 0;
-		for (Integer nodeId : nodes.keySet())
-			if (nodeId > maxId)
-				maxId = nodeId;
 		String seq = "";
 		current = null;
 
@@ -595,8 +591,6 @@ public class POGraph {
 				for (Integer seqId : seqNodeMap.keySet())
 					if (seqNodeMap.get(seqId).contains(node))
 						sb.append(sequences.get(seqId) + ":" + node.seqChars.get(seqId) + ";");
-				if (sb.toString() == "")
-					sb.toString();
 				sb.replace(sb.length()-1, sb.length(),"");
 				dw.writeNode(Integer.toString(node.getID()), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
 							"\"" + (node.getBase()==null?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
@@ -806,6 +800,7 @@ public class POGraph {
 					String[] elements = line.split("[\\[]+");
 					if (elements.length > 1) {
 						String nodeId = elements[0].replace("\"","");
+						nodeId = nodeId.replaceAll("[^\\d]", "");
 						int pogId = Integer.parseInt(nodeId);
 						HashMap<Character, Double> dist = null;
 						Character base = null;
@@ -829,7 +824,7 @@ public class POGraph {
 							} else if (el.contains("sequences")) {
 								nodeSeqCharMap.put(pogId, new HashMap<>());
 								el = el.replace("\"", "");
-								String seqs = el.split("[=]")[1];
+								String seqs = el.split("sequences=")[1];
 								for (String seq : seqs.split("[;]+"))
 									nodeSeqCharMap.get(pogId).put(seq.split("[:]+")[0], seq.split("[:]+")[1].toCharArray()[0]);
 							}
@@ -857,14 +852,18 @@ public class POGraph {
 				lineCount = 0;
 				line = lines[++lineCount];
 			}
+
+			// load all edges
 			while (line != null) {
 				line = line.replace("\t", "");
 				if (line.contains("->")) {
-					String[] elements = line.split("[->]+");
+					String[] elements = line.split("->");
 					String fromId = elements[0].replace("\"","");
+					fromId = fromId.replaceAll("[^\\d]", "");
 					int fromNodeId = Integer.parseInt(fromId);
 					elements = elements[1].split("[\\[]+");
 					String toId = elements[0].replace("\"","");
+					toId = toId.replaceAll("[^\\d]", "");
 					int toNodeId = Integer.parseInt(toId);
 					inputNodeToPONode.put(toId, toNodeId);
 					int toPOGID = inputNodeToPONode.get(toId);

@@ -117,6 +117,7 @@ public class RunASRPOG {
 					asr.saveMSAGraph(outputPath);
 				asr.saveSupportedAncestors(outputPath);
 				asr.saveGraph(outputPath);
+				asr.saveDistrib(outputPath + "/" + (marginalNode == null ? "root" : marginalNode));
 				if (inference.equalsIgnoreCase("joint"))
 					asr.save(outputPath, true, "fasta");
 				else
