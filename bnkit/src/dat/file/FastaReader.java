@@ -183,7 +183,7 @@ public class FastaReader {
     protected EnumSeq extract(String[] seqDef, boolean gappy) {
 //        boolean gappy = false;
         if (seqDef.length > 0) {
-            StringTokenizer tok = new StringTokenizer(seqDef[0], " \t,;|");
+            StringTokenizer tok = new StringTokenizer(seqDef[0], " \t,;");
             if (tok.hasMoreTokens()) {
                 // find name and collect annotations from first line
                 String first = tok.nextToken();
