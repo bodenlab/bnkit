@@ -23,7 +23,7 @@ public class POAGJson {
     HashMap<Integer, Integer> xcoords;
     JSONObject jsonMap;
     PathGen pathGen;
-    
+
     public POAGJson(PartialOrderGraph poag) {
         this.poag = poag;
         pathGen = new PathGen(poag);
@@ -33,22 +33,21 @@ public class POAGJson {
     }
 
     /**
-     * For the POAG's where the state hasn't been decided we pass the label
-     * in a format so that a pie chart can easily be rendered on the
-     * JavaScript side
+     * For the POAG's where the state hasn't been decided we pass the label in a
+     * format so that a pie chart can easily be rendered on the JavaScript side
+     *
      * @param map
-     * @return 
+     * @return
      */
     private JSONObject seq2JSON(Map<Character, Integer> map) {
         JSONObject chars = new JSONObject();
         JSONArray bars = new JSONArray();
-        int numChars = map.size();
         for (Map.Entry<Character, Integer> list : map.entrySet()) {
-
-                JSONObject bar = new JSONObject();
-                bar.put("label", list.getKey().toString());
-                bar.put("value", list.getValue());
-                bars.put(bar);
+            JSONObject bar = new JSONObject();
+            bar.put("label", list.getKey().toString());
+            bar.put("value", list.getValue());
+            bars.put(bar);
+            break;
         }
         chars.put("chars", bars);
         return chars;
@@ -56,19 +55,18 @@ public class POAGJson {
 
     /**
      * Returns a JSON representation of the histogram,
+     *
      * @param map
-     * @return 
+     * @return
      */
     private JSONObject map2JSON(Map<Character, Double> map) {
         JSONObject graph = new JSONObject();
         JSONArray bars = new JSONArray();
         for (Map.Entry<Character, Double> list : map.entrySet()) {
-            if (list.getValue() * 100 > 1) {
-                JSONObject bar = new JSONObject();
-                bar.put("x_label", list.getKey().toString());
-                bar.put("value", (int) (list.getValue() * 100));
-                bars.put(bar);
-            }
+            JSONObject bar = new JSONObject();
+            bar.put("x_label", list.getKey().toString());
+            bar.put("value", (list.getValue() * 100));
+            bars.put(bar);
         }
         graph.put("bars", bars);
         return graph;
@@ -94,7 +92,7 @@ public class POAGJson {
             thisNode.put("class", ""); // Some sort of class
             thisNode.put("id", id);
             thisNode.put("lane", y);
-            
+
             // Ones needed for tthe actual poag
             thisNode.put("label", poag.getLabel(id));
             thisNode.put("x", x);
@@ -139,5 +137,4 @@ public class POAGJson {
         return jsonMap;
     }
 
-    
 }
