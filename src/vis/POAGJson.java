@@ -49,6 +49,7 @@ public class POAGJson {
                 bar.put("label", list.getKey().toString());
                 bar.put("value", list.getValue());
                 bars.put(bar);
+                break;
         }
         chars.put("chars", bars);
         return chars;
@@ -68,6 +69,7 @@ public class POAGJson {
                 bar.put("x_label", list.getKey().toString());
                 bar.put("value", (int) (list.getValue() * 100));
                 bars.put(bar);
+                break;
             }
         }
         graph.put("bars", bars);
@@ -128,6 +130,7 @@ public class POAGJson {
                 } catch (Exception e) {
                     System.err.println("Error with reaction: " + nid);
                 }
+                
 
             }
             // Want to add each of the edge weights to the reaction nodes

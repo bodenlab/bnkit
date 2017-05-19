@@ -279,8 +279,15 @@ public class POGraph {
 			// set the previous node and next node pointers
 			if (seqNodeMap.get(seqId).indexOf(current) == 0) {
 				// first node, only affects next node pointers
-				Node nextNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1);
-				nextNode.removePrevNode(current);
+				// check if this is also the last node for this sequence
+				if (seqNodeMap.get(seqId).size() == 1) {
+					seqNodeMap.remove(seqId);
+					System.err.println("Warning: " + sequences.get(seqId) + " removed from inference.");
+					continue;
+				} else {
+					Node nextNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1);
+					nextNode.removePrevNode(current);
+				}
 			} else if (seqNodeMap.get(seqId).indexOf(current) == seqNodeMap.get(seqId).size() - 1) {
 				// final node, only affect previous node pointers
 				Node prevNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) - 1);
@@ -296,7 +303,13 @@ public class POGraph {
 			}
 			seqNodeMap.get(seqId).remove(current);
 		}
-
+		if (initialNode.getNextNodes().contains(current)) {
+			for (Node nextNode : current.getNextNodes()) {
+				initialNode.addNextNode(nextNode);
+				nextNode.addPrevNode(initialNode);
+			}
+			initialNode.getNextNodes().remove(current);
+		}
 		nodes.remove(current.getID(), current);
 		current = initialNode.getNextNodes().get(0);
 	}
@@ -584,7 +597,7 @@ public class POGraph {
 						sb.append(sequences.get(seqId) + ":" + node.seqChars.get(seqId) + ";");
 				sb.replace(sb.length()-1, sb.length(),"");
 				dw.writeNode(Integer.toString(node.getID()), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
-							"\"" + (node.getBase()==0?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
+							"\"" + (node.getBase()==null?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
 				for (Node next : node.getNextNodes()) {
 					// find the number of sequences that traverse to the next node and calculate the weighting and percentage
 					sb = new StringBuilder();
@@ -791,11 +804,8 @@ public class POGraph {
 					String[] elements = line.split("[\\[]+");
 					if (elements.length > 1) {
 						String nodeId = elements[0].replace("\"","");
-                                                
-                                                // Split on character and numeric sequences, take the first numeric seuqence as the ID
-                                                nodeId = nodeId.split("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)")[0];
+						nodeId = nodeId.replaceAll("[^\\d]", "");
 						int pogId = Integer.parseInt(nodeId);
-                                                
 						HashMap<Character, Double> dist = null;
 						Character base = null;
 						elements = elements[1].split("[,]+");
@@ -818,7 +828,7 @@ public class POGraph {
 							} else if (el.contains("sequences")) {
 								nodeSeqCharMap.put(pogId, new HashMap<>());
 								el = el.replace("\"", "");
-								String seqs = el.split("[=]")[1];
+								String seqs = el.split("sequences=")[1];
 								for (String seq : seqs.split("[;]+"))
 									nodeSeqCharMap.get(pogId).put(seq.split("[:]+")[0], seq.split("[:]+")[1].toCharArray()[0]);
 							}
@@ -846,21 +856,20 @@ public class POGraph {
 				lineCount = 0;
 				line = lines[++lineCount];
 			}
+
+			// load all edges
 			while (line != null) {
 				line = line.replace("\t", "");
 				if (line.contains("->")) {
-					String[] elements = line.split("[->]+");
+					String[] elements = line.split("->");
 					String fromId = elements[0].replace("\"","");
-                                        // Split on character and numeric sequences, take the first numeric seuqence as the ID
-                                        fromId = fromId.split("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)")[0];
+					fromId = fromId.replaceAll("[^\\d]", "");
 					int fromNodeId = Integer.parseInt(fromId);
 					elements = elements[1].split("[\\[]+");
 					String toId = elements[0].replace("\"","");
-                                        // Split on character and numeric sequences, take the first numeric seuqence as the ID
-                                        toId = toId.split("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)")[0];                                          
+					toId = toId.replaceAll("[^\\d]", "");
 					int toNodeId = Integer.parseInt(toId);
 					inputNodeToPONode.put(toId, toNodeId);
-                                      
 					int toPOGID = inputNodeToPONode.get(toId);
 					elements = elements[1].split("[\"]+");
 					for (int el = 0; el < elements.length ; el++)
@@ -973,7 +982,14 @@ public class POGraph {
 				}
 		}
 
-		for (Node node : nodes.values()) {
+		List<Node> nodelist = new ArrayList<>(nodes.values());
+		for (Node node : nodelist) {
+			// if no sequences in node, remove (i.e. was a full gap column in aln)
+			if (node.getSeqCharMapping().size() == 0) {
+				setCurrent(node.getID());
+				removeNode();
+				continue;
+			}
 			// find starting nodes
 			if (node.getPreviousNodes().isEmpty()) {
 				initialNode.addNextNode(node);
@@ -1204,6 +1220,16 @@ public class POGraph {
 		 * @return distribution {(Character, probability)}
 		 */
 		public HashMap<Character, Double> getDistribution() {
+			if (distribution != null)
+				return distribution;
+			distribution = new HashMap<>();
+			for (Character b : seqChars.values())
+				if (distribution.containsKey(b))
+					distribution.put(b, distribution.get(b) + 1.0);
+				else
+					distribution.put(b, 1.0);
+			for (Character b : distribution.keySet())
+				distribution.put(b, distribution.get(b) / seqChars.size());
 			return this.distribution;
 		}
 

@@ -5,6 +5,7 @@ import dat.POGraph;
 import java.util.HashMap;
 import java.util.Map;
 
+
 /**
  * Partial order graph data structure.
  *
@@ -21,10 +22,12 @@ public class PartialOrderGraph {
         graph = new POGraph();
     }
 
-    public PartialOrderGraph(POGraph graph) { this.graph = graph; }
-
     public PartialOrderGraph(String dotStructure) {
         graph = new POGraph(dotStructure);
+    }
+
+    public PartialOrderGraph(POGraph pograph) {
+        graph = pograph;
     }
 
     /**
@@ -60,34 +63,6 @@ public class PartialOrderGraph {
         graph.getNextIDs().toArray(ids);
         return ids;
     }
-
-     /**
-     * Get the IDs of the previous nodes of the node with the given ID.
-     *
-     * @param id    ID of current node
-     * @return      IDs of 'previous' nodes
-     */
-    public Integer[] getPreviousNodeIDs(int id) {
-        graph.setCurrent(id);
-        Integer[] ids = new Integer[graph.getPrevIDs().size()];
-        graph.getPrevIDs().toArray(ids);
-        return ids;
-    }
-
-    
-    
-
-    /**
-     * Get the characters in the node with the given ID.
-     *
-     * @param id    ID of current node
-     * @return      Map of sequence characters
-     */
-    public Map<Integer, Character> getSeqChars(int id) {
-        graph.setCurrent(id);
-        return new HashMap<>(graph.getSequenceCharacterMapping());
-    }
-
 
     /**
      * Get the weights of the out edges of the node with the given ID.
@@ -134,15 +109,38 @@ public class PartialOrderGraph {
     }
 
     /**
-<<<<<<< HEAD
      * Return string representation of PO Graph.
-=======
-     * String representation of partial order graph.
->>>>>>> piegraph
      *
      * @return      String representation
      */
     public String toString() {
         return graph.toString();
     }
+    
+    
+         /**
+     * Get the IDs of the previous nodes of the node with the given ID.
+     *
+     * @param id    ID of current node
+     * @return      IDs of 'previous' nodes
+     */
+    public Integer[] getPreviousNodeIDs(int id) {
+        graph.setCurrent(id);
+        Integer[] ids = new Integer[graph.getPrevIDs().size()];
+        graph.getPrevIDs().toArray(ids);
+        return ids;
+    }
+
+
+    /**
+     * Get the characters in the node with the given ID.
+     *
+     * @param id    ID of current node
+     * @return      Map of sequence characters
+     */
+    public Map<Integer, Character> getSeqChars(int id) {
+        graph.setCurrent(id);
+        return new HashMap<>(graph.getSequenceCharacterMapping());
+    }
+
 }

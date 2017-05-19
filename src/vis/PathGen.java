@@ -6,10 +6,8 @@
 package vis;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -17,6 +15,8 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import api.PartialOrderGraph;
+import java.util.AbstractList;
+import java.util.Arrays;
 
 /**
  *
@@ -42,7 +42,14 @@ public class PathGen {
     Integer goalNode;
 
     public Queue<Integer[]> gaps;
+
+    // Keeps track of the nodes which still have unsearched edges
+    public PriorityQueue<Integer> unsearchedPaths;
+    // Store the ends of the gaps in a similar manner
+    public PriorityQueue<Integer> gapEnds;
+    
     private HashMap<Integer, Integer> searchedList = null;
+    private HashMap<Integer, Map<Integer, Double>> nodesWithEdges;
 
     private final int size;
 
@@ -64,50 +71,57 @@ public class PathGen {
         size = poag.getNodeIDs().length;
         nodes = new HashMap<>();
         searchedList = initSearchList();
-        gaps = new LinkedList<>();
+        unsearchedPaths = new PriorityQueue<>();
+        gapEnds = new PriorityQueue<>();
+        // Initialise the nodes with edges to be all the available nodes
+        nodesWithEdges = initNodesWithEdges();
         // Get path depths fills everything out
         HashMap<Integer, List<Integer>> pathDepths = getPathDepths();
+        System.err.println("Nodes size:" + nodes.size() + " should be: " + poag.getNodeIDs().length);
         // Here we want to add in any nodes which we may have missed at the 
         // start of the POAG. There may be multiple starting nodes.
+        ArrayList<Integer> remainingNodes = new ArrayList<>();
+        for (Integer i: poag.getNodeIDs()) {
+            try {
+                Node egg = nodes.get(i);
+                if (egg == null) {
+                    remainingNodes.add(i);
+                    System.err.println("Not in nodes: " + i + " " + Arrays.toString(poag.getNextNodeIDs(i)));
+                }
+            } catch (Exception e) {
+                System.err.println("Not in nodes: " + i);
+            }
+        }
+        
+        addNodes(remainingNodes, depth);
+        System.err.println("Nodes size:" + nodes.size() + " should be: " + poag.getNodeIDs().length);
     }
 
-    public Integer choose_starting_node() {
+    public HashMap<Integer, Map<Integer, Double>> initNodesWithEdges() {
+        nodesWithEdges = new HashMap<>();
+        sorted = poag.getNodeIDs();
+        for (Integer i : sorted) {
+            unsearchedPaths.add(i);
+            nodesWithEdges.put(i, poag.getOutEdgeWeights(i));
+        }
+        return nodesWithEdges;
+    }
+
+    public PriorityQueue<Integer> getStartingNodes() {
         // Performing a topological sort sometimes causes the ordering between
         // the MSA and the inferred graph to differ. Instead assume that it is
         // already sorted.
         sorted = poag.getNodeIDs();
-        ArrayList<Integer> startingNodeIds = new ArrayList<>();
-        Double maxOutWeight = 0.0;
-        Integer maxOutWeightID = sorted[0];
-        Integer currNodeId = sorted[0];
-        Map<Integer, Double> nodeOutWeights;
+        PriorityQueue<Integer> startingNodeIds = new PriorityQueue<>();
         for (int i = 0; i < size; i++) {
             Integer[] prevs = poag.getPreviousNodeIDs(sorted[i]);
             if (prevs[0] == null) {
-                nodeOutWeights = poag.getOutEdgeWeights(sorted[i]);
                 // Add it to our starting node ids
                 startingNodeIds.add(sorted[i]);
-                for (Map.Entry<Integer, Double> out : nodeOutWeights.entrySet()) {
-                    Double outWeight = out.getValue();
-                    if (outWeight > maxOutWeight) {
-                        currNodeId = sorted[i];
-                        maxOutWeightID = currNodeId; // set the id to be that 
-                        maxOutWeight = outWeight; // with the largest out weight
-
-                    }
-                }
+                
             }
         }
-        // Add the nodes which won't be part of the main path with a depth of 1
-        int depth = 1;
-        for (Integer id : startingNodeIds) {
-            if (id != maxOutWeightID) {
-                Node n = new Node(id, id, depth, poag.getCharacterDistribution(id), poag.getOutEdgeWeights(id), poag.getSeqChars(id));
-                nodes.put(id, n);
-            }
-        }
-        // Return the node with the highest out weight
-        return currNodeId;
+        return startingNodeIds;
     }
 
     public void initAStarSearch(Integer startNode, Integer goalNode) {
@@ -165,10 +179,12 @@ public class PathGen {
             if (Objects.equals(currentEntry.getCurrentPosition(), goalNode)) {
                 // Check to make sure we didn't get straight there from the 
                 // initial node, if we did return null and don't re add the gap
-                if (Objects.equals(cameFrom.get(goalNode), startNode)) {
-                    return null;
+                if (Objects.equals(currentEntry.getPreviousPosition(), startNode)) {
+                    // if (Objects.equals(cameFrom.get(goalNode), startNode)) {
+
+                } else {
+                    return (getPath());
                 }
-                return (getPath());
             }
             searchNeighbours();
         }
@@ -176,13 +192,40 @@ public class PathGen {
     }
 
     /**
+     * Gets the out edge weights which are still available to be searched
+     * i.e. paths yet to be explored.
+     */
+    private Map<Integer, Double>  getUnsearchedOutEdgeWeights(Integer id) {
+        try {
+            return nodesWithEdges.get(id);
+        } catch (Exception e) {
+            System.out.println("vis.PathGen.getUnsearchedOutEdgeWeights()");
+        }
+        return null;
+    }
+    
+    /**
+     * Gets the next node id's which are still available to be searched
+     * i.e. have a path which is yet to be explored.
+     */
+    private Set<Integer> getUnsearchedNextNodeIDs(Integer id) {        
+        try {
+            return nodesWithEdges.get(id).keySet();
+        } catch (Exception e) {
+            System.out.println(id + " vis.PathGen.getUnsearchedOutEdgeWeights()");
+        }
+        return null;
+    }
+    
+    /**
      * Searches the neighboring nodes and updates the cost to these nodes if it
      * is less from this current node.
      */
     private void searchNeighbours() {
         int currentID = currentEntry.getCurrentPosition();
-        Map<Integer, Double> successors = poag.getOutEdgeWeights(currentID);
-        Integer[] successorIds = poag.getNextNodeIDs(currentID);
+        Map<Integer, Double> successors = getUnsearchedOutEdgeWeights(currentID);
+        Set<Integer> successorIds = getUnsearchedNextNodeIDs(currentID);
+        // was Integer[]
         double heuristic = 100000; // An arbitarilty large initial heuristic.
         double currentCost = totalScoreMap.get(currentID);
 
@@ -199,13 +242,14 @@ public class PathGen {
             // need to give it the maxinum cost of 0 (which is what the label says)
             double posCost = costPenalty;
             try {
-                posCost = costPenalty - (100 * successors.get(neighborID)); //Because we want it to have some cost                                
+                posCost = costPenalty + 1;//- (100 * successors.get(neighborID)); 
+                //Because we want it to have some cost                                
             } catch (Exception e) {
                 posCost = 200; // This has no weight associated need to ask!
                 System.err.println("The ids didnt match the length of out "
-                        + " weights: " + Arrays.toString(successorIds) + "\n" + successors.toString());
+                        + " weights: " + successorIds + "\n" + successors.toString());
             }
-            heuristic = getHeuristic(0, 0);
+            heuristic = 0;//getHeuristic(0, 0);
             // Means it hasn't been searched yet otherwise we ignore it
             if (pos > 0) {
                 // Get the total score to the 
@@ -240,44 +284,45 @@ public class PathGen {
      * @return most likely path.
      */
     private List<Integer> getPath() {
-        int currId = currentEntry.getCurrentPosition();
-        String totalPath = "" + currId;
+        int prevId = currentEntry.getCurrentPosition();
+        String totalPath = "" + prevId;
         List<Integer> pathReverse = new ArrayList<>();
-        pathReverse.add(currId);
-        int prevId = 0;
-        while (currId != startNode) {
-            prevId = currId;
+        pathReverse.add(prevId);
+        int curId = 0;
+        // Each time we get the path we want to re initialise the priority queue
+        // which stores the smallest node
+        while (prevId != startNode) {
+            curId = prevId;
             try {
-                currId = cameFrom.get(prevId);
+                prevId = cameFrom.get(prevId);
             } catch (Exception e) {
                 System.err.println(e);
                 return null;
             }
-            totalPath += "-" + currId;
-            pathReverse.add(currId);
-            // Means there is a gap so add it to the gaps
-            if (prevId - currId != 1) {
-                // If the gap size is two we know we're just going to want to 
-                // add the node one out from the two (add one to the depth)
-                if (prevId - currId == 2) {
-                    int gapNodeId = currId + 1;
-                    int prevY = depth + 1;
-                    System.err.println("" + Arrays.toString(poag.getNodeIDs()));
-                    Node n = new Node(gapNodeId, gapNodeId, prevY, poag.getCharacterDistribution(gapNodeId), poag.getOutEdgeWeights(gapNodeId), poag.getSeqChars(gapNodeId));
-                    nodes.put(gapNodeId, n);
-                } else {
-                    addGaps(currId, prevId);
-                }
+            totalPath += "-" + prevId;
+            pathReverse.add(prevId);
+            // We want to ensure that every node is searched but that
+            // edges aren't re traversed, as such remove this edge from the unsearched edges list.
+            nodesWithEdges.get(prevId).remove(curId);
+            if (nodesWithEdges.get(prevId).keySet().size() < 1) {
+                unsearchedPaths.remove(prevId);
             }
-        }
-        if (prevId - startNode != 1) {
-            if (prevId - currId == 2) {
-                int gapNodeId = prevId + 1;
-                int prevY = depth + 1;
-                Node n = new Node(gapNodeId, gapNodeId, prevY, poag.getCharacterDistribution(gapNodeId), poag.getOutEdgeWeights(gapNodeId), poag.getSeqChars(gapNodeId));
-                nodes.put(gapNodeId, n);
-            } else {
-                addGaps(currId, prevId);
+            // Means there is a gap so add it to the gaps
+            if (curId - prevId != 1) {
+                // If the gap size is two we know we're just going to want to 
+                // add the node one out from the two (add one to the depth)                
+                if (curId - prevId == 2) {
+                    int gapNodeId = prevId + 1;
+                    int prevY = depth + 1;
+                    try {
+                        Node n = new Node(gapNodeId, gapNodeId, prevY, poag.getCharacterDistribution(gapNodeId), poag.getOutEdgeWeights(gapNodeId), poag.getSeqChars(gapNodeId));
+                        nodes.put(gapNodeId, n);
+                    } catch (Exception e) {
+                        System.err.println(e + " Node: " + gapNodeId + " removed during inferrence");
+                    }
+                } else {
+                    addGaps(prevId, curId);
+                }
             }
         }
         return pathReverse;
@@ -300,8 +345,8 @@ public class PathGen {
      * @param end
      */
     public void addGaps(int start, int end) {
-        Integer[] gap = {start, end};
-        gaps.add(gap);
+        //Integer[] gap = {start, end};
+        gapEnds.add(end);
     }
 
     /**
@@ -319,8 +364,10 @@ public class PathGen {
      * and are looking for subsequent paths.
      */
     public void resetSearchList() {
-        Set<Integer> keys = searchedList.keySet();
+        Set<Integer> keys = nodesWithEdges.keySet();//searchedList.keySet();
         keys.stream().forEach((Integer k) -> {
+            // We want to check if there are out edges still remaining for a
+            // Node otherwise we don't want to add it to the search list
             searchedList.put(k, 1);
         });
     }
@@ -339,7 +386,6 @@ public class PathGen {
         goalID = sorted[sorted.length - 1];
         // Choose the starting node and add those which won't be covered by the
         // search path to the list
-        startID = choose_starting_node();
         for (int i = 0; i < size; i++) {
             search.put(sorted[i], 1);
         }
@@ -359,67 +405,99 @@ public class PathGen {
         }
     }
 
+    
+    /**
+     * Helper function to convert a key set to a priority queue
+     * Used for storing the nodes left to search
+     */
+    private void keySetToPriorityQueue(Set<Integer> keyset) {
+        unsearchedPaths.clear();
+        keyset.stream().forEach((i) -> {
+            unsearchedPaths.add(i);
+        });
+    }
+    
+    
     /**
      * Returns a map of paths and the depth at which these occur
      *
      * @return paths
      */
     public HashMap<Integer, List<Integer>> getPathDepths() {
-        Integer[] nodeys = poag.getNodeIDs();
-        int numNodes = nodeys.length;
-
         HashMap<Integer, List<Integer>> paths = new HashMap<>();
         // want there to be a distinct x position for each node
         // This gets the main path which will be centered
-        resetSearchList();
-        initAStarSearch(startID, goalID);
-        List<Integer> path = getMainPath();
-        paths.put(depth, path);
-        addNodes(path, depth);
-        // Now we need to get each of the subsequent paths
-        // A depth will be associated for each itteration - this will be
-        // visualised as further away from the central line.
-        depth++;
-
         int prevGapStart = 10000000; // Something large (note this needs to be done better)
-        int gapEnd = 0;
         int gapStart = 0;
-        while (!gaps.isEmpty()) {
-            // Get the next gap from the FIFO gap queue set up in the POAG
-            Integer[] gap = gaps.remove();
-            gapStart = gap[0];
-            gapEnd = gap[1];
-
-            // Set up the AStar search environment with the start and end 
-            // This also clears the searched nodes in the search map
-            resetSearchList();
-            initAStarSearch(gapStart, gapEnd);
-            path = getMainPath();
-
-            // If the path was null we don't want to add it - see code below
-            // for alternative method (ugly with nested while loops to step
-            // through the gap.
-            if (path == null) {
-                //System.err.println("depth: " + depth + " Path: was none for gap: " + Arrays.toString(gap));
-                continue;
+        int gapEnd = goalID;
+        List<Integer> path;
+        // First search all the starting node paths
+        PriorityQueue<Integer> startingNodes = getStartingNodes();
+        int startDepth = 0;
+        while (!startingNodes.isEmpty()){
+            gapStart = startingNodes.poll();
+            path = getSubPath(gapStart, gapEnd);
+            paths.put(startDepth, path);
+            addNodes(path, startDepth);
+            if (startDepth == 0) {
+                startDepth += 1;
             }
-            //System.err.println("Depth: " + depth + ", Path: " + path);  
+            nodesWithEdges = initNodesWithEdges();
+        }
+        // We want to search every path rather than just the gaps.
+        while (!gapEnds.isEmpty()) {
+            // Get the next gap from the FIFO gap queue set up in the POAG
+            // Initialise the start node as the smallest node with unsearched 
+            // paths
+            // Reset the unseached paths as the keyset of the nodes left
+            // Resets the unsearched paths
+            keySetToPriorityQueue(nodesWithEdges.keySet());
+            gapStart = unsearchedPaths.poll();
+            // We want to remove the gap end
+            gapEnd = gapEnds.poll();
+            path = getSubPath(gapStart, gapEnd);
             paths.put(depth, path);
             addNodes(path, depth);
             // Check if we have reached the end of the first itteration of gaps
             // We can tell this because the gaps will start again from the 
             // End of the path.
-            if (gapStart > prevGapStart) {
+            if (gapStart < prevGapStart) {
                 depth++;
             }
-
             prevGapStart = gapStart;
         }
-
+//        if (nodes.size() != size) {
+//
+//        }
         // Reset the nodes to have correct x coords
         return paths;
     }
 
+    private List<Integer> getSubPath(int gapStart, int gapEnd) {
+            // Set up the AStar search environment with the start and end 
+            // This also clears the searched nodes in the search map
+            resetSearchList();
+            initAStarSearch(gapStart, gapEnd);
+            List<Integer> path = getMainPath();
+            // If the path was null we don't want to add it - see code below
+            // for alternative method (ugly with nested while loops to step
+            // through the gap.
+            while (path == null && gapStart <= gapEnd) {
+                path = getMainPath();
+                // If there was no path to the node it is another starting node
+                // So we add it at the current depth
+                if (gapEnd == gapStart) {
+                    path.add(gapEnd);
+                    break;
+                }
+                resetSearchList();
+                gapStart = unsearchedPaths.poll();
+                initAStarSearch(gapStart, gapEnd);
+            }
+            
+            return path;
+    }
+    
     private void addNodes(List<Integer> path, int depth) {
         int id;
 
