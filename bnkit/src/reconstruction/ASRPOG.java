@@ -270,38 +270,34 @@ public class ASRPOG {
 	 * @param filename	filepath to save distribution
 	 */
 	public void saveDistrib(String filename) throws IOException {
-		Writer writer = new PrintWriter(filename, "UTF-8");
-		Object[] aacid = Enumerable.aacid_ext.getValues();
-		Object[][] margMatrix = new Object[aacid.length][marginalDistributions.length + 1];
-		writer.write("columns\t");
-		for (int i = 1; i < marginalDistributions.length; i++) { //write header
-			if (i == marginalDistributions.length - 1)
-				writer.write(i + "\n");
+		if (marginalNode == null) {
+			System.err.println("Marginal reconstruction has not been performed. Cannot save distribution.");
+			return;
+		}
+		POGraph ancestor = getAncestor(marginalNode);
+		Writer writer = new PrintWriter(filename + "_dist.tsv", "UTF-8");
+		Object[] aacid = Enumerable.aacid.getValues();
+		writer.write("ID\t");
+		// Header is amino acid characters
+		for (int i = 0; i < aacid.length; i++)  //write header
+			if (i == aacid.length - 1)
+				writer.write(aacid[i] + "\n");
 			else
-				writer.write(i + "\t");
-		}
-		for (int j = 0; j < aacid.length; j++) { //fill in row names
-			margMatrix[j][0] = aacid[j];
-		}
-		for (int k = 1; k < marginalDistributions.length + 1; k++) {
-			EnumDistrib distr = marginalDistributions[k - 1];
+				writer.write(aacid[i] + "\t");
+		// Each row is a graph node ID and character distribution
+		for (int k = 0; k < ancestor.getNumNodes(); k++) {
+			writer.write(Integer.toString(ancestor.getNodeIDs().get(k)) + "\t");
+			ancestor.setCurrent(ancestor.getNodeIDs().get(k));
+			Map<Character, Double> distribution = ancestor.getCharacterDistribution();
 			for (int a = 0; a < aacid.length; a++) {
-				if (aacid[a].equals('-')) {
-					Object na = "NA";
-					margMatrix[a][k] = na;
-				} else {
-					double val = distr.get(aacid[a]);
-					margMatrix[a][k] = val;
-				}
-			}
-		}
-		for (int j = 0; j < aacid.length; j++) {
-			for (int k = 0; k < margMatrix[j].length; k++) {
-				if (k == margMatrix[j].length - 1) {
-					writer.write(margMatrix[j][k] + "\n");
-				} else {
-					writer.write(margMatrix[j][k] + "\t");
-				}
+				if (!distribution.containsKey(aacid[a]))
+					writer.write("NA");
+				else
+					writer.write(Double.toString(distribution.get(aacid[a])));
+				if (a == aacid.length - 1)
+					writer.write("\n");
+				else
+					writer.write("\t");
 			}
 		}
 		writer.close();
