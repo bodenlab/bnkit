@@ -170,7 +170,7 @@ public class PhyloTree {
                 node.setParent(parent);
             } else { // there's a distance
                 String label = str.substring(0, split_index).trim();
-                node = new Node(label.contains("|") ? label.substring(0, label.indexOf('|')).trim() : label);
+                node = new Node(label);
                 double dist = Double.parseDouble(str.substring(split_index + 1, str.length()));
                 if (dist == 0.0) {
                     dist = 0.00001;
