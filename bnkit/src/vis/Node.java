@@ -16,7 +16,7 @@ public class Node {
     private int x;
     private int y;
     private final Map<Character, Double> graph;
-    private Map<Character, Integer> seqChars;
+    private Map<Character, Double> seqChars;
     private final int id;
     private Map<Integer, Double> outedges;
     
@@ -36,10 +36,13 @@ public class Node {
      * @param rawSeq
      * @return 
      */
-    private Map<Character, Integer> makeDistSeqChars(Map<Integer, Character> rawSeq) {
+    private Map<Character, Double> makeDistSeqChars(Map<Integer, Character> rawSeq) {
         seqChars = new HashMap<>();
 
-        for (Map.Entry<Integer, Character> list : rawSeq.entrySet()) {
+        int numSequences = rawSeq.size();
+        for (Character base : graph.keySet())
+            seqChars.put(base, graph.get(base)*numSequences);
+        /*for (Map.Entry<Integer, Character> list : rawSeq.entrySet()) {
             
             // Try and see if we have already stored the character otherwise add
             // it
@@ -51,11 +54,11 @@ public class Node {
             } catch(Exception e) {
                 seqChars.put(list.getValue(), 1); // The initial count
             }
-        }
+        }*/
         return seqChars;
     }
     
-    public Map<Character, Integer> getSeq() {
+    public Map<Character, Double> getSeq() {
         return seqChars;
     }
            

@@ -5,12 +5,13 @@
  */
 package vis;
 
+import api.PartialOrderGraph;
+import json.JSONArray;
+import json.JSONObject;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import json.JSONArray;
-import json.JSONObject;
-import api.PartialOrderGraph;
 
 /**
  *
@@ -39,15 +40,14 @@ public class POAGJson {
      * @param map
      * @return
      */
-    private JSONObject seq2JSON(Map<Character, Integer> map) {
+    private JSONObject seq2JSON(Map<Character, Double> map) {
         JSONObject chars = new JSONObject();
         JSONArray bars = new JSONArray();
-        for (Map.Entry<Character, Integer> list : map.entrySet()) {
+        for (Map.Entry<Character, Double> list : map.entrySet()) {
             JSONObject bar = new JSONObject();
             bar.put("label", list.getKey().toString());
             bar.put("value", list.getValue());
             bars.put(bar);
-            break;
         }
         chars.put("chars", bars);
         return chars;
