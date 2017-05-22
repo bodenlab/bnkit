@@ -41,7 +41,8 @@ public class Node {
 
         int numSequences = rawSeq.size();
         for (Character base : graph.keySet())
-            seqChars.put(base, graph.get(base)*numSequences);
+            if (graph.get(base) > 0.01)
+                seqChars.put(base, graph.get(base)*numSequences);
         /*for (Map.Entry<Integer, Character> list : rawSeq.entrySet()) {
             
             // Try and see if we have already stored the character otherwise add
