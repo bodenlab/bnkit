@@ -3,6 +3,9 @@ package reconstruction;
 import bn.math.Matrix;
 import dat.*;
 import dat.substitutionmodels.Blosum62;
+import alignment.utilities.MutableInt;
+import alignment.PairHMM;
+
 
 import java.io.*;
 import java.util.*;
