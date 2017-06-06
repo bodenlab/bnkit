@@ -1,4 +1,4 @@
-package alignment.utilities.;
+package alignment.utilities;
 
 
 import Alignment.Utilities.Sequence;
@@ -18,7 +18,7 @@ import java.util.Map;
 public class HashProfile {
 
 
-    private List<Map<Character,MutableInt>> profileArray;
+    private List<Map<Character, alignment.utilities.MutableInt>> profileArray;
     private List<String> seqIDs;
     private List<Sequence> sequences;
 
