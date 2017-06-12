@@ -902,8 +902,8 @@ public class POGraph {
                                     sequences.put(seqId, seq);
                                 }
                                 // TODO: Base character for MSA (if base is null)
-//                                nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeSeqCharMap.get(fromNodeId).get(seq));
-//                                nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeSeqCharMap.get(toNodeId).get(seq));
+                                nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeSeqCharMap.get(fromNodeId).get(seq));
+                                nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeSeqCharMap.get(toNodeId).get(seq));
                                 if (!seqNodeMap.containsKey(seqId))
                                     seqNodeMap.put(seqId, new ArrayList<>());
                                 if (!seqNodeMap.get(seqId).contains(nodes.get(fromNodeId)))
@@ -1314,19 +1314,19 @@ public class POGraph {
          * @param base	Base character of sequence
          */
         private void addSequence(int seqId, char base){
-            if (this.seqChars.isEmpty())
-                this.base = base;
-            if (base != this.base) {
-                this.base = 0;
-
-            }
-
-            MutableInt count = bases.get(base);
-            if (count == null) {
-                bases.put(base, new MutableInt());
-            } else {
-                count.increment();
-            }
+//            if (this.seqChars.isEmpty())
+//                this.base = base;
+//            if (base != this.base) {
+//                this.base = 0;
+//
+//            }
+//
+//            MutableInt count = bases.get(base);
+//            if (count == null) {
+//                bases.put(base, new MutableInt());
+//            } else {
+//                count.increment();
+//            }
 
             for (Integer sqId : seqChars.keySet())
                 if (sqId == seqId)
