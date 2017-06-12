@@ -3,6 +3,7 @@ package dat;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
+import alignment.utilities.MutableInt;
 
 import java.io.*;
 import java.util.*;
@@ -67,7 +68,7 @@ public class POGraph {
 
 	/**
 	 * Copy constructor for the partial order graph
-	 * 
+	 *
 	 * @param copy	POGraph to copy from
 	 */
 	public POGraph(POGraph copy) {
@@ -122,7 +123,7 @@ public class POGraph {
 
 	/**
 	 * Set the pointer of the current node reference to the node with the specified ID.
-	 * 
+	 *
 	 * @param nodeID	Node ID to set as current
 	 * @return			indication of whether setting the node succeeded or not
 	 */
@@ -177,14 +178,14 @@ public class POGraph {
 
 	/**
 	 * Get the mapping between sequence ID and base character for the current node.
-	 * 
+	 *
 	 * @return	mapping <seqID, base character>
 	 */
 	public Map<Integer, Character> getSequenceCharacterMapping(){ return (current == null) ? null : current.getSeqCharMapping(); }
-	
+
 	/**
 	 * Set the inferred base character of the current node.
-	 * 
+	 *
 	 * @param base	inferred base character
 	 */
 	public void setBase(char base){
@@ -207,6 +208,15 @@ public class POGraph {
 		return bases;
 	}
 
+	public Map<Character, MutableInt> getCurrentBaseCounts(){
+		if (current == null)
+			return null;
+		return current.getBaseCounts();
+
+	}
+
+
+
 	/**
 	 * Get a list of base characters in the current node (note: can have repeats).
 	 *
@@ -223,9 +233,20 @@ public class POGraph {
 	 */
 	public int getNumNodes(){ return nodes.size(); }
 
+    /**
+     * Get a sorted list of IDs in the graph
+     *
+     * @return topologically sorted list of IDs
+     */
+    public List<Integer> getSortedIDs(){
+        List<Integer> sortedIDs = topologicalSort();
+        return sortedIDs;
+
+    }
+
 	/**
 	 * Get the ID of the current node.
-	 * 
+	 *
 	 * @return	id of the current node, -1 if no node is set
 	 */
 	public int getCurrentId(){ return (current == null) ? -1 : current.getID(); }
@@ -268,7 +289,7 @@ public class POGraph {
 			nextIDs.add(node.getID());
 		return nextIDs;
 	}
-	
+
 	/**
 	 * Removes the current node from the graph.
 	 */
@@ -313,10 +334,10 @@ public class POGraph {
 		nodes.remove(current.getID(), current);
 		current = initialNode.getNextNodes().get(0);
 	}
-	
+
 	/**
 	 * Get a list of IDs of the nodes in the graph.
-	 * 
+	 *
 	 * @return	List of structure node IDs.
 	 */
 	public List<Integer> getNodeIDs(){
@@ -717,7 +738,7 @@ public class POGraph {
 
 	/**
 	 * String representation of the partial order alignment graph.
-	 * 
+	 *
 	 * @return	String representation as dot format
 	 */
 	public String toString() {
@@ -760,11 +781,11 @@ public class POGraph {
 		sb += "}";
 		return sb;
 	}
-	
+
 
 	/**
 	 * Load partial order alignment structure from filename or string format
-	 * 
+	 *
 	 * @param 	structure string representation of structure or filepath to structure representation
 	 * @return	first node in the graph
 	 */
@@ -1020,10 +1041,10 @@ public class POGraph {
 		for (Node next : node.getNextNodes())
 			addNode(next);
 	}
-	
+
 	/**
 	 * Gets the ID of the extant sequence, i.e. position in the extant sequence list
-	 * 
+	 *
 	 * @param 	seqLabel	label of extant sequence
 	 * @return	position of sequence in extant sequence list
 	 */
@@ -1124,16 +1145,18 @@ public class POGraph {
     private class Node {
     	private Integer ID = null;								// alignment ID
     	private Character base;									// base character
-    	private List<Node> prevNodes;							// list of neighbouring previous nodes
+		private Map<Character, MutableInt> bases;
+		private List<Node> prevNodes;							// list of neighbouring previous nodes
     	private List<Node> nextNodes;							// list of neighbouring next nodes
 		private List<Node> alignedTo = null;					// list of nodes that are aligned with this node
 		private HashMap<Integer, Character> seqChars;			// map of sequence Ids and their base character
 		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
-    	
+
     	/**
     	 * Constructor
     	 */
     	public Node() {
+			this.bases = new HashMap<>();
 			this.prevNodes = new ArrayList<>();
 			this.nextNodes = new ArrayList<>();
 			this.seqChars = new HashMap<>();
@@ -1147,11 +1170,12 @@ public class POGraph {
     	public Node(Integer ID) {
 			this();
     		this.ID = ID;
-    	}
+
+		}
 
     	/**
     	 * Returns a deep copy of the node structure.
-    	 * 
+    	 *
     	 * @param map	Map structure to keep track of visited nodes
     	 * @return		deep copy of node
     	 */
@@ -1173,7 +1197,7 @@ public class POGraph {
 			}
 			return copy;
     	}
-    	
+
     	/**
     	 * Get the ID of the alignment
 		 *
@@ -1231,7 +1255,7 @@ public class POGraph {
 
     	/**
     	 * Checks if the previous node is already stored, if not, add to list of previous nodes.
-    	 * 
+    	 *
     	 * @param prev		Pointer to the prev node
     	 */
     	private void addPrevNode(Node prev) {
@@ -1240,10 +1264,10 @@ public class POGraph {
     				return;
 			prevNodes.add(prev);
     	}
-    	
+
     	/**
     	 * Checks if the next node is already stored, if not, add to list of next nodes.
-    	 * 
+    	 *
     	 * @param next		Pointer to the next node
     	 */
     	private void addNextNode(Node next) {
@@ -1252,10 +1276,10 @@ public class POGraph {
 					return;
 			nextNodes.add(next);
     	}
-    	
+
     	/**
     	 * Remove the previous node from the list.
-    	 * 
+    	 *
     	 * @param prev	previous node
     	 */
 		private void removePrevNode(Node prev){
@@ -1265,10 +1289,10 @@ public class POGraph {
     				return;
     			}
     	}
-    	
+
     	/**
     	 * Remove the next node from the list.
-    	 * 
+    	 *
     	 * @param next	next node
     	 */
 		private void removeNextNode(Node next){
@@ -1294,23 +1318,23 @@ public class POGraph {
 
     	/**
     	 * Get list of next nodes.
-    	 * 
+    	 *
     	 * @return	list of next nodes
     	 */
 		private List<Node> getNextNodes(){ return this.nextNodes; }
-    	
+
     	/**
     	 * Get list of previous nodes.
-    	 * 
+    	 *
     	 * @return	list of previous nodes
     	 */
 		private List<Node> getPreviousNodes(){
     		return this.prevNodes;
     	}
-    	
+
     	/**
     	 * Set the inferred base character of this Node.
-    	 * 
+    	 *
     	 * @param base	inferred base character
     	 */
 		private void setBase(Character base) {
@@ -1320,15 +1344,18 @@ public class POGraph {
 
     	/**
     	 * Get the inferred base character.
-    	 * 
+    	 *
     	 * @return	inferred base character
     	 */
 		private Character getBase(){ return base; }
 
+		private Map<Character, MutableInt> getBaseCounts(){ return bases; }
 
-    	/**
+
+
+		/**
     	 *  Generates string representation of the Node.
-    	 *  
+    	 *
     	 * @return		String representation in reduced dot format
     	 */
     	public String toString() {

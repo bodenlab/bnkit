@@ -1,7 +1,7 @@
 package alignment.utilities;
 
 
-import Alignment.Utilities.Sequence;
+import alignment.utilities.Sequence;
 
 import java.util.ArrayList;
 import java.util.HashMap;

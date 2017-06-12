@@ -3,9 +3,9 @@ package reconstruction;
 import bn.math.Matrix;
 import dat.*;
 import dat.substitutionmodels.Blosum62;
+import alignment.utilities.SubstitutionMatrix;
 import alignment.utilities.MutableInt;
 import alignment.PairHMM;
-
 
 import java.io.*;
 import java.util.*;
@@ -22,14 +22,14 @@ public class MSA {
     private double openGapPenalty = -4;
     private double extendGapPenalty = -2;
     private POGraph graph;
-    private Blosum62 blosum62;
+    private SubstitutionMatrix subMatrix;
     List<Integer> sortedIDs;
 
 
     public MSA(String filepath) throws IOException{
 
 
-        MSA msa = new MSA(filepath, -4, -2, Blosum62 blosum62, false, false);
+        MSA msa = new MSA(filepath, -4, -2, new SubstitutionMatrix("blosum62"), false, false);
     }
 
     /**
