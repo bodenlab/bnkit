@@ -902,8 +902,8 @@ public class POGraph {
                                     sequences.put(seqId, seq);
                                 }
                                 // TODO: Base character for MSA (if base is null)
-                                nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeSeqCharMap.get(fromNodeId).get(seq));
-                                nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeSeqCharMap.get(toNodeId).get(seq));
+//                                nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeSeqCharMap.get(fromNodeId).get(seq));
+//                                nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeSeqCharMap.get(toNodeId).get(seq));
                                 if (!seqNodeMap.containsKey(seqId))
                                     seqNodeMap.put(seqId, new ArrayList<>());
                                 if (!seqNodeMap.get(seqId).contains(nodes.get(fromNodeId)))

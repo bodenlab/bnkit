@@ -1,5 +1,7 @@
 package reconstruction;
 
+import alignment.utilities.SubstitutionMatrix;
+
 import java.io.IOException;
 
 
@@ -102,7 +104,10 @@ public class RunASRPOG {
                         System.out.println("got here sucka");
 
                         MSA msa = new MSA(sequencePath);
-                        asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
+//						SubstitutionMatrix blosum62 = new SubstitutionMatrix("blosum62");
+//						MSA msa = new MSA(sequencePath, -10, -4, blosum62, false, false );
+
+						asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
                     }
                 }
 					asr = new ASRPOG(poagRepresentation, treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);

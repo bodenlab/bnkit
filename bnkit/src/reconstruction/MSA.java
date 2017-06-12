@@ -29,7 +29,7 @@ public class MSA {
     public MSA(String filepath) throws IOException{
 
 
-        MSA msa = new MSA(filepath, -4, -2, new SubstitutionMatrix("blosum62"), false, false);
+        this(filepath, -4, -2, new SubstitutionMatrix("blosum62"), false, false);
     }
 
     /**
@@ -46,7 +46,7 @@ public class MSA {
         try {
 
             List<EnumSeq.Gappy<Enumerable>> seqs = getSeqs(filepath);
-            POGraph graph = getGraph(seqs);
+            graph = getGraph(seqs);
 
 
 
@@ -159,6 +159,7 @@ public class MSA {
         for (int id = 0; id < graphLength; id++)
             nodeIds.add(id);
         graph.addSequence(0, seqs.get(0).getName(), seqs.get(0).toString(), nodeIds);
+        this.graph = graph;
 
         return graph;
     }
@@ -490,7 +491,7 @@ public class MSA {
             // Get character of node
             List<Character> bases = new ArrayList<>();
             Character pbase = this.graph.getCurrentBase();
-            if (pbase == null) // multiple base characters to consider
+            if (pbase == '\u0000') // multiple base characters to consider
                 bases.addAll(this.graph.getSequenceCharacterMapping().values());
             else
                 bases.add(pbase);
@@ -540,8 +541,9 @@ public class MSA {
                 matchPoints = getMEAMatchScore(i, sequence);
             }
 
+            //TODO: Don't just grab the first base from bases, but use them all together
             else {
-                matchPoints = this.getMatchScore(pbase, sequence, subMatrix);
+                matchPoints = this.getMatchScore(bases.get(0), sequence, subMatrix);
             }
 
 //            System.out.println("Profile match score ");
