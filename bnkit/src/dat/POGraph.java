@@ -1,5 +1,6 @@
 package dat;
 
+import com.sun.xml.internal.fastinfoset.util.CharArray;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
@@ -817,6 +818,8 @@ public class POGraph {
         Map<String, Integer> inputNodeToPONode = new HashMap<>();				// Mapping of input nodes and which PO graph nodes they are stored in
         Map<Integer, Map<String, Character>> nodeSeqCharMap = new HashMap<>();	// Mapping of input nodes, the sequences in that node and their base characters from the aln
         try {
+            String label = "";
+            int pogId = -1;
             // load all nodes
             while (line != null) {
                 line = line.replace("\t", "");
@@ -825,17 +828,20 @@ public class POGraph {
                     if (elements.length > 1) {
                         String nodeId = elements[0].replace("\"","");
                         nodeId = nodeId.replaceAll("[^\\d]", "");
-                        int pogId = Integer.parseInt(nodeId);
+                        pogId = Integer.parseInt(nodeId);
                         HashMap<Character, Double> dist = null;
                         Character base = null;
+                        CharArray bases = null;
                         elements = elements[1].split("[,]+");
                         for (String el : elements)
                             if (el.contains("label")) {
                                 // load node label
                                 elements = el.split("[\"]+");
-                                String label = elements[1].replaceAll("\"", "");
-                                if (label.length() == 1)
+                                label = elements[1].replaceAll("\"", "");
+                                if (label.length() == 1) {
                                     base = label.toCharArray()[0];
+                                }
+
                             } else if (el.contains("distribution")) {
                                 // load node character distribution, expects "char:prob char:prob ... "
                                 elements = el.split("[\" ]+");
@@ -858,7 +864,26 @@ public class POGraph {
                             nodes.get(pogId).setCharacterDistribution(dist);
                         inputNodeToPONode.put(nodeId, pogId);
                     }
+                } else {
+
+                    String[] elements = line.split("[\\[]+");
+
+//                    elements = elements[1].split("[,]+");
+                    for (String el : elements) {
+                        if (el.contains("sequences")) {
+                            nodeSeqCharMap.put(pogId, new HashMap<>());
+                            el = el.replace("\"", "");
+                            String seqs = el.split("sequences=")[1];
+                            seqs = seqs.split("[];]+")[0];
+                            for (String seq : seqs.split("[,]+"))
+                                nodeSeqCharMap.get(pogId).put(seq, label.toCharArray()[0]);
+
+//                            nodeSeqCharMap.get(pogId).put(seq.split("[:]+")[0], seq.split("[:]+")[1].toCharArray()[0]);
+                        }
+                    }
+
                 }
+
                 if (reader != null)
                     line = reader.readLine();
                 else if (lineCount + 1 == lines.length)
@@ -902,6 +927,11 @@ public class POGraph {
                                     sequences.put(seqId, seq);
                                 }
                                 // TODO: Base character for MSA (if base is null)
+//                                System.out.println("This label is in ");
+//                                System.out.println(lines[lineCount - 1]);
+//
+//                                System.out.println("These sequences");
+//                                System.out.println(lines[lineCount]);
                                 nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeSeqCharMap.get(fromNodeId).get(seq));
                                 nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeSeqCharMap.get(toNodeId).get(seq));
                                 if (!seqNodeMap.containsKey(seqId))
@@ -1335,6 +1365,8 @@ public class POGraph {
 
 
         }
+
+
 
         /**
          * Get list of next nodes.

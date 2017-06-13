@@ -28,8 +28,11 @@ public class MSA {
 
     public MSA(String filepath) throws IOException{
 
-
         this(filepath, -4, -2, new SubstitutionMatrix("blosum62"), false, false);
+    }
+
+    public MSA(String filepath, String alignmentType) throws IOException{
+        this(filepath, 0.01, 0.39, 0.011, 0.05, 0.05, new SubstitutionMatrix("blosum62EstimatedWithX"), alignmentType, true, true);
     }
 
     /**
@@ -55,10 +58,10 @@ public class MSA {
                 List<Integer> alignment = alignSeqToGraph(seqs.get(seqId).toString(), false, partialOrder, partialOrderTraceback);
 
                 graph.addSequence(seqId, seqs.get(seqId).getName(), seqs.get(seqId).toString(), alignment);
-//                    saveMSA("/Users/gabe/Dropbox/Code/!Files/MEAPOA/" + seqId);
+                    saveMSA("/Users/gabefoley/Dropbox/Code/!Files/MEAPOA/" + seqId);
                 Map<Character, MutableInt> baseCounts = graph.getCurrentBaseCounts();
 
-//            System.out.println("Done");
+            System.out.println("Done");
 
             }
 
@@ -95,19 +98,24 @@ public class MSA {
 
 
             if (type.equals("POViterbi")){
+                System.out.println("Using Partial Order Viterbi alignment");
                 pairHMM.getViterbiAlignment();
 
             }
 
             else if (type.equals("Viterbi")){
+                System.out.println("Using Viterbi alignment");
                 pairHMM.getViterbiAlignment();
             }
 
             else if (type.equals("POMEA")){
+                System.out.println("Using Partial order maximum expected accuracy alignment");
                 pairHMM.getMEAAlignment(1);
             }
 
             else if (type.equals("MEA")){
+                System.out.println("Using Maximum expected accuracy alignment");
+
 //                pairHMM = new PairHMM(graph, seqs, tau, epsilon, delta, emissionX, emissionY, subMatrix, type, false);
 
                 pairHMM.getMEAAlignment(1);
@@ -491,7 +499,7 @@ public class MSA {
             // Get character of node
             List<Character> bases = new ArrayList<>();
             Character pbase = this.graph.getCurrentBase();
-            if (pbase == '\u0000') // multiple base characters to consider
+            if (pbase == null) // multiple base characters to consider
                 bases.addAll(this.graph.getSequenceCharacterMapping().values());
             else
                 bases.add(pbase);

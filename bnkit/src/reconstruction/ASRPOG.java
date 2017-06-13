@@ -99,6 +99,19 @@ public class ASRPOG {
 
 	/**
 	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 * This one
+	 * @param msa				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param maxParsimonyGaps	flag for indicating gap inference using maximum parsimony (true: maximum parsimony or false: maximum likelihood)
+	 */
+	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, boolean maxParsimonyGaps) throws IOException {
+		performASR(msa, treeFile, sequenceFile, jointInference, maxParsimonyGaps);
+	}
+
+	/**
+	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
 	 *
 	 * @param pog			POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
@@ -335,6 +348,36 @@ public class ASRPOG {
 			pog = sequenceFile;
 		pogAlignment = new POGraph(pog, sequenceFile);
 		pog = null;
+
+		// perform inference
+		if (jointInference) {
+			marginalDistributions = null;
+			queryBNJoint(parsimony);
+		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
+			queryBNMarginal(marginalNode, parsimony);
+		} else {
+			if (marginalNode == null)
+				System.out.println("No node was specified for the marginal inference: inferring the root node");
+			else
+				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
+			marginalNode = phyloTree.getRoot().getLabel().toString();
+			queryBNMarginal(phyloTree.getRoot().getLabel().toString(), parsimony);
+		}
+	}
+
+	/**
+	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 *
+	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param msa				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param parsimony			flag to identify gaps in reconstruction using parsimony (true) or maximum likelihood (false)
+	 */
+	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, boolean parsimony) throws RuntimeException, IOException {
+		loadData(treeFile, sequenceFile);
+
+		pogAlignment = msa;
 
 		// perform inference
 		if (jointInference) {

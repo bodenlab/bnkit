@@ -31,6 +31,8 @@ public class Alignment {
     private int[][] iBackIndexes;
     private int[][] jBackIndexes;
 
+
+
     /**
      * Constructor that takes sequences as Strings and converts them into HashProfiles
      * @param seq1 First sequence

@@ -1,7 +1,5 @@
 package reconstruction;
 
-import alignment.utilities.SubstitutionMatrix;
-
 import java.io.IOException;
 
 
@@ -37,16 +35,17 @@ public class RunASRPOG {
 	 * @throws IOException
 	 */
 	public static void main(String[] args) throws IOException {
-		
+
 		if (args.length > 1) {
 			ASRPOG asr = null;
-			
+
 			String inference = "joint";
 			String marginalNode = null;
 			String outputPath = "";
 			String sequencePath = "";
 			String treePath = "";
 			String poagRepresentation = "";
+			String alignmentType;
 			if (!args[0].contains("-"))
 				if (!args[0].contains(".nwk"))
 					poagRepresentation = args[0];
@@ -75,45 +74,34 @@ public class RunASRPOG {
 					msaFile = true;
 				else if (args[arg].equalsIgnoreCase("-dot"))
 					dotFile = true;
-				else if (args[arg].equalsIgnoreCase("-align"))
+				else if (args[arg].equalsIgnoreCase("-align")) {
 					performAlignment = true;
+					alignmentType = args[arg + 1];
+				}
 				else if (args[arg].equalsIgnoreCase("-mp"))
 					mp = true;
 			}
-			
+
 			// exit if the phylogenetic tree has not been specified, or the partial order alignment structure and sequence filepath both have not been specified (need one or the other)
 			if (treePath.isEmpty())
 				usage("Filepath to the phylogenetic tree must be provided as an input parameter.");
 			if (poagRepresentation.isEmpty() && sequencePath.isEmpty())
 				usage("A partial order alignment graph structure or filepath must be input as a parameter, or a sequence fasta filepath must be specified using the [-s] parameter.");
-			
-			// generate a partial order alignment graph if the alignment has not been specified
-			//try {
-				if (poagRepresentation.isEmpty()) {
-					System.out.println("got here");
 
-					 if (marginalNode != null)
-						asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, mp);
-					else
-						asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), mp);
-				}
-				else if (marginalNode != null)
-				    asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, mp);
-				else {
-                    if (performAlignment) {
-                        System.out.println("got here sucka");
+			if (poagRepresentation.isEmpty()) {
+				if (performAlignment) { // generate a partial order alignment graph if the alignment has not been specified
+					MSA msa = new MSA(sequencePath);
+					asr = new ASRPOG(msa.getMSAGraph(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
 
-                        MSA msa = new MSA(sequencePath);
-//						SubstitutionMatrix blosum62 = new SubstitutionMatrix("blosum62");
-//						MSA msa = new MSA(sequencePath, -10, -4, blosum62, false, false );
-
-						asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
-                    }
-                }
-					asr = new ASRPOG(poagRepresentation, treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
-			//} catch (RuntimeException e) {
-			//	exit(e.getMessage());
-			//}
+//					asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
+				} else if (marginalNode != null)
+					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, mp);
+				else
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), mp);
+			} else if (marginalNode != null)
+				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, mp);
+			else
+				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
 
 			if (!outputPath.isEmpty()) {
 				if (dotFile)
@@ -122,7 +110,7 @@ public class RunASRPOG {
 					asr.saveMSAGraph(outputPath);
 				asr.saveSupportedAncestors(outputPath);
 				asr.saveGraph(outputPath);
-				asr.saveDistrib(outputPath + "/" + (marginalNode == null ? "root" : marginalNode));
+				asr.saveDistrib(outputPath + "/" + marginalNode);
 				if (inference.equalsIgnoreCase("joint"))
 					asr.save(outputPath, true, "fasta");
 				else
