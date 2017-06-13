@@ -50,6 +50,7 @@ public class MSA {
 
             List<EnumSeq.Gappy<Enumerable>> seqs = getSeqs(filepath);
             graph = getGraph(seqs);
+            System.out.println("Using Needleman Wunsch alignment");
 
 
 
@@ -507,26 +508,27 @@ public class MSA {
             //TODO: NW alignment not considering all the characters at a position
 
             // consider all 'aligned' base characters (set in current node), identify best match of character
-//            Double max = this.openGapPenalty;
-//            pbase = bases.get(0);
-//            if (bases.size() > 1) {
-//                double[] potentialBases;
-//                for (Character base : bases) {
-//                    if (MEA) {
-//                        potentialBases = getMEAMatchScore(base, sequence);
-//
-//
-//                    } else {
-//                        potentialBases = this.getMatchScore(base, sequence, subMatrix);
-//                    }
-//                    for (Double score : potentialBases)
-//                        if (score > max) {
-//                            max = score;
-//                            pbase = base;
-//                            break;
-//                        }
-//                }
-//            }
+            Double max = this.openGapPenalty;
+            pbase = bases.get(0);
+            if (bases.size() > 1) {
+                double[] potentialBases;
+                for (Character base : bases) {
+                    if (MEA) {
+                        potentialBases = getMEAMatchScore(base, sequence);
+
+
+                    } else {
+                        potentialBases = this.getMatchScore(base, sequence, subMatrix);
+                    }
+                    for (Double score : potentialBases)
+                        if (score > max) {
+                            max = score;
+                            pbase = base;
+                            break;
+                        }
+                }
+            }
+            
             // Get predecessors of node
 
 

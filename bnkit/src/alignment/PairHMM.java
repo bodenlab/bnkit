@@ -11,7 +11,6 @@ import reconstruction.MSA;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * PairHMM for aligning sequences
@@ -160,6 +159,7 @@ public class PairHMM {
         for (int i = 0; i <= nodeNum; i++) {
             for (int j = 0; j <= seqs.get(seqId).length(); j++) {
                 if (!(i == 0) || !(j == 0)) {
+                    System.out.println( "i and j are " + i + " " + j);
 
                     fillVM(i, j, vM, vX, vY, tracebackM);
                     fillVX(i, j, vM, vX, tracebackX);
@@ -171,6 +171,7 @@ public class PairHMM {
             }
 
         }
+
 
 //        System.out.println("VM");
 //        MatrixUtils.printMatrix(vM);

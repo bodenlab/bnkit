@@ -45,7 +45,7 @@ public class RunASRPOG {
 			String sequencePath = "";
 			String treePath = "";
 			String poagRepresentation = "";
-			String alignmentType;
+			String alignmentType = "";
 			if (!args[0].contains("-"))
 				if (!args[0].contains(".nwk"))
 					poagRepresentation = args[0];
@@ -90,10 +90,21 @@ public class RunASRPOG {
 
 			if (poagRepresentation.isEmpty()) {
 				if (performAlignment) { // generate a partial order alignment graph if the alignment has not been specified
-					MSA msa = new MSA(sequencePath);
+
+					MSA msa = null;
+					if (alignmentType.equals("NW")){
+						msa = new MSA(sequencePath);
+
+					}
+					else {
+						msa = new MSA(sequencePath, alignmentType);
+
+					}
 					asr = new ASRPOG(msa.getMSAGraph(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
 
 //					asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
+
+
 				} else if (marginalNode != null)
 					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, mp);
 				else
