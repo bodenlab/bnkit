@@ -100,10 +100,12 @@ public class POGraph {
         char[] bases = sequence.toCharArray();
         sequences.put(id, label);
         List<Node> seqnodes = new ArrayList<>();
+        char[] seqChars = sequence.toCharArray();
         for (int baseInd = 0; baseInd < bases.length; baseInd++) {
             if (baseInd >= nodeIds.size() || !setCurrent(nodeIds.get(baseInd))) { // node doesn't currently exist in the graph, create and add to graph
                 // find next ID number
-                current = new Node(nodes.size());
+                current = new Node(nodes.size(), seqChars[baseInd]);
+
                 nodes.put(current.getID(), current);
                 if (baseInd == 0) {
                     initialNode.addNextNode(current);
@@ -1208,6 +1210,18 @@ public class POGraph {
         }
 
         /**
+         * Constructor
+         *
+         * @param ID Node id
+         */
+        public Node(Integer ID, char base) {
+            this();
+            this.ID = ID;
+            this.base = base;
+
+        }
+
+        /**
          * Returns a deep copy of the node structure.
          *
          * @param map	Map structure to keep track of visited nodes
@@ -1344,19 +1358,23 @@ public class POGraph {
          * @param base	Base character of sequence
          */
         private void addSequence(int seqId, char base){
-//            if (this.seqChars.isEmpty())
-//                this.base = base;
-//            if (base != this.base) {
-//                this.base = 0;
-//
-//            }
-//
-//            MutableInt count = bases.get(base);
-//            if (count == null) {
-//                bases.put(base, new MutableInt());
-//            } else {
-//                count.increment();
-//            }
+
+            // If this is the only character then make it the base character
+            if (this.base != null) {
+
+                if (this.base != base){
+                    this.base = null;
+                }
+            }
+
+            else if (this.seqChars.isEmpty()){
+                this.base = base;
+            }
+
+            else {
+                this.base = null;
+            }
+
 
             for (Integer sqId : seqChars.keySet())
                 if (sqId == seqId)

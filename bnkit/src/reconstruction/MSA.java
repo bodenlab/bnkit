@@ -59,11 +59,8 @@ public class MSA {
                 List<Integer> alignment = alignSeqToGraph(seqs.get(seqId).toString(), false, partialOrder, partialOrderTraceback);
 
                 graph.addSequence(seqId, seqs.get(seqId).getName(), seqs.get(seqId).toString(), alignment);
-                    saveMSA("/Users/gabefoley/Dropbox/Code/!Files/MEAPOA/" + seqId);
+                    saveMSA("/Users/gabefoley/Dropbox/Code/!Files/bnkit/tiny/" + seqId);
                 Map<Character, MutableInt> baseCounts = graph.getCurrentBaseCounts();
-
-            System.out.println("Done");
-
             }
 
         } catch (IOException e) {
@@ -205,14 +202,18 @@ public class MSA {
      * Return the scores associated with matching a single character in a PO Graph to an
      * array of characters.
      * Used to get the scores for matching each row in the score matrix to each column
-     * @param base the character in the PO Graph to be matched against
      * @param seqvec characters in the sequence to be matched against
      * @return an int array containing the match scores
      */
-    private double[] getMatchScore(char base, String seqvec, SubstitutionMatrix subMatrix) {
+    private double[] getMatchScore(Map<Character, Double> bases, String seqvec, SubstitutionMatrix subMatrix) {
         double[] matches = new double[seqvec.length()];
         for (int i = 0; i < seqvec.length(); i++) {
-            double matchScore = subMatrix.getDistance(seqvec.charAt(i), base);
+            double matchScore = 0;
+            for (Character base : bases.keySet()) {
+                System.out.println(base);
+                matchScore += subMatrix.getDistance(seqvec.charAt(i), base) * bases.get(base);
+                System.out.println(matchScore);
+            }
 //            System.out.println("Match" + matchScore);
             matches[i] = matchScore;
         }
@@ -491,69 +492,79 @@ public class MSA {
 
 
         for (int i = 0; i < l1; i++) {
-
-            if ( i == 4){
-//                System.out.println("help" + partialOrder);
-            }
             this.graph.setCurrent(sortedIDs.get(i));
 
             // Get character of node
             List<Character> bases = new ArrayList<>();
             Character pbase = this.graph.getCurrentBase();
+            //                System.out.println(this.graph.getCharacterDistribution());
+
+
+            System.out.println(pbase);
+            System.out.println(this.graph.getSequenceCharacterMapping().values().size());
+//
+//            if (this.graph.getSequenceCharacterMapping().size() > 1)
             if (pbase == null) // multiple base characters to consider
                 bases.addAll(this.graph.getSequenceCharacterMapping().values());
-            else
-                bases.add(pbase);
+//            else
+//                bases.add(pbase);
 
             //TODO: NW alignment not considering all the characters at a position
 
-            // consider all 'aligned' base characters (set in current node), identify best match of character
-            Double max = this.openGapPenalty;
-            pbase = bases.get(0);
-            if (bases.size() > 1) {
-                double[] potentialBases;
-                for (Character base : bases) {
-                    if (MEA) {
-                        potentialBases = getMEAMatchScore(base, sequence);
-
-
-                    } else {
-                        potentialBases = this.getMatchScore(base, sequence, subMatrix);
-                    }
-                    for (Double score : potentialBases)
-                        if (score > max) {
-                            max = score;
-                            pbase = base;
-                            break;
-                        }
-                }
-            }
+//            // consider all 'aligned' base characters (set in current node), identify best match of character
+//            Double max = this.openGapPenalty;
+////            pbase = bases.get(0);
+//            if (bases.size() > 1) {
+//                double[] potentialBases;
+//                for (Character base : bases) {
+//                    if (MEA) {
+//                        potentialBases = getMEAMatchScore(base, sequence);
+//
+//
+//                    } else {
+//                        potentialBases = this.getMatchScore(base, sequence, subMatrix);
+//                    }
+//                    for (Double score : potentialBases)
+//                        if (score > max) {
+//                            max = score;
+//                            pbase = base;
+//                            break;
+//                        }
+//                }
+//            }
             
             // Get predecessors of node
-
-
             List<Integer> predecessors = this.graph.getPrevIDs();
 
             //Get the actual index, not the ID for the predecessors
 
             for (int j = 0; j < predecessors.size(); j++){
                 predecessors.set(j, nodeIDToIndex.get(predecessors.get(j)));
-
             }
 
-            if (predecessors.isEmpty())
+            if (predecessors.isEmpty()) {
                 predecessors.add(-1);
+            }
 
             // Get array of scores for matching current node with each position in sequence
             double[] matchPoints;
+
+            if (bases.size() > 1){
+//                System.out.println(this.graph.getCharacterDistribution());
+//                System.out.println("What I'm interested in");
+
+            }
 
             if (MEA){
                 matchPoints = getMEAMatchScore(i, sequence);
             }
 
+
             //TODO: Don't just grab the first base from bases, but use them all together
             else {
-                matchPoints = this.getMatchScore(bases.get(0), sequence, subMatrix);
+//                System.out.println(this.graph.getCharacterDistribution());
+
+                matchPoints = this.getMatchScore(this.graph.getCharacterDistribution(), sequence, subMatrix);
             }
 
 //            System.out.println("Profile match score ");
@@ -609,10 +620,6 @@ public class MSA {
 
             if (partialOrderTraceback) {
                 //TODO This checks the new score against the existing score, even when they're identical
-                if (i == 4) {
-//                    System.out.println("i is equal to 4");
-                }
-//                System.out.println("Partial Order");
                 for (int j = 0; j < predecessors.size(); j++) {
                     int predecessor = predecessors.get(j);
                     double[] newDeleteScore = Arrays.copyOfRange(scores[predecessors.get(j) + 1], 1, scores[0].length);

@@ -477,7 +477,6 @@ final public class SubstitutionMatrix {
         double distance = 0.0;
 
         try {
-            System.out.println(a1 + " " +  a2);
             distance = matrix[getIndex(a1)][getIndex(a2)];
 
         } catch (NullPointerException e){

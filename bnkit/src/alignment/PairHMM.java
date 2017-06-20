@@ -7,6 +7,7 @@ import dat.POGraph;
 import alignment.utilities.SubstitutionMatrix;
 import alignment.utilities.MutableInt;
 import reconstruction.MSA;
+import alignment.utilities.MatrixUtils;
 
 
 import java.io.IOException;
@@ -1152,10 +1153,10 @@ public class PairHMM {
 //        MatrixUtils.printMatrix(vX);
 //        MatrixUtils.printMatrix(vY);
 //
-//        System.out.println("Tracebacks: ");
-//        MatrixUtils.printMatrix(tracebackM);
-//        MatrixUtils.printMatrix(tracebackX);
-//        MatrixUtils.printMatrix(tracebackY);
+        System.out.println("Tracebacks: ");
+        MatrixUtils.printMatrix(tracebackM);
+        MatrixUtils.printMatrix(tracebackX);
+        MatrixUtils.printMatrix(tracebackY);
 
 
 
