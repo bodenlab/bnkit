@@ -36,9 +36,3 @@ public class POAG {
         System.out.println(jsonText);
     }
 }
-    
-    
-    
-   
-    
-    
