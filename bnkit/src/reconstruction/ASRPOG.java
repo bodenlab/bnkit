@@ -317,6 +317,40 @@ public class ASRPOG {
 	}
 
 	/**
+	 * Save distribution of characters for MSA
+	 *
+	 * @param filename	filepath to save distribution
+	 */
+	public void saveMSADistrib(String filename) throws IOException {
+		Writer writer = new PrintWriter(filename + "_dist.tsv", "UTF-8");
+		Object[] aacid = Enumerable.aacid.getValues();
+		writer.write("ID\t");
+		// Header is amino acid characters
+		for (int i = 0; i < aacid.length; i++)  //write header
+			if (i == aacid.length - 1)
+				writer.write(aacid[i] + "\n");
+			else
+				writer.write(aacid[i] + "\t");
+		// Each row is a graph node ID and character distribution
+		for (int k = 0; k < pogAlignment.getNumNodes(); k++) {
+			writer.write(Integer.toString(pogAlignment.getNodeIDs().get(k)) + "\t");
+			pogAlignment.setCurrent(pogAlignment.getNodeIDs().get(k));
+			Map<Character, Double> distribution = pogAlignment.getCharacterDistribution();
+			for (int a = 0; a < aacid.length; a++) {
+				if (!distribution.containsKey(aacid[a]))
+					writer.write("NA");
+				else
+					writer.write(Double.toString(distribution.get(aacid[a])));
+				if (a == aacid.length - 1)
+					writer.write("\n");
+				else
+					writer.write("\t");
+			}
+		}
+		writer.close();
+	}
+
+	/**
 	 * Save the phylogenetic tree with the ancestral nodes entered.
 	 *
 	 * @param filepath	filepath to save phylogenetic tree (.nwk)
