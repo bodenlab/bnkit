@@ -99,6 +99,7 @@ public class POAGJson {
             thisNode.put("y", y);
             thisNode.put("graph", map2JSON(n.getGraph()));
             thisNode.put("seq", seq2JSON(n.getSeq()));
+            thisNode.put("mutants", seq2JSON(n.getSeq()));
             nodesJSON.put(thisNode);
             //Check if it is the max depth
             if (y > max_depth) {
