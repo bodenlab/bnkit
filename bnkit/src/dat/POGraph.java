@@ -368,14 +368,16 @@ public class POGraph {
                 List<Character> characters = new ArrayList<>();
                 for (Integer nodeId : orderedNodeIds) {
                     boolean found = false;
-                    for (Node node : seqNodes)
+                    for (Node node : seqNodes) {
                         if (node.getID() == nodeId) {
                             characters.add(node.getSeqCharMapping().get(seqId));
                             found = true;
                             break;
                         }
-                    if (!found)
-                        characters.add('-');
+                    }
+                        if (!found)
+                            characters.add('-');
+
                 }
                 EnumSeq seq = new EnumSeq(Enumerable.aacid_ext);
                 seq.setName(sequences.get(seqId));
@@ -384,6 +386,7 @@ public class POGraph {
                 characters.toArray(chars);
                 seq.set(chars);
                 seqs[seqId] = seq;
+
             }
             if (format.equalsIgnoreCase("fasta")) {
                 // fasta writer
@@ -1359,21 +1362,34 @@ public class POGraph {
          */
         private void addSequence(int seqId, char base){
 
-            // If this is the only character then make it the base character
-            if (this.base != null) {
 
-                if (this.base != base){
-                    this.base = null;
-                }
-            }
-
-            else if (this.seqChars.isEmpty()){
+            // If there are no other bases at this node, set the node as the current base
+            if (this.seqChars.isEmpty()){
                 this.base = base;
             }
 
+            // Otherwise reset the base and distribution
             else {
                 this.base = null;
+                this.distribution = null;
             }
+
+
+//            // If there are multiple bases already at this node, reset the distribution
+//            if (this.base == null) {
+//                this.distribution = null;
+//            }
+//
+//            // If there are no other bases already at this node, set the current base
+//            else if (this.seqChars.isEmpty()){
+//                this.base = base;
+//            }
+//
+//            // Otherwise
+//            else {
+//                this.base = null;
+//                this.distribution = null;
+//            }
 
 
             for (Integer sqId : seqChars.keySet())

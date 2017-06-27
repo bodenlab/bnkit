@@ -59,7 +59,7 @@ public class MSA {
                 List<Integer> alignment = alignSeqToGraph(seqs.get(seqId).toString(), false, partialOrder, partialOrderTraceback);
 
                 graph.addSequence(seqId, seqs.get(seqId).getName(), seqs.get(seqId).toString(), alignment);
-                    saveMSA("/Users/gabefoley/Dropbox/Code/!Files/bnkit/tiny/" + seqId);
+                    saveMSA(filepath + seqId);
                 Map<Character, MutableInt> baseCounts = graph.getCurrentBaseCounts();
             }
 
@@ -210,11 +210,9 @@ public class MSA {
         for (int i = 0; i < seqvec.length(); i++) {
             double matchScore = 0;
             for (Character base : bases.keySet()) {
-                System.out.println(base);
                 matchScore += subMatrix.getDistance(seqvec.charAt(i), base) * bases.get(base);
-                System.out.println(matchScore);
             }
-//            System.out.println("Match" + matchScore);
+
             matches[i] = matchScore;
         }
 
@@ -446,9 +444,7 @@ public class MSA {
 //    }
 
 
-        for (Integer pos: matchesIndex){
-//            System.out.println(pos);
-        }
+
         return matchesIndex;
     }
 
@@ -500,8 +496,8 @@ public class MSA {
             //                System.out.println(this.graph.getCharacterDistribution());
 
 
-            System.out.println(pbase);
-            System.out.println(this.graph.getSequenceCharacterMapping().values().size());
+//            System.out.println(pbase);
+//            System.out.println(this.graph.getSequenceCharacterMapping().values().size());
 //
 //            if (this.graph.getSequenceCharacterMapping().size() > 1)
             if (pbase == null) // multiple base characters to consider
@@ -549,11 +545,8 @@ public class MSA {
             // Get array of scores for matching current node with each position in sequence
             double[] matchPoints;
 
-            if (bases.size() > 1){
-//                System.out.println(this.graph.getCharacterDistribution());
-//                System.out.println("What I'm interested in");
+            System.out.println(this.graph.getCharacterDistribution());
 
-            }
 
             if (MEA){
                 matchPoints = getMEAMatchScore(i, sequence);

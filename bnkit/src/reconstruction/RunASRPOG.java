@@ -55,6 +55,7 @@ public class RunASRPOG {
 			boolean msaFile = false;
 			boolean performAlignment = false;
 			boolean mp = false;
+			boolean checkBranchIsolation = true;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {
@@ -126,6 +127,11 @@ public class RunASRPOG {
 					asr.save(outputPath, true, "fasta");
 				else
 					asr.save(outputPath, false, "fasta");
+			}
+
+			if (checkBranchIsolation){
+				asr.checkBranchIsolation("N0");
+
 			}
 
 		} else {

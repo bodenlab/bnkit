@@ -806,6 +806,17 @@ public class ASRPOG {
         return d_marg;
     }
 
+	/**
+	 * Check to see if a node has an inferred character that is being contributed by one but not both children
+	 * @param node node to check
+	 */
+
+	public void checkBranchIsolation(String node){
+
+		System.out.println("what have we here");
+
+	}
+
     /**
      * Helper class to store changes to an ancestral graph node
      * 
