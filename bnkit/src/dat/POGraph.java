@@ -1368,8 +1368,9 @@ public class POGraph {
                 this.base = base;
             }
 
-            // Otherwise reset the base and distribution
-            else {
+
+            // Otherwise if adding a different base then reset the base and distribution
+            else if (this.base !=null && this.base!= base) {
                 this.base = null;
                 this.distribution = null;
             }
