@@ -56,7 +56,7 @@ public class MSA {
                 List<Integer> alignment = alignSeqToGraph(seqs.get(seqId).toString(), false, partialOrder, partialOrderTraceback);
 
                 graph.addSequence(seqId, seqs.get(seqId).getName(), seqs.get(seqId).toString(), alignment);
-//                    saveMSA(filepath + seqId);
+                    saveMSA(filepath + seqId);
                 Map<Character, MutableInt> baseCounts = graph.getCurrentBaseCounts();
             }
 

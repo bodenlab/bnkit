@@ -869,23 +869,23 @@ public class POGraph {
                             nodes.get(pogId).setCharacterDistribution(dist);
                         inputNodeToPONode.put(nodeId, pogId);
                     }
-                } else {
-
-                    String[] elements = line.split("[\\[]+");
-
-//                    elements = elements[1].split("[,]+");
-                    for (String el : elements) {
-                        if (el.contains("sequences")) {
-                            nodeSeqCharMap.put(pogId, new HashMap<>());
-                            el = el.replace("\"", "");
-                            String seqs = el.split("sequences=")[1];
-                            seqs = seqs.split("[];]+")[0];
-                            for (String seq : seqs.split("[,]+"))
-                                nodeSeqCharMap.get(pogId).put(seq, label.toCharArray()[0]);
-
-//                            nodeSeqCharMap.get(pogId).put(seq.split("[:]+")[0], seq.split("[:]+")[1].toCharArray()[0]);
-                        }
-                    }
+//                } else {
+//
+//                    String[] elements = line.split("[\\[]+");
+//
+////                    elements = elements[1].split("[,]+");
+//                    for (String el : elements) {
+//                        if (el.contains("sequences")) {
+//                            nodeSeqCharMap.put(pogId, new HashMap<>());
+//                            el = el.replace("\"", "");
+//                            String seqs = el.split("sequences=")[1];
+//                            seqs = seqs.split("[];]+")[0];
+//                            for (String seq : seqs.split("[,]+"))
+//                                nodeSeqCharMap.get(pogId).put(seq, label.toCharArray()[0]);
+//
+////                            nodeSeqCharMap.get(pogId).put(seq.split("[:]+")[0], seq.split("[:]+")[1].toCharArray()[0]);
+//                        }
+//                    }
 
                 }
 
@@ -932,11 +932,7 @@ public class POGraph {
                                     sequences.put(seqId, seq);
                                 }
                                 // TODO: Base character for MSA (if base is null)
-//                                System.out.println("This label is in ");
-//                                System.out.println(lines[lineCount - 1]);
-//
-//                                System.out.println("These sequences");
-//                                System.out.println(lines[lineCount]);
+
                                 nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeSeqCharMap.get(fromNodeId).get(seq));
                                 nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeSeqCharMap.get(toNodeId).get(seq));
                                 if (!seqNodeMap.containsKey(seqId))
@@ -1361,37 +1357,6 @@ public class POGraph {
          * @param base	Base character of sequence
          */
         private void addSequence(int seqId, char base){
-
-
-            // If there are no other bases at this node, set the node as the current base
-            if (this.seqChars.isEmpty()){
-                this.base = base;
-            }
-
-
-            // Otherwise if adding a different base then reset the base and distribution
-            else if (this.base !=null && this.base!= base) {
-                this.base = null;
-                this.distribution = null;
-            }
-
-
-//            // If there are multiple bases already at this node, reset the distribution
-//            if (this.base == null) {
-//                this.distribution = null;
-//            }
-//
-//            // If there are no other bases already at this node, set the current base
-//            else if (this.seqChars.isEmpty()){
-//                this.base = base;
-//            }
-//
-//            // Otherwise
-//            else {
-//                this.base = null;
-//                this.distribution = null;
-//            }
-
 
             for (Integer sqId : seqChars.keySet())
                 if (sqId == seqId)
