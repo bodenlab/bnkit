@@ -813,7 +813,6 @@ public class ASRPOG {
 
 	public void checkBranchIsolation(String node){
 
-		System.out.println("what have we here");
 
 	}
 

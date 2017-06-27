@@ -6,8 +6,8 @@ import dat.Enumerable;
 import dat.POGraph;
 import alignment.utilities.SubstitutionMatrix;
 import alignment.utilities.MutableInt;
-import reconstruction.MSA;
 import alignment.utilities.MatrixUtils;
+import alignment.MSA;
 
 
 import java.io.IOException;

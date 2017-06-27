@@ -232,17 +232,6 @@ public class HashProfile {
 
     }
 
-//    public void printProfileArray(){
-//
-//        for (int i = 0; i < profileArray.size(); i++){
-//            for (Character name: profileArray.get(i).keySet()){
-//                String key = name.toString();
-//                String value = profileArray.get(i).get(name).toString();
-//                System.out.println("Column " + i + " Residue: " + key + " Count: " + value );
-//
-//            }
-//        }
-//    }
 
 
 

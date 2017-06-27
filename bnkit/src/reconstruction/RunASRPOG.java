@@ -1,5 +1,7 @@
 package reconstruction;
 
+import alignment.MSA;
+
 import java.io.IOException;
 
 

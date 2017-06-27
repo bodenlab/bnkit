@@ -1,11 +1,8 @@
-package reconstruction;
+package alignment;
 
-import bn.math.Matrix;
 import dat.*;
-import dat.substitutionmodels.Blosum62;
 import alignment.utilities.SubstitutionMatrix;
 import alignment.utilities.MutableInt;
-import alignment.PairHMM;
 
 import java.io.*;
 import java.util.*;
@@ -23,7 +20,7 @@ public class MSA {
     private double extendGapPenalty = -2;
     private POGraph graph;
     private SubstitutionMatrix subMatrix;
-    List<Integer> sortedIDs;
+    private List<Integer> sortedIDs;
 
 
     public MSA(String filepath) throws IOException{
@@ -59,7 +56,7 @@ public class MSA {
                 List<Integer> alignment = alignSeqToGraph(seqs.get(seqId).toString(), false, partialOrder, partialOrderTraceback);
 
                 graph.addSequence(seqId, seqs.get(seqId).getName(), seqs.get(seqId).toString(), alignment);
-                    saveMSA(filepath + seqId);
+//                    saveMSA(filepath + seqId);
                 Map<Character, MutableInt> baseCounts = graph.getCurrentBaseCounts();
             }
 
@@ -74,8 +71,6 @@ public class MSA {
         this.subMatrix = subMatrix;
         this.openGapPenalty = openGapPenalty;
         this.extendGapPenalty = extendGapPenalty;
-
-
     }
 
     public  void alignMEASequence(int seqId, EnumSeq<Enumerable> seq, boolean partialOrder, boolean partialOrderTraceback){
@@ -87,7 +82,7 @@ public class MSA {
 
     }
 
-    public MSA(String filepath, double tau, double epsilon, double delta, double emissionX, double emissionY, SubstitutionMatrix subMatrix,  String type, boolean partialOrder, boolean partialOrderTraceback ) throws IOException {
+    private MSA(String filepath, double tau, double epsilon, double delta, double emissionX, double emissionY, SubstitutionMatrix subMatrix, String type, boolean partialOrder, boolean partialOrderTraceback) throws IOException {
         try {
 
             List<EnumSeq.Gappy<Enumerable>> seqs = getSeqs(filepath);
@@ -130,8 +125,8 @@ public class MSA {
 
     }
 
-    public List<EnumSeq.Gappy<Enumerable>> getSeqs(String filepath) throws IOException {
-        List<EnumSeq.Gappy<Enumerable>> seqs = new ArrayList<EnumSeq.Gappy<Enumerable>>();
+    private List<EnumSeq.Gappy<Enumerable>> getSeqs(String filepath) throws IOException {
+        List<EnumSeq.Gappy<Enumerable>> seqs = new ArrayList<>();
 
         try {
             // load the sequence data
@@ -155,9 +150,8 @@ public class MSA {
         return seqs;
     }
 
-    public POGraph getGraph(List<EnumSeq.Gappy<Enumerable>> seqs){
+    private POGraph getGraph(List<EnumSeq.Gappy<Enumerable>> seqs){
         graph = new POGraph();
-//        System.out.println("Here");
 
         // for each sequence, align with the partial order graph and add to graph
         List<Integer> nodeIds = new ArrayList<>();
@@ -185,7 +179,7 @@ public class MSA {
      *
      * @param filepath file path to save alignment
      */
-    public void saveMSA(String filepath){
+    private void saveMSA(String filepath){
         graph.saveSequences(filepath, "fasta");
     }
 
@@ -225,7 +219,7 @@ public class MSA {
      * @param profile
      * @return
      */
-    public double[] getMEAMatchScore(int i, String profile) {
+    private double[] getMEAMatchScore(int i, String profile) {
         double[] matches = new double[profile.length()];
         System.arraycopy(subMatrix.getMatrix()[i + 1], 1, matches, 0, profile.length());
 
@@ -248,7 +242,7 @@ public class MSA {
         Map<Integer, Integer> nodeIndexToID = new HashMap<>();
 
         int index = 0;
-        int pos = 0;
+        int pos;
         sortedIDs = this.graph.getSortedIDs();
 
         for (Integer id : sortedIDs) {
@@ -271,8 +265,6 @@ public class MSA {
             this.graph.setCurrent(sortedIDs.get(i));
             List<Integer> prevIdxs = this.graph.getPrevIDs();
             if (prevIdxs.isEmpty()){
-
-//                prevIdxs.add(-1);
                 pos = 0;
                 scores[i + 1][0] = openGapPenalty;
 
@@ -298,18 +290,11 @@ public class MSA {
 
                 else {
                     best = prevScore;
-//                    backGraphIdx[i+1][0] = nodeIDToIndex.get(prevIdx);
                 }
             }
 
             scores[0][0] = 0;
         }
-
-
-
-//        for (int i = 0; i < l1; i++) {
-//            backGraphIdx[i + 1][0] = i;
-//        }
 
 
         // Fill first column with optimal previous cell move
@@ -338,12 +323,8 @@ public class MSA {
      * @return
      */
     private List<Integer> backtrack(double[][] scores, int[][] backStrIdx, int[][] backGrphIdx, Map<Integer, Integer> nodeIndextoID) {
-//        List<Integer> orderedNodes = graph.getSortedIDs();
         List<Integer> orderedNodes = sortedIDs;
-//        System.out.println("SCORES");
-//        MatrixUtils.printMatrix(scores);
-//        MatrixUtils.printMatrix(backGrphIdx);
-//        MatrixUtils.printMatrix(backStrIdx);
+
 
         int besti = scores.length;
         int bestj = scores[0].length;
@@ -365,11 +346,11 @@ public class MSA {
             System.out.println("Terminal index size greater than one");
 
 
-            for (int i = 0; i < terminalIndices.size(); i++) {
-                double score = scores[terminalIndices.get(i)][bestj];
+            for (Integer terminalIndice : terminalIndices) {
+                double score = scores[terminalIndice][bestj];
                 if (score > bestScore) {
                     bestScore = score;
-                    besti = terminalIndices.get(i);
+                    besti = terminalIndice;
                 }
             }
         }
@@ -400,8 +381,6 @@ public class MSA {
 
             besti = nexti;
             bestj = nextj;
-
-//            System.out.println(nexti + " " + nextj);
         }
 
         // Fill out the remaining indexes of each profile
@@ -437,11 +416,8 @@ public class MSA {
                 int index = profile1Indexes.get(i) == -1 ? -1: orderedNodes.get(profile1Indexes.get(i));
 
                 matchesIndex.add(index);
-//                    matchesIndex.add(nodeIndextoID.get(i));
-
             }
         }
-//    }
 
 
 
@@ -455,8 +431,6 @@ public class MSA {
      * @return
      */
     private List<Integer> alignSeqToGraph(String sequence, boolean MEA, boolean partialOrder, boolean partialOrderTraceback) {
-
-//        MatrixUtils.printMatrix(this.subMatrix.getMatrix());
 
         int l1 = this.graph.getNumNodes();
         int l2 = sequence.length();
@@ -493,19 +467,10 @@ public class MSA {
             // Get character of node
             List<Character> bases = new ArrayList<>();
             Character pbase = this.graph.getCurrentBase();
-            //                System.out.println(this.graph.getCharacterDistribution());
 
-
-//            System.out.println(pbase);
-//            System.out.println(this.graph.getSequenceCharacterMapping().values().size());
-//
-//            if (this.graph.getSequenceCharacterMapping().size() > 1)
             if (pbase == null) // multiple base characters to consider
                 bases.addAll(this.graph.getSequenceCharacterMapping().values());
-//            else
-//                bases.add(pbase);
 
-            //TODO: NW alignment not considering all the characters at a position
 
 //            // consider all 'aligned' base characters (set in current node), identify best match of character
 //            Double max = this.openGapPenalty;
@@ -533,7 +498,6 @@ public class MSA {
             List<Integer> predecessors = this.graph.getPrevIDs();
 
             //Get the actual index, not the ID for the predecessors
-
             for (int j = 0; j < predecessors.size(); j++){
                 predecessors.set(j, nodeIDToIndex.get(predecessors.get(j)));
             }
@@ -545,71 +509,37 @@ public class MSA {
             // Get array of scores for matching current node with each position in sequence
             double[] matchPoints;
 
-            System.out.println(this.graph.getCharacterDistribution());
-
-
             if (MEA){
                 matchPoints = getMEAMatchScore(i, sequence);
             }
 
-
-            //TODO: Don't just grab the first base from bases, but use them all together
             else {
-//                System.out.println(this.graph.getCharacterDistribution());
 
                 matchPoints = this.getMatchScore(this.graph.getCharacterDistribution(), sequence, subMatrix);
             }
 
-//            System.out.println("Profile match score ");
-//            for (double match : matchScore){
-//                System.out.println(match);
-//            }
 
             // Get array of scores equal to previous row + the cost of a deletion at each position
             double[] deleteScore = Arrays.copyOfRange(scores[i], 1, scores[0].length);
 
-//            System.out.println("DeleteScore 1");
-//            System.out.println(i );
-//            for (double mScore : deleteScore){
-//                System.out.print(mScore + " ");
-//            }
-//            System.out.println();
+
             deleteScore = addArrays(deleteScore, Arrays.copyOfRange(deleteCost[i ], 1, deleteCost[0].length));
 
-//            System.out.println("DeleteScore 2");
-//            System.out.println(i );
-//            for (double mScore : deleteScore){
-//                System.out.print(mScore + " ");
-//            }
-//            System.out.println();
-
-//            System.out.println("DelScores");
-//            for (double delScore: deleteScore){
-//                System.out.println(delScore);
-//            }
 
 
             // Array to store the best possible score for deleting at each position
             int[] bestDelete = new int[l2];
-            for (int del : bestDelete){
-//                System.out.println("DEL" +del);
-            }
+
 
             // Fill array with first predecessor position
             Arrays.fill(bestDelete, i);
 
             double[] matchScore = addArrays(Arrays.copyOfRange(scores[i], 0, scores[0].length - 1), matchPoints);
 
-//            System.out.println("MatchScore");
-//            for (double mScore : matchScore){
-//                System.out.println(mScore);
-//            }
+
             int[] bestMatch = new int[l2];
             Arrays.fill(bestMatch, i);
 
-            if (i == 4) {
-//                System.out.println("i is equal to 4");
-            }
 
             if (partialOrderTraceback) {
                 //TODO This checks the new score against the existing score, even when they're identical
@@ -646,32 +576,9 @@ public class MSA {
                 scores[i + 1][k + 1] = max(deleteScore[k], matchScore[k]);
             }
 
-//            System.out.println("DeleteScore");
-//            System.out.println(i );
-//            for (double mScore : deleteScore){
-//                System.out.print(mScore + " ");
-//            }
-//            System.out.println();
 
-
-//            System.out.println("MatchScore");
-//            for (double mScore : matchScore){
-//                System.out.print(mScore + " ");
-//            }
-//////
-//            System.out.println();
-//
-//////
-//            System.out.println("Deleted scores");
-//            for (boolean val : deleted){
-//                System.out.print(val + " ");
-//            }
-//            System.out.println();
             for (int l = 1; l < scores[0].length; l++) {
 
-//                if ( i == 4){
-//                    System.out.println("help");
-//                }
                 scores[i + 1][l] = max(deleteScore[l - 1], matchScore[l - 1]);
 
                 if (deleted[l - 1]) {
@@ -712,9 +619,6 @@ public class MSA {
                 }
             }
         }
-
-//        System.out.println(partialOrder);
-//        MatrixUtils.printMatrix(scores);
 
         return backtrack(scores, backStrIdx, backGraphIdx, nodeIndexToID);
     }
