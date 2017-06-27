@@ -268,119 +268,118 @@ final public class SubstitutionMatrix {
 
     private int getIndex(char a) {
 
-        if (type.equals("protein")) {
+        switch (type) {
+            case "protein":
 
-            // check for upper and lowercase characters
-            switch ((String.valueOf(a)).toUpperCase().charAt(0)) {
-                case 'A':
-                    return 0;
-                case 'R':
-                    return 1;
-                case 'N':
-                    return 2;
-                case 'D':
-                    return 3;
-                case 'C':
-                    return 4;
-                case 'Q':
-                    return 5;
-                case 'E':
-                    return 6;
-                case 'G':
-                    return 7;
-                case 'H':
-                    return 8;
-                case 'I':
-                    return 9;
-                case 'L':
-                    return 10;
-                case 'K':
-                    return 11;
-                case 'M':
-                    return 12;
-                case 'F':
-                    return 13;
-                case 'P':
-                    return 14;
-                case 'S':
-                    return 15;
-                case 'T':
-                    return 16;
-                case 'W':
-                    return 17;
-                case 'Y':
-                    return 18;
-                case 'V':
-                    return 19;
-                case 'B':
-                    return 20;
-                case 'X':
-                    return 21;
-                case 'Z':
-                    return 22;
-                case '*':
-                    return 23;
-                default:
-                    return -1;
-            }
-        }
+                // check for upper and lowercase characters
+                switch ((String.valueOf(a)).toUpperCase().charAt(0)) {
+                    case 'A':
+                        return 0;
+                    case 'R':
+                        return 1;
+                    case 'N':
+                        return 2;
+                    case 'D':
+                        return 3;
+                    case 'C':
+                        return 4;
+                    case 'Q':
+                        return 5;
+                    case 'E':
+                        return 6;
+                    case 'G':
+                        return 7;
+                    case 'H':
+                        return 8;
+                    case 'I':
+                        return 9;
+                    case 'L':
+                        return 10;
+                    case 'K':
+                        return 11;
+                    case 'M':
+                        return 12;
+                    case 'F':
+                        return 13;
+                    case 'P':
+                        return 14;
+                    case 'S':
+                        return 15;
+                    case 'T':
+                        return 16;
+                    case 'W':
+                        return 17;
+                    case 'Y':
+                        return 18;
+                    case 'V':
+                        return 19;
+                    case 'B':
+                        return 20;
+                    case 'X':
+                        return 21;
+                    case 'Z':
+                        return 22;
+                    case '*':
+                        return 23;
+                    default:
+                        return -1;
+                }
+            case "proteinEstimatedWithX":
 
-        else if (type.equals("proteinEstimatedWithX")) {
+                // check for upper and lowercase characters
+                switch ((String.valueOf(a)).toUpperCase().charAt(0)) {
+                    case 'A':
+                        return 0;
+                    case 'R':
+                        return 14;
+                    case 'N':
+                        return 11;
+                    case 'D':
+                        return 2;
+                    case 'C':
+                        return 1;
+                    case 'Q':
+                        return 13;
+                    case 'E':
+                        return 3;
+                    case 'G':
+                        return 5;
+                    case 'H':
+                        return 6;
+                    case 'I':
+                        return 7;
+                    case 'L':
+                        return 8;
+                    case 'K':
+                        return 9;
+                    case 'M':
+                        return 10;
+                    case 'F':
+                        return 4;
+                    case 'P':
+                        return 12;
+                    case 'S':
+                        return 15;
+                    case 'T':
+                        return 16;
+                    case 'W':
+                        return 18;
+                    case 'Y':
+                        return 19;
+                    case 'V':
+                        return 17;
+                    case 'B':
+                        return 20;
+                    case 'X':
+                        return 20;
+                    case 'Z':
+                        return 20;
+                    case '*':
+                        return 20;
+                    default:
+                        return -1;
+                }
 
-            // check for upper and lowercase characters
-            switch ((String.valueOf(a)).toUpperCase().charAt(0)) {
-                case 'A':
-                    return 0;
-                case 'R':
-                    return 14;
-                case 'N':
-                    return 11;
-                case 'D':
-                    return 2;
-                case 'C':
-                    return 1;
-                case 'Q':
-                    return 13;
-                case 'E':
-                    return 3;
-                case 'G':
-                    return 5;
-                case 'H':
-                    return 6;
-                case 'I':
-                    return 7;
-                case 'L':
-                    return 8;
-                case 'K':
-                    return 9;
-                case 'M':
-                    return 10;
-                case 'F':
-                    return 4;
-                case 'P':
-                    return 12;
-                case 'S':
-                    return 15;
-                case 'T':
-                    return 16;
-                case 'W':
-                    return 18;
-                case 'Y':
-                    return 19;
-                case 'V':
-                    return 17;
-                case 'B':
-                    return 20;
-                case 'X':
-                    return 20;
-                case 'Z':
-                    return 20;
-                case '*':
-                    return 20;
-                default:
-                    return -1;
-            }
-        }
 
 //        case 'V':
 //        return 17;
@@ -394,80 +393,79 @@ final public class SubstitutionMatrix {
 //        return 23;
 //        default:
 //        return -1;
+            case "proteinestimatedlambda":
 
-        else if (type.equals("proteinestimatedlambda")) {
+                // check for upper and lowercase characters
+                switch ((String.valueOf(a)).toUpperCase().charAt(0)) {
+                    case 'A':
+                        return 0;
+                    case 'R':
+                        return 14;
+                    case 'N':
+                        return 11;
+                    case 'D':
+                        return 2;
+                    case 'C':
+                        return 1;
+                    case 'Q':
+                        return 13;
+                    case 'E':
+                        return 3;
+                    case 'G':
+                        return 5;
+                    case 'H':
+                        return 6;
+                    case 'I':
+                        return 7;
+                    case 'L':
+                        return 8;
+                    case 'K':
+                        return 9;
+                    case 'M':
+                        return 10;
+                    case 'F':
+                        return 4;
+                    case 'P':
+                        return 12;
+                    case 'S':
+                        return 15;
+                    case 'T':
+                        return 16;
+                    case 'W':
+                        return 18;
+                    case 'Y':
+                        return 19;
+                    case 'V':
+                        return 17;
+                    case 'B':
+                        return 20;
+                    case 'X':
+                        return 21;
+                    case 'Z':
+                        return 22;
+                    case '*':
+                        return 23;
+                    default:
+                        return -1;
+                }
+            case "nucleotide":
 
-            // check for upper and lowercase characters
-            switch ((String.valueOf(a)).toUpperCase().charAt(0)) {
-                case 'A':
-                    return 0;
-                case 'R':
-                    return 14;
-                case 'N':
-                    return 11;
-                case 'D':
-                    return 2;
-                case 'C':
-                    return 1;
-                case 'Q':
-                    return 13;
-                case 'E':
-                    return 3;
-                case 'G':
-                    return 5;
-                case 'H':
-                    return 6;
-                case 'I':
-                    return 7;
-                case 'L':
-                    return 8;
-                case 'K':
-                    return 9;
-                case 'M':
-                    return 10;
-                case 'F':
-                    return 4;
-                case 'P':
-                    return 12;
-                case 'S':
-                    return 15;
-                case 'T':
-                    return 16;
-                case 'W':
-                    return 18;
-                case 'Y':
-                    return 19;
-                case 'V':
-                    return 17;
-                case 'B':
-                    return 20;
-                case 'X':
-                    return 21;
-                case 'Z':
-                    return 22;
-                case '*':
-                    return 23;
-                default:
-                    return -1;
-            }
-        }
+                switch ((String.valueOf(a)).toUpperCase().charAt(0)) {
 
-
-        else if (type.equals("nucleotide")){
-
-            switch ((String.valueOf(a)).toUpperCase().charAt(0)) {
-
-                case 'A': return 3;
-                case 'G': return 1;
-                case 'C': return 2;
-                case 'T': return 0;
-                default: return -1;
-            }
-        }
-
-        else{
-            System.out.println("Type of substitution matrix not found");
-            return -99;
+                    case 'A':
+                        return 3;
+                    case 'G':
+                        return 1;
+                    case 'C':
+                        return 2;
+                    case 'T':
+                        return 0;
+                    default:
+                        return -1;
+                }
+            default:
+                System.out.println("Type of substitution matrix not found");
+                return -99;
         }
     }
 

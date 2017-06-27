@@ -126,7 +126,7 @@ public class MSA {
     }
 
     private List<EnumSeq.Gappy<Enumerable>> getSeqs(String filepath) throws IOException {
-        List<EnumSeq.Gappy<Enumerable>> seqs = new ArrayList<>();
+        List<EnumSeq.Gappy<Enumerable>> seqs = new ArrayList<EnumSeq.Gappy<Enumerable>>();
 
         try {
             // load the sequence data
@@ -493,7 +493,7 @@ public class MSA {
 //                        }
 //                }
 //            }
-            
+
             // Get predecessors of node
             List<Integer> predecessors = this.graph.getPrevIDs();
 

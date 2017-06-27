@@ -6,9 +6,9 @@ package alignment.utilities;
 public class MutableInt {
 
     // Start at one because we are counting
-    int value = 1;
+    private int value = 1;
 
-    public void increment() {
+    void increment() {
         ++value;
     }
 

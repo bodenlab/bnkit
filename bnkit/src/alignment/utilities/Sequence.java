@@ -13,7 +13,7 @@ public class Sequence {
         this.seq = seq;
     }
 
-    public String getID(){
+    String getID(){
         return this.id;
     }
 
