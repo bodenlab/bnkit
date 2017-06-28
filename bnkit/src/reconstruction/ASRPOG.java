@@ -146,14 +146,16 @@ public class ASRPOG {
 		ancestor.saveToDot(filepath + nodeLabel);
 	}
 
-	/**
+
+
+    	/**
 	 * Get the partial order alignment graph for the given internal node of the phylogenetic tree.
 	 *
 	 * @param nodeLabel	Ancestral node
 	 * @return			Partial order graph of the given ancestral node
 	 */
-	public PartialOrderGraph getGraph(String nodeLabel) {
-		return new PartialOrderGraph(getAncestor(nodeLabel));
+	public POGraph getGraph(String nodeLabel) {
+		return new POGraph(getAncestor(nodeLabel));
 	}
 
 	/**
@@ -161,9 +163,32 @@ public class ASRPOG {
 	 *
 	 * @return	Partial order graph representing sequence alignment
 	 */
-	public PartialOrderGraph getMSAGraph() {
-		return new PartialOrderGraph(this.pogAlignment);
+	public POGraph getMSAGraph() {
+		return new POGraph(this.pogAlignment);
 	}
+
+    //TODO: Update the test classes that use getGraph() and expect a PartialOrderGraph
+
+
+//	/**
+//	 * Get the partial order alignment graph for the given internal node of the phylogenetic tree.
+//	 *
+//	 * @param nodeLabel	Ancestral node
+//	 * @return			Partial order graph of the given ancestral node
+//	 */
+//	public PartialOrderGraph getGraph(String nodeLabel) {
+//		return new PartialOrderGraph(getAncestor(nodeLabel));
+
+	//TODO: Update the test classes that use getMSAGraph() and expect a PartialOrderGraph
+
+//    /**
+//     * Get the multiple sequence alignment partial order graph.
+//     *
+//     * @return	Partial order graph representing sequence alignment
+//     */
+//    public PartialOrderGraph getMSAGraph() {
+//        return new PartialOrderGraph(this.pogAlignment);
+//    }
 	
 	/**
 	 * Save multiple sequence alignment partial order alignment graph as a dot file in the given output filepath.
@@ -350,6 +375,25 @@ public class ASRPOG {
 		writer.close();
 	}
 
+    /**
+     * Return a collection of the children of a given node
+     *
+     * @param node	node to get children of
+     */
+	public Collection<PhyloTree.Node> getChildren(String node) {
+	    return this.phyloTree.find(node).getChildren();
+
+    }
+
+    /**
+     *
+     * Return the marginal distributions
+     *
+     */
+    public EnumDistrib[] getMarginalDistributions(){
+	    return this.marginalDistributions;
+    }
+
 	/* ****************************************************************************************************************************************************
 	 * 																PRIVATE METHODS
 	 * ****************************************************************************************************************************************************/
@@ -401,7 +445,7 @@ public class ASRPOG {
 			chars[c] = s.toCharArray()[c];
 		seq.set(chars);
 		phyloTree.find(phyloNodeLabel).setSequence(seq);
-		System.out.println(phyloNodeLabel + ": sequence " + seq.toString());
+//		System.out.println(phyloNodeLabel + ": sequence " + seq.toString());
 	}
 
 	/**
