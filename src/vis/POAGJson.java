@@ -50,7 +50,6 @@ public class POAGJson {
             bar.put("label", list.getKey().toString());
             bar.put("value", list.getValue());
             bars.put(bar);
-            break;
         }
         chars.put("chars", bars);
         return chars;
