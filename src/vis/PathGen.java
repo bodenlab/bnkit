@@ -19,29 +19,27 @@ import java.util.AbstractList;
 import java.util.Arrays;
 
 /**
- * A path generation class, 
- * How the path is determined:
- *      1. Takes in a start and goal node
- *      2. Tries to assert the shortest path from the start to goal 
- *          follows the edges of the POAG.
- *      3. If there are unsearched nodes it itteratively tries to "close" these
- *      4. Each subsequent itteration assigns a y coordinate further from the
- *          most optimal path (to indicate less likely).
- *      5. X coordinates are given by the topological sort of the POAG
- *          (performed prior to the path calculation program)
+ * A path generation class, How the path is determined: 1. Takes in a start and
+ * goal node 2. Tries to assert the shortest path from the start to goal follows
+ * the edges of the POAG. 3. If there are unsearched nodes it itteratively tries
+ * to "close" these 4. Each subsequent itteration assigns a y coordinate further
+ * from the most optimal path (to indicate less likely). 5. X coordinates are
+ * given by the topological sort of the POAG (performed prior to the path
+ * calculation program)
+ *
  * @author ariane
  */
 public class PathGen {
 
     // A queue holding the states to be searched.
     PriorityQueue<QueueTiny<Object>> closedSet;
-        
+
     // Keeps a list of the nodes yet to be searched
     PriorityQueue<QueueTiny<Object>> openSet;
-    
+
     // Depth indicates where in the 
     int depth;
-    
+
     // The cost associated with a move
     int costPenalty;
 
@@ -64,7 +62,7 @@ public class PathGen {
     public PriorityQueue<Integer> unsearchedPaths;
     // Store the ends of the gaps in a similar manner
     public PriorityQueue<Integer> gapEnds;
-    
+
     private HashMap<Integer, Integer> searchedList = null;
     private HashMap<Integer, Map<Integer, Double>> nodesWithEdges;
 
@@ -97,10 +95,10 @@ public class PathGen {
         // Here we want to add in any nodes which we may have missed at the 
         // start of the POAG. There may be multiple starting nodes.
         ArrayList<Integer> remainingNodes = new ArrayList<>();
-        for (Integer i: poag.getNodeIDs()) {
+        for (Integer i : poag.getNodeIDs()) {
             try {
-                Node egg = nodes.get(i);
-                if (egg == null) {
+                Node node = nodes.get(i);
+                if (node == null) {
                     remainingNodes.add(i);
                     System.err.println("Not in nodes: " + i + " " + Arrays.toString(poag.getNextNodeIDs(i)));
                 }
@@ -122,6 +120,7 @@ public class PathGen {
         return nodesWithEdges;
     }
 
+    
     public PriorityQueue<Integer> getStartingNodes() {
         // Performing a topological sort sometimes causes the ordering between
         // the MSA and the inferred graph to differ. Instead assume that it is
@@ -139,17 +138,17 @@ public class PathGen {
     }
 
     public void initAStarSearch(Integer startNode, Integer goalNode) {
-        int queueSize = 10000; 
+        int queueSize = 10000;
         this.goalNode = goalNode;
         this.startNode = startNode;
 
-        costPenalty = 101; // The max cost is 100 (if the chance is 100% we get 
+        costPenalty = 50; // The max cost is 100 (if the chance is 100% we get 
         // a cost of a move = 1, as every move should have some penalty 
         // associated (NEED TO ASK)
 
         // The comparator currently just compares on the cost + heuristic
         queueComparator = new QueueComparator();
-        
+
         closedSet = new PriorityQueue<>(queueSize, queueComparator);
 
         // Open nodes
@@ -180,7 +179,7 @@ public class PathGen {
     /**
      * Gets the path with the least cost associated from an initial to goal
      * node.
-     * 
+     *
      * @return a path from a start to end node
      */
     public List<Integer> getMainPath() {
@@ -196,9 +195,6 @@ public class PathGen {
                 // initial node, if we did return null and don't re add the gap
                 if (Objects.equals(currentEntry.getPreviousPosition(), startNode)) {
 
-                    
-                    
-                    
                 } else {
                     return (getPath());
                 }
@@ -209,10 +205,10 @@ public class PathGen {
     }
 
     /**
-     * Gets the out edge weights which are still available to be searched
-     * i.e. paths yet to be explored.
+     * Gets the out edge weights which are still available to be searched i.e.
+     * paths yet to be explored.
      */
-    private Map<Integer, Double>  getUnsearchedOutEdgeWeights(Integer id) {
+    private Map<Integer, Double> getUnsearchedOutEdgeWeights(Integer id) {
         try {
             return nodesWithEdges.get(id);
         } catch (Exception e) {
@@ -220,12 +216,12 @@ public class PathGen {
         }
         return null;
     }
-    
+
     /**
-     * Gets the next node id's which are still available to be searched
-     * i.e. have a path which is yet to be explored.
+     * Gets the next node id's which are still available to be searched i.e.
+     * have a path which is yet to be explored.
      */
-    private Set<Integer> getUnsearchedNextNodeIDs(Integer id) {        
+    private Set<Integer> getUnsearchedNextNodeIDs(Integer id) {
         try {
             return nodesWithEdges.get(id).keySet();
         } catch (Exception e) {
@@ -233,22 +229,21 @@ public class PathGen {
         }
         return null;
     }
-    
+
     /**
      * Searches the neighboring nodes and updates the cost to these nodes if it
      * is less from this current node.
-     * 
+     * Note we set the heuristic to 0 as we don't use this in this version.
      */
     private void searchNeighbours() {
         int currentID = currentEntry.getCurrentPosition();
-        Map<Integer, Double> successors = getUnsearchedOutEdgeWeights(currentID);
         Set<Integer> successorIds = getUnsearchedNextNodeIDs(currentID);
-        
-        double heuristic = 100000; // An arbitarilty large initial heuristic.
+
+        // Don't use the heuristic
+        double heuristic = 0.0;
         double currentCost = totalScoreMap.get(currentID);
 
         for (Integer neighborID : successorIds) {
-
             // This is if we are searching between gaps - we already know the
             // direct path is best so we want to skip the optimal path and find
             // the secondary one.
@@ -256,32 +251,17 @@ public class PathGen {
                 continue;
             }
             int pos = isNodeSearched(neighborID);
-            // If there has been no weight associated it will error out so we 
-            // need to give it the maxinum cost of 0 (which is what the label says)
-            double posCost = costPenalty;
-            try {
-                posCost = costPenalty + 1;//- (100 * successors.get(neighborID)); 
-                //Because we want it to have some cost                                
-            } catch (Exception e) {
-                posCost = 200; // This has no weight associated need to ask!
-                System.err.println("The ids didnt match the length of out "
-                        + " weights: " + successorIds + "\n" + successors.toString());
-            }
-            heuristic = 0;//getHeuristic(0, 0);
+            double posCost = costPenalty + 1;
             // Means it hasn't been searched yet otherwise we ignore it
             if (pos > 0) {
-                // Get the total score to the 
+                // Get the total score to the node
                 double totalMoveCost = currentCost + posCost;
                 openSet.add(new QueueTiny<>(neighborID, totalMoveCost, heuristic, neighborID, currentID));
                 // If its less than this is a better move than the current score
                 // to get to that position - best path so far
-                try {
-                    if (totalMoveCost < totalScoreMap.get(neighborID)) {
-                        cameFrom.put(neighborID, currentID);
-                        totalScoreMap.put(neighborID, totalMoveCost);
-                    }
-                } catch (Exception e) {
-                    //System.err.println("This node wasn't searchable? + " + neighborID);
+                if (totalMoveCost < totalScoreMap.get(neighborID)) {
+                    cameFrom.put(neighborID, currentID);
+                    totalScoreMap.put(neighborID, totalMoveCost);
                 }
             }
         }
@@ -291,7 +271,7 @@ public class PathGen {
 
     /**
      * Gets the heuristic between two nodes.
-     * 
+     *
      * @param Start node ID
      * @param Goal node ID
      * @return the heuristic based on the start and goal node
@@ -337,13 +317,20 @@ public class PathGen {
                     int gapNodeId = prevId + 1;
                     int prevY = depth + 1;
                     try {
-                        Node n = new Node(gapNodeId, gapNodeId, prevY, poag.getCharacterDistribution(gapNodeId), poag.getOutEdgeWeights(gapNodeId), poag.getSeqChars(gapNodeId));
+                        // Try to get this node and if it doesn't exist then 
+                        // we know that it has been removed during inference ->
+                        // print this out so the user knows.
+                        Node n = new Node(gapNodeId, gapNodeId, prevY, 
+                                poag.getCharacterDistribution(gapNodeId), 
+                                poag.getOutEdgeWeights(gapNodeId), 
+                                poag.getSeqChars(gapNodeId));
                         nodes.put(gapNodeId, n);
                     } catch (Exception e) {
-                        System.err.println(e + " Node: " + gapNodeId + " removed during inferrence");
+                        System.err.println(e + " Node: " + gapNodeId + 
+                                " removed during inferrence");
                     }
                 } else {
-                    addGaps(prevId, curId);
+                    addGaps(curId);
                 }
             }
         }
@@ -361,12 +348,12 @@ public class PathGen {
     }
 
     /**
-     * Adds gaps to the stored gap list associated with the POAG. 
+     * Adds gaps to the stored gap list associated with the POAG.
      *
      * @param start
      * @param end
      */
-    public void addGaps(int start, int end) {
+    public void addGaps(int end) {
         gapEnds.add(end);
     }
 
@@ -396,7 +383,7 @@ public class PathGen {
     /**
      * Initialise the search list to indicate none of the nodes have been
      * searched yet (set all to 0)
-     * 
+     *
      * @return the node IDs in a sorted list
      */
     private HashMap<Integer, Integer> initSearchList() {
@@ -420,6 +407,7 @@ public class PathGen {
      * 
      */
     public class QueueComparator implements Comparator<QueueTiny<Object>> {
+
         @Override
         public int compare(QueueTiny<Object> o1, QueueTiny<Object> o2) {
             return Double.compare(o1.totalCost + o1.heuristicEstimate,
@@ -427,13 +415,12 @@ public class PathGen {
         }
     }
 
-    
     /**
-     * Helper function to convert a key set to a priority queue
-     * Used for storing the nodes left to search.
-     * 
-     * @param Adds the ID's of the nodes which haven't been searched
-     * to the priority queue.
+     * Helper function to convert a key set to a priority queue Used for storing
+     * the nodes left to search.
+     *
+     * @param Adds the ID's of the nodes which haven't been searched to the
+     * priority queue.
      */
     private void keySetToPriorityQueue(Set<Integer> keyset) {
         unsearchedPaths.clear();
@@ -441,11 +428,10 @@ public class PathGen {
             unsearchedPaths.add(i);
         });
     }
-    
-    
+
     /**
      * Returns a map of paths and the depth at which these occur.
-     * 
+     *
      * @return a list of paths
      */
     public HashMap<Integer, List<Integer>> getPathDepths() {
@@ -459,7 +445,7 @@ public class PathGen {
         // First search all the starting node paths
         PriorityQueue<Integer> startingNodes = getStartingNodes();
         int startDepth = 0;
-        while (!startingNodes.isEmpty()){
+        while (!startingNodes.isEmpty()) {
             gapStart = startingNodes.poll();
             path = getSubPath(gapStart, gapEnd);
             paths.put(startDepth, path);
@@ -494,43 +480,48 @@ public class PathGen {
         // Reset the nodes to have correct x coords
         return paths;
     }
-    
-    
+
     /**
-     * 
+     * Gets the sub paths which havn't yet been searched. 
+     * 1. Polls for an unsearched path
+     * 2. Initisalises a new AStarSearch
+     * 3. Itteratively searches the gap
+     * 4. Breaks when the start = end
      * @param gapStart
      * @param gapEnd
-     * @return 
+     * @return
      */
     private List<Integer> getSubPath(int gapStart, int gapEnd) {
-            // Set up the AStar search environment with the start and end 
-            // This also clears the searched nodes in the search map
-            resetSearchList();
-            initAStarSearch(gapStart, gapEnd);
-            List<Integer> path = getMainPath();
-            // If the path was null we don't want to add it - see code below
-            // for alternative method (ugly with nested while loops to step
-            // through the gap.
-            while (path == null && gapStart <= gapEnd) {
-                path = getMainPath();
-                // If there was no path to the node it is another starting node
-                // So we add it at the current depth
-                if (gapEnd == gapStart) {
-                    path.add(gapEnd);
-                    break;
-                }
-                resetSearchList();
-                gapStart = unsearchedPaths.poll();
-                initAStarSearch(gapStart, gapEnd);
+        // Set up the AStar search environment with the start and end 
+        // This also clears the searched nodes in the search map
+        resetSearchList();
+        initAStarSearch(gapStart, gapEnd);
+        List<Integer> path = getMainPath();
+        // If the path was null we don't want to add it - see code below
+        // for alternative method (ugly with nested while loops to step
+        // through the gap.
+        while (path == null && gapStart <= gapEnd) {
+            path = getMainPath();
+            // If there was no path to the node it is another starting node
+            // So we add it at the current depth
+            if (gapEnd == gapStart) {
+                path.add(gapEnd);
+                break;
             }
-            
-            return path;
+            resetSearchList();
+            gapStart = unsearchedPaths.poll();
+            initAStarSearch(gapStart, gapEnd);
+        }
+
+        return path;
     }
-    
+
     /**
-     * 
+     * Adds the nodes from the new found path to the node array. 
+     * This creates a node with the required information for the JSON object if
+     * it doesn't already exist.
      * @param path
-     * @param depth 
+     * @param depth
      */
     private void addNodes(List<Integer> path, int depth) {
         int id;
@@ -539,7 +530,7 @@ public class PathGen {
             Node n = nodes.get(id);
             if (n == null) {
                 // if we don't have the node already then we want to add it
-                n = new Node(id, id, depth, poag.getCharacterDistribution(id), 
+                n = new Node(id, id, depth, poag.getCharacterDistribution(id),
                         poag.getOutEdgeWeights(id), poag.getSeqChars(id));
             }
             // Otherwise, check if the depth is smaller for this one as we 

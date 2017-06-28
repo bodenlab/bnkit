@@ -100,9 +100,7 @@ public class POAGJson {
             int id = n.getID();
             String nid = "node-" + id;
             // Extra things for the multi view poag
-            thisNode.put("class", ""); // Some sort of class
             thisNode.put("id", id);
-            thisNode.put("lane", y);
             // Ones needed for tthe actual poag
             thisNode.put("label", poag.getLabel(id));
             thisNode.put("x", x);
@@ -116,6 +114,10 @@ public class POAGJson {
             }
             // Need to get the out egdes into JSON reaction object
             Map<Integer, Double> outedges = n.getOutedges();
+            // Add the number of out edges so we can know whether this node
+            // is of interest.
+            thisNode.put("num_out_edges", outedges.size());
+            System.err.println(outedges.size());
             for (Map.Entry<Integer, Double> outNodes : outedges.entrySet()) {
                 try {
                     JSONObject thisEdge = new JSONObject();
