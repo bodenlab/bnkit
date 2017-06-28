@@ -20,21 +20,18 @@ import java.util.Map;
  */
 public class BranchIsolation {
 
+    private ASRPOG asr;
+    private String treePath;
+    private String sequencePath;
+    private boolean mp;
+
     public BranchIsolation(ASRPOG asr, String treePath, String sequencePath, String node, boolean mp) throws IOException {
+        this.asr = asr;
+        this.treePath = treePath;
+        this.sequencePath = sequencePath;
+        this.mp = mp;
 
         POGraph msa = asr.getMSAGraph();
-
-        // Iterate through the MSA distributions
-//        System.out.println("Print all the MSA distributions");
-
-        for (int k = 0; k < msa.getNumNodes(); k++) {
-            msa.setCurrent(msa.getNodeIDs().get(k));
-            Map<Character, Double> distribution = msa.getCharacterDistribution();
-//            System.out.println(msa.getNodeIDs().get(k));
-//            System.out.println(distribution);
-
-        }
-
 
 
         //TODO: Can we get children for a node without having to do this conversion to a List
@@ -42,24 +39,91 @@ public class BranchIsolation {
         Collection<PhyloTree.Node> children = asr.getChildren(node);
         List<PhyloTree.Node> childrenList = new ArrayList(children);
 
-        String leftNode = childrenList.get(0).getLabel().toString();
-        String rightNode = childrenList.get(1).getLabel().toString();
+        EnumDistrib[] leftDistrib = getDistrib(childrenList.get(0).getLabel().toString());
+        EnumDistrib[] rightDistrib = getDistrib(childrenList.get(1).getLabel().toString());
+
+
+        // Iterate through the MSA distributions
+        for (int k = 0; k < msa.getNumNodes(); k++) {
+            msa.setCurrent(msa.getNodeIDs().get(k));
+            Map<Character, Double> distribution = msa.getCharacterDistribution();
+
+            int currentNode = msa.getNodeIDs().get(k);
+
+            System.out.println("At node " + currentNode);
+
+            for (Character character : distribution.keySet()){
+
+
+                System.out.println(character + " " +  distribution.get(character));
+                System.out.println("Left distrib at this node is " + leftDistrib[currentNode].get(getDistibPostion(character)));
+                System.out.println("Right distrib at this node is " + rightDistrib[currentNode].get(getDistibPostion(character)));
+
+            }
+
+        }
+
+    }
+
+    private EnumDistrib[] getDistrib(String node) throws IOException {
+
+        ASRPOG child = new ASRPOG(sequencePath, treePath, sequencePath, node, mp);
+        EnumDistrib[] distrib = child.getMarginalDistributions();
+
+        return distrib;
 
 
 
-        //TODO: Is it best to recreate ASRPOG objects using the sequencePath / treePath ?
-        // Create marginal reconstructions for the children
-        ASRPOG leftChild = new ASRPOG(sequencePath, treePath, sequencePath, leftNode, mp);
-        ASRPOG rightChild = new ASRPOG(sequencePath, treePath, sequencePath, rightNode.toString(), mp);
+    }
 
-        EnumDistrib[] leftDistrib = leftChild.getMarginalDistributions();
-        EnumDistrib[] rightDistrib = rightChild.getMarginalDistributions();
+    private int getDistibPostion(Character character){
 
-        POGraph leftGraph = leftChild.getGraph(leftNode);
-        POGraph rightGraph = rightChild.getGraph(rightNode);
+        switch(character) {
+            case 'A':
+                return 0;
+            case 'C':
+                return 1;
+            case 'D':
+                return 2;
+            case 'E':
+                return 3;
+            case 'F':
+                return 4;
+            case 'G':
+                return 5;
+            case 'H':
+                return 6;
+            case 'I':
+                return 7;
+            case 'K':
+                return 8;
+            case 'L':
+                return 9;
+            case 'M':
+                return 10;
+            case 'N':
+                return 11;
+            case 'P':
+                return 12;
+            case 'Q':
+                return 13;
+            case 'R':
+                return 14;
+            case 'S':
+                return 15;
+            case 'T':
+                return 16;
+            case 'V':
+                return 17;
+            case 'W':
+                return 18;
+            case 'Y':
+                return 19;
+            default:
+                System.out.println("Coudn't map this character to a marginal distiburtion: " + character);
+        }
 
-
-
+        return -1;
 
     }
 }
