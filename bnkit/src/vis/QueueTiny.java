@@ -18,11 +18,11 @@ public class QueueTiny<Data> {
     /**
      * Current position of the person on the map
      */
-    private Integer currentPosition;
+    final Integer currentPosition;
     /**
      * Current position of the person on the map
      */
-    private Integer previousPosition;
+    final Integer previousPosition;
     /**
      * A heuristic estimate of the remaining cost to the goal; this will be zero
      * if no heuristic is being used
