@@ -54,7 +54,7 @@ public class RunASRPOG {
 			boolean msaFile = false;
 			boolean performAlignment = false;
 			boolean mp = false;
-			boolean checkBranchIsolation = true;
+			boolean checkBranchIsolation = false;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {

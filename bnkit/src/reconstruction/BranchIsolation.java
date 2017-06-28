@@ -25,13 +25,13 @@ public class BranchIsolation {
         POGraph msa = asr.getMSAGraph();
 
         // Iterate through the MSA distributions
-        System.out.println("Print all the MSA distributions");
+//        System.out.println("Print all the MSA distributions");
 
         for (int k = 0; k < msa.getNumNodes(); k++) {
             msa.setCurrent(msa.getNodeIDs().get(k));
             Map<Character, Double> distribution = msa.getCharacterDistribution();
-            System.out.println(msa.getNodeIDs().get(k));
-            System.out.println(distribution);
+//            System.out.println(msa.getNodeIDs().get(k));
+//            System.out.println(distribution);
 
         }
 
@@ -57,7 +57,9 @@ public class BranchIsolation {
 
         POGraph leftGraph = leftChild.getGraph(leftNode);
         POGraph rightGraph = rightChild.getGraph(rightNode);
-        
+
+
+
 
     }
 }
