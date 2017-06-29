@@ -1,6 +1,9 @@
 package reconstruction;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -115,7 +118,38 @@ public class RunASRPOG {
 			}
 
 			if (checkBranchIsolation){
-				BranchIsolation branchIsolation = new BranchIsolation(asr, treePath, sequencePath, "N0", mp);
+
+				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
+					add("N3");
+					add("N4");
+					add("N10");
+					add("N14");
+					add("N19");
+				}};
+
+
+
+				Map<String, String> ancestralLabels = asr.getAncestralDict();
+
+
+				// Code for using a specific list of Nodes
+//				for (String node : ancestralNodes){
+//					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
+//
+//
+//				}
+
+				// Code for using one specific node
+//				BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, "N4", mp);
+
+
+				// Code for using all nodes
+				for (String node : ancestralLabels.keySet()){
+					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
+
+
+				}
+
 
 			}
 

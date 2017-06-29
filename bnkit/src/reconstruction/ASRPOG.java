@@ -385,6 +385,17 @@ public class ASRPOG {
 
     }
 
+    public Map<String, String> getAncestralDict(){
+
+		Map<String, String> ancestralDict = new HashMap<>();
+
+		for (String label : this.ancestralSeqLabels){
+			ancestralDict.put(label, "");
+		}
+
+		return ancestralDict;
+	}
+
     /**
      *
      * Return the marginal distributions
