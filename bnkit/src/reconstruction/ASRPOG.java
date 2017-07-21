@@ -1,7 +1,6 @@
 package reconstruction;
 
 
-import api.PartialOrderGraph;
 import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
@@ -126,17 +125,17 @@ public class ASRPOG {
 
 	/**
 	 * Constructs partial order alignment graphs for each of the internal nodes of the phylogenetic tree.
-	 * 
+	 *
 	 * @param filepath	filepath to store the internal POAG alignment information to
 	 */
 	public void saveGraph(String filepath) {
 		for (String phyloNodeLabel : ancestralSeqLabels)
 			saveGraph(filepath, phyloNodeLabel);
 	}
-	
+
 	/**
 	 * Constructs partial order alignment graphs for the given internal node of the phylogenetic tree.
-	 * 
+	 *
 	 * @param filepath	filepath to store the POAG alignment information to
 	 * @param nodeLabel	label of the internal node to generate file for (internal labels are specified in the phylogenetic tree .nwk file)
 	 */
@@ -148,7 +147,7 @@ public class ASRPOG {
 
 
 
-    	/**
+	/**
 	 * Get the partial order alignment graph for the given internal node of the phylogenetic tree.
 	 *
 	 * @param nodeLabel	Ancestral node
@@ -167,7 +166,7 @@ public class ASRPOG {
 		return new POGraph(this.pogAlignment);
 	}
 
-    //TODO: Update the test classes that use getGraph() and expect a PartialOrderGraph
+	//TODO: Update the test classes that use getGraph() and expect a PartialOrderGraph
 
 
 //	/**
@@ -189,7 +188,7 @@ public class ASRPOG {
 //    public PartialOrderGraph getMSAGraph() {
 //        return new PartialOrderGraph(this.pogAlignment);
 //    }
-	
+
 	/**
 	 * Save multiple sequence alignment partial order alignment graph as a dot file in the given output filepath.
 	 *
@@ -375,17 +374,17 @@ public class ASRPOG {
 		writer.close();
 	}
 
-    /**
-     * Return a collection of the children of a given node
-     *
-     * @param node	node to get children of
-     */
+	/**
+	 * Return a collection of the children of a given node
+	 *
+	 * @param node	node to get children of
+	 */
 	public Collection<PhyloTree.Node> getChildren(String node) {
-	    return this.phyloTree.find(node).getChildren();
+		return this.phyloTree.find(node).getChildren();
 
-    }
+	}
 
-    public Map<String, String> getAncestralDict(){
+	public Map<String, String> getAncestralDict(){
 
 		Map<String, String> ancestralDict = new HashMap<>();
 
@@ -396,14 +395,18 @@ public class ASRPOG {
 		return ancestralDict;
 	}
 
-    /**
-     *
-     * Return the marginal distributions
-     *
-     */
-    public EnumDistrib[] getMarginalDistributions(){
-	    return this.marginalDistributions;
-    }
+	public Map<String, List<Inference>> getAncestralInferences(){
+		return this.ancestralInferences;
+	}
+
+	/**
+	 *
+	 * Return the marginal distributions
+	 *
+	 */
+	public EnumDistrib[] getMarginalDistributions(){
+		return this.marginalDistributions;
+	}
 
 	/* ****************************************************************************************************************************************************
 	 * 																PRIVATE METHODS
@@ -491,7 +494,7 @@ public class ASRPOG {
 
 	/**
 	 * Loads the phylogenetic tree into the BN tree structure, performs MSA using the input sequences and generates the partial order alignment graph of the MSA
-	 * 
+	 *
 	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param sequenceFile	filepath to the sequences (expected extension .aln, .fa or .fasta)
 	 */
@@ -543,40 +546,40 @@ public class ASRPOG {
 
 		// Check if the provided extant sequences match up to the provided tree
 		if (!eNodes.equals(seqNames)) {
-		    // find labels that don't match
-            String seqLabels = "";
-            for (String seqLabel : seqNames)
-                if (!eNodes.contains(seqLabel))
-                    seqLabels += " " + seqLabel;
-            String eLabels = "";
-            for (String eLabel : eNodes)
-                if (!seqNames.contains(eLabel))
-                    eLabels += " " + eLabel;
-            throw new RuntimeException("The sequence names in the provided alignment must all have a match" +
-                    " in the provided tree. Unique labels in the alignment: " + seqLabels + ": unique labels in the tree: " + eLabels);
-        }
+			// find labels that don't match
+			String seqLabels = "";
+			for (String seqLabel : seqNames)
+				if (!eNodes.contains(seqLabel))
+					seqLabels += " " + seqLabel;
+			String eLabels = "";
+			for (String eLabel : eNodes)
+				if (!seqNames.contains(eLabel))
+					eLabels += " " + eLabel;
+			throw new RuntimeException("The sequence names in the provided alignment must all have a match" +
+					" in the provided tree. Unique labels in the alignment: " + seqLabels + ": unique labels in the tree: " + eLabels);
+		}
 
 		// save sequence information in internal nodes of the phylogenetic tree
 		for (EnumSeq.Gappy<Enumerable> extant : extantSequences)
 			phyloTree.find(extant.getName()).setSequence(extant);
 	}
-	
+
 	/**
-	 * Create Bayesian network for node in the partial order alignment graph that contains multiple characters. 
-	 * 
+	 * Create Bayesian network for node in the partial order alignment graph that contains multiple characters.
+	 *
 	 * @return	Bayesian networks for node position in pogAlignment
 	 */
 	private PhyloBNet createCharacterNetwork(){
 		// create a bayesian network with the phylogenetic tree structure and the JTT substitution model for amino acids
-		PhyloBNet phyloBN = PhyloBNet.create(phyloTree, new JTT());														
+		PhyloBNet phyloBN = PhyloBNet.create(phyloTree, new JTT());
 		Map<Integer, Character> sequenceCharacterMapping = pogAlignment.getSequenceCharacterMapping();
-		
+
 		// for all extant sequences, if sequence is in this alignment, find where the location is in the phylogenetic tree and assign base to that position in the bayesian network
 		// for all sequences not in this alignment, find where the location is in the phylogenetic tree and assign a gap to that position in the bayesian network
 		for (int extantSeq = 0; extantSeq < extantSequences.size(); extantSeq++)
 			if (sequenceCharacterMapping.containsKey(extantSeq))
 				// find where the sequence is in the BN and set the base character
-				phyloBN.getBN().getNode(extantSequences.get(extantSeq).getName()).setInstance(sequenceCharacterMapping.get(extantSeq));	
+				phyloBN.getBN().getNode(extantSequences.get(extantSeq).getName()).setInstance(sequenceCharacterMapping.get(extantSeq));
 			else {
 				// sequence is not part of character inference, check for gap
 				SubstNode snode = (SubstNode)phyloBN.getBN().getNode(extantSequences.get(extantSeq).getName());
@@ -585,14 +588,14 @@ public class ASRPOG {
 
 		// remove all nodes that are 'gaps'
 		phyloBN.purgeGaps();
-		
+
 		return phyloBN;
 	}
 
 
 	/**
-	 * Create gap/character Bayesian network for node in the partial order alignment graph. 
-	 * 
+	 * Create gap/character Bayesian network for node in the partial order alignment graph.
+	 *
 	 * @return	Bayesian networks for node position in pogAlignment
 	 */
 	private PhyloBNet createGapNetwork() {
@@ -611,7 +614,7 @@ public class ASRPOG {
 
 		return phyloBN;
 	}
-	
+
 	/**
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using joint inference.
 	 *
@@ -619,7 +622,7 @@ public class ASRPOG {
 	 */
 	private void queryBNJoint(boolean gapParsimony){
 
-		// infer base/gap of each aligned node 
+		// infer base/gap of each aligned node
 		List<Integer> nodeIDs = pogAlignment.getNodeIDs();
 		rates = new Double[nodeIDs.get(nodeIDs.size()-1) + 1]; //Rate matrix
 		for (Integer nodeId : nodeIDs) {
@@ -780,61 +783,64 @@ public class ASRPOG {
 
 	/**
 	 * Gets the joint probability assignment of instantiated bayesian network associated with VarElim ve
-	 * 
+	 *
 	 * @param ve	Instantiated variable elimination for bayesian inference of joint probabilities
 	 * @return		likelihood assignment of each node from ve
 	 */
-    private Variable.Assignment[] getJointAssignment(VarElim ve) {
-        Query q_joint = ve.makeMPE();
-        CGTable r_joint = (CGTable)ve.infer(q_joint);
-        return r_joint.getMPE();
-    }
-    
-    /**
-     * Gets the marginal distribution of the queryNode using instantiated bayesian network associated with VarElim ve
-     * 
-     * @param ve			instantiated bayesian network
-     * @param queryNode		node to query
-     * @return				marginal distribution of query node using ve
-     */
-    private EnumDistrib getMarginalDistrib(VarElim ve, EnumVariable queryNode) {
-        EnumDistrib d_marg = null;
-        try {
-            Query q_marg = ve.makeQuery(queryNode);
-            CGTable r_marg = (CGTable)ve.infer(q_marg);
-            d_marg = (EnumDistrib)r_marg.query(queryNode);
-        } catch (NullPointerException npe) { //When node of interest has been removed from network of interest
-            if (npe.toString().contains("Invalid query")) {
-                double[] empty = new double[Enumerable.aacid.size()];
-                for (int d = 0; d < Enumerable.aacid.size(); d++) {
-                    empty[d] = 0.0;
-                }
-                d_marg = new EnumDistrib(Enumerable.aacid, empty);
-            } else {
-                npe.printStackTrace();
-            }
+	private Variable.Assignment[] getJointAssignment(VarElim ve) {
+		Query q_joint = ve.makeMPE();
+		CGTable r_joint = (CGTable)ve.infer(q_joint);
+		return r_joint.getMPE();
+	}
 
-        }
-        return d_marg;
-    }
+	/**
+	 * Gets the marginal distribution of the queryNode using instantiated bayesian network associated with VarElim ve
+	 *
+	 * @param ve			instantiated bayesian network
+	 * @param queryNode		node to query
+	 * @return				marginal distribution of query node using ve
+	 */
+	private EnumDistrib getMarginalDistrib(VarElim ve, EnumVariable queryNode) {
+		EnumDistrib d_marg = null;
+		try {
+			Query q_marg = ve.makeQuery(queryNode);
+			CGTable r_marg = (CGTable)ve.infer(q_marg);
+			d_marg = (EnumDistrib)r_marg.query(queryNode);
+		} catch (NullPointerException npe) { //When node of interest has been removed from network of interest
+			if (npe.toString().contains("Invalid query")) {
+				double[] empty = new double[Enumerable.aacid.size()];
+				for (int d = 0; d < Enumerable.aacid.size(); d++) {
+					empty[d] = 0.0;
+				}
+				d_marg = new EnumDistrib(Enumerable.aacid, empty);
+			} else {
+				npe.printStackTrace();
+			}
 
-    /**
-     * Helper class to store changes to an ancestral graph node
-     * 
-     * Information:
-     * 		- POG structure index 
-     * 		- Inferred base character: base character that is inferred or '-' to represent a gap (i.e. that the node needs to be deleted when updating the structure)
-     */
-    private class Inference {
-    	int pogId;
-    	char base;
+		}
+		return d_marg;
+	}
 
-    	public Inference(int id, char ch){
-    		pogId = id;
-    		base = ch;
-    	}
-    	public String toString(){
-    		return pogId + "->" + base;
-    	}
-    }
+	/**
+	 * Helper class to store changes to an ancestral graph node
+	 *
+	 * Information:
+	 * 		- POG structure index
+	 * 		- Inferred base character: base character that is inferred or '-' to represent a gap (i.e. that the node needs to be deleted when updating the structure)
+	 */
+	public class Inference {
+		int pogId;
+		char base;
+
+		public Inference(int id, char ch){
+			pogId = id;
+			base = ch;
+		}
+		public String toString(){
+			return pogId + "->" + base;
+		}
+
+
+
+	}
 }

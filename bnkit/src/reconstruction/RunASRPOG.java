@@ -119,12 +119,32 @@ public class RunASRPOG {
 
 			if (checkBranchIsolation){
 
+//				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
+//					add("N3");
+//					add("N4");
+//					add("N10");
+//					add("N14");
+//					add("N19");
+//				}};
+
+				// For PhyML data
+//				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
+////					add("NO");
+//					add("N1");
+//					add("N2");
+//					add("N104");
+//					add("N101");
+//					add("N79");
+//					add("N85");
+//					add("N4");
+//
+//				}};
+
 				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
+					add("N1");
+					add("N2");
 					add("N3");
-					add("N4");
-					add("N10");
-					add("N14");
-					add("N19");
+
 				}};
 
 
@@ -140,15 +160,15 @@ public class RunASRPOG {
 //				}
 
 				// Code for using one specific node
-//				BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, "N4", mp);
+				BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, "N4", mp);
 
 
 				// Code for using all nodes
-				for (String node : ancestralLabels.keySet()){
-					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
-
-
-				}
+//				for (String node : ancestralLabels.keySet()){
+//					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
+//
+//
+//				}
 
 
 			}

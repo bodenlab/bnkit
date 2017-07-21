@@ -1,12 +1,10 @@
 package reconstruction;
 
-import api.PartialOrderGraph;
 import bn.prob.EnumDistrib;
 import dat.POGraph;
 import dat.PhyloTree;
 
 import java.io.IOException;
-import java.security.Key;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -32,12 +30,14 @@ public class BranchIsolation {
         this.sequencePath = sequencePath;
         this.mp = mp;
 
+
+
         List<Integer> unsupportedLeft = new ArrayList<>();
         List<Integer> unsupportedRight = new ArrayList<>();
 
         POGraph msa = asr.getMSAGraph();
 
-        System.out.println("\nCurrently at node: " + node);
+//        System.out.println("\nCurrently at node: " + node);
 
 
         //TODO: Can we get children for a node without having to do this conversion to a List
@@ -45,38 +45,114 @@ public class BranchIsolation {
         Collection<PhyloTree.Node> children = asr.getChildren(node);
         List<PhyloTree.Node> childrenList = new ArrayList(children);
 
+
         String leftNode = childrenList.get(0).getLabel().toString();
         String rightNode = childrenList.get(1).getLabel().toString();
+
+//        if (leftNode == "XP_020383892_1_cytochrome_P450_2U1like_Rhincodon_typus"){
+//            leftNode = childrenList.get(0).getLabel().toString();
+//        }
+//
+//        if (rightNode == "XP_020383892_1_cytochrome_P450_2U1like_Rhincodon_typus"){
+//            leftNode = childrenList.get(0).getLabel().toString();
+//        }
 
         // Get the marginal distributions for each child
         if (ancestralDict.get(leftNode) != null && ancestralDict.get(rightNode) != null) {
 
-            System.out.println("This node is a goer " + node);
-        }
+//            System.out.println("This node is a goer " + node);
+//        }
 
 
-//            EnumDistrib[] leftDistrib = getDistrib(childrenList.get(0).getLabel().toString());
-//            EnumDistrib[] rightDistrib = getDistrib(childrenList.get(1).getLabel().toString());
+          EnumDistrib[] parentDistrib = getDistrib(node.toString());
+            EnumDistrib[] leftDistrib = getDistrib(childrenList.get(0).getLabel().toString());
+            EnumDistrib[] rightDistrib = getDistrib(childrenList.get(1).getLabel().toString());
+
+            System.out.println(rightDistrib);
+
+
+
+            // Iterate through the MSA distributions
+            for (int k = 0; k < msa.getNumNodes(); k++) {
+                msa.setCurrent(msa.getNodeIDs().get(k));
+                Map<Character, Double> distribution = msa.getCharacterDistribution();
+
+                int currentNode = msa.getNodeIDs().get(k);
+
+
+                Character maxMSACharacter = Collections.max(distribution.entrySet(), Map.Entry.comparingByValue()).getKey();
+
+                Map<String, List<ASRPOG.Inference>>ancestralInferences = asr.getAncestralInferences();
+                Character maxDistribCharacter = ancestralInferences.get(node).get(k).base;
+                Character rootDistribCharacter = ancestralInferences.get("N0").get(k).base;
+//                System.out.println("Max distrib character is " + maxDistribCharacter);
+
+                if (maxDistribCharacter != '-' && rootDistribCharacter != '-') {
+
+                    Character leftDistribMax = getDistribCharacter(leftDistrib[currentNode].getMaxIndex());
+                    Character rightDistribMax = getDistribCharacter(rightDistrib[currentNode].getMaxIndex());
+
+
+
+
+
+
+                    double leftCharacterDistrib = leftDistrib[currentNode].get(getDistibPostion(maxDistribCharacter));
+                    double rightCharacterDistrib = rightDistrib[currentNode].get(getDistibPostion(maxDistribCharacter));
+
+                    double leftMSADistrib = leftDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
+                    double rightMSADistrib = rightDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
+
+                    double leftRootDistrib = leftDistrib[currentNode].get(getDistibPostion(rootDistribCharacter));
+                    double rightRootDistrib = rightDistrib[currentNode].get(getDistibPostion(rootDistribCharacter));
+
+                    if (leftCharacterDistrib < 0.5 && rightCharacterDistrib > 0.5){
+                        System.out.println("*********YEPPPERS********");
+                    }
+
+                    else if (rightCharacterDistrib < 0.5 && leftCharacterDistrib > 0.5){
+                        System.out.println("***********YEPPERS********");
+                    }
+
+//                if (leftCharacterDistrib < 0.1 && rightCharacterDistrib > 0.5) {
+//                    unsupportedLeft.add(k);
+                    System.out.println();
+                    System.out.println("We are at node " + node + " in the phylogenetic tree");
+                    System.out.println("Node in the partial order graph is " + k);
+                    System.out.println("Node distrib character we're checking is " + maxDistribCharacter);
+                    System.out.println("Root distrib character is " + rootDistribCharacter);
+                    System.out.println("MSA highest character is " + maxMSACharacter);
+
+                    System.out.println("Left distrib max character is " + leftDistribMax);
+                    System.out.println("Right distrib max character is " + rightDistribMax);
+
+
+                    System.out.println("MSA distribution of max character here is " + distribution.get(maxMSACharacter));
+//                    System.out.println("MSA distribution of character we're checking is " + distribution.get(maxMSACharacter));
+
+                    System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftCharacterDistrib + " of the max parent character " + maxDistribCharacter);
+                    System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightCharacterDistrib + " of the max parent character " + maxDistribCharacter);
+
+                    System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftMSADistrib + " of the  max MSA character " + maxMSACharacter);
+                    System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightMSADistrib + " of the max MSA character " + maxMSACharacter);
+
+                    System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftRootDistrib);
+                    System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightRootDistrib);
+//                }
 //
-//
-//
-//            // Iterate through the MSA distributions
-//            for (int k = 0; k < msa.getNumNodes(); k++) {
-//                msa.setCurrent(msa.getNodeIDs().get(k));
-//                Map<Character, Double> distribution = msa.getCharacterDistribution();
-//
-//                int currentNode = msa.getNodeIDs().get(k);
-//
-//                Character maxMSACharacter = Collections.max(distribution.entrySet(), Map.Entry.comparingByValue()).getKey();
-//
+//                if (rightCharacterDistrib < 0.1 && leftCharacterDistrib > 0.5) {
+//                    unsupportedRight.add(k);
+//                }
+
+
 //                double leftCharacterDistrib = leftDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
 //                double rightCharacterDistrib = rightDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
 //
 //
 //
 //
-//                if (leftCharacterDistrib < 0.1 && rightCharacterDistrib > 0.5) {
-//                    unsupportedLeft.add(k);
+////                if (leftCharacterDistrib < 0.1 && rightCharacterDistrib > 0.5) {
+////                    unsupportedLeft.add(k);
 //                    System.out.println();
 //                    System.out.println("We are at node " + node + " in the phylogenetic tree");
 //                    System.out.println("Node in the partial order graph is " + k);
@@ -84,10 +160,10 @@ public class BranchIsolation {
 //                    System.out.println("MSA distribution here is " + distribution.get(maxMSACharacter));
 //                    System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftCharacterDistrib);
 //                    System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightCharacterDistrib);
-//                }
-//
-//                if (rightCharacterDistrib < 0.1 && leftCharacterDistrib > 0.5) {
-//                    unsupportedRight.add(k);
+////                }
+////
+////                if (rightCharacterDistrib < 0.1 && leftCharacterDistrib > 0.5) {
+////                    unsupportedRight.add(k);
 //                    System.out.println();
 //                    System.out.println("We are at node " + node + " in the phylogenetic tree");
 //                    System.out.println("Node in the partial order graph is " + k);
@@ -95,16 +171,16 @@ public class BranchIsolation {
 //                    System.out.println("MSA distribution here is " + distribution.get(maxMSACharacter));
 //                    System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftCharacterDistrib);
 //                    System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightCharacterDistrib);
-//                }
-//
-//
-//            }
-//
-//        }
-//
-//        else {
-//            System.out.println("At least one of the children of this node is an extant");
-//        }
+////                }
+                }
+
+            }
+
+        }
+
+        else {
+            System.out.println("At least one of the children of this node is an extant");
+        }
 
         if (!unsupportedLeft.isEmpty() || !unsupportedRight.isEmpty()) {
 
@@ -150,15 +226,8 @@ public class BranchIsolation {
 
         System.out.println("Marginal reconstruction took " + TimeUnit.NANOSECONDS.toSeconds(duration) + " seconds");
 
-        EnumDistrib[] distrib = child.getMarginalDistributions();
+        return child.getMarginalDistributions();
 
-
-
-
-
-
-
-        return distrib;
 
 
 
@@ -212,6 +281,57 @@ public class BranchIsolation {
         }
 
         return -1;
+
+    }
+
+    private Character getDistribCharacter(int pos){
+
+        switch(pos) {
+            case 0:
+                return 'A';
+            case 1:
+                return 'C';
+            case 2:
+                return 'D';
+            case 3:
+                return 'E';
+            case 4:
+                return 'F';
+            case 5:
+                return 'G';
+            case 6:
+                return 'H';
+            case 7:
+                return 'I';
+            case 8:
+                return 'K';
+            case 9:
+                return 'L';
+            case 10:
+                return 'M';
+            case 11:
+                return 'N';
+            case 12:
+                return 'P';
+            case 13:
+                return 'Q';
+            case 14:
+                return 'R';
+            case 15:
+                return 'S';
+            case 16:
+                return 'T';
+            case 17:
+                return 'V';
+            case 18:
+                return 'W';
+            case 19:
+                return 'Y';
+            default:
+                System.out.println("Coudn't map this position to character: " + pos);
+        }
+
+        return 'X';
 
     }
 }
