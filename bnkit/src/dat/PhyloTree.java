@@ -38,10 +38,10 @@ import java.util.Set;
  * @author mikael
  */
 public class PhyloTree {
-    
+
     final private Node root; // the root of the tree
-   // static int count = 0;
-    
+    // static int count = 0;
+
     /**
      * Private constructor for tree from a root with all nodes connected off that.
      * Use factory methods to construct trees.
@@ -57,11 +57,11 @@ public class PhyloTree {
     public String toString() {
         return root.toString();
     }
-    
+
     public String printValues() {
         return root.printValue();
     }
-    
+
     public Node[] toNodesBreadthFirst() {
         List<Node> done = new ArrayList<>();
         List<Node> queue = new ArrayList<>();
@@ -72,7 +72,7 @@ public class PhyloTree {
         done.toArray(arr);
         return arr;
     }
-    
+
     private void expandNodes(List<Node> done, List<Node> queue) {
         if (queue.isEmpty())
             return;
@@ -83,15 +83,15 @@ public class PhyloTree {
         }
         expandNodes(done, queue);
     }
-    
+
     public String[] toStringsBreadthFirst() {
         Node[] nodes = toNodesBreadthFirst();
         String[] arr = new String[nodes.length];
-        for (int i = 0; i < nodes.length; i ++) 
+        for (int i = 0; i < nodes.length; i ++)
             arr[i] = nodes[i].label.toString();
         return arr;
     }
-    
+
     /**
      * Get root node of tree.
      * @return the root of the tree
@@ -108,7 +108,7 @@ public class PhyloTree {
     public Node find(Object content) {
         return root.find(content);
     }
-    
+
     /**
      * Set sequence of nodes that are matched (by name) by the sequences in the alignment.
      * @param aln sequence alignment
@@ -123,7 +123,7 @@ public class PhyloTree {
             }
         }
     }
-    
+
     /**
      * Find index of first comma at the current level (non-embedded commas are ignored) or end of string.
      * @param str a Newick string
@@ -141,7 +141,7 @@ public class PhyloTree {
         }
         return str.length();
     }
-    
+
     /**
      * Utility method to parse an embedded string on the Newick format.
      * @param str text on Newick format
@@ -221,7 +221,7 @@ public class PhyloTree {
         }
         return node;
     }
-    
+
     /**
      * Factory method to create a tree instance from a Newick formatted file.
      * @param filename name of file
@@ -240,35 +240,49 @@ public class PhyloTree {
         reader.close();
         return t;
     }
-    
-    public Object setContentByParsimony(String[] names, Object[] symbols) {
+
+    // MB-Fix: does no longer return a value
+    public void setContentByParsimony(String[] names, Object[] symbols) {
         Map<String, Object> map = new HashMap<>();
         for (int i = 0; i < names.length; i ++)
             map.put(names[i], symbols[i]);
-        return setContentByParsimony(map);
+        setContentByParsimony(map);
     }
-    
-    public Object setContentByParsimony(Map<String, Object> map) {
+
+    // MB-Fix: does no longer return a value
+    public void setContentByParsimony(Map<String, Object> map) {
+        // reset node values (otherwise stores previous uses)
+        reset_values(this.getRoot());
         Set<Object> values = new HashSet<>(map.values());
         Object[] unique = values.toArray();
         Node root = this.getRoot();
         root.forwardParsimony(map, unique);
-        return root.backwardParsimony(unique);
+        root.backwardParsimony(unique);
     }
-    
+
+    private void reset_values(Node node) {
+        if (node.getChildren().isEmpty())
+            return;
+        node.setValue(null);
+        for (Node child : node.getChildren())
+            reset_values(child);
+    }
+
     /**
      * Class for nodes that make up tree.
      * Note recursive definition. Supports any branching factor.
      */
     public static class Node {
-        final private List<Node> children; // the children of this node
-        final private Object label; // arbitrary label of node
-        private Object value; // arbitrary value of node
-        private EnumSeq sequence = null; // sequence
-        private double[] scores = null; 
-        private int[][] traceback = null; 
-        private Double dist = null; // optional distance (from this node to its parent)
-        private List<Double> modelProb = new ArrayList<>(); //Every node has a single parent (bar root) so it can carry
+        final private List<Node> children;  // the children of this node
+        final private Object label;         // arbitrary label of node
+        // MB-Fix: now a list of values, previously just a single "value"
+        private List<Object> values = null; // values of node
+        private EnumSeq sequence = null;    // sequence
+        private double[] scores = null;     // the optimal score for each parent value
+        // MB-Fix: added third index, to allow multiple child symbols to contribute to the same parent score
+        private int[][][] traceback = null; // [parent value][child branch] = [value in child that gives optimal value, next value in same child ...]
+        private Double dist = null;         // optional distance (from this node to its parent)
+        private List<Double> modelProb = new ArrayList<>(); // Every node has a single parent (bar root) so it can carry
         // the value for the edge
         private Node parent;
         /**
@@ -279,18 +293,43 @@ public class PhyloTree {
             this.label = label;
             this.children = new ArrayList<>();
         }
-        
+
         public Object getLabel() {
             return label;
         }
-        
+
+        // MB-Fix: re-directs to a new function, defaults to return the first symbol if multiple available
         public Object getValue() {
-            return value;
+            return getValue(0);
         }
 
-        public Object setValue(Object value) {
-            this.value = value;
-            return value;
+        // MB-Fix: new function signature, using index to retrieve specific value
+        public Object getValue(int index) {
+            if (this.values == null)
+                return null;
+            else if (this.values.size() < index + 1)
+                return null;
+            return values.get(index);
+        }
+
+        // MB-Fix: new function, returns all values; should be run after parsimony
+        public List<Object> getValues() {
+            return values;
+        }
+
+        // MB-Fix: same signature, handles multiple calls to save each internally.
+        // Note it no longer returns value, it returns true if new value was set, false, if value was already set (used to optimise traversal below)
+        public boolean setValue(Object value) {
+            if (value == null) {
+                this.values = null;
+                return true;
+            }
+            if (this.values == null)
+                this.values = new ArrayList<>();
+            else if (this.values.contains(value))
+                return false;
+            this.values.add(value);
+            return true;
         }
 
         public List<Double> getModelProb() { return modelProb; }
@@ -321,15 +360,15 @@ public class PhyloTree {
         public void setParent(Node parent) { this.parent = parent; }
 
         public Node getParent() { return parent; }
-        
+
         public void setSequence(EnumSeq seq) {
             this.sequence = seq;
         }
-        
+
         public EnumSeq getSequence() {
             return sequence;
         }
-        
+
         /**
          * String representation of the node and its children (recursively) that uses the Newick format.
          * @return string representation
@@ -345,13 +384,22 @@ public class PhyloTree {
                     sb.append(",");
             }
             if (dist != null)
-                dstr = ":" + dist.toString(); 
-            if (nchildren < 1) 
+                dstr = ":" + dist.toString();
+            if (nchildren < 1)
                 return label.toString() + ((dist != null) ? (dstr) : (""));
-            else 
+            else
                 return "(" + sb.toString() + ")" + label.toString() + ((dist != null) ? (dstr) : (""));
         }
-        
+
+        // MB-Fix: added to simplify printing of multiple values
+        private static String concat(List<Object> values) {
+            StringBuilder sb = new StringBuilder();
+            for (Object y : values)
+                sb.append(y + ";");
+            return sb.toString();
+        }
+
+        // MB-Fix: added printing of multiple values
         public String printValue() {
             StringBuilder sb = new StringBuilder();
             String dstr = null;
@@ -363,37 +411,37 @@ public class PhyloTree {
                     sb.append(",");
             }
             if (dist != null)
-                dstr = ":" + dist.toString(); 
-            if (nchildren < 1) 
-                return label.toString() + "_" + value.toString() + ((dist != null) ? (dstr) : (""));
-            else 
-                return "(" + sb.toString() + ")" + label.toString() + "_" + value.toString() + ((dist != null) ? (dstr) : (""));
+                dstr = ":" + dist.toString();
+            if (nchildren < 1)
+                return label.toString() + "_" + concat(values) + ((dist != null) ? (dstr) : (""));
+            else
+                return "(" + sb.toString() + ")" + label.toString() + "_" + concat(values) + ((dist != null) ? (dstr) : (""));
         }
-        
+
         /**
          * Add child to node.
-         * @param child 
+         * @param child
          */
         public void addChild(Node child) {
             children.add(child);
         }
-        
+
         /**
          * Retrieve all the children of the node.
-         * @return 
+         * @return
          */
         public Collection<Node> getChildren() {
             return children;
         }
-        
+
         /**
-         * Find node by label/label. 
+         * Find node by label/label.
          * Searches the tree recursively using the current node as root.
          * @param label
          * @return the node that contains the specified label, or null if not found
          */
         public Node find(Object label) {
-            if (this.label.equals(label)) 
+            if (this.label.equals(label))
                 return this;
             else {
                 for (Node child : children) {
@@ -404,7 +452,7 @@ public class PhyloTree {
                 return null;
             }
         }
-        
+
         /**
          * Set the distance for this node (from this node to its parent)
          * @param dist the distance
@@ -412,11 +460,11 @@ public class PhyloTree {
         public void setDistance(double dist) {
             this.dist = dist;
         }
-        
+
         /**
          * Retrieve the distance of this node (from this node to its parent)
          * @return the distance
-         */ 
+         */
         public double getDistance() {
             if (this.dist == null)
                 throw new RuntimeException("Node " + this + " with content " + label + " does not have a distance");
@@ -425,17 +473,19 @@ public class PhyloTree {
 
         /**
          * Internal function that operates recursively to first initialise each node (forward),
-         * stopping only once a sequence has been assigned to the node, 
-         * then to propagate scores from sequence assigned nodes to root (backward).
+         * stopping only once a value has been assigned to the node,
+         * then to propagate scores from assigned nodes to root (backward).
+         * MB-Fix: extended to deal with multiple values contributing to optimal scores
          * @param assign map with assignments (named nodes and corresponding values)
          * @param unique all possible values, in order
+         * @return the scores of the unique values at the root
          */
         protected double[] forwardParsimony(Map<String, Object> assign, Object[] unique) {
-            this.scores = new double[unique.length]; 
+            this.scores = new double[unique.length]; // A score for each possible value
             Object sym = assign.get(label);
             if (sym != null) { // this node is instantiated
                 int index;
-                for (index = 0; index < unique.length; index ++) 
+                for (index = 0; index < unique.length; index ++)
                     if (sym.equals(unique[index]))
                         break;
                 setValue(unique[index]);
@@ -446,63 +496,91 @@ public class PhyloTree {
                 if (this.children == null) { // no children, ouch...
                     throw new RuntimeException("Leaf " + this + " has not been assigned a value");
                 } else { // recurse into children nodes...
+                    // determine scores contributed by each child (cscores) BEFORE substitution penalties
                     double[][] cscores = new double[children.size()][];
-                    this.traceback = new int[unique.length][children.size()];
                     for (int c = 0; c < children.size(); c ++) {
                         Node child = children.get(c);
-                        cscores[c] = child.forwardParsimony(assign, unique);
+                        cscores[c] = child.forwardParsimony(assign, unique); // one score from child c for each symbol
                     }
-                    
-                    // now we have children scores (cscores)
-                    for (int i = 0; i < scores.length; i ++) { // loop through each possible parent assignment, let's see what symbol in each child that best supports this
-                        for (int c = 0;  c < children.size(); c ++) {
-                            int best_index = 0;
+                    // traceback array needs to hold all child symbol indices that contribute to (indexed) parent symbol score via (indexed) child
+                    this.traceback = new int[unique.length][children.size()][];
+                    double best_parent_score = Double.POSITIVE_INFINITY; // need to work best parent score out
+                    for (int c = 0;  c < children.size(); c ++) {
+                        // loop through each possible parent assignment, record what symbol in each child that best supports this (adding substitution penalties as we go)
+                        for (int i = 0; i < scores.length; i ++) {
                             double best_score = Double.POSITIVE_INFINITY;
-                            for (int j = 0; j < cscores[c].length; j ++) { // loop through each possible child value to score parent value
+                            int best_cnt = 0; // this is how many symbols in child that need to be recorded
+                            for (int j = 0; j < cscores[c].length; j ++) { // loop through each possible value in this child to score parent value
                                 if (cscores[c][j] + (i == j ? 0 : 1) < best_score) {
                                     best_score = cscores[c][j] + (i == j ? 0 : 1);
-                                    best_index = j;
+                                    best_cnt = 1;
+                                } else if (cscores[c][j] + (i == j ? 0 : 1) == best_score) {
+                                    best_cnt += 1;
                                 }
                             }
-                            scores[i] += best_score; // the best we can do with this child
-                            traceback[i][c] = best_index; // ... and that score is based on this child symbol
+                            // now we know what the best_score is; work out all assignments in children that give it (could be multiple)
+                            traceback[i][c] = new int[best_cnt];
+                            int k = 0;
+                            for (int j = 0; j < cscores[c].length; j ++) { // loop through each possible child symbol, again adding substitution penalties
+                                if (cscores[c][j] + (i == j ? 0 : 1) == best_score)
+                                    traceback[i][c][k ++] = j;
+                            }
+                            scores[i] += best_score; // the best we can do with parent symbol i
                         }
                     }
                     return this.scores;
                 }
             }
         }
-        
-        protected Object backwardParsimony(Object[] unique) {
-            return backwardParsimony(null, unique);
+
+        // MB-Fix: broke apart so that the two backwardParsimony functions handle the "root" and internal nodes, respectively
+        // no longer returns anything
+        protected void backwardParsimony(Object[] unique) {
+            int best_index = 0;
+            for (int i = 1; i < scores.length; i ++) {
+                if (scores[i] < scores[best_index])
+                    best_index = i;
+            }
+            for (int parent_index = 0; parent_index < scores.length; parent_index ++) {
+                if (scores[best_index] == scores[parent_index]) {
+                    // now we know the index of the parent
+                    if (setValue(unique[parent_index])) {
+                        if (this.children != null) { // recurse into children nodes...
+                            for (int c = 0; c < children.size(); c++) {
+                                for (int child_index = 0; child_index < traceback[parent_index][c].length; child_index++) {
+                                    int best_index_in_child = traceback[parent_index][c][child_index];
+                                    Node child = children.get(c);
+                                    child.backwardParsimony(unique[best_index_in_child], unique);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-        
-        protected Object backwardParsimony(Object parent_symbol, Object[] unique) {
+
+        protected void backwardParsimony(Object parent_symbol, Object[] unique) {
             int parent_index = 0;
-            if (parent_symbol == null) { // root
-                for (int i = 1; i < scores.length; i ++) {
-                    if (scores[i] < scores[parent_index])
-                        parent_index = i;
-                }
-            } else {
-                for (parent_index = 0; parent_index < unique.length; parent_index ++) {
-                    if (parent_symbol.equals(unique[parent_index]))
-                        break;
-                }
+            for (parent_index = 0; parent_index < unique.length; parent_index ++) {
+                if ((parent_symbol == null && unique[parent_index] == null) || (parent_symbol != null & parent_symbol.equals(unique[parent_index])))
+                    break;
             }
             // now we know the index of the parent
-            if (this.children != null) { // recurse into children nodes...
-                for (int c = 0; c < children.size(); c ++) {
-                    int child_index = traceback[parent_index][c];
-                    Node child = children.get(c);
-                    child.backwardParsimony(unique[child_index], unique);
+            if (setValue(unique[parent_index])) { // will return false if already set, so no point in recursing
+                if (this.children != null) { // recurse into children nodes...
+                    for (int c = 0; c < children.size(); c++) {
+                        for (int child_index = 0; child_index < traceback[parent_index][c].length; child_index++) {
+                            int best_index = traceback[parent_index][c][child_index];
+                            Node child = children.get(c);
+                            child.backwardParsimony(unique[best_index], unique);
+                        }
+                    }
                 }
             }
-            return setValue(unique[parent_index]);
         }
-        
+
     }
-    
+
     public static void main(String[] args) {
         //null parent for root
         Node root = parseNewick("((A:0.6,((B:3.3,(C:1.0,D:2.5)cd:1.8)bcd:5,((E:3.9,F:4.5)ef:2.5,G:0.3)efg:7)X:3.2)Y:0.5,H:1.1)I:0.2", null);
@@ -511,15 +589,15 @@ public class PhyloTree {
         root = parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)", null);
         System.out.println(root);
         try {
-            PhyloTree cyp3 = PhyloTree.loadNewick("/Users/mikael/simhome/ASR/gap_example.nwk");
-            System.out.println(cyp3);
-            Alignment aln = new Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/gap_example.aln", Enumerable.aacid));
-            cyp3.setAlignment(aln);
-            cyp3.setContentByParsimony(aln.getNames(), aln.getGapColumn(2));
-            System.out.println(cyp3.printValues());
+            PhyloTree edge1 = PhyloTree.loadNewick("/Users/mikael/simhome/ASR/edge1.nwk");
+            System.out.println(edge1);
+            Alignment aln = new Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/gap1.aln", Enumerable.aacid));
+            edge1.setAlignment(aln);
+            edge1.setContentByParsimony(aln.getNames(), aln.getGapColumn(1));
+            System.out.println(edge1.printValues());
         } catch (IOException ex) {
             ex.printStackTrace();
         }
     }
-    
+
 }

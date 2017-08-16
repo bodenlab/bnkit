@@ -47,6 +47,7 @@ public class SeqDomain<E extends Domain> implements Domain {
     
     public void set(Object[] value) {
         if (this.isValid(value)) {
+            System.err.print("Invalid character found.");
             this.arr = value;
         }
     }

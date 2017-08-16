@@ -15,18 +15,29 @@ public class ASRTests {
     @Test
     @DisplayName("Get ancestral partial order graph")
     public void getAncestralGraphTest() throws IOException {
-        String alnfilepath = "src/test/resources/large.aln";
-        String nwkfilepath = "src/test/resources/large.nwk";
-        ASRPOG asr = new ASRPOG(null, nwkfilepath, alnfilepath, "N3_72.0", true);
+        String alnfilepath = "src/test/resources/2U1_aligned_trimmed.aln";
+        String nwkfilepath = "src/test/resources/2U1_final.nwk";
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true);
+        asr.saveALN("src/test/cyp2u1", "fasta");
         PartialOrderGraph msa = asr.getMSAGraph();
-        PartialOrderGraph graph = asr.getGraph("N3_72.0");
+        asr.saveMSAGraph("src/test/msa");
+        asr.saveGraph("src/test/cyp2u1", "root");
         System.out.println(msa.toString());
-        System.out.println(graph.toString());
 
         POAGJson msajson = new POAGJson(msa);
         JSONObject msaObj = msajson.toJSON();
-        POAGJson json = new POAGJson(graph);
-        JSONObject jsonObj = json.toJSON();
-        System.out.println(jsonObj.toString());
+        System.out.println(msaObj.toString());
+    }
+
+    @Test
+    @DisplayName("Small ASR")
+    public void performSmallASR() throws IOException {
+        String alnfilepath = "src/test/resources/edge1.aln";
+        String nwkfilepath = "src/test/resources/edge1.nwk";
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true);
+        PartialOrderGraph msa = asr.getMSAGraph();
+        PartialOrderGraph graph = asr.getGraph("root");
+        System.out.println(msa.toString());
+        System.out.println(graph.toString());
     }
 }

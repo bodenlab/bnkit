@@ -53,7 +53,6 @@ public class RunASRPOG {
 			boolean dotFile = false;
 			boolean msaFile = false;
 			boolean performAlignment = false;
-			boolean mp = false;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {
@@ -75,8 +74,6 @@ public class RunASRPOG {
 					dotFile = true;
 				else if (args[arg].equalsIgnoreCase("-align"))
 					performAlignment = true;
-				else if (args[arg].equalsIgnoreCase("-mp"))
-					mp = true;
 			}
 
 			// exit if the phylogenetic tree has not been specified, or the partial order alignment structure and sequence filepath both have not been specified (need one or the other)
@@ -88,15 +85,15 @@ public class RunASRPOG {
 			if (poagRepresentation.isEmpty()) {
 				if (performAlignment) { // generate a partial order alignment graph if the alignment has not been specified
 					MSA msa = new MSA(sequencePath);
-					asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
+					asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"));
 				} else if (marginalNode != null)
-					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, mp);
+					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode);
 				else
-					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), mp);
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"));
 			} else if (marginalNode != null)
-				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, mp);
+				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode);
 			else
-				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
+				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, inference.equalsIgnoreCase("joint"));
 
 			if (!outputPath.isEmpty()) {
 				if (dotFile)
@@ -134,7 +131,6 @@ public class RunASRPOG {
 		System.out.println("\t-msa		generate dot file in output directory representing multiple sequence alignment of input sequences or partial order alignment graph. Default: no msa dot file is generated");
 		System.out.println("\t-dot		generate dot file in output directory representing ancestral node sequence. Default: no dot file is generated");
 		System.out.println("\t-align	\tperform sequence alignment prior to reconstruction. Assumes sequences are aligned if this flag is not specified");
-		System.out.println("\t-mp		\tuse maximum parsimony to perform gap inference instead of maximum likelihood");
 		System.exit(1);
 	}
 }

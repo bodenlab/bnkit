@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import vis.POAGJson;
 
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,12 +19,31 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 public class POGraphTests {
     @Test
-    @DisplayName("Small PO Graph test")
-    public void smallPOGraph(){
+    @DisplayName("Small Partial Order Graph test")
+    public void smallPartialOrderGraph(){
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println("Consensus sequence: " + apiGraph.getConsensusSequence());
         assertEquals("PMAR", apiGraph.getConsensusSequence());
+    }
+
+    @Test
+    @DisplayName("Small PO Graph test")
+    public void smallPOGraph(){
+        String filepath = "src/test/resources/testPOGraphSmall.dot";
+        POGraph graph = new POGraph(filepath);
+        System.out.println("Consensus sequence: " + graph.getSupportedSequence());
+        assertEquals("PNAR", graph.getSupportedSequence());
+        Map<Integer, List<Integer>> lists = graph.getSequenceNodeMapping();
+        for (Integer nodeId : graph.getNodeIDs()) {
+            graph.setCurrent(nodeId);
+            System.out.println(nodeId + ":" + graph.getCurrentBase());
+        }
+        for (Integer seqId : lists.keySet()){
+            System.out.println("Seq: " + seqId);
+            for (Integer id : lists.get(seqId))
+                System.out.println(id);
+        }
     }
 
     @Test
@@ -72,6 +93,7 @@ public class POGraphTests {
     public void graphToAPITest(){
         String filepath = "src/test/resources/small.aln";
         POGraph graph = new POGraph(filepath);
+        graph.saveSequences("src/text/resources/small_graph.aln", "clustal");
         PartialOrderGraph apiGraph = new PartialOrderGraph(graph);
         System.out.println(graph.toString());
         System.out.println(apiGraph.toString());
