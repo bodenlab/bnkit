@@ -57,7 +57,7 @@ public class RunASRPOG {
 			boolean msaFile = false;
 			boolean performAlignment = false;
 			boolean mp = false;
-			boolean checkBranchIsolation = true;
+			boolean checkBranchIsolation = false;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {
@@ -142,8 +142,9 @@ public class RunASRPOG {
 
 				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
 					add("N1");
-					add("N2");
 					add("N3");
+					add("N4");
+					add("N5");
 
 				}};
 
@@ -153,14 +154,14 @@ public class RunASRPOG {
 
 
 				// Code for using a specific list of Nodes
-//				for (String node : ancestralNodes){
-//					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
-//
-//
-//				}
+				for (String node : ancestralNodes){
+					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
+
+
+				}
 
 				// Code for using one specific node
-				BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, "N4", mp);
+//				BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, "N5", mp);
 
 
 				// Code for using all nodes
