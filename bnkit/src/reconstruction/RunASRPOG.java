@@ -1,9 +1,6 @@
 package reconstruction;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -38,7 +35,7 @@ public class RunASRPOG {
 	 * @throws IOException
 	 */
 	public static void main(String[] args) throws IOException {
-		
+
 		if (args.length > 1) {
 			ASRPOG asr = null;
 
@@ -48,6 +45,7 @@ public class RunASRPOG {
 			String sequencePath = "";
 			String treePath = "";
 			String poagRepresentation = "";
+			String alignmentType = "";
 			if (!args[0].contains("-"))
 				if (!args[0].contains(".nwk"))
 					poagRepresentation = args[0];
@@ -56,8 +54,7 @@ public class RunASRPOG {
 			boolean dotFile = false;
 			boolean msaFile = false;
 			boolean performAlignment = false;
-			boolean mp = false;
-			boolean checkBranchIsolation = false;
+			boolean checkBranchIsolation = true;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {
@@ -77,10 +74,10 @@ public class RunASRPOG {
 					msaFile = true;
 				else if (args[arg].equalsIgnoreCase("-dot"))
 					dotFile = true;
-				else if (args[arg].equalsIgnoreCase("-align"))
+				else if (args[arg].equalsIgnoreCase("-align")) {
 					performAlignment = true;
-				else if (args[arg].equalsIgnoreCase("-mp"))
-					mp = true;
+					alignmentType = args[arg + 1];
+				}
 			}
 
 			// exit if the phylogenetic tree has not been specified, or the partial order alignment structure and sequence filepath both have not been specified (need one or the other)
@@ -91,17 +88,17 @@ public class RunASRPOG {
 
 			if (poagRepresentation.isEmpty()) {
 				if (performAlignment) { // generate a partial order alignment graph if the alignment has not been specified
-					MSA msa = new MSA(sequencePath);
-					asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
+
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), true);
+
 				} else if (marginalNode != null)
-					//TODO: Is sequencePath supposed to be passed twice to this constructor?
-					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, mp);
+					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, false);
 				else
-					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), mp);
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), false);
 			} else if (marginalNode != null)
-				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, mp);
+				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, performAlignment);
 			else
-				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, inference.equalsIgnoreCase("joint"), mp);
+				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), performAlignment);
 
 			if (!outputPath.isEmpty()) {
 				if (dotFile)
@@ -118,59 +115,7 @@ public class RunASRPOG {
 			}
 
 			if (checkBranchIsolation){
-
-//				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
-//					add("N3");
-//					add("N4");
-//					add("N10");
-//					add("N14");
-//					add("N19");
-//				}};
-
-				// For PhyML data
-//				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
-////					add("NO");
-//					add("N1");
-//					add("N2");
-//					add("N104");
-//					add("N101");
-//					add("N79");
-//					add("N85");
-//					add("N4");
-//
-//				}};
-
-				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
-					add("N1");
-					add("N3");
-					add("N4");
-					add("N5");
-
-				}};
-
-
-
-				Map<String, String> ancestralLabels = asr.getAncestralDict();
-
-
-				// Code for using a specific list of Nodes
-				for (String node : ancestralNodes){
-					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
-
-
-				}
-
-				// Code for using one specific node
-//				BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, "N5", mp);
-
-
-				// Code for using all nodes
-//				for (String node : ancestralLabels.keySet()){
-//					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
-//
-//
-//				}
-
+				asr.checkBranchIsolation("N0");
 
 			}
 
@@ -196,7 +141,6 @@ public class RunASRPOG {
 		System.out.println("\t-msa		generate dot file in output directory representing multiple sequence alignment of input sequences or partial order alignment graph. Default: no msa dot file is generated");
 		System.out.println("\t-dot		generate dot file in output directory representing ancestral node sequence. Default: no dot file is generated");
 		System.out.println("\t-align	\tperform sequence alignment prior to reconstruction. Assumes sequences are aligned if this flag is not specified");
-		System.out.println("\t-mp		\tuse maximum parsimony to perform gap inference instead of maximum likelihood");
 		System.exit(1);
 	}
 }

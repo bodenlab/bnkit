@@ -48,7 +48,10 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
     public String getName() {
         return name;
     }
-    
+
+    public Object getFromIndex(int index) { return arr[index];}
+
+
     @Override
     public E getType() {
         return super.getType();

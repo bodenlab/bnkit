@@ -1,5 +1,6 @@
 package dat;
 
+import alignment.utilities.MutableInt;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
@@ -23,8 +24,8 @@ import java.util.*;
 public class POGraph {
 	private Map<Integer, Node> nodes;				// map of node ID and nodes in the structure (for fast node retrieval)
 	private Node current;							// pointer to the current node
-	private Map<Integer, List<Node>> seqNodeMap;	// map of sequence ID and the order of structure nodes it traverses
 	private Node initialNode = null;				// initial node (null node), points to the first actual nodes as 'next' nodes
+	private Node finalNode = null; 					// final node (null node), 'previous' pointers point to the final actual nodes
 	private Map<Integer, String> sequences;			// map of sequence ID and sequence label
 
 	/**
@@ -32,9 +33,9 @@ public class POGraph {
 	 */
 	public POGraph() {
 		sequences = new HashMap<>();
-		initialNode = new Node();
+		initialNode = new Node(-1);
+		finalNode = new Node();
 		nodes = new HashMap<>();
-		seqNodeMap = new HashMap<>();
 		current = null;
 	}
 
@@ -46,7 +47,7 @@ public class POGraph {
 	 *                      sequences (.aln, .fa, .fasta), constructs a graph from the aligned sequences
 	 * @param seqPath		File path to sequences
 	 */
-	public POGraph(String structure, String seqPath) {
+	public POGraph(String structure, String seqPath) throws IOException {
 		this();
 		// load sequences
 		loadSequencesWithGraphStructure(structure, seqPath);
@@ -57,7 +58,7 @@ public class POGraph {
 	 *
 	 * @param structure		Dot representation of partial order graph
 	 */
-	public POGraph(String structure) {
+	public POGraph(String structure) throws IOException {
 		this();
 		if (structure.endsWith(".dot"))
 			current = loadPOGraph(structure);
@@ -67,21 +68,17 @@ public class POGraph {
 
 	/**
 	 * Copy constructor for the partial order graph
-	 * 
+	 *
 	 * @param copy	POGraph to copy from
 	 */
 	public POGraph(POGraph copy) {
 		this();
 		this.sequences.putAll(copy.sequences);
-		IdentityHashMap<Node,Node> map = new IdentityHashMap<>();
-		this.initialNode = copy.initialNode.copy(map);
+		this.initialNode = copy.initialNode.copy();
 		for (Node node : this.initialNode.getNextNodes())
 			addNode(node);
-		for (Integer seqId : copy.seqNodeMap.keySet()) {
-			this.seqNodeMap.put(seqId, new ArrayList<>());
-			for (Node node : copy.seqNodeMap.get(seqId))
-				this.seqNodeMap.get(seqId).add(this.nodes.get(node.getID()));
-		}
+		this.finalNode = this.nodes.get(null);
+		this.nodes.remove(null);
 		this.current = initialNode.getNextNodes().get(0);
 	}
 
@@ -94,40 +91,48 @@ public class POGraph {
 	 * @param nodeIds	List of node ids to add each base character of the sequence
 	 */
 	public void addSequence(int id, String label, String sequence, List<Integer> nodeIds) {
+		ArrayList<Integer> nodeIdsAdded = new ArrayList<>();
 		char[] bases = sequence.toCharArray();
 		sequences.put(id, label);
-		List<Node> seqnodes = new ArrayList<>();
 		for (int baseInd = 0; baseInd < bases.length; baseInd++) {
-			if (baseInd >= nodeIds.size() || !setCurrent(nodeIds.get(baseInd))) { // node doesn't currently exist in the graph, create and add to graph
-				// find next ID number
-				current = new Node(nodes.size());
+			Integer curId = nodeIds.get(baseInd);
+			Integer prevId = -1;
+			if (nodeIds.indexOf(curId) > 0)
+				prevId = nodeIdsAdded.get(nodeIdsAdded.size()-1);
+			if (curId == -1 || !setCurrent(curId)) {
+				// base did not align with graph or node doesn't currently exist in the graph, create it
+				current = new Node(curId == -1 ? nodes.size() : curId);
 				nodes.put(current.getID(), current);
-				if (baseInd == 0) {
-					initialNode.addNextNode(current);
-					current.addPrevNode(initialNode);
-				}
+			}
+			if (prevId == -1){
+				initialNode.addNextNode(current, id);
+				current.addPrevNode(initialNode, id);
+			} else {
+				nodes.get(prevId).addNextNode(current, id);
+				current.addPrevNode(nodes.get(prevId), id);
+			}
+			if (baseInd == bases.length - 1) {
+				current.addNextNode(finalNode, id);
+				finalNode.addPrevNode(current, id);
 			}
 			current.addSequence(id, bases[baseInd]);
-			seqnodes.add(current);
+			nodeIdsAdded.add(current.getID());
 		}
-		// update node pointers
-		seqnodes.get(0).addNextNode(seqnodes.get(1));
-		seqnodes.get(seqnodes.size()-1).addPrevNode(seqnodes.get(seqnodes.size()-2));
-		for (int nodeind = 1; nodeind < seqnodes.size() - 1; nodeind++) {
-			seqnodes.get(nodeind).addPrevNode(seqnodes.get(nodeind-1));
-			seqnodes.get(nodeind).addNextNode(seqnodes.get(nodeind+1));
-		}
-		seqNodeMap.put(id, seqnodes);
 	}
 
 	/**
 	 * Set the pointer of the current node reference to the node with the specified ID.
-	 * 
+	 *
 	 * @param nodeID	Node ID to set as current
 	 * @return			indication of whether setting the node succeeded or not
 	 */
-	public boolean setCurrent(int nodeID){
-		current = nodes.get(nodeID);
+	public boolean setCurrent(Integer nodeID){
+		if (nodeID == null)
+			current = finalNode;
+		else if (nodeID == -1)
+			current = initialNode;
+		else
+			current = nodes.get(nodeID);
 		return (current != null);
 	}
 
@@ -148,8 +153,8 @@ public class POGraph {
 	 */
 	public Map<Integer, Double> getEdgeWeights(){
 		HashMap<Integer, Double> edgeWeights = new HashMap<>();
-		for (Integer nextId : getNextIDs())
-			edgeWeights.put(nextId, 1.0 * getSequencesOutEdges().get(nextId).size() / sequences.size());
+		for (Edge next : current.getNextTransitions())
+			edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
 		return edgeWeights;
 	}
 
@@ -167,24 +172,51 @@ public class POGraph {
 	 */
 	public Map<Integer, List<Integer>> getSequenceNodeMapping() {
 		Map<Integer, List<Integer>> seqNodeMapping = new HashMap<>();
-		for (Integer seqId : seqNodeMap.keySet()) {
-			seqNodeMapping.put(seqId, new ArrayList<>());
-			for (Node node : seqNodeMap.get(seqId))
-				seqNodeMapping.get(seqId).add(node.getID());
-		}
+
+		for (Integer seqId : sequences.keySet())
+			for (Edge out : initialNode.getNextTransitions())
+				if (out.getSequences().contains(seqId)) {
+					ArrayList<Integer> ids = new ArrayList<>();
+					ids.add(out.getNext().getID());
+					seqNodeMapping.put(seqId, getNodeIdSequence(seqId, ids, out.getNext()));
+					break;
+				}
 		return seqNodeMapping;
 	}
 
 	/**
+	 * Recursively identify the sequence of node IDs for sequence with the given ID.
+	 *
+	 * @param seqId		ID of the sequence
+	 * @param nodeIds	List of node IDs to populate recursively
+	 * @param node		node to check
+	 * @return			Ordered list of node IDs
+	 */
+	private List<Integer> getNodeIdSequence(int seqId, List<Integer> nodeIds, Node node) {
+		if (node.getNextTransitions().isEmpty())
+			return nodeIds;
+		Node next = null;
+		for (Edge out : node.getNextTransitions())
+			if (out.getSequences().contains(seqId)) {
+				next = out.getNext();
+				break;
+			}
+		if (next == null)
+			return nodeIds;
+		nodeIds.add(next.getID());
+		return getNodeIdSequence(seqId, nodeIds, next);
+	}
+
+	/**
 	 * Get the mapping between sequence ID and base character for the current node.
-	 * 
+	 *
 	 * @return	mapping <seqID, base character>
 	 */
 	public Map<Integer, Character> getSequenceCharacterMapping(){ return (current == null) ? null : current.getSeqCharMapping(); }
-	
+
 	/**
 	 * Set the inferred base character of the current node.
-	 * 
+	 *
 	 * @param base	inferred base character
 	 */
 	public void setBase(char base){
@@ -224,11 +256,22 @@ public class POGraph {
 	public int getNumNodes(){ return nodes.size(); }
 
 	/**
+	 * Get a sorted list of IDs in the graph
+	 *
+	 * @return topologically sorted list of IDs
+	 */
+	public List<Integer> getSortedIDs(){
+		List<Integer> sortedIDs = topologicalSort();
+		return sortedIDs;
+
+	}
+
+	/**
 	 * Get the ID of the current node.
-	 * 
+	 *
 	 * @return	id of the current node, -1 if no node is set
 	 */
-	public int getCurrentId(){ return (current == null) ? -1 : current.getID(); }
+	public Integer getCurrentId(){ return current.getID(); }
 
 	/**
 	 * Get the base character of the current node. Returns null if it is not set.
@@ -246,12 +289,13 @@ public class POGraph {
 	 *
 	 * @return	previous node IDs
 	 */
-	public List<Integer> getPrevIDs(){
+	public List<Integer> getPreviousIDs(){
 		if (current == null)
 			return null;
 		ArrayList<Integer> prevIDs = new ArrayList<>();
 		for (Node node : current.getPreviousNodes())
-			prevIDs.add(node.getID());
+			if (node.getID() != -1)
+				prevIDs.add(node.getID());
 		return prevIDs;
 	}
 
@@ -268,55 +312,113 @@ public class POGraph {
 			nextIDs.add(node.getID());
 		return nextIDs;
 	}
-	
+
+	/**
+	 * Remove transition to next node with the provided ID
+	 *
+	 * @param removeId	ID of the 'next' node transition to remove
+	 */
+	public void removeNextTransition(Integer removeId) {
+		for (Edge edge : current.getNextTransitions())
+			if (edge.getNext().getID() == removeId) {
+				// find edges to move sequence IDs to, based on the shortest path to the sequences actual next node
+				List<Node> path = findShortestPathToNode(current, edge.getNext(), null);
+				if (path == null) {
+					// there is no alternative path to the node, for each sequence in the node, re-direct to it's next
+					// node
+					for (Integer seqId : edge.getSequences()) {
+						// get the 'next' node for the sequence
+						Edge nextEdge = null;
+						for (Edge e : edge.getNext().getNextTransitions())
+							if (e.getSequences().contains(seqId)) {
+								nextEdge = e;
+								break;
+							}
+						// find the alternative path for the sequence
+						if (nextEdge != null)
+							// sequence continues to another node, so re-direct (otherwise ignore because it ends here)
+							if (current.getNextNodes().contains(nextEdge.getNext())) {
+								// add sequence to this edge
+								current.addNextNode(nextEdge.getNext(), seqId);
+								nextEdge.getNext().addPrevNode(current, seqId);
+							} else {
+								// find alternative path to next node for the sequence
+								path = findShortestPathToNode(current, nextEdge.getNext(), edge.getNext());
+								if (path == null) // there is no alternative path, therefore node is removed
+									continue;
+								for (int i = 0; i < path.size() - 1; i++) {
+									path.get(i).addNextNode(path.get(i + 1), seqId);
+									path.get(i + 1).addPrevNode(path.get(i), seqId);
+								}
+							}
+					}
+
+				} else
+					for (Integer seqId : edge.getSequences())
+						for (int i = 0; i < path.size() - 1; i++) {
+							path.get(i).addNextNode(path.get(i + 1), seqId);
+							path.get(i + 1).addPrevNode(path.get(i), seqId);
+						}
+				current.removeNextNode(edge.getNext());
+				if (edge.getNext().getPreviousNodes().isEmpty()) {
+					Node tmp = current;
+					setCurrent(edge.getNext().getID());
+					removeNode();
+					current = tmp;
+				}
+				return;
+			}
+	}
+
 	/**
 	 * Removes the current node from the graph.
 	 */
 	public void removeNode() {
 		if (current == null)
 			return;
-		for (Integer seqId : current.getSeqIds()) {
-			// set the previous node and next node pointers
-			if (seqNodeMap.get(seqId).indexOf(current) == 0) {
-				// first node, only affects next node pointers
-				// check if this is also the last node for this sequence
-				if (seqNodeMap.get(seqId).size() == 1) {
-					seqNodeMap.remove(seqId);
-					System.err.println("Warning: " + sequences.get(seqId) + " removed from inference.");
-					continue;
-				} else {
-					Node nextNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1);
-					nextNode.removePrevNode(current);
+		// set all previous nodes to point to the next node, for the sequences in the edges
+		List<Edge> previousEdges = new ArrayList<>(current.getPreviousTransitions());
+		for (Edge prev : previousEdges) {
+			// find the next node for each sequence in the previous edge and update pointers
+			List<Integer> seqs = new ArrayList<>(prev.getSequences());
+			for (Integer seqId : seqs) {
+				// find the next edge/node
+				Edge nextEdge = null;
+				for (Edge next : current.getNextTransitions())
+					if (next.getSequences().contains(seqId)) {
+						nextEdge = next;
+						break;
+					}
+				// if there is an edge, join nodes otherwise just delete this sequence
+				prev.removeSequence(seqId);
+				if (nextEdge != null) {
+					// update seqId to go from the previous node to the next
+					prev.getNext().addNextNode(nextEdge.getNext(), seqId);
+					nextEdge.getNext().addPrevNode(prev.getNext(), seqId);
 				}
-			} else if (seqNodeMap.get(seqId).indexOf(current) == seqNodeMap.get(seqId).size() - 1) {
-				// final node, only affect previous node pointers
-				Node prevNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) - 1);
-				prevNode.removeNextNode(current);
-			} else {
-				// somewhere in between, affects both previous and next node pointers
-				Node prevNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) - 1);
-				Node nextNode = seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1);
-				prevNode.addNextNode(nextNode);
-				prevNode.removeNextNode(current);
-				nextNode.addPrevNode(prevNode);
-				nextNode.removePrevNode(current);
 			}
-			seqNodeMap.get(seqId).remove(current);
+			prev.getNext().removeNextNode(current);
 		}
-		if (initialNode.getNextNodes().contains(current)) {
-			for (Node nextNode : current.getNextNodes()) {
-				initialNode.addNextNode(nextNode);
-				nextNode.addPrevNode(initialNode);
+		// remove current node from the 'previous' edges of next nodes
+		List<Edge> nextEdges = new ArrayList<>(current.getNextTransitions());
+		for (Edge next : nextEdges) {
+			next.getNext().removePrevNode(current);
+			if (next.getNext().getPreviousNodes().isEmpty()) {
+				Node tmp = current;
+				setCurrent(next.getNext().getID());
+				removeNode();
+				current = tmp;
 			}
-			initialNode.getNextNodes().remove(current);
 		}
-		nodes.remove(current.getID(), current);
+
+		nodes.remove(current.getID());
 		current = initialNode.getNextNodes().get(0);
+
 	}
-	
+
 	/**
 	 * Get a list of IDs of the nodes in the graph.
-	 * 
+	 *
 	 * @return	List of structure node IDs.
 	 */
 	public List<Integer> getNodeIDs(){
@@ -334,22 +436,13 @@ public class POGraph {
 			// determine the order of the nodes in the graph
 			List<Integer> orderedNodeIds = topologicalSort();
 			EnumSeq[] seqs = new EnumSeq[sequences.size()];
-			for (Integer seqId : seqNodeMap.keySet()) {
-				List<Node> seqNodes = seqNodeMap.get(seqId);
-				// step through sorted nodes and add gap or character, depending on if the node appears in the
-				// node list for the sequence
+
+			// TODO:
+			for (Integer seqId : sequences.keySet()) {
 				List<Character> characters = new ArrayList<>();
-				for (Integer nodeId : orderedNodeIds) {
-					boolean found = false;
-					for (Node node : seqNodes)
-						if (node.getID() == nodeId) {
-							characters.add(node.getSeqCharMapping().get(seqId));
-							found = true;
-							break;
-						}
-					if (!found)
-						characters.add('-');
-				}
+				String sequence  = getGappySequence(seqId, initialNode, "", orderedNodeIds);
+				for (Character c : sequence.toCharArray())
+					characters.add(c);
 				EnumSeq seq = new EnumSeq(Enumerable.aacid_ext);
 				seq.setName(sequences.get(seqId));
 				seq.setInfo(characters.toString());
@@ -373,6 +466,93 @@ public class POGraph {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Recursively get the character sequence for a sequence with the specified ID
+	 *
+	 * @param seqId		ID of sequence
+	 * @param node		Initial node
+	 * @param sequence	Sequence string to append to
+	 * @return			Sequence characters
+	 */
+	private String getSequence(Integer seqId, Node node, String sequence) {
+		if (node.getNextTransitions().isEmpty())
+			return sequence;
+
+		Node next = null;
+		for (Edge edge : node.getNextTransitions())
+			if (edge.getSequences().contains(seqId)) {
+				next = edge.getNext();
+				break;
+			}
+
+		if (next == null)
+			return sequence;
+
+		return getSequence(seqId, next, sequence + next.getBase());
+	}
+
+	/**
+	 * Recursively get the gappy character sequence for a sequence with the specified ID.
+	 *
+	 * @param seqId				ID of the sequence
+	 * @param node				Initial node
+	 * @param sequence			Sequence string to append to
+	 * @param orderedNodeIds	List of ordered Node IDs
+	 * @return					Sequence characters (gappy)
+	 */
+	private String getGappySequence(Integer seqId, Node node, String sequence, List<Integer> orderedNodeIds) {
+
+		Node next = null;
+		String characters = (node.getSeqCharMapping().get(seqId) == null ? "" : node.getSeqCharMapping().get(seqId)) + "";
+
+		// find next node
+		for (Edge edge : node.getNextTransitions())
+			if (edge.getSequences().contains(seqId)) {
+				next = edge.getNext();
+				break;
+			}
+
+		if (next.getID() == null) { // end of sequence
+			// check if there are gaps at the end..
+			int numGaps = orderedNodeIds.size() - orderedNodeIds.indexOf(node.getID()) - 1;
+			characters = node.getSeqCharMapping().get(seqId) + "";
+			for (int i = 0; i < numGaps; i++)
+				characters += '-';
+			return sequence + characters;
+		}
+
+		if (next == null) { // sequence finishes in this node
+			// check if there are gaps at the end..
+			int numGaps = orderedNodeIds.size() - orderedNodeIds.indexOf(node.getID()) - 1;
+			characters = node.getSeqCharMapping().get(seqId) + "";
+			for (int i = 0; i < numGaps; i++)
+				characters += '-';
+			return sequence + characters;
+		}
+
+		// identify the number of gaps between the nodes (based on the sorted node IDs)
+		int numGaps = orderedNodeIds.indexOf(next.getID()) - orderedNodeIds.indexOf(node.getID()) - 1;
+		for (int i = 0; i < numGaps; i++)
+			characters += '-';
+
+		return getGappySequence(seqId, next, sequence + characters, orderedNodeIds);
+	}
+
+	/**
+	 * Get a histogram of the characters in the current node.
+	 *
+	 * @return	Map of base character to histogram count
+	 */
+	public Map<Character, MutableInt> getCurrentBaseCounts() {
+		Map<Character, MutableInt> bases = new HashMap<>();
+		for (Character b : current.getSeqCharMapping().values())
+			if (!bases.containsKey(b))
+				bases.put(b, new MutableInt());
+			else
+				bases.get(b).increment();
+		return bases;
 	}
 
 	/**
@@ -424,20 +604,12 @@ public class POGraph {
 	 */
 	private Map<Integer, List<Integer>> getSequencesOutEdges(Node node){
 		Map<Integer, List<Integer>> nextNodeSeqs = new HashMap<>();
-		Map<Integer, List<Integer>> seqNodeMap = getSequenceNodeMapping();
-		for (Integer seqId : node.getSeqIds())
-			for (Node nextNode : node.getNextNodes())
-				// check if sequence is in the next node
-				if (nextNode.getSeqIds().contains(seqId))
-					// check that there are no nodes between node and nextNode for seqId
-					for (int i = 0; i < seqNodeMap.get(seqId).size() - 1; i++)
-						if (seqNodeMap.get(seqId).get(i) == node.getID() && seqNodeMap.get(seqId).get(i+1) ==
-								nextNode.getID()) {
-							if (!nextNodeSeqs.containsKey(nextNode.getID()))
-								nextNodeSeqs.put(nextNode.getID(), new ArrayList<>());
-							nextNodeSeqs.get(nextNode.getID()).add(seqId);
-							break;
-						}
+		for (Edge next : node.getNextTransitions()) {
+			if (!nextNodeSeqs.containsKey(next.getNext().getID()))
+				nextNodeSeqs.put(next.getNext().getID(), new ArrayList<>());
+			for (Integer seqId : next.getSequences())
+				nextNodeSeqs.get(next.getNext().getID()).add(seqId);
+		}
 		return nextNodeSeqs;
 	}
 
@@ -448,9 +620,8 @@ public class POGraph {
 	 *                      sequences (.aln, .fa, .fasta), constructs a graph from the aligned sequences
 	 * @param seqPath		File path to sequences
 	 */
-	private void loadSequencesWithGraphStructure(String structure, String seqPath) {
+	private void loadSequencesWithGraphStructure(String structure, String seqPath) throws FileNotFoundException, IOException{
 		List<EnumSeq.Gappy<Enumerable>> seqs = new ArrayList<>();
-		try {
 			BufferedReader seqfile = new BufferedReader(new FileReader(seqPath));
 			String line = null;
 			line = seqfile.readLine();
@@ -462,9 +633,6 @@ public class POGraph {
 				throw new RuntimeException("Alignment should be in Clustal or Fasta format");
 			}
 			seqfile.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 
 		for (Integer seqId = 0; seqId < seqs.size(); seqId++)
 			sequences.put(seqId, seqs.get(seqId).getName());
@@ -525,34 +693,21 @@ public class POGraph {
 	 * @return	most supported sequence of base characters
 	 */
 	public String getSupportedSequence() {
-		String seq = "";
-		current = null;
 
-		while (current == null || !current.getNextNodes().isEmpty()) {
-			// find the next node based on how many sequences traverse to that node
-			HashMap<Node, Integer> nodeCount = new HashMap<>();
-			for (Integer seqId : seqNodeMap.keySet())
-				if (current == null) {
-					if (!nodeCount.containsKey(seqNodeMap.get(seqId).get(0)))
-						nodeCount.put(seqNodeMap.get(seqId).get(0), 0);
-					nodeCount.put(seqNodeMap.get(seqId).get(0), nodeCount.get(seqNodeMap.get(seqId).get(0))+1);
-				} else if (seqNodeMap.get(seqId).contains(current) && seqNodeMap.get(seqId).indexOf(current) + 1 < seqNodeMap.get(seqId).size()) {
-					if (!nodeCount.containsKey(seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1)))
-						nodeCount.put(seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1), 0);
-					nodeCount.put(seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1), nodeCount.get(seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(current) + 1))+1);
-				}
-
-			Node next = null;
-			for (Node node : nodeCount.keySet())
-				if (next == null || nodeCount.get(node) > nodeCount.get(next))
-					next = node;
-
-			current = next;
-			seq += current.getBase();
+		String sequence = "";
+		Node current = initialNode;
+		while (current != finalNode) {
+			Edge next = current.getNextTransitions().get(0);
+			for (Edge nextEdge : current.getNextTransitions())
+				if (nextEdge.getSequences().size() > next.getSequences().size())
+					next = nextEdge;
+			if (next.getNext() != finalNode)
+				sequence += next.getNext().getBase();
+			current = next.getNext();
 		}
-		return seq;
-	}
 
+		return sequence;
+	}
 
 	/**
 	 * Save partial order alignment graph in a dot format in the given directory.
@@ -580,6 +735,8 @@ public class POGraph {
 			// if the base value of the node has not been instantiated, replace the base value with all possible values in the node
 			Map<Node, String> nodeToLabel = getNodeLabels();
 			for (Node node : nodes.values()) {
+				if (node == finalNode)
+					continue;
 				// format node character distribution, if available
 				HashMap<Character, Double> dist = node.getDistribution();
 				String distStr = "\"";
@@ -587,29 +744,30 @@ public class POGraph {
 					for (Character base : dist.keySet())
 						distStr += base + ":" + String.format("%.0e", dist.get(base)) + " ";
 				distStr = distStr.trim() + "\"";
+
 				StringBuilder sb = new StringBuilder();
-				for (Integer seqId : seqNodeMap.keySet())
-					if (seqNodeMap.get(seqId).contains(node))
-						sb.append(sequences.get(seqId) + ":" + node.seqChars.get(seqId) + ";");
+
+				// save node information
+				for (Integer seqId : node.getSeqCharMapping().keySet())
+					sb.append(sequences.get(seqId) + ":" + node.getSeqCharMapping().get(seqId) + ";");
+
 				sb.replace(sb.length()-1, sb.length(),"");
 				dw.writeNode(Integer.toString(node.getID()), "label", "\"" + nodeToLabel.get(node) + "\"", "fontsize", 15, "style", "\"filled\"", "fillcolor",
-							"\"" + (node.getBase()==null?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
-				for (Node next : node.getNextNodes()) {
-					// find the number of sequences that traverse to the next node and calculate the weighting and percentage
+						"\"" + (node.getBase()==null?"#FFFFFF":dat.colourschemes.Clustal.getColour(node.getBase())) + "\"", "distribution", distStr, "sequences", "\"" + sb.toString() + "\"");
+
+				// save edge information
+				for (Edge out : node.getNextTransitions()) {
+					if (out.getNext() == finalNode)
+						continue;
 					sb = new StringBuilder();
-					int numSeqs = 0;
-					for (Integer seqId : seqNodeMap.keySet())
-						if (seqNodeMap.get(seqId).contains(node) && seqNodeMap.get(seqId).indexOf(node)+1 < seqNodeMap.get(seqId).size() &&
-								seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(node)+1) == next) {
-							numSeqs++;
-							sb.append(sequences.get(seqId));
-							sb.append(",");
-						}
-					if (numSeqs > 0)
-						sb.replace(sb.length()-1, sb.length(), "");
-					float percent = (100.1f * numSeqs / seqNodeMap.keySet().size());
-					dw.writeEdge(Integer.toString(node.getID()), Integer.toString(next.getID()), "fontsize", 12,
-							"fontcolor", "darkgray", "penwidth", (numSeqs > 20 ? 8 : numSeqs/3 + 1), "dir", "forward", "label",
+					for (Integer seqId : out.getSequences()){
+						sb.append(sequences.get(seqId));
+						sb.append(",");
+					}
+					sb.replace(sb.length()-1, sb.length(), "");
+					float percent = (100.1f * out.getSequences().size() / sequences.size());
+					dw.writeEdge(Integer.toString(node.getID()), Integer.toString(out.getNext().getID()), "fontsize", 12,
+							"fontcolor", "darkgray", "penwidth", (out.getSequences().size() > 20 ? 8 : out.getSequences().size()/3 + 1), "dir", "forward", "label",
 							String.format("\"%.0f", percent) + "%\"", "sequences", "\""+sb.toString()+"\"");
 				}
 			}
@@ -717,7 +875,7 @@ public class POGraph {
 
 	/**
 	 * String representation of the partial order alignment graph.
-	 * 
+	 *
 	 * @return	String representation as dot format
 	 */
 	public String toString() {
@@ -738,33 +896,32 @@ public class POGraph {
 		// if the base value of the node has not been instantiated, replace the base value with all possible values in the node
 		Map<Node, String> nodeToLabel = getNodeLabels();
 		for (Node node : nodes.values()) {
+			if (node == finalNode)
+				continue;
 			sb += "\t\"" + Integer.toString(node.getID()) + "\"[label=\"" + nodeToLabel.get(node) + "\"];\n";
-			for (Node next : node.getNextNodes()) {
+			for (Edge edge : node.getNextTransitions()) {
+				if (edge.getNext() == finalNode)
+					continue;
 				// find the number of sequences that traverse to the next node and calculate the weighting and percentage
 				StringBuilder seqb = new StringBuilder();
-				int numSeqs = 0;
-				for (Integer seqId : seqNodeMap.keySet())
-					if (seqNodeMap.get(seqId).contains(node) && seqNodeMap.get(seqId).indexOf(node)+1 < seqNodeMap.get(seqId).size() &&
-							seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).indexOf(node)+1) == next) {
-						numSeqs++;
-						seqb.append(sequences.get(seqId));
-						seqb.append(",");
-					}
-				if (numSeqs > 0)
-					seqb.replace(seqb.length()-1, seqb.length(), "");
-				float percent = (100.1f * numSeqs / seqNodeMap.keySet().size());
-				sb += "\t\"" + Integer.toString(node.getID()) + "\"->\"" + Integer.toString(next.getID()) + "\"[dir=forward," + "label=" +
+				for (Integer seqId : edge.getSequences()) {
+					seqb.append(sequences.get(seqId));
+					seqb.append(",");
+				}
+				seqb.replace(seqb.length()-1, seqb.length(), "");
+				float percent = (100.1f * edge.getSequences().size() / sequences.size());
+				sb += "\t\"" + Integer.toString(node.getID()) + "\"->\"" + Integer.toString(edge.getNext().getID()) + "\"[dir=forward," + "label=" +
 						String.format("\"%.1f", percent) + "%\"," + "sequences=\"" + seqb.toString() + "\"];\n";
 			}
 		}
 		sb += "}";
 		return sb;
 	}
-	
+
 
 	/**
 	 * Load partial order alignment structure from filename or string format
-	 * 
+	 *
 	 * @param 	structure string representation of structure or filepath to structure representation
 	 * @return	first node in the graph
 	 */
@@ -790,20 +947,24 @@ public class POGraph {
 			line = lines[lineCount];
 		}
 		// parse graph structure
-		Map<String, Integer> inputNodeToPONode = new HashMap<>();				// Mapping of input nodes and which PO graph nodes they are stored in
-		Map<Integer, Map<String, Character>> nodeSeqCharMap = new HashMap<>();	// Mapping of input nodes, the sequences in that node and their base characters from the aln
 		try {
 			// load all nodes
 			while (line != null) {
 				line = line.replace("\t", "");
 				if (!line.contains("->")) {
+					// node information, store distribution and sequence characters
 					String[] elements = line.split("[\\[]+");
 					if (elements.length > 1) {
 						String nodeId = elements[0].replace("\"","");
 						nodeId = nodeId.replaceAll("[^\\d]", "");
 						int pogId = Integer.parseInt(nodeId);
-						HashMap<Character, Double> dist = null;
-						Character base = null;
+
+						Node node = new Node(pogId);
+						if (nodes.containsKey(pogId))
+							node = nodes.get(pogId);
+						else
+							nodes.put(pogId, node);
+
 						elements = elements[1].split("[,]+");
 						for (String el : elements)
 							if (el.contains("label")) {
@@ -811,62 +972,56 @@ public class POGraph {
 								elements = el.split("[\"]+");
 								String label = elements[1].replaceAll("\"", "");
 								if (label.length() == 1)
-									base = label.toCharArray()[0];
+									node.setBase(label.toCharArray()[0]);
 							} else if (el.contains("distribution")) {
 								// load node character distribution, expects "char:prob char:prob ... "
 								elements = el.split("[\" ]+");
-								dist = new HashMap<>();
+								HashMap<Character, Double> dist = new HashMap<>();
 								for (String cp : elements)
 									if (cp.contains(":")) {
 										String[] els = cp.split("[:]+");
 										dist.put(els[0].toCharArray()[0], Double.parseDouble(els[1]));
 									}
+								node.setCharacterDistribution(dist);
 							} else if (el.contains("sequences")) {
-								nodeSeqCharMap.put(pogId, new HashMap<>());
 								el = el.replace("\"", "");
 								String seqs = el.split("sequences=")[1];
-								for (String seq : seqs.split("[;]+"))
-									nodeSeqCharMap.get(pogId).put(seq.split("[:]+")[0], seq.split("[:]+")[1].toCharArray()[0]);
+								for (String seq : seqs.split("[;]+")) {
+									Integer seqId = getSequenceID(seq.split("[:]+")[0]);
+									if (seqId == null) {
+										seqId = sequences.size()+1;
+										sequences.put(seqId, seq.split("[:]+")[0]);
+									}
+									node.addSequence(seqId, seq.split("[:]+")[1].toCharArray()[0]);
+								}
 							}
-						nodes.put(pogId, new Node(pogId));
-						nodes.get(pogId).setBase(base);
-						if (dist != null)
-							nodes.get(pogId).setCharacterDistribution(dist);
-						inputNodeToPONode.put(nodeId, pogId);
 					}
-				}
-				if (reader != null)
-					line = reader.readLine();
-				else if (lineCount + 1 == lines.length)
-					line = null;
-				else
-					line = lines[++lineCount];
-			}
-
-			// update pointers and sequence character mappings using edge information
-			if (reader != null) {
-				reader.close();
-				reader = new BufferedReader(new FileReader(new File(structure)));
-				line = reader.readLine();
-			} else {
-				lineCount = 0;
-				line = lines[++lineCount];
-			}
-
-			// load all edges
-			while (line != null) {
-				line = line.replace("\t", "");
-				if (line.contains("->")) {
+				} else {
+					// edge information, store pointers
 					String[] elements = line.split("->");
-					String fromId = elements[0].replace("\"","");
-					fromId = fromId.replaceAll("[^\\d]", "");
-					int fromNodeId = Integer.parseInt(fromId);
+					String id = elements[0].replace("\"","");
+					id = id.replaceAll("[^\\d]", "");
+					int fromId = Integer.parseInt(id);
+
 					elements = elements[1].split("[\\[]+");
-					String toId = elements[0].replace("\"","");
-					toId = toId.replaceAll("[^\\d]", "");
-					int toNodeId = Integer.parseInt(toId);
-					inputNodeToPONode.put(toId, toNodeId);
-					int toPOGID = inputNodeToPONode.get(toId);
+					id = elements[0].replace("\"","");
+					id = id.replaceAll("[^\\d]", "");
+					int toId = Integer.parseInt(id);
+
+					Node nodeFrom = new Node(fromId);
+					Node nodeTo = new Node(toId);
+
+					// check if the node has already been defined, if so use that instead
+					if (nodes.containsKey(fromId))
+						nodeFrom = nodes.get(fromId);
+					else
+						nodes.put(fromId, nodeFrom);
+					if (nodes.containsKey(toId))
+						nodeTo = nodes.get(toId);
+					else
+						nodes.put(toId, nodeTo);
+
+					// put sequences in the edge
 					elements = elements[1].split("[\"]+");
 					for (int el = 0; el < elements.length ; el++)
 						if (elements[el].contains("sequences")) {
@@ -877,20 +1032,11 @@ public class POGraph {
 									seqId = sequences.size()+1;
 									sequences.put(seqId, seq);
 								}
-								// TODO: Base character for MSA (if base is null)
-								nodes.get(inputNodeToPONode.get(fromId)).addSequence(seqId, nodeSeqCharMap.get(fromNodeId).get(seq));
-								nodes.get(inputNodeToPONode.get(toId)).addSequence(seqId, nodeSeqCharMap.get(toNodeId).get(seq));
-								if (!seqNodeMap.containsKey(seqId))
-									seqNodeMap.put(seqId, new ArrayList<>());
-								if (!seqNodeMap.get(seqId).contains(nodes.get(fromNodeId)))
-									seqNodeMap.get(seqId).add(nodes.get(fromNodeId));
-								if (!seqNodeMap.get(seqId).contains(nodes.get(toPOGID)))
-									seqNodeMap.get(seqId).add(nodes.get(toPOGID));
+								nodeFrom.addNextNode(nodeTo, seqId);
+								nodeTo.addPrevNode(nodeFrom, seqId);
 							}
 							break;
 						}
-					nodes.get(fromNodeId).addNextNode(nodes.get(toNodeId));
-					nodes.get(toNodeId).addPrevNode(nodes.get(fromNodeId));
 				}
 				if (reader != null)
 					line = reader.readLine();
@@ -906,31 +1052,19 @@ public class POGraph {
 			e.printStackTrace();
 		}
 
-		// sort node order for each sequence and add the seqChar mapping for the final nodes
-		for (Integer seqId : seqNodeMap.keySet()) {
-			List<Node> sorted = new ArrayList<>();
-			List<Node> unsorted = seqNodeMap.get(seqId);
-			while (!unsorted.isEmpty()) {
-				Node current = unsorted.get(0);
-				for (Node node : unsorted) {
-					if (current.getPreviousNodes().contains(node))
-						current = node;
-					if (current.getPreviousNodes().isEmpty())
-						// found first node, add to sorted list
-						break;
-				}
-				sorted.add(current);
-				unsorted.remove(current);
-			}
-			seqNodeMap.get(seqId).addAll(sorted);
-		}
-
 		// find starting nodes
-		for (Node node : nodes.values())
-			if (node.getPreviousNodes().isEmpty()) {
-				initialNode.addNextNode(node);
-				node.addPrevNode(initialNode);
-			}
+		for (Node node : nodes.values()) {
+			if (node.getPreviousNodes().isEmpty())
+				for (Integer seqId : node.getSeqIds()) {
+					initialNode.addNextNode(node, seqId);
+					node.addPrevNode(initialNode, seqId);
+				}
+			if (node.getNextTransitions().isEmpty())
+				for (Integer seqId : node.getSeqIds()) {
+					finalNode.addPrevNode(node, seqId);
+					node.addNextNode(finalNode, seqId);
+				}
+		}
 
 		return initialNode.getNextNodes().get(0);
 	}
@@ -943,9 +1077,10 @@ public class POGraph {
 	private Node loadPOGraph(List<EnumSeq.Gappy<Enumerable>> seqs) {
 		// input:	seqLabel	sequence(with gap character)
 		// each Node is a column of the aln file
-		initialNode = new Node();
+		initialNode = new Node(-1);
+		finalNode = new Node();
 		nodes = new HashMap<>();
-		seqNodeMap = new HashMap<>();
+		HashMap<Integer, List<Node>> seqNodeMap = new HashMap<>();
 
 		int numNodes = seqs.get(0).toString().toCharArray().length;
 		for (int nodeId = 0; nodeId < numNodes; nodeId++)
@@ -968,15 +1103,12 @@ public class POGraph {
 			seqs.get(seqId).set(chars);
 		}
 
-		// iterate through the lists of nodes in the sequence mapping and assign pointers in nodes
-		for (List<Node> nodeSeqs : seqNodeMap.values()) {
-			nodeSeqs.size();
-			for (int nodeInd = 0; nodeInd < nodeSeqs.size(); nodeInd++)
-				if (nodeInd + 1 < nodeSeqs.size()) {
-					nodeSeqs.get(nodeInd).addNextNode(nodeSeqs.get(nodeInd + 1));
-					nodeSeqs.get(nodeInd + 1).addPrevNode(nodeSeqs.get(nodeInd));
-				}
-		}
+		// iterate through the lists of nodes in the sequence mapping and assign edges to other nodes
+		for (Integer seqId : seqNodeMap.keySet())
+			for (int nodeInd = 0; nodeInd + 1 < seqNodeMap.get(seqId).size(); nodeInd++) {
+				seqNodeMap.get(seqId).get(nodeInd).addNextNode(seqNodeMap.get(seqId).get(nodeInd + 1), seqId);
+				seqNodeMap.get(seqId).get(nodeInd + 1).addPrevNode(seqNodeMap.get(seqId).get(nodeInd), seqId);
+			}
 
 		List<Node> nodelist = new ArrayList<>(nodes.values());
 		for (Node node : nodelist) {
@@ -986,11 +1118,7 @@ public class POGraph {
 				removeNode();
 				continue;
 			}
-			// find starting nodes
-			if (node.getPreviousNodes().isEmpty()) {
-				initialNode.addNextNode(node);
-				node.addPrevNode(initialNode);
-			}
+
 			// for all nodes, if only one unique character, set as base
 			Character baseChar = null;
 			for (Character b : node.getSeqCharMapping().values())
@@ -1004,6 +1132,14 @@ public class POGraph {
 				node.setBase(baseChar);
 		}
 
+		// find starting and ending nodes
+		for (Integer seqId : seqNodeMap.keySet()) {
+			initialNode.addNextNode(seqNodeMap.get(seqId).get(0), seqId);
+			seqNodeMap.get(seqId).get(0).addPrevNode(initialNode, seqId);
+			finalNode.addPrevNode(seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).size()-1), seqId);
+			seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).size()-1).addNextNode(finalNode, seqId);
+		}
+
 		return initialNode.getNextNodes().get(0);
 	}
 
@@ -1014,16 +1150,18 @@ public class POGraph {
 	 * @param node	node to add to list
 	 */
 	private void addNode(Node node){
+		if (node == finalNode)
+			return;
 		if (this.nodes.containsKey(node.getID()))
 			return;
 		this.nodes.put(node.getID(), node);
 		for (Node next : node.getNextNodes())
 			addNode(next);
 	}
-	
+
 	/**
 	 * Gets the ID of the extant sequence, i.e. position in the extant sequence list
-	 * 
+	 *
 	 * @param 	seqLabel	label of extant sequence
 	 * @return	position of sequence in extant sequence list
 	 */
@@ -1108,7 +1246,7 @@ public class POGraph {
 			successors.clear();
 
 			for (Node next : nodes.get(nodeID).getNextNodes())
-				if (!completed.contains(next.getID()))
+				if (next.getID() != null && !completed.contains(next.getID()))
 					successors.add(0, next.getID());
 
 			started.add(nodeID);
@@ -1118,24 +1256,91 @@ public class POGraph {
 	}
 
 	/**
-     * Node for encapsulating a partial order graph alignment of nodes. 'Aligned' POG nodes are combined to represent
+	 * Find the shortest path from the start node to the end node using breadth first search.
+	 *
+	 * @param start		Node to start the search
+	 * @param end		Node to finish
+	 * @param ignore	Node to ignore (if applicable)
+	 * @return			List of nodes to traverse
+	 */
+	private List<Node> findShortestPathToNode(Node start, Node end, Node ignore) {
+		Queue<ArrayList<Node>> paths = new ArrayDeque<>();
+
+		// create adjacency map of nodes, where adjacency is defined as nodes that are a 'next' node of the previous
+		// considered node (or parent node)
+		HashMap<Node, List<Node>> adjacency = new HashMap<>();
+		ArrayList<Node> allNodes = new ArrayList<>();
+		allNodes.add(initialNode);
+		allNodes.addAll(nodes.values());
+		allNodes.add(finalNode);
+
+		for (Node node : allNodes) {
+			if (node.getID() != null && !adjacency.keySet().contains(node))
+				adjacency.put(node, new ArrayList<>());
+			for (Node next : node.getNextNodes()) {
+				if (!adjacency.keySet().contains(next))
+					adjacency.put(next, new ArrayList<>());
+				for (Node adjacent : node.getNextNodes())
+					if (!adjacency.get(next).contains(adjacent))
+						adjacency.get(next).add(adjacent);
+			}
+		}
+
+		ArrayList<Node> initialPath = new ArrayList<>();
+		initialPath.add(start);
+		paths.add(initialPath);
+
+		ArrayList<Node> path = null;
+		while (!paths.isEmpty()) {
+			path = paths.remove();
+			if (path.contains(end))
+				break;
+			// if there are no adjacent nodes, find a 'next' node
+			if (path.get(path.size()-1).getNextNodes().isEmpty())
+				continue;
+			Node next = path.get(path.size()-1).getNextNodes().get(0);
+			if (!adjacency.containsKey(next) || adjacency.get(next).isEmpty())
+				adjacency.get(next);
+			for (Node adjacent : adjacency.get(next)) {
+				if (path.contains(adjacent) || adjacent.getID() == null || (end.getID() != null && adjacent.getID() > end.getID()) || adjacent == ignore)
+					continue;
+				ArrayList<Node> newpath = new ArrayList<>();
+				newpath.addAll(path);
+				newpath.add(adjacent);
+				if (!newpath.contains(end))
+					paths.add(newpath);
+				else if (newpath.size() > 2)
+					return newpath;
+			}
+		}
+		if (!path.contains(end)) // couldn't find an alternative path to the node
+			return null;
+		return path;
+	}
+
+	private Node copyInitialNode(Node initial) {
+		return initial.copy();
+	}
+
+	/**
+	 * Node for encapsulating a partial order graph alignment of nodes. 'Aligned' POG nodes are combined to represent
 	 * a single node.
-     */
-    private class Node {
-    	private Integer ID = null;								// alignment ID
-    	private Character base;									// base character
-    	private List<Node> prevNodes;							// list of neighbouring previous nodes
-    	private List<Node> nextNodes;							// list of neighbouring next nodes
+	 */
+	private class Node {
+		private Integer ID = null;								// alignment ID
+		private Character base;									// base character
+		private List<Edge> nextTransitions;						// transitions to next nodes
+		private List<Edge> prevTransitions;						// transitions to previous nodes
 		private List<Node> alignedTo = null;					// list of nodes that are aligned with this node
 		private HashMap<Integer, Character> seqChars;			// map of sequence Ids and their base character
 		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
-    	
-    	/**
-    	 * Constructor
-    	 */
-    	public Node() {
-			this.prevNodes = new ArrayList<>();
-			this.nextNodes = new ArrayList<>();
+
+		/**
+		 * Constructor
+		 */
+		public Node() {
+			this.prevTransitions = new ArrayList<>();
+			this.nextTransitions = new ArrayList<>();
 			this.seqChars = new HashMap<>();
 		}
 
@@ -1144,18 +1349,18 @@ public class POGraph {
 		 *
 		 * @param ID Node id
 		 */
-    	public Node(Integer ID) {
+		public Node(Integer ID) {
 			this();
-    		this.ID = ID;
-    	}
+			this.ID = ID;
+		}
 
-    	/**
-    	 * Returns a deep copy of the node structure.
-    	 * 
-    	 * @param map	Map structure to keep track of visited nodes
-    	 * @return		deep copy of node
-    	 */
-		public Node copy(Map<Node, Node> map) {
+		/**
+		 * Returns a deep copy of the node structure.
+		 *
+		 * @param map	Map structure to keep track of visited nodes
+		 * @return		deep copy of node
+		 */
+		private Node copy(Map<Node, Node> map) {
 			Node copy = map.get(this);
 			if (copy == null) {
 				copy = new Node(this.getID());
@@ -1165,23 +1370,81 @@ public class POGraph {
 						copy.addAlignedNode(node.copy(map));
 				for (Integer sc : this.seqChars.keySet())
 					copy.addSequence(sc, seqChars.get(sc));
+				for (Node next : this.getNextNodes())
+					next.copy(map);
 				map.put(this, copy);
-				for (Node node: this.prevNodes)
-					copy.addPrevNode(node.copy(map));
-				for (Node node: this.nextNodes)
-					copy.addNextNode(node.copy(map));
 			}
 			return copy;
-    	}
-    	
-    	/**
-    	 * Get the ID of the alignment
+		}
+
+		public Node copy() {
+			Map<Node,Node> map = new IdentityHashMap<>();
+			initialNode.copy(map);
+			// link prev/next pointers
+			for (Node fromOriginal : map.keySet())
+				for (Edge toEdge : fromOriginal.getNextTransitions()) {
+					Node fromCopy = map.get(fromOriginal);
+					Node toCopy = map.get(toEdge.getNext());
+					for (Integer seqId : toEdge.getSequences()) {
+						fromCopy.addNextNode(toCopy, seqId);
+						toCopy.addPrevNode(fromCopy, seqId);
+					}
+				}
+			// find node with ID
+			for (Node node : map.values())
+				if (node.getID() == this.getID())
+					return node;
+			return null;
+		}
+
+		/**
+		 * Add transition from this to the given next node.
 		 *
-    	 * @return	Alignment ID
-    	 */
-    	private Integer getID(){
-    		return this.ID;
-    	}
+		 * @param next	Next node where transition points
+		 * @param seq	List of sequences that traverse to the next node
+		 */
+		private void addNextNode(Node next, Integer seq) {
+			for (Edge edge : nextTransitions)
+				if (edge.getNext().getID() == next.getID()) {
+					// edge already exists, just add sequence
+					edge.addSequence(seq);
+					return;
+				}
+			// edge doesn't already exist, create new transition
+			Edge nextT = new Edge(next);
+			if (seq != null)
+				nextT.addSequence(seq);
+			this.nextTransitions.add(nextT);
+		}
+
+		/**
+		 * Add transition from this to the given previous node.
+		 *
+		 * @param prev	Previous node where transition points
+		 * @param seq	Sequence that traverses to the next node
+		 */
+		private void addPrevNode(Node prev, Integer seq) {
+			for (Edge edge : prevTransitions)
+				if (edge.getNext().getID() == prev.getID()) {
+					// edge already exists, just add sequence
+					edge.addSequence(seq);
+					return;
+				}
+			// edge doesn't already exist, create new transition
+			Edge prevT = new Edge(prev);
+			if (seq != null)
+				prevT.addSequence(seq);
+			this.prevTransitions.add(prevT);
+		}
+
+		/**
+		 * Get the ID of the alignment
+		 *
+		 * @return	Alignment ID
+		 */
+		private Integer getID(){
+			return this.ID;
+		}
 
 		/**
 		 * Get a list of nodes that are aligned with this node.
@@ -1229,55 +1492,33 @@ public class POGraph {
 			return this.distribution;
 		}
 
-    	/**
-    	 * Checks if the previous node is already stored, if not, add to list of previous nodes.
-    	 * 
-    	 * @param prev		Pointer to the prev node
-    	 */
-    	private void addPrevNode(Node prev) {
-    		for (Node previous : prevNodes)
-    			if (previous.getID() == prev.getID())
-    				return;
-			prevNodes.add(prev);
-    	}
-    	
-    	/**
-    	 * Checks if the next node is already stored, if not, add to list of next nodes.
-    	 * 
-    	 * @param next		Pointer to the next node
-    	 */
-    	private void addNextNode(Node next) {
-			for (Node nextN : nextNodes)
-				if (nextN.getID() == next.getID())
-					return;
-			nextNodes.add(next);
-    	}
-    	
-    	/**
-    	 * Remove the previous node from the list.
-    	 * 
-    	 * @param prev	previous node
-    	 */
+		/**
+		 * Remove the previous node from the list.
+		 *
+		 * @param prev	previous node
+		 */
 		private void removePrevNode(Node prev){
-    		for (Node node : prevNodes)
-    			if (node.getID() == prev.getID()) {
-    				prevNodes.remove(node);
-    				return;
-    			}
-    	}
-    	
-    	/**
-    	 * Remove the next node from the list.
-    	 * 
-    	 * @param next	next node
-    	 */
+			for (Edge edge : prevTransitions)
+				if (edge.getNext().getID() == prev.getID()) {
+					prevTransitions.remove(edge);
+					prev.removeNextNode(this);
+					return;
+				}
+		}
+
+		/**
+		 * Remove the next node from the list.
+		 *
+		 * @param next	next node
+		 */
 		private void removeNextNode(Node next){
-    		for (Node node : nextNodes)
-    			if (node.getID() == next.getID()) {
-    				nextNodes.remove(node);
-    				return;
-    			}
-    	}
+			for (Edge edge : nextTransitions)
+				if (edge.getNext().getID() == next.getID()) {
+					nextTransitions.remove(edge);
+					next.removePrevNode(this);
+					return;
+				}
+		}
 
 		/**
 		 * Store sequence that traverses through this node.
@@ -1292,51 +1533,78 @@ public class POGraph {
 			this.seqChars.put(seqId, base);
 		}
 
-    	/**
-    	 * Get list of next nodes.
-    	 * 
-    	 * @return	list of next nodes
-    	 */
-		private List<Node> getNextNodes(){ return this.nextNodes; }
-    	
-    	/**
-    	 * Get list of previous nodes.
-    	 * 
-    	 * @return	list of previous nodes
-    	 */
-		private List<Node> getPreviousNodes(){
-    		return this.prevNodes;
-    	}
-    	
-    	/**
-    	 * Set the inferred base character of this Node.
-    	 * 
-    	 * @param base	inferred base character
-    	 */
+		/**
+		 * Get list of next nodes.
+		 *
+		 * @return	list of next nodes
+		 */
+		private List<Node> getNextNodes(){
+			List<Node> nodes = new ArrayList<>();
+			for (Edge edge : nextTransitions)
+				nodes.add(edge.getNext());
+			return nodes;
+		}
+
+		/**
+		 * Get list of previous nodes.
+		 *
+		 * @return	list of previous nodes
+		 */
+		private List<Node> getPreviousNodes() {
+			List<Node> nodes = new ArrayList<>();
+			for (Edge edge : prevTransitions)
+				nodes.add(edge.getNext());
+			return nodes;
+		}
+
+		/**
+		 * Get the list of in edges.
+		 *
+		 * @return	List of in transition edges.
+		 */
+		private List<Edge> getPreviousTransitions() {
+			return this.prevTransitions;
+		}
+
+		/**
+		 * Get the list of out edges.
+		 *
+		 * @return	List of out transition edges.
+		 */
+		private List<Edge> getNextTransitions() {
+			return this.nextTransitions;
+		}
+
+		/**
+		 * Set the inferred base character of this Node.
+		 *
+		 * @param base	inferred base character
+		 */
 		private void setBase(Character base) {
-    		this.base = base;
-    	}
+			this.base = base;
+		}
 
 
-    	/**
-    	 * Get the inferred base character.
-    	 * 
-    	 * @return	inferred base character
-    	 */
+		/**
+		 * Get the inferred base character.
+		 *
+		 * @return	inferred base character
+		 */
 		private Character getBase(){ return base; }
 
 
-    	/**
-    	 *  Generates string representation of the Node.
-    	 *  
-    	 * @return		String representation in reduced dot format
-    	 */
-    	public String toString() {
-    		String sb = "\"" + ((ID == null) ? "null" : Integer.toString(ID)) + "\"" + "[label=\"" + base + "\"];\n";
-    		for (Node nextNode : getNextNodes())
-    			sb += "\"" + ((ID == null) ? "null" : Integer.toString(ID)) + "\"->\"" + Integer.toString(nextNode.getID())+ "\"" + "[]\n;";
-    		return sb;
-    	}
+		/**
+		 * Generates string representation of the Node.
+		 *
+		 * @return		String representation in reduced dot format
+		 */
+		public String toString() {
+			String sb = "\"" + ((ID == null) ? "null" : Integer.toString(ID)) + "\"" + "[label=\"" + base + "\"];\n";
+			for (Node nextNode : getNextNodes())
+				if (nextNode.getID() != null)
+					sb += "\"" + ((ID == null) ? "null" : Integer.toString(ID)) + "\"->\"" + Integer.toString(nextNode.getID())+ "\"" + "[]\n;";
+			return sb;
+		}
 
 		/**
 		 * Gets a list of the sequence IDs that traverse this node.
@@ -1344,7 +1612,7 @@ public class POGraph {
 		 * @return	List of sequence IDs
 		 */
 		private List<Integer> getSeqIds(){
-    		List<Integer> ids = new ArrayList<>();
+			List<Integer> ids = new ArrayList<>();
 			for (Integer sc : seqChars.keySet())
 				ids.add(sc);
 			return ids;
@@ -1361,6 +1629,44 @@ public class POGraph {
 				mapping.put(sc, seqChars.get(sc));
 			return mapping;
 		}
+	}
 
-    }
+	/**
+	 * Edge for storing transitions between nodes. This is required to easily track sequence paths when edges and nodes
+	 * are removed from the graph.
+	 */
+	private class Edge {
+		private Node next = null;
+		private List<Integer> sequences;
+
+		public Edge() {
+			this.sequences = new ArrayList<>();
+		}
+
+		public Edge(Node nextNode) {
+			this();
+			this.next = nextNode;
+		}
+
+		public void addSequence(int seqId) {
+			this.sequences.add(seqId);
+		}
+
+		public void removeSequence(int seqId) {
+			this.sequences.remove((Integer)seqId);
+		}
+
+		public List<Integer> getSequences() {
+			return this.sequences;
+		}
+
+		public Node getNext() {
+			return this.next;
+		}
+
+		public void setNext(Node nextNode) {
+			this.next = nextNode;
+		}
+	}
+
 }
