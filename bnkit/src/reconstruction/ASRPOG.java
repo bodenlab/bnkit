@@ -1,6 +1,7 @@
 package reconstruction;
 
 
+import alignment.MSA;
 import api.PartialOrderGraph;
 import bn.alg.CGTable;
 import bn.alg.Query;
@@ -42,9 +43,10 @@ public class ASRPOG {
 	 * @param alignmentFile		filepath to the sequence alignment (expected extension .fa, .fasta or .aln)
 	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference) throws IOException {
-		performASR("", treeFile, alignmentFile, jointInference);
+	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, boolean performMSA) throws IOException {
+		performASR("", treeFile, alignmentFile, jointInference, performMSA);
 	}
 
 	/**
@@ -53,10 +55,11 @@ public class ASRPOG {
 	 * @param alignmentFile	filepath to the sequence alignment (expected extension .fa, .fasta or .aln)
 	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param marginalNode	node label for maginal inference
+	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, String marginalNode) throws IOException {
+	public ASRPOG(String alignmentFile, String treeFile, String marginalNode, boolean performMSA) throws IOException {
 		this.marginalNode = marginalNode;
-		performASR("", treeFile, alignmentFile, false);
+		performASR("", treeFile, alignmentFile, false, performMSA);
 	}
 
 	/**
@@ -66,9 +69,23 @@ public class ASRPOG {
 	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference) throws IOException {
-		performASR(pog, treeFile, sequenceFile, jointInference);
+	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException {
+		performASR(pog, treeFile, sequenceFile, jointInference, performMSA);
+	}
+
+	/**
+	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 * This one
+	 * @param msa				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
+	 */
+	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException {
+		performASR(msa, treeFile, sequenceFile, jointInference, performMSA);
 	}
 
 	/**
@@ -78,10 +95,11 @@ public class ASRPOG {
 	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param sequenceFile	filepath to the sequences (expected extension .fa, .fasta or .aln)
 	 * @param marginalNode	node label for maginal inference
+	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode) throws IOException {
+	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA) throws IOException {
 		this.marginalNode = marginalNode;
-		performASR(pog, treeFile, sequenceFile, false);
+		performASR(pog, treeFile, sequenceFile, false, performMSA);
 	}
 
 	/**
@@ -322,12 +340,46 @@ public class ASRPOG {
 	 * @param pog				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 */
-	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference) throws RuntimeException, IOException {
+	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws RuntimeException, IOException {
 		loadData(treeFile, sequenceFile);
 		if (pog == null || pog.equals(""))	// load graph structure from alignment file
 			pog = sequenceFile;
-		pogAlignment = new POGraph(pog, sequenceFile);
+		if (performMSA) {
+			MSA alignment = new MSA(pog);
+			pogAlignment = alignment.getMSAGraph();
+		} else
+			pogAlignment = new POGraph(pog, sequenceFile);
 		pog = null;
+
+		// perform inference
+		if (jointInference) {
+			marginalDistributions = null;
+			queryBNJoint();
+		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
+			queryBNMarginal(marginalNode);
+		} else {
+			if (marginalNode == null)
+				System.out.println("No node was specified for the marginal inference: inferring the root node");
+			else
+				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
+			marginalNode = phyloTree.getRoot().getLabel().toString();
+			queryBNMarginal(phyloTree.getRoot().getLabel().toString());
+		}
+	}
+
+	/**
+	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 *
+	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param msa				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param parsimony			flag to identify gaps in reconstruction using parsimony (true) or maximum likelihood (false)
+	 */
+	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, boolean parsimony) throws RuntimeException, IOException {
+		loadData(treeFile, sequenceFile);
+
+		pogAlignment = msa;
 
 		// perform inference
 		if (jointInference) {
@@ -694,6 +746,16 @@ public class ASRPOG {
         }
         return d_marg;
     }
+
+	/**
+	 * Check to see if a node has an inferred character that is being contributed by one but not both children
+	 * @param node node to check
+	 */
+
+	public void checkBranchIsolation(String node){
+		System.out.println("Yo");
+
+	}
 
     /**
      * Helper class to store changes to an ancestral graph node

@@ -35,7 +35,7 @@ public class RunASRPOG {
 	 * @throws IOException
 	 */
 	public static void main(String[] args) throws IOException {
-		
+
 		if (args.length > 1) {
 			ASRPOG asr = null;
 
@@ -45,6 +45,7 @@ public class RunASRPOG {
 			String sequencePath = "";
 			String treePath = "";
 			String poagRepresentation = "";
+			String alignmentType = "";
 			if (!args[0].contains("-"))
 				if (!args[0].contains(".nwk"))
 					poagRepresentation = args[0];
@@ -53,6 +54,7 @@ public class RunASRPOG {
 			boolean dotFile = false;
 			boolean msaFile = false;
 			boolean performAlignment = false;
+			boolean checkBranchIsolation = true;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {
@@ -72,8 +74,10 @@ public class RunASRPOG {
 					msaFile = true;
 				else if (args[arg].equalsIgnoreCase("-dot"))
 					dotFile = true;
-				else if (args[arg].equalsIgnoreCase("-align"))
+				else if (args[arg].equalsIgnoreCase("-align")) {
 					performAlignment = true;
+					alignmentType = args[arg + 1];
+				}
 			}
 
 			// exit if the phylogenetic tree has not been specified, or the partial order alignment structure and sequence filepath both have not been specified (need one or the other)
@@ -84,16 +88,17 @@ public class RunASRPOG {
 
 			if (poagRepresentation.isEmpty()) {
 				if (performAlignment) { // generate a partial order alignment graph if the alignment has not been specified
-					MSA msa = new MSA(sequencePath);
-					asr = new ASRPOG(msa.getMSAGraph().toString(), treePath, sequencePath, inference.equalsIgnoreCase("joint"));
+
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), true);
+
 				} else if (marginalNode != null)
-					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode);
+					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, false);
 				else
-					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"));
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), false);
 			} else if (marginalNode != null)
-				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode);
+				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, performAlignment);
 			else
-				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, inference.equalsIgnoreCase("joint"));
+				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), performAlignment);
 
 			if (!outputPath.isEmpty()) {
 				if (dotFile)
@@ -107,6 +112,11 @@ public class RunASRPOG {
 					asr.save(outputPath, true, "fasta");
 				else
 					asr.save(outputPath, false, "fasta");
+			}
+
+			if (checkBranchIsolation){
+				asr.checkBranchIsolation("N0");
+
 			}
 
 		} else {

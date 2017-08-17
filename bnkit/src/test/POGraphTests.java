@@ -1,3 +1,5 @@
+
+
 import api.PartialOrderGraph;
 import dat.POGraph;
 import json.JSONObject;
@@ -5,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import vis.POAGJson;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class POGraphTests {
     @Test
     @DisplayName("Small Partial Order Graph test")
-    public void smallPartialOrderGraph(){
+    public void smallPartialOrderGraph() throws IOException {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println("Consensus sequence: " + apiGraph.getConsensusSequence());
@@ -29,7 +32,7 @@ public class POGraphTests {
 
     @Test
     @DisplayName("Small PO Graph test")
-    public void smallPOGraph(){
+    public void smallPOGraph() throws IOException {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         POGraph graph = new POGraph(filepath);
         System.out.println("Consensus sequence: " + graph.getSupportedSequence());
@@ -48,7 +51,7 @@ public class POGraphTests {
 
     @Test
     @DisplayName("MSA PO Graph test")
-    public void MSAPOGraph(){
+    public void MSAPOGraph() throws IOException {
         String filepath = "src/test/resources/testPOGraphMSAMed.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         for (Integer id : apiGraph.getNodeIDs())
@@ -57,7 +60,7 @@ public class POGraphTests {
 
     @Test
     @DisplayName("Load Graph test")
-    public void LoadPOGraph(){
+    public void LoadPOGraph() throws IOException {
         String filepath = "src/test/resources/testPOGraphMSAFourLevels.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println(apiGraph.toString());
@@ -65,7 +68,7 @@ public class POGraphTests {
 
     @Test
     @DisplayName("Small PO Graph test edge weights")
-    public void smallPOGraphEdgeWeights(){
+    public void smallPOGraphEdgeWeights() throws IOException {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         for (Integer nodeId : apiGraph.getNodeIDs()) {
@@ -79,7 +82,7 @@ public class POGraphTests {
 
     @Test
     @DisplayName("Sort small PO Graph")
-    public void smallPOGraphSort(){
+    public void smallPOGraphSort() throws IOException {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         Integer[] ids = apiGraph.sort();
@@ -90,7 +93,7 @@ public class POGraphTests {
 
     @Test
     @DisplayName("Convert PO Graph to API PartialOrderGraph")
-    public void graphToAPITest(){
+    public void graphToAPITest() throws IOException {
         String filepath = "src/test/resources/small.aln";
         POGraph graph = new POGraph(filepath);
         graph.saveSequences("src/text/resources/small_graph.aln", "clustal");
@@ -102,7 +105,7 @@ public class POGraphTests {
 
     @Test
     @DisplayName("Convert PO Graph to JSON")
-    public void graphToJSONTest() {
+    public void graphToJSONTest() throws IOException {
         String filepath = "src/test/resources/testPOGraphMSAEightLevels.dot";
         PartialOrderGraph graph = new PartialOrderGraph(filepath);
         POAGJson json = new POAGJson(graph);

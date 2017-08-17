@@ -2,6 +2,7 @@ package api;
 
 import dat.POGraph;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,7 +24,7 @@ public class PartialOrderGraph {
 
     public PartialOrderGraph(POGraph graph) { this.graph = graph; }
 
-    public PartialOrderGraph(String dotStructure) {
+    public PartialOrderGraph(String dotStructure) throws IOException {
         graph = new POGraph(dotStructure);
     }
 
@@ -71,8 +72,8 @@ public class PartialOrderGraph {
     public Integer[] getPreviousNodeIDs(int id) {
         if (!graph.setCurrent(id))
             return null;
-        Integer[] ids = new Integer[graph.getPrevIDs().size()];
-        graph.getPrevIDs().toArray(ids);
+        Integer[] ids = new Integer[graph.getPreviousIDs().size()];
+        graph.getPreviousIDs().toArray(ids);
         return ids;
     }
 
