@@ -4,6 +4,7 @@ import dat.POGraph;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -71,6 +72,9 @@ public class PartialOrderGraph {
      */
     public Integer[] getPreviousNodeIDs(int id) {
         if (!graph.setCurrent(id))
+            return null;
+        List<Integer> prevIds = graph.getPreviousIDs();
+        if (prevIds == null)
             return null;
         Integer[] ids = new Integer[graph.getPreviousIDs().size()];
         graph.getPreviousIDs().toArray(ids);

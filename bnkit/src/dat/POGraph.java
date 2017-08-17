@@ -154,7 +154,8 @@ public class POGraph {
 	public Map<Integer, Double> getEdgeWeights(){
 		HashMap<Integer, Double> edgeWeights = new HashMap<>();
 		for (Edge next : current.getNextTransitions())
-			edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
+			if (next.getNext() != finalNode)
+				edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
 		return edgeWeights;
 	}
 
@@ -296,6 +297,8 @@ public class POGraph {
 		for (Node node : current.getPreviousNodes())
 			if (node.getID() != -1)
 				prevIDs.add(node.getID());
+		if (prevIDs.isEmpty())
+			return null;
 		return prevIDs;
 	}
 
@@ -605,6 +608,8 @@ public class POGraph {
 	private Map<Integer, List<Integer>> getSequencesOutEdges(Node node){
 		Map<Integer, List<Integer>> nextNodeSeqs = new HashMap<>();
 		for (Edge next : node.getNextTransitions()) {
+			if (next.getNext() == finalNode)
+				continue;
 			if (!nextNodeSeqs.containsKey(next.getNext().getID()))
 				nextNodeSeqs.put(next.getNext().getID(), new ArrayList<>());
 			for (Integer seqId : next.getSequences())

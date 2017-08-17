@@ -178,6 +178,31 @@ public class ASRPOG {
 	}
 
 	/**
+	 * Save the reconstructed sequences that have the most support through the partial order graph in FASTA format.
+	 * Saved in output path as "reconstructed_sequences.fasta"
+	 *
+	 * @param filepath	Output filepath
+	 * @param label		label of ancestor to save (tree node label)
+	 */
+	public void saveSupportedAncestor(String filepath, String label) throws IOException {
+		Map<String, String> ancestralSeqs = new HashMap<>();
+		if (marginalNode == null)
+			ancestralSeqs.put(label, phyloTree.find(label).getSequence().toString());
+		else
+			ancestralSeqs.put(marginalNode, phyloTree.find(marginalNode).getSequence().toString());
+
+		BufferedWriter bw = new BufferedWriter(new FileWriter(filepath + "_recon.fa", false));
+		for (String node : ancestralSeqs.keySet()) {
+			bw.write(">" + node);
+			bw.newLine();
+			bw.write(ancestralSeqs.get(node));
+			bw.newLine();
+			bw.newLine();
+		}
+		bw.close();
+	}
+
+	/**
 	 * Save ASR information; ALN, tree, rates, marginal distribution (if applicable).
 	 *
 	 * @param filepath		filename to save ASR
