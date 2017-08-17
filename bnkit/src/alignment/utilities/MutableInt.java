@@ -8,7 +8,7 @@ public class MutableInt {
     // Start at one because we are counting
     private int value = 1;
 
-    void increment() {
+    public void increment() {
         ++value;
     }
 

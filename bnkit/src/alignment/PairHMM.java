@@ -1372,8 +1372,7 @@ public class PairHMM {
 //        long startTime = System.nanoTime();
 //        System.out.println("Starting to get current base count");
 
-        // TODO
-        Map<Character, MutableInt> baseCounts = null;//graph.getCurrentBaseCounts();
+        Map<Character, MutableInt> baseCounts = graph.getCurrentBaseCounts();
 
 //        long endTime = System.nanoTime();
 //        long duration = (endTime - startTime);

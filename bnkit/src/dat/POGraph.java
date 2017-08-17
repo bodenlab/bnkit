@@ -1,5 +1,6 @@
 package dat;
 
+import alignment.utilities.MutableInt;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
@@ -537,6 +538,21 @@ public class POGraph {
 			characters += '-';
 
 		return getGappySequence(seqId, next, sequence + characters, orderedNodeIds);
+	}
+
+	/**
+	 * Get a histogram of the characters in the current node.
+	 *
+	 * @return	Map of base character to histogram count
+	 */
+	public Map<Character, MutableInt> getCurrentBaseCounts() {
+		Map<Character, MutableInt> bases = new HashMap<>();
+		for (Character b : current.getSeqCharMapping().values())
+			if (!bases.containsKey(b))
+				bases.put(b, new MutableInt());
+			else
+				bases.get(b).increment();
+		return bases;
 	}
 
 	/**
