@@ -185,6 +185,8 @@ public class ASRPOG {
 	 * @param label		label of ancestor to save (tree node label)
 	 */
 	public void saveSupportedAncestor(String filepath, String label) throws IOException {
+		if (label.equalsIgnoreCase("root"))
+			label = (String)phyloTree.getRoot().getLabel();
 		Map<String, String> ancestralSeqs = new HashMap<>();
 		if (marginalNode == null)
 			ancestralSeqs.put(label, phyloTree.find(label).getSequence().toString());
