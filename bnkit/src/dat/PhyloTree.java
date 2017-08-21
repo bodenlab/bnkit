@@ -21,14 +21,7 @@ import dat.EnumSeq.Alignment;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Class to represent a phylogenetic tree.
@@ -40,7 +33,6 @@ import java.util.Set;
 public class PhyloTree {
 
     final private Node root; // the root of the tree
-    // static int count = 0;
 
     /**
      * Private constructor for tree from a root with all nodes connected off that.
@@ -58,10 +50,18 @@ public class PhyloTree {
         return root.toString();
     }
 
+    /**
+     * Print the tree as a string with values associated with each node.
+     * @return a text string
+     */
     public String printValues() {
         return root.printValue();
     }
 
+    /**
+     * Convert nodes to an array, breadth-first
+     * @return
+     */
     public Node[] toNodesBreadthFirst() {
         List<Node> done = new ArrayList<>();
         List<Node> queue = new ArrayList<>();
@@ -154,6 +154,8 @@ public class PhyloTree {
 
     /**
      * Utility method for recursively parse an embedded string on the Newick format.
+     * MB-Fix: fixed a bug that meant that labels were missing the last character.
+     * (Only last node or any node if distance is not given.)
      * @param str text on Newick format
      * @param parent the parent of the current node
      * @return the root node of tree
@@ -185,9 +187,11 @@ public class PhyloTree {
             String tail = str.substring(end_index + 1, str.length());
             int split_index = tail.indexOf(':'); // check if a distance is specified
             if (split_index == -1) { // no distance
-                if(!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty())
-                    node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1));
-                else
+                if(!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty()) {
+                    String name = tail.substring(split_index + 1, tail.length()).replace(";", "");
+                    node = new Node("N" + count + "_" + name);
+                    //node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1)); // MB-Fix: replaced this line with the two above to fix cropped name endings
+                } else
                     node = new Node("N" + count);
                 node.setParent(parent);
             } else { // there's a distance
@@ -223,6 +227,17 @@ public class PhyloTree {
     }
 
     /**
+     * Factory method to construct tree from text string on Newick format.
+     * @param newick text string specifying a tree
+     * @return the tree
+     */
+    public static PhyloTree parseNewick(String newick) {
+        Node root = parseNewick(newick, null); //null parent for root
+        PhyloTree t = new PhyloTree(root);
+        return t;
+    }
+
+    /**
      * Factory method to create a tree instance from a Newick formatted file.
      * @param filename name of file
      * @return instance of tree
@@ -241,7 +256,12 @@ public class PhyloTree {
         return t;
     }
 
-    // MB-Fix: does no longer return a value
+    /**
+     * Perform parsimony calcs on this tree.
+     * Uses a simple 0/1 substitution penalty based on equivalence or not of states
+     * @param names the names of the leaves
+     * @param symbols the symbols/states/values assigned to the leaves (same order as names)
+     */
     public void setContentByParsimony(String[] names, Object[] symbols) {
         Map<String, Object> map = new HashMap<>();
         for (int i = 0; i < names.length; i ++)
@@ -249,12 +269,31 @@ public class PhyloTree {
         setContentByParsimony(map);
     }
 
-    // MB-Fix: does no longer return a value
+    /**
+     * Perform parsimony calcs on this tree.
+     * Uses a simple 0/1 substitution penalty based on equivalence or not of states
+     * @param map contains key/value pairs for leaf names and states
+     */
     public void setContentByParsimony(Map<String, Object> map) {
         // reset node values (otherwise stores previous uses)
         reset_values(this.getRoot());
         Set<Object> values = new HashSet<>(map.values());
         Object[] unique = values.toArray();
+        Node root = this.getRoot();
+        root.forwardParsimony(map, unique);
+        root.backwardParsimony(unique);
+    }
+
+    /**
+     * Perform parsimony calcs on this tree.
+     * Uses a simple 0/1 substitution penalty based on equivalence or not of states
+     * @param map contains key/value pairs for leaf names and states
+     * @param unique array with the unique states in order of preference
+     * (which decides what states that are preferred when multiple states contribute to optimal solution)
+     */
+    public void setContentByParsimony(Map<String, Object> map, Object[] unique) {
+        // reset node values (otherwise stores previous uses)
+        reset_values(this.getRoot());
         Node root = this.getRoot();
         root.forwardParsimony(map, unique);
         root.backwardParsimony(unique);
@@ -312,13 +351,17 @@ public class PhyloTree {
             return values.get(index);
         }
 
+        public double[] getScores() {
+            return scores;
+        }
+
         // MB-Fix: new function, returns all values; should be run after parsimony
         public List<Object> getValues() {
             return values;
         }
 
         // MB-Fix: same signature, handles multiple calls to save each internally.
-        // Note it no longer returns value, it returns true if new value was set, false, if value was already set (used to optimise traversal below)
+        // Note it no longer returns value, instead it returns true if new value was set, false, if value was already set (used to optimise traversal below)
         public boolean setValue(Object value) {
             if (value == null) {
                 this.values = null;
@@ -394,8 +437,10 @@ public class PhyloTree {
         // MB-Fix: added to simplify printing of multiple values
         private static String concat(List<Object> values) {
             StringBuilder sb = new StringBuilder();
-            for (Object y : values)
-                sb.append(y + ";");
+            for (int i = 0; i < values.size(); i ++) {
+                Object y = values.get(i);
+                sb.append(y + (i == values.size() - 1 ? "" : "/"));
+            }
             return sb.toString();
         }
 
@@ -413,9 +458,9 @@ public class PhyloTree {
             if (dist != null)
                 dstr = ":" + dist.toString();
             if (nchildren < 1)
-                return label.toString() + "_" + concat(values) + ((dist != null) ? (dstr) : (""));
+                return label.toString() + "=" + concat(values) + ((dist != null) ? (dstr) : (""));
             else
-                return "(" + sb.toString() + ")" + label.toString() + "_" + concat(values) + ((dist != null) ? (dstr) : (""));
+                return "(" + sb.toString() + ")" + label.toString() + "=" + concat(values) + ((dist != null) ? (dstr) : (""));
         }
 
         /**
@@ -475,25 +520,26 @@ public class PhyloTree {
          * Internal function that operates recursively to first initialise each node (forward),
          * stopping only once a value has been assigned to the node,
          * then to propagate scores from assigned nodes to root (backward).
-         * MB-Fix: extended to deal with multiple values contributing to optimal scores
+         * Extended to deal with multiple values contributing to optimal scores
          * @param assign map with assignments (named nodes and corresponding values)
-         * @param unique all possible values, in order
+         * @param unique all possible values, in order; order matters if SET_ONE_TARGET_PARSIMONY is true
          * @return the scores of the unique values at the root
          */
         protected double[] forwardParsimony(Map<String, Object> assign, Object[] unique) {
-            this.scores = new double[unique.length]; // A score for each possible value
-            Object sym = assign.get(label);
-            if (sym != null) { // this node is instantiated
-                int index;
+            this.scores = new double[unique.length]; // a score for each possible value; pushed from leaves to this node; starts at 0
+            this.values = null;
+            Object sym = assign.get(this.label);     // check if this node has a definitive state (symbol) assigned to it (via its name/label)
+            if (sym != null) {                       // yes, this node is instantiated
+                int index;                           // index of the assigned state
                 for (index = 0; index < unique.length; index ++)
-                    if (sym.equals(unique[index]))
+                    if (sym.equals(unique[index]))   // found it
                         break;
-                setValue(unique[index]);
-                Arrays.fill(this.scores, Double.POSITIVE_INFINITY);
-                this.scores[index] = 0; // the actual symbol is scored 0, all others impossible do positive infinity
-                return this.scores;
+                setValue(unique[index]);             // definitive state is assigned to node
+                Arrays.fill(this.scores, Double.POSITIVE_INFINITY); // the default score is Infinity
+                this.scores[index] = 0; // the actual assignment is scored 0, all others impossible, so positive infinity
+                return this.scores;     // done with this leaf node
             } else { // this node is NOT instantiated
-                if (this.children == null) { // no children, ouch...
+                if (this.children == null) { // leaf node, no children, ouch... problem
                     throw new RuntimeException("Leaf " + this + " has not been assigned a value");
                 } else { // recurse into children nodes...
                     // determine scores contributed by each child (cscores) BEFORE substitution penalties
@@ -504,81 +550,194 @@ public class PhyloTree {
                     }
                     // traceback array needs to hold all child symbol indices that contribute to (indexed) parent symbol score via (indexed) child
                     this.traceback = new int[unique.length][children.size()][];
-                    double best_parent_score = Double.POSITIVE_INFINITY; // need to work best parent score out
+                    double best_parent_score = Double.POSITIVE_INFINITY; // need to work out best parent score for "scores"; they all start at 0 (init at allocation above)
                     for (int c = 0;  c < children.size(); c ++) {
                         // loop through each possible parent assignment, record what symbol in each child that best supports this (adding substitution penalties as we go)
                         for (int i = 0; i < scores.length; i ++) {
                             double best_score = Double.POSITIVE_INFINITY;
-                            int best_cnt = 0; // this is how many symbols in child that need to be recorded
-                            for (int j = 0; j < cscores[c].length; j ++) { // loop through each possible value in this child to score parent value
-                                if (cscores[c][j] + (i == j ? 0 : 1) < best_score) {
-                                    best_score = cscores[c][j] + (i == j ? 0 : 1);
+                            int best_cnt = 0; // this is how many symbols in child that need to be recorded (multiple are possible)
+                            // next, loop through each possible value in this child to find best parent score (may be the score from multiple origins)
+                            for (int j = 0; j < cscores[c].length; j ++) {
+                                int subst_penalty = (i == j ? 0 : 1);
+                                double parent_score = cscores[c][j] + subst_penalty;
+                                if (parent_score < best_score) { // new best, reset count to 1
+                                    best_score = parent_score;
                                     best_cnt = 1;
-                                } else if (cscores[c][j] + (i == j ? 0 : 1) == best_score) {
-                                    best_cnt += 1;
-                                }
+                                } else if (parent_score == best_score) { // new equal best, add +1 to count
+                                    best_cnt ++;
+                                } // else, let this parent score slip
                             }
-                            // now we know what the best_score is; work out all assignments in children that give it (could be multiple)
-                            traceback[i][c] = new int[best_cnt];
-                            int k = 0;
+                            // now we know what the best parent score is; work out all assignments in child c that give it (could be multiple)
+                            traceback[i][c] = new int[best_cnt]; // allocate space to hold their indices
+                            int k = 0; // index for holding possible origins
                             for (int j = 0; j < cscores[c].length; j ++) { // loop through each possible child symbol, again adding substitution penalties
-                                if (cscores[c][j] + (i == j ? 0 : 1) == best_score)
+                                int subst_penalty = (i == j ? 0 : 1);
+                                double parent_score = cscores[c][j] + subst_penalty;
+                                if (parent_score == best_score)
                                     traceback[i][c][k ++] = j;
                             }
-                            scores[i] += best_score; // the best we can do with parent symbol i
-                        }
-                    }
-                    return this.scores;
+                            scores[i] += best_score; // the best we can do with parent symbol i, from child c
+                        } // finished the score for a parent i, for one child c
+                    } // finished all children here
+                    return this.scores; // done, return parent scores (recursing them as child scores up the tree)
                 }
             }
         }
 
-        // MB-Fix: broke apart so that the two backwardParsimony functions handle the "root" and internal nodes, respectively
-        // no longer returns anything
+        public double getParsimonyScore() {
+            return getParsimonyScore(null);
+        }
+        private double getParsimonyScore(Object parent_state) {
+            Object my_state = this.values.get(0);
+            if (my_state == null)
+                return 0;
+            double score = 0;
+            if (parent_state != null)
+                score = (parent_state == my_state ? 0 : 1);
+            for (Node child : children) {
+                score += child.getParsimonyScore(my_state);
+            }
+            return score;
+        }
+/*        private double getParsimonyScore(Object parent_state, int parent_state_index) {
+            Object my_state = this.values.get(0);
+            if (my_state == null)
+                return 0;
+            double score = 0;
+            if (parent_state != null)
+                score = (parent_state == my_state ? 0 : 1);
+            for (int c = 0; c < children.size(); c ++) {
+                Node child = children.get(c);
+                int y = random.nextInt(traceback[child_state_index][c].length);
+                int traceback[child_state_index][c][y];
+                score += child.getParsimonyScore(my_state);
+            }
+            return score;
+        }*/
+
+        /** If one or multiple solutions should be identified */
+        static public boolean SET_ONE_TARGET_PARSIMONY = false;
+        /** If solutions are listed in order or if they should be randomised */
+        static public boolean SET_RANDOM_PARSIMONY = false;
+
+        private static Random random = new Random(System.currentTimeMillis());
+
+        /**
+         * Shuffles the elements in the array randomly.
+         * Code based on methods in java.util.Collections.shuffle();
+         */
+        protected static void shuffle(int[] array) {
+            int count = array.length;
+            for (int i = count; i > 1; i--) {
+                swap(array, i - 1, random.nextInt(i));
+            }
+        }
+
+        /**
+         * Helper function to shuffle.
+         * @param array
+         * @param i
+         * @param j
+         */
+        private static void swap(int[] array, int i, int j) {
+            int temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+        }
+
+        /**
+         * Generates an array with values from 0 to specified n.
+         * The order is either ascending or shuffled, depending on parameter shuffled.
+         * @param n number of elements, populating the array with 0 up to n - 1
+         * @param shuffled if true, the array will be returned with elements in random order
+         * @return the array
+         */
+        protected static int[] range(int n, boolean shuffled) {
+            int[] ret = new int[n];
+            for (int i = 0; i < n; i ++)
+                ret[i] = i;
+            shuffle(ret);
+            return ret;
+        }
+
+        /**
+         * Two backwardParsimony functions handle the "root" and internal nodes, respectively.
+         * This handles the node as if it was root; goes by scores assigned to states/symbols.
+         * @param unique array with the states/symbols that can be assigned, in the same order as provided to forwardParsimony.
+         */
         protected void backwardParsimony(Object[] unique) {
-            int best_index = 0;
+            int best_index = 0; // find one index with the best score (could be many but one is enough)
             for (int i = 1; i < scores.length; i ++) {
                 if (scores[i] < scores[best_index])
                     best_index = i;
             }
-            for (int parent_index = 0; parent_index < scores.length; parent_index ++) {
-                if (scores[best_index] == scores[parent_index]) {
-                    // now we know the index of the parent
-                    if (setValue(unique[parent_index])) {
-                        if (this.children != null) { // recurse into children nodes...
+            // Go through each score and when it is "best", recurse into each child, propagating the state for the score
+            // This iteration could be randomised (SET_RANDOM_PARSIMONY=true) so that the states are assigned in different order
+            boolean butt_out = false;
+            for (int parent_index : range(scores.length, SET_RANDOM_PARSIMONY)) {
+                if (scores[parent_index] == scores[best_index]) {
+                    // now we know the index of (one of) the optimal parent state/s
+                    if (setValue(unique[parent_index])) { // will check so that the state is assigned only once... setValue returns false if already set
+                        if (this.children != null) {      // recurse into children nodes...
                             for (int c = 0; c < children.size(); c++) {
-                                for (int child_index = 0; child_index < traceback[parent_index][c].length; child_index++) {
-                                    int best_index_in_child = traceback[parent_index][c][child_index];
-                                    Node child = children.get(c);
-                                    child.backwardParsimony(unique[best_index_in_child], unique);
+                                Node child = children.get(c);
+                                // Go through each optimal child state
+                                for (int child_index : range(traceback[parent_index][c].length, SET_RANDOM_PARSIMONY)) {
+                                    int best_index_in_child = traceback[parent_index][c][child_index]; // index of optimal child state
+                                    child.backwardParsimony(best_index_in_child, unique);
+                                    // if we are interested in only one optimal solution, we can butt out...
+                                    if (SET_ONE_TARGET_PARSIMONY) {
+                                        butt_out = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                if (butt_out)
+                    break;
             }
         }
 
-        protected void backwardParsimony(Object parent_symbol, Object[] unique) {
-            int parent_index = 0;
-            for (parent_index = 0; parent_index < unique.length; parent_index ++) {
-                if ((parent_symbol == null && unique[parent_index] == null) || (parent_symbol != null & parent_symbol.equals(unique[parent_index])))
+        /**
+         * Two backwardParsimony functions handle the "root" and internal nodes, respectively.
+         * This function handles internal nodes and should only be called by the formes; goes by state assigned to parent.
+         * @param assign_me the state assigned to this node (by its parent)
+         * @param unique array with the states/symbols that can be assigned, in the same order as provided to forwardParsimony.
+         */
+        private void backwardParsimony(Object assign_me, Object[] unique) {
+            int best_index;
+            for (best_index = 0; best_index < unique.length; best_index++) {
+                if ((assign_me == null && unique[best_index] == null) || (assign_me != null & assign_me.equals(unique[best_index])))
                     break;
             }
+            backwardParsimony(best_index, unique);
+        }
+
+        /**
+         * Two backwardParsimony functions handle the "root" and internal nodes, respectively.
+         * This function handles internal nodes and should only be called by the formes; goes by state assigned to parent.
+         * @param value_index the index of the state assigned to this node
+         * @param unique array with the states/symbols that can be assigned, in the same order as provided to forwardParsimony.
+         */
+        private void backwardParsimony(int value_index, Object[] unique) {
             // now we know the index of the parent
-            if (setValue(unique[parent_index])) { // will return false if already set, so no point in recursing
-                if (this.children != null) { // recurse into children nodes...
-                    for (int c = 0; c < children.size(); c++) {
-                        for (int child_index = 0; child_index < traceback[parent_index][c].length; child_index++) {
-                            int best_index = traceback[parent_index][c][child_index];
+            if (setValue(unique[value_index])) { // will return false if already set; if so, no point in recursing into children
+                if (this.children != null) {
+                    for (int c = 0; c < children.size(); c++) { // iterate over children...
+                        // For each child: choose the first optimal state, or go through each. Ordered randomly, or dictated by traceback/parent.
+                        for (int child_state_index : range(traceback[value_index][c].length, SET_RANDOM_PARSIMONY)) {
+                            int best_index_in_child = traceback[value_index][c][child_state_index];
                             Node child = children.get(c);
-                            child.backwardParsimony(unique[best_index], unique);
+                            child.backwardParsimony(best_index_in_child, unique);
+                            if (SET_ONE_TARGET_PARSIMONY)
+                                break;
                         }
                     }
                 }
             }
         }
-
     }
 
     public static void main(String[] args) {

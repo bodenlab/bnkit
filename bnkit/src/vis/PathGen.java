@@ -5,18 +5,9 @@
  */
 package vis;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Set;
 import api.PartialOrderGraph;
 
-import java.util.Arrays;
+import java.util.*;
 
 /**
  *
@@ -115,7 +106,7 @@ public class PathGen {
         PriorityQueue<Integer> startingNodeIds = new PriorityQueue<>();
         for (int i = 0; i < size; i++) {
             Integer[] prevs = poag.getPreviousNodeIDs(sorted[i]);
-            if (prevs[0] == null) {
+            if (prevs == null) {
                 // Add it to our starting node ids
                 startingNodeIds.add(sorted[i]);
                 
@@ -237,7 +228,12 @@ public class PathGen {
             if (neighborID == goalNode && currentID == startNode) {
                 continue;
             }
-            int pos = isNodeSearched(neighborID);
+            int pos = 0;
+            try {
+                pos = isNodeSearched(neighborID);
+            } catch (Exception e){
+                e.printStackTrace();
+            }
             // If there has been no weight associated it will error out so we 
             // need to give it the maxinum cost of 0 (which is what the label says)
             double posCost = costPenalty;
