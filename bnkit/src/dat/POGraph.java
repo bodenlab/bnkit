@@ -22,11 +22,11 @@ import java.util.*;
  *
  */
 public class POGraph {
-	private Map<Integer, Node> nodes;				// map of node ID and nodes in the structure (for fast node retrieval)
-	private Node current;							// pointer to the current node
-	private Node initialNode = null;				// initial node (null node), points to the first actual nodes as 'next' nodes
-	private Node finalNode = null; 					// final node (null node), 'previous' pointers point to the final actual nodes
-	private Map<Integer, String> sequences;			// map of sequence ID and sequence label
+	private Map<Integer, Node> nodes;					// map of node ID and nodes in the structure (for fast node retrieval)
+	private Node current;								// pointer to the current node
+	private Node initialNode = null;					// initial node (null node), points to the first actual nodes as 'next' nodes
+	private Node finalNode = null; 						// final node (null node), 'previous' pointers point to the final actual nodes
+	private Map<Integer, String> sequences;				// map of sequence ID and sequence label
 
 	/**
 	 * Constructor to initialise empty graph.
@@ -154,7 +154,7 @@ public class POGraph {
 	public Map<Integer, Double> getEdgeWeights(){
 		HashMap<Integer, Double> edgeWeights = new HashMap<>();
 		for (Edge next : current.getNextTransitions())
-			if (next.getNext() != finalNode)
+			//if (next.getNext() != finalNode)
 				edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
 		return edgeWeights;
 	}
@@ -291,14 +291,12 @@ public class POGraph {
 	 * @return	previous node IDs
 	 */
 	public List<Integer> getPreviousIDs(){
-		if (current == null)
-			return null;
 		ArrayList<Integer> prevIDs = new ArrayList<>();
+		if (current == null)
+			return prevIDs;
 		for (Node node : current.getPreviousNodes())
 			if (node.getID() != -1)
 				prevIDs.add(node.getID());
-		if (prevIDs.isEmpty())
-			return null;
 		return prevIDs;
 	}
 
@@ -695,7 +693,7 @@ public class POGraph {
 	/**
 	 * Traverses the graph structure to construct the most supported sequence of characters.
 	 *
-	 * @return	most supported sequence of base characters
+	 * @return	most supported sequence of base characters (based on close/far nodes, specified as input)
 	 */
 	public String getSupportedSequence() {
 
@@ -703,9 +701,6 @@ public class POGraph {
 		Node current = initialNode;
 		while (current != finalNode) {
 			Edge next = current.getNextTransitions().get(0);
-			for (Edge nextEdge : current.getNextTransitions())
-				if (nextEdge.getSequences().size() > next.getSequences().size())
-					next = nextEdge;
 			if (next.getNext() != finalNode)
 				sequence += next.getNext().getBase();
 			current = next.getNext();
@@ -1269,7 +1264,7 @@ public class POGraph {
 	 * @return			List of nodes to traverse
 	 */
 	private List<Node> findShortestPathToNode(Node start, Node end, Node ignore) {
-		Queue<ArrayList<Node>> paths = new ArrayDeque<>();
+    		Queue<ArrayList<Node>> paths = new ArrayDeque<>();
 
 		// create adjacency map of nodes, where adjacency is defined as nodes that are a 'next' node of the previous
 		// considered node (or parent node)
@@ -1291,6 +1286,8 @@ public class POGraph {
 			}
 		}
 
+		List<Integer> sortedIds = getSortedIDs();
+
 		ArrayList<Node> initialPath = new ArrayList<>();
 		initialPath.add(start);
 		paths.add(initialPath);
@@ -1307,7 +1304,8 @@ public class POGraph {
 			if (!adjacency.containsKey(next) || adjacency.get(next).isEmpty())
 				adjacency.get(next);
 			for (Node adjacent : adjacency.get(next)) {
-				if (path.contains(adjacent) || adjacent.getID() == null || (end.getID() != null && adjacent.getID() > end.getID()) || adjacent == ignore)
+				if (path.contains(adjacent) || adjacent.getID() == null || (end.getID() != null && sortedIds.indexOf(adjacent.getID()) > sortedIds.indexOf(end.getID()))
+						|| adjacent == ignore || (sortedIds.indexOf(adjacent.getID()) < sortedIds.indexOf(start.getID())))
 					continue;
 				ArrayList<Node> newpath = new ArrayList<>();
 				newpath.addAll(path);
@@ -1419,6 +1417,29 @@ public class POGraph {
 			Edge nextT = new Edge(next);
 			if (seq != null)
 				nextT.addSequence(seq);
+			// find index to put next edge
+			// order transitions so that the node that is farthest/closest (depending on flag) is at the top
+			/*List<Integer> sortedIds = getSortedIDs();
+			int index = 0;
+			int dist = 0;
+			if (!this.nextTransitions.isEmpty())
+				dist = sortedIds.indexOf(this.nextTransitions.get(index).getNext().getID()) - sortedIds.indexOf(this.getID());
+			for (int i = 1; i < this.nextTransitions.size(); i++) {
+				if (this.nextTransitions.get(i).getNext().getID() == null)
+					continue;
+				int curDist = sortedIds.indexOf(this.nextTransitions.get(i).getNext().getID()) - sortedIds.indexOf(this.getID());
+				if (orderTransitionsClosest)
+					if (dist == 0 || curDist <= dist) {
+						index = i;
+						dist = curDist;
+					}
+				else
+					if (dist == 0 || curDist >= dist) {
+						index = i;
+						dist = curDist;
+					}
+			}
+			this.nextTransitions.add(index, nextT);*/
 			this.nextTransitions.add(nextT);
 		}
 

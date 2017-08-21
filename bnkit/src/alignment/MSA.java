@@ -46,7 +46,7 @@ public class MSA {
         this.extendGapPenalty = extendGapPenalty;
         this.subMatrix = subMatrix;
 
-        try {
+        //try {
 
             List<EnumSeq.Gappy<Enumerable>> seqs = getSeqs(filepath);
             graph = getGraph(seqs);
@@ -59,9 +59,9 @@ public class MSA {
             }
             saveMSA(filepath);
 
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+       // } catch (IOException e) {
+        //    e.printStackTrace();
+        //}
     }
 
     public  MSA(POGraph graph,  int openGapPenalty, int extendGapPenalty, SubstitutionMatrix subMatrix, int seqId) throws IOException {

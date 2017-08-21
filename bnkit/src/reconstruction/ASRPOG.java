@@ -82,10 +82,9 @@ public class ASRPOG {
 	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
-	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
 	 */
-	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException {
-		performASR(msa, treeFile, sequenceFile, jointInference, performMSA);
+	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws IOException {
+		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
 
 	/**
@@ -401,9 +400,8 @@ public class ASRPOG {
 	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
 	 * @param msa				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
-	 * @param parsimony			flag to identify gaps in reconstruction using parsimony (true) or maximum likelihood (false)
 	 */
-	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, boolean parsimony) throws RuntimeException, IOException {
+	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws RuntimeException, IOException {
 		loadData(treeFile, sequenceFile);
 
 		pogAlignment = msa;
@@ -589,23 +587,37 @@ public class ASRPOG {
 		Map<String, Integer[]> phyloTransition = new HashMap<>();
 
 		// populate tree for transitional inference using max parsimony
-		// construct string[] of extant names
-		// construct object[] of 'next' nodes (for transitions)
-		String[] extants = new String[extantSequences.size()];
-		Integer[] nextNodes = new Integer[extantSequences.size()];
+
+		// get ordered list of unique transitions based on MSA and num. seqs on the 'out' edges
+		ArrayList<Integer> orderedUnique = new ArrayList<>();
+
+		Map<String, Object> map = new HashMap<>();
 		Map<Integer, List<Integer>> nodeSeqs = pogAlignment.getSequenceNodeMapping();
 		for (int seqId = 0; seqId < extantSequences.size(); seqId++) {
-			extants[seqId] = extantSequences.get(seqId).getName();
 			if (nodeId == -1) // initial node, set next node as the starting node
-				nextNodes[seqId] = nodeSeqs.get(seqId).get(0);
+				map.put(extantSequences.get(seqId).getName(), nodeSeqs.get(seqId).get(0));
 			else {
 				int ind = nodeSeqs.get(seqId).indexOf(nodeId);
 				if (ind != -1 && ind + 1 < nodeSeqs.get(seqId).size())
-					nextNodes[seqId] = nodeSeqs.get(seqId).get(ind + 1);
+					map.put(extantSequences.get(seqId).getName(), nodeSeqs.get(seqId).get(ind + 1));
+			}
+			// if the node doesn't occur in the sequence, move onto the next sequence
+			if (map.containsKey(extantSequences.get(seqId).getName()) && !orderedUnique.contains(map.get(extantSequences.get(seqId).getName()))) {
+				// add to ordered list, but first identify index for ordering
+				int index = -1;
+				for (int i = 0; i < orderedUnique.size(); i++)
+					if (pogAlignment.getEdgeWeights().get(map.get(extantSequences.get(seqId).getName())) <= pogAlignment.getEdgeWeights().get(orderedUnique.get(i)))
+						index = i + 1;
+				if (index == -1)
+					index = orderedUnique.size();
+				orderedUnique.add(index, (Integer)map.get(extantSequences.get(seqId).getName()));
 			}
 		}
+		Object[] unique = new Integer[orderedUnique.size()];
+		for (int v = 0; v < orderedUnique.size(); v++)
+			unique[v] = orderedUnique.get(v);
 
-		phyloTree.setContentByParsimony(extants, nextNodes);
+		phyloTree.setContentByParsimony(map, unique);
 
 		for (String phyloNode : ancestralSeqLabels) {
 			List<Object> values = phyloTree.find(phyloNode).getValues();
