@@ -1,6 +1,8 @@
 package reconstruction;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Map;
 
 
 /**
@@ -54,7 +56,7 @@ public class RunASRPOG {
 			boolean dotFile = false;
 			boolean msaFile = false;
 			boolean performAlignment = false;
-			boolean checkBranchIsolation = true;
+			boolean checkBranchIsolation = false;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {
@@ -115,7 +117,59 @@ public class RunASRPOG {
 			}
 
 			if (checkBranchIsolation){
-				asr.checkBranchIsolation("N0");
+
+//				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
+//					add("N3");
+//					add("N4");
+//					add("N10");
+//					add("N14");
+//					add("N19");
+//				}};
+
+				// For PhyML data
+//				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
+////					add("NO");
+//					add("N1");
+//					add("N2");
+//					add("N104");
+//					add("N101");
+//					add("N79");
+//					add("N85");
+//					add("N4");
+//
+//				}};
+
+				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
+					add("N1");
+					add("N3");
+					add("N4");
+					add("N5");
+
+				}};
+
+
+
+				Map<String, String> ancestralLabels = asr.getAncestralDict();
+
+
+				// Code for using a specific list of Nodes
+				for (String node : ancestralNodes){
+					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, performAlignment);
+
+
+				}
+
+				// Code for using one specific node
+//				BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, "N5", mp);
+
+
+				// Code for using all nodes
+//				for (String node : ancestralLabels.keySet()){
+//					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
+//
+//
+//				}
+
 
 			}
 

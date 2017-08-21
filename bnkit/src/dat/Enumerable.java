@@ -116,6 +116,8 @@ public class Enumerable implements Domain {
             getIndex(value);
             return true;
         } catch (RuntimeException e) {
+            System.out.println("here");
+            System.out.println(value.toString());
             return false;
         }
     }

@@ -139,8 +139,8 @@ public class ASRPOG {
 	 *
 	 * @return	Partial order graph representing sequence alignment
 	 */
-	public PartialOrderGraph getMSAGraph() {
-		return new PartialOrderGraph(this.pogAlignment);
+	public POGraph getMSAGraph() {
+		return new POGraph(this.pogAlignment);
 	}
 	
 	/**
@@ -326,6 +326,40 @@ public class ASRPOG {
 		writer.write(newick);
 		writer.write(";\n");
 		writer.close();
+	}
+
+	/**
+	 * Return a collection of the children of a given node
+	 *
+	 * @param node	node to get children of
+	 */
+	public Collection<PhyloTree.Node> getChildren(String node) {
+		return this.phyloTree.find(node).getChildren();
+
+	}
+
+	public Map<String, String> getAncestralDict(){
+
+		Map<String, String> ancestralDict = new HashMap<>();
+
+		for (String label : this.ancestralSeqLabels){
+			ancestralDict.put(label, "");
+		}
+
+		return ancestralDict;
+	}
+
+	public Map<String, List<Inference>> getAncestralInferences(){
+		return this.ancestralInferences;
+	}
+
+	/**
+	 *
+	 * Return the marginal distributions
+	 *
+	 */
+	public EnumDistrib[] getMarginalDistributions(){
+		return this.marginalDistributions;
 	}
 
 	/* ****************************************************************************************************************************************************
@@ -747,15 +781,6 @@ public class ASRPOG {
         return d_marg;
     }
 
-	/**
-	 * Check to see if a node has an inferred character that is being contributed by one but not both children
-	 * @param node node to check
-	 */
-
-	public void checkBranchIsolation(String node){
-		System.out.println("Yo");
-
-	}
 
     /**
      * Helper class to store changes to an ancestral graph node
@@ -764,7 +789,7 @@ public class ASRPOG {
      * 		- POG structure index 
      * 		- Inferred base character: base character that is inferred or '-' to represent a gap (i.e. that the node needs to be deleted when updating the structure)
      */
-    private class Inference {
+    public class Inference {
     	Integer pogId;
     	char base;
     	List<Integer> transitions;
