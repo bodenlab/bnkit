@@ -8,7 +8,10 @@ import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.PhyloBNet;
 import bn.ctmc.SubstNode;
+import bn.ctmc.matrix.Dayhoff;
 import bn.ctmc.matrix.JTT;
+import bn.ctmc.matrix.LG;
+import bn.ctmc.matrix.WAG;
 import bn.prob.EnumDistrib;
 import dat.*;
 import dat.file.AlnWriter;
@@ -36,6 +39,9 @@ public class ASRPOG {
 	private String marginalNode = null;									// Label of node to perform marginal reconstruction (if applicable)
 	private Map<String, List<Inference>> ancestralInferences;			// stores updates to the POGStructure for the ancestral node <node label, changes>
 	private Double[] rates = null; 										// Rates at positions in alignment
+	private String model = "JTT";										// Evolutionary model to use for character inference
+	private int threads = 1;											// Number of threads to use for performing the reconstruction
+
 
 	/**
 	 * Infer ancestral sequences given an alignment file (fasta or aln).
@@ -44,8 +50,11 @@ public class ASRPOG {
 	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
+	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
+	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, boolean performMSA) throws IOException {
+	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException {
+		setupASRPOG(model, null, threads);
 		performASR("", treeFile, alignmentFile, jointInference, performMSA);
 	}
 
@@ -56,9 +65,11 @@ public class ASRPOG {
 	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param marginalNode	node label for maginal inference
 	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
+	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
+	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, String marginalNode, boolean performMSA) throws IOException {
-		this.marginalNode = marginalNode;
+	public ASRPOG(String alignmentFile, String treeFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException {
+		setupASRPOG(model, marginalNode, threads);
 		performASR("", treeFile, alignmentFile, false, performMSA);
 	}
 
@@ -70,8 +81,11 @@ public class ASRPOG {
 	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
+	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
+	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException {
+	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException {
+		setupASRPOG(model, null, threads);
 		performASR(pog, treeFile, sequenceFile, jointInference, performMSA);
 	}
 
@@ -82,8 +96,11 @@ public class ASRPOG {
 	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param sequenceFile		filepath to the sequences (expected extension .fa, .fasta or .aln)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
+	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws IOException {
+	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, String model, int threads) throws IOException {
+		setupASRPOG(model, null, threads);
 		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
 
@@ -95,9 +112,11 @@ public class ASRPOG {
 	 * @param sequenceFile	filepath to the sequences (expected extension .fa, .fasta or .aln)
 	 * @param marginalNode	node label for maginal inference
 	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
+	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
+	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA) throws IOException {
-		this.marginalNode = marginalNode;
+	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException {
+		setupASRPOG(model, marginalNode, threads);
 		performASR(pog, treeFile, sequenceFile, false, performMSA);
 	}
 
@@ -359,6 +378,19 @@ public class ASRPOG {
 	 * ****************************************************************************************************************************************************/
 
 	/**
+	 * Set conditions for reconstruction
+	 * @param model		Evolutionary model
+	 * @param node		Marginal node (or null)
+	 * @param threads	Number of threads for processing
+	 */
+	private void setupASRPOG(String model, String node, int threads) {
+		this.threads = threads;
+		if (model != null)
+			this.model = model;
+		this.marginalNode = node;
+	}
+
+	/**
 	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
 	 *
 	 * @param treeFile			filepath to the phylogenetic tree (expected extension .nwk)
@@ -559,7 +591,15 @@ public class ASRPOG {
 	 */
 	private PhyloBNet createCharacterNetwork(){
 		// create a bayesian network with the phylogenetic tree structure and the JTT substitution model for amino acids
-		PhyloBNet phyloBN = PhyloBNet.create(phyloTree, new JTT());														
+		PhyloBNet phyloBN = null;
+		if (this.model.equalsIgnoreCase("Dayhoff"))
+			phyloBN = PhyloBNet.create(phyloTree, new Dayhoff());
+		else if (this.model.equalsIgnoreCase("LG"))
+			phyloBN = PhyloBNet.create(phyloTree, new LG());
+		else if (this.model.equalsIgnoreCase("WAG"))
+			phyloBN = PhyloBNet.create(phyloTree, new WAG());
+		else
+			phyloBN = PhyloBNet.create(phyloTree, new JTT());
 		Map<Integer, Character> sequenceCharacterMapping = pogAlignment.getSequenceCharacterMapping();
 		
 		// for all extant sequences, if sequence is in this alignment, find where the location is in the phylogenetic tree and assign base to that position in the bayesian network

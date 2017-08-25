@@ -17,7 +17,7 @@ public class ASRTests {
     public void getAncestralGraphTest() throws IOException {
         String alnfilepath = "src/test/resources/2U1_aligned_trimmed.aln";
         String nwkfilepath = "src/test/resources/2U1_final.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false);
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
         asr.saveALN("src/test/cyp2u1", "fasta");
         PartialOrderGraph msa = asr.getMSAGraph();
         asr.saveMSAGraph("src/test/msa");
@@ -32,12 +32,14 @@ public class ASRTests {
     @Test
     @DisplayName("Small ASR")
     public void performSmallASR() throws IOException {
-        String alnfilepath = "src/test/resources/example.fasta";
-        String nwkfilepath = "src/test/resources/example.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, true);
+        String alnfilepath = "src/test/resources/small.aln";
+        String nwkfilepath = "src/test/resources/small.nwk";
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, "Dayhoff", 1);
+        asr.saveGraph("src/test/cyp2u1", "root");
         PartialOrderGraph msa = asr.getMSAGraph();
         PartialOrderGraph graph = asr.getGraph("root");
         System.out.println(msa.toString());
         System.out.println(graph.toString());
+        System.out.println(graph.getConsensusSequence());
     }
 }

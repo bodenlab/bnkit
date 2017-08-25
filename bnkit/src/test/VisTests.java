@@ -28,7 +28,7 @@ public class VisTests {
     public void getJSONASRTest() throws IOException {
         String alnfilepath = "src/test/resources/small.aln";
         String treefilepath = "src/test/resources/small.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, treefilepath, false, false);
+        ASRPOG asr = new ASRPOG(alnfilepath, treefilepath, false, false, null, 1);
         PartialOrderGraph msa = asr.getMSAGraph();
         PartialOrderGraph graph = asr.getGraph("root");
         POAGJson msajson = new POAGJson(msa);

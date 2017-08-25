@@ -35,8 +35,11 @@ public class POGraphTests {
     public void smallPOGraph() throws IOException {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         POGraph graph = new POGraph(filepath);
+        List<Integer> ids = graph.getSortedIDs();
+        for (Integer id : ids)
+            System.out.println(id);
         System.out.println("Consensus sequence: " + graph.getSupportedSequence());
-        assertEquals("PNAR", graph.getSupportedSequence());
+        assertEquals("PMAR", graph.getSupportedSequence());
         Map<Integer, List<Integer>> lists = graph.getSequenceNodeMapping();
         for (Integer nodeId : graph.getNodeIDs()) {
             graph.setCurrent(nodeId);
