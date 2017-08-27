@@ -160,6 +160,16 @@ public class ASRPOG {
 	public POGraph getMSAGraph() {
 		return new POGraph(this.pogAlignment);
 	}
+
+	/**
+	 * Get the multiple sequence alignment partial order graph.
+	 *
+	 * @return	Partial order graph representing sequence alignment
+	 */
+	public PartialOrderGraph getPartialOrderGraph() {
+		return new PartialOrderGraph(this.pogAlignment);
+	}
+
 	
 	/**
 	 * Save multiple sequence alignment partial order alignment graph as a dot file in the given output filepath.

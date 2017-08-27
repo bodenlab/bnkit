@@ -19,7 +19,7 @@ public class ASRTests {
         String nwkfilepath = "src/test/resources/2U1_final.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
         asr.saveALN("src/test/cyp2u1", "fasta");
-        PartialOrderGraph msa = asr.getMSAGraph();
+        PartialOrderGraph msa = asr.getPartialOrderGraph();
         asr.saveMSAGraph("src/test/msa");
         asr.saveGraph("src/test/cyp2u1", "root");
         System.out.println(msa.toString());
@@ -36,7 +36,7 @@ public class ASRTests {
         String nwkfilepath = "src/test/resources/small.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, "Dayhoff", 1);
         asr.saveGraph("src/test/cyp2u1", "root");
-        PartialOrderGraph msa = asr.getMSAGraph();
+        PartialOrderGraph msa = asr.getPartialOrderGraph();
         PartialOrderGraph graph = asr.getGraph("root");
         System.out.println(msa.toString());
         System.out.println(graph.toString());
