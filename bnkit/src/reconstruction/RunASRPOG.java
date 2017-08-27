@@ -37,7 +37,6 @@ public class RunASRPOG {
 	 * @throws IOException
 	 */
 	public static void main(String[] args) throws IOException {
-
 		if (args.length > 1) {
 			ASRPOG asr = null;
 
@@ -48,6 +47,8 @@ public class RunASRPOG {
 			String treePath = "";
 			String poagRepresentation = "";
 			String alignmentType = "";
+			String model = null;
+			int numThreads = 1;
 			if (!args[0].contains("-"))
 				if (!args[0].contains(".nwk"))
 					poagRepresentation = args[0];
@@ -68,7 +69,12 @@ public class RunASRPOG {
 					poagRepresentation = args[arg];
 				else if (args[arg].equalsIgnoreCase("-o"))
 					outputPath = args[arg + 1];
-				else if (args[arg].equalsIgnoreCase("-p")) {
+				else if (args[arg].equalsIgnoreCase("-help")) {
+					usage("GRASP ancestral sequence predictions");
+					return;
+				} else if (args[arg].equalsIgnoreCase("-p"))
+					numThreads = Integer.parseInt(args[arg + 1]);
+				else if (args[arg].equalsIgnoreCase("-inf")) {
 					inference = args[arg + 1];
 					if (inference.equalsIgnoreCase("marginal") && arg + 2 < args.length && !args[arg + 2].startsWith("-"))
 						marginalNode = args[arg + 2];
@@ -76,6 +82,8 @@ public class RunASRPOG {
 					msaFile = true;
 				else if (args[arg].equalsIgnoreCase("-dot"))
 					dotFile = true;
+				else if (args[arg].equalsIgnoreCase("-model"))
+					model = args[arg + 1];
 				else if (args[arg].equalsIgnoreCase("-align")) {
 					performAlignment = true;
 					alignmentType = args[arg + 1];
@@ -90,17 +98,15 @@ public class RunASRPOG {
 
 			if (poagRepresentation.isEmpty()) {
 				if (performAlignment) { // generate a partial order alignment graph if the alignment has not been specified
-
-					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), true);
-
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), true, model, numThreads);
 				} else if (marginalNode != null)
-					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, false);
+					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, false, model, numThreads);
 				else
-					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), false);
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), false, model, numThreads);
 			} else if (marginalNode != null)
-				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, performAlignment);
+				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, performAlignment, model, numThreads);
 			else
-				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), performAlignment);
+				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), performAlignment, model, numThreads);
 
 			if (!outputPath.isEmpty()) {
 				if (dotFile)
@@ -115,7 +121,6 @@ public class RunASRPOG {
 				else
 					asr.save(outputPath, false, "fasta");
 			}
-
 			if (checkBranchIsolation){
 
 //				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
@@ -188,13 +193,15 @@ public class RunASRPOG {
 		if (!message.isEmpty())
 			System.out.println(message + "\n");
 		System.out.println("Usage: <poag_structure/poag_file.dot> <tree_file.nwk>");
-		System.out.println("Usage: <tree_file.nwk> <sequence_file.fasta/.aln/.fa> [-o/-p/-dot/-msa/-align]\n");
+		System.out.println("Usage: <tree_file.nwk> <sequence_file.fasta/.aln/.fa> [-o/-p/-inf/-dot/-msa/-align/-model]\n");
 		System.out.println("Optional flags:");
-		System.out.println("\t-o 		\toutput filepath to save reconstruction");
-		System.out.println("\t-p		\tinference type, 'marginal' or 'joint'. Default: Joint");
+		System.out.println("\t-o 		output filepath to save reconstruction");
+		System.out.println("\t-p		number of threads to use. Default: 1");
+		System.out.println("\t-inf		inference type, 'marginal' or 'joint'. Default: Joint");
 		System.out.println("\t-msa		generate dot file in output directory representing multiple sequence alignment of input sequences or partial order alignment graph. Default: no msa dot file is generated");
 		System.out.println("\t-dot		generate dot file in output directory representing ancestral node sequence. Default: no dot file is generated");
 		System.out.println("\t-align	\tperform sequence alignment prior to reconstruction. Assumes sequences are aligned if this flag is not specified");
+		System.out.println("\t-model	\tevolutionary model to use for reconstruction (JTT, Dayhoff, LG or WAG). Default: JTT");
 		System.exit(1);
 	}
 }

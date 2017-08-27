@@ -392,6 +392,7 @@ public class POGraph {
 					}
 				// if there is an edge, join nodes otherwise just delete this sequence
 				prev.removeSequence(seqId);
+				// re-order transitions so that the transitions stay in order of max number of sequence traversal
 				if (nextEdge != null) {
 					// update seqId to go from the previous node to the next
 					prev.getNext().addNextNode(nextEdge.getNext(), seqId);
@@ -438,7 +439,6 @@ public class POGraph {
 			List<Integer> orderedNodeIds = topologicalSort();
 			EnumSeq[] seqs = new EnumSeq[sequences.size()];
 
-			// TODO:
 			for (Integer seqId : sequences.keySet()) {
 				List<Character> characters = new ArrayList<>();
 				String sequence  = getGappySequence(seqId, initialNode, "", orderedNodeIds);
@@ -693,7 +693,7 @@ public class POGraph {
 	/**
 	 * Traverses the graph structure to construct the most supported sequence of characters.
 	 *
-	 * @return	most supported sequence of base characters (based on close/far nodes, specified as input)
+	 * @return	most supported sequence of base characters
 	 */
 	public String getSupportedSequence() {
 
@@ -1407,40 +1407,27 @@ public class POGraph {
 		 * @param seq	List of sequences that traverse to the next node
 		 */
 		private void addNextNode(Node next, Integer seq) {
+			Edge nextT = null;
 			for (Edge edge : nextTransitions)
 				if (edge.getNext().getID() == next.getID()) {
 					// edge already exists, just add sequence
-					edge.addSequence(seq);
-					return;
+					nextT = edge;
+					this.nextTransitions.remove(nextT);
+					break;
 				}
 			// edge doesn't already exist, create new transition
-			Edge nextT = new Edge(next);
+			if (nextT == null)
+			 	nextT = new Edge(next);
 			if (seq != null)
 				nextT.addSequence(seq);
 			// find index to put next edge
-			// order transitions so that the node that is farthest/closest (depending on flag) is at the top
-			/*List<Integer> sortedIds = getSortedIDs();
+			// order transitions based on #seqs
 			int index = 0;
-			int dist = 0;
-			if (!this.nextTransitions.isEmpty())
-				dist = sortedIds.indexOf(this.nextTransitions.get(index).getNext().getID()) - sortedIds.indexOf(this.getID());
-			for (int i = 1; i < this.nextTransitions.size(); i++) {
-				if (this.nextTransitions.get(i).getNext().getID() == null)
-					continue;
-				int curDist = sortedIds.indexOf(this.nextTransitions.get(i).getNext().getID()) - sortedIds.indexOf(this.getID());
-				if (orderTransitionsClosest)
-					if (dist == 0 || curDist <= dist) {
-						index = i;
-						dist = curDist;
-					}
-				else
-					if (dist == 0 || curDist >= dist) {
-						index = i;
-						dist = curDist;
-					}
-			}
-			this.nextTransitions.add(index, nextT);*/
-			this.nextTransitions.add(nextT);
+			int seqCount = nextT.getSequences().size();
+			for (int i = 0; i < this.nextTransitions.size(); i++)
+				if (seqCount < this.nextTransitions.get(i).getSequences().size())
+					index = i+1;
+			this.nextTransitions.add(index, nextT);
 		}
 
 		/**
@@ -1665,32 +1652,32 @@ public class POGraph {
 		private Node next = null;
 		private List<Integer> sequences;
 
-		public Edge() {
+		private Edge() {
 			this.sequences = new ArrayList<>();
 		}
 
-		public Edge(Node nextNode) {
+		private Edge(Node nextNode) {
 			this();
 			this.next = nextNode;
 		}
 
-		public void addSequence(int seqId) {
+		private void addSequence(int seqId) {
 			this.sequences.add(seqId);
 		}
 
-		public void removeSequence(int seqId) {
+		private void removeSequence(int seqId) {
 			this.sequences.remove((Integer)seqId);
 		}
 
-		public List<Integer> getSequences() {
+		private List<Integer> getSequences() {
 			return this.sequences;
 		}
 
-		public Node getNext() {
+		private Node getNext() {
 			return this.next;
 		}
 
-		public void setNext(Node nextNode) {
+		private void setNext(Node nextNode) {
 			this.next = nextNode;
 		}
 	}
