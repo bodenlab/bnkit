@@ -40,6 +40,13 @@ public class PartialOrderGraph {
     }
 
     /**
+     * Get the node IDs that make up the consensus sequence.
+     *
+     * @return      node IDs that make up the most supported sequence
+     */
+    public Integer[] getConsensusNodeIds() { return graph.getSupportedSequenceIds(); }
+
+    /**
      * Get all node IDs in the graph.
      *
      * @return      IDs of nodes in the graph

@@ -710,6 +710,26 @@ public class POGraph {
 	}
 
 	/**
+	 * Get the ordered node IDs of the consensus sequence
+	 *
+	 * @return	Array of the node IDs that make up the supported sequence
+	 */
+	public Integer[] getSupportedSequenceIds() {
+		ArrayList<Integer> ids = new ArrayList<>();
+		Node current = initialNode;
+		while (current != finalNode) {
+			Edge next = current.getNextTransitions().get(0);
+			if (next.getNext() != finalNode)
+				ids.add(next.getNext().getID());
+			current = next.getNext();
+		}
+		Integer[] idArray = new Integer[ids.size()];
+		for (int i = 0; i < ids.size(); i++)
+			idArray[i] = ids.get(i);
+		return idArray;
+	}
+
+	/**
 	 * Save partial order alignment graph in a dot format in the given directory.
 	 *
 	 * @param filepath	pathname to save dot product as

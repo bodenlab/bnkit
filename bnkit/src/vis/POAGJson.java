@@ -80,6 +80,10 @@ public class POAGJson {
         JSONObject reactions = new JSONObject();
         Node n;
         Set<Integer> ns = nodes.keySet();
+
+        // get list of consensus IDs so that we can set a node as being part of the consensus or not
+        Integer[] consensusIds = poag.getConsensusNodeIds();
+
         for (int i : ns) {
             JSONObject thisNode = new JSONObject();
             //           JSONObject nodesReactions = new JSONObject();
@@ -100,11 +104,23 @@ public class POAGJson {
             thisNode.put("graph", map2JSON(n.getGraph()));
             thisNode.put("seq", seq2JSON(n.getSeq()));
             thisNode.put("mutants", seq2JSON(n.getSeq()));
+            boolean consensus = false;
+            for (int c = 0; c < consensusIds.length; c++)
+                if (consensusIds[c] == id) {
+                    consensus = true;
+                }
+            thisNode.put("consensus", consensus);
             nodesJSON.put(thisNode);
             //Check if it is the max depth
             if (y > max_depth) {
                 max_depth = y;
             }
+            // If the node is a consensus node, find the consensus edge for this node
+            Integer edgeId = null;
+            if (consensus)
+                for (Map.Entry<Integer, Double> edge : n.getOutedges().entrySet())
+                    if (edgeId == null || edge.getValue() > n.getOutedges().get(edgeId))
+                        edgeId = edge.getKey();
             // Need to get the out egdes into JSON reaction object
             Map<Integer, Double> outedges = n.getOutedges();
             for (Map.Entry<Integer, Double> outNodes : outedges.entrySet()) {
@@ -123,6 +139,7 @@ public class POAGJson {
                     thisReaction.put("y1", y);
                     thisReaction.put("y2", y2);
                     thisReaction.put("weight", weight);
+                    thisReaction.put("consensus", outNodes.getKey() == edgeId);
                     reactions.put(rid, thisReaction);
                 } catch (Exception e) {
                     System.err.println("Error with reaction: " + nid);
