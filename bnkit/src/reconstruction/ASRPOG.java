@@ -157,9 +157,19 @@ public class ASRPOG {
 	 *
 	 * @return	Partial order graph representing sequence alignment
 	 */
-	public PartialOrderGraph getMSAGraph() {
+	public POGraph getMSAGraph() {
+		return new POGraph(this.pogAlignment);
+	}
+
+	/**
+	 * Get the multiple sequence alignment partial order graph.
+	 *
+	 * @return	Partial order graph representing sequence alignment
+	 */
+	public PartialOrderGraph getPartialOrderGraph() {
 		return new PartialOrderGraph(this.pogAlignment);
 	}
+
 	
 	/**
 	 * Save multiple sequence alignment partial order alignment graph as a dot file in the given output filepath.
@@ -179,8 +189,13 @@ public class ASRPOG {
 	public void saveSupportedAncestors(String filepath) throws IOException {
 		Map<String, String> ancestralSeqs = new HashMap<>();
 		if (marginalNode == null)
-			for (String phyloNodeLabel : ancestralSeqLabels)
-				ancestralSeqs.put(phyloNodeLabel, phyloTree.find(phyloNodeLabel).getSequence().toString());
+			for (String phyloNodeLabel : ancestralSeqLabels) {
+				try {
+					ancestralSeqs.put(phyloNodeLabel, phyloTree.find(phyloNodeLabel).getSequence().toString());
+				} catch (NullPointerException npe) {
+					System.err.println("Could not save sequence " + phyloNodeLabel + ": " + npe);
+				}
+			}
 		else
 			ancestralSeqs.put(marginalNode, phyloTree.find(marginalNode).getSequence().toString());
 
@@ -371,6 +386,40 @@ public class ASRPOG {
 		writer.write(newick);
 		writer.write(";\n");
 		writer.close();
+	}
+
+	/**
+	 * Return a collection of the children of a given node
+	 *
+	 * @param node	node to get children of
+	 */
+	public Collection<PhyloTree.Node> getChildren(String node) {
+		return this.phyloTree.find(node).getChildren();
+
+	}
+
+	public Map<String, String> getAncestralDict(){
+
+		Map<String, String> ancestralDict = new HashMap<>();
+
+		for (String label : this.ancestralSeqLabels){
+			ancestralDict.put(label, "");
+		}
+
+		return ancestralDict;
+	}
+
+	public Map<String, List<Inference>> getAncestralInferences(){
+		return this.ancestralInferences;
+	}
+
+	/**
+	 *
+	 * Return the marginal distributions
+	 *
+	 */
+	public EnumDistrib[] getMarginalDistributions(){
+		return this.marginalDistributions;
 	}
 
 	/* ****************************************************************************************************************************************************
@@ -674,48 +723,78 @@ public class ASRPOG {
 		return phyloTransition;
 	}
 
+	// MB's laptop on 2U1 data (145 seqs) queryBNJoint for different number of threads:
+	// 0: 30 secs; 1: 29 secs; 2: 22 secs; 3: 21 secs; 4: 20 secs; 5: 19 secs; 6: 19 secs; 7: 19 secs; 8: 20 secs
+
 	/**
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using joint inference.
 	 */
 	private void queryBNJoint(){
+
+//		long startTime = System.nanoTime();
 
 		// infer base/gap of each aligned node
 		List<Integer> nodeIDs = new ArrayList<>();
 		nodeIDs.add(-1);
 		nodeIDs.addAll(pogAlignment.getNodeIDs());
 		rates = new Double[nodeIDs.get(nodeIDs.size()-1) + 1]; //Rate matrix
-		for (Integer nodeId : nodeIDs) {
+
+		// First, create a queue with which all nodes will be inferred (by NodeID)
+		Queue<Integer> nodeQueue = new PriorityQueue<>();
+		for (Integer nodeId : nodeIDs)
+			nodeQueue.add(nodeId);
+
+		// Create a thread coordinator, set the number of threads it should be using
+		JointInferenceExecutor batch = null;
+		if (this.threads > 0)
+			batch = new JointInferenceExecutor(this.threads);
+
+		// Here's where all results will end up
+		Map<Integer, Variable.Assignment[]> result = new HashMap<>(nodeIDs.size());
+
+		// Populate the coordinator with jobs, and run them successively;
+		// results are kept for later (associated with IDs) but the actual internals of the inference are not
+		while (!nodeQueue.isEmpty()) {
+			Integer nodeId = nodeQueue.poll(); // next job
 			pogAlignment.setCurrent(nodeId);
-
-			//if ((pogAlignment.getCurrentBase() != null || pogAlignment.getCurrentId() == -1) && pogAlignment.getNumEdgesOut() == 1)
-			//	continue;
-			
-			Variable.Assignment[] charAssignments = new Variable.Assignment[]{};
-
-			// get gap or character inference at phylogenetic nodes
-			Map<String, Integer[]> phyloTransition = getPhyloTransitions();
-
 			// perform character inference if not the dummy initial node
 			if (nodeId != -1) {
 				VarElim ve = new VarElim();
 				PhyloBNet charNet = createCharacterNetwork();
 				rates[nodeId] = charNet.getRate();
 				ve.instantiate(charNet.getBN());
-				charAssignments = getJointAssignment(ve);
+				if (this.threads < 1) {
+					Variable.Assignment[] charAssignments = getJointAssignment(ve);
+					result.put(nodeId, charAssignments);
+				} else {
+					batch.addJointInference(nodeId, ve);
+					if (batch.isFull() || nodeQueue.isEmpty()) { // job list complete OR this was the last, so need to run batch
+						Map<Integer, Variable.Assignment[]> rets = batch.run();
+						result.putAll(rets);
+					}
+				}
 			}
-
+		}
+		// last time through all nodes; this time serially, extracting results
+		for (Integer nodeId : nodeIDs) {
+			pogAlignment.setCurrent(nodeId);
+			Variable.Assignment[] charAssignments = new Variable.Assignment[]{};
+			if (nodeId != -1)
+				charAssignments = result.get(nodeId);
+			// get gap or character inference at phylogenetic nodes
+			Map<String, Integer[]> phyloTransition = getPhyloTransitions();
 			// for each node in the phylogenetic tree, if character is inferred at position, set inferred base,
 			// otherwise gap is inferred, remove from alignment and set transitions of previous nodes to the
 			// inferred transition
 			for (String phyloNode : ancestralSeqLabels) {
 				Character base = '-';
 				// check for inferred base character
-				for (Variable.Assignment varassign : charAssignments)
+				for (Variable.Assignment varassign : charAssignments) {
 					if (phyloNode.equals(varassign.var.getName())) {
 						base = (char) varassign.val;
 						break;
 					}
-
+				}
 				// store inferred transitions
 				List<Integer> transitionIds = new ArrayList<>();
 				Integer[] transitions = phyloTransition.get(phyloNode);
@@ -727,11 +806,15 @@ public class ASRPOG {
 				ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
 			}
 		}
-
 		// save sequence information in internal nodes of the phylogenetic tree
 		for (String phyloNodeLabel : ancestralSeqLabels)
 			populateTreeNodeSeq(phyloNodeLabel);
+//		long elapsedTimeNs = System.nanoTime() - startTime;
+//		System.out.printf("Elapsed time in secs: %5.3f\n", elapsedTimeNs/1000000000.0);
 	}
+
+	// MB's laptop on 2U1 data (145 seqs) queryBNMarginal "N0" for different number of threads:
+	// 0: 15 secs; 1: 16 secs; 2: 12 secs; 3: 11 secs; 4: 11 secs; 5: 10 secs; 6: 11 secs; 7: 12 secs; 8: 11 secs
 
 	/**
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using marginal inference.
@@ -740,20 +823,33 @@ public class ASRPOG {
 	 */
 	private void queryBNMarginal(String phyloNode) {
 		marginalDistributions = new EnumDistrib[pogAlignment.getNumNodes()];
+//		long startTime = System.nanoTime();
 
 		// infer base/gap of each aligned node
 
 		List<Integer> nodeIDs = new ArrayList<>();
 		nodeIDs.add(-1);
 		nodeIDs.addAll(pogAlignment.getNodeIDs());
-		for (Integer nodeId : nodeIDs) {
+
+		// First, create a queue with which all nodes will be inferred (by NodeID)
+		Queue<Integer> nodeQueue = new PriorityQueue<>();
+		for (Integer nodeId : nodeIDs)
+			nodeQueue.add(nodeId);
+
+		// Create a thread coordinator, set the number of threads it should be using
+		MarginalInferenceExecutor batch = null;
+		if (this.threads > 0)
+			batch = new MarginalInferenceExecutor(this.threads);
+
+		// Here's where all results will end up
+		Map<Integer, EnumDistrib> result = new HashMap<>(nodeIDs.size());
+
+		// Populate the coordinator with jobs, and run them successively;
+		// results are kept for later (associated with IDs) but the actual internals of the inference are not
+		while (!nodeQueue.isEmpty()) {
+			Integer nodeId = nodeQueue.poll(); // next job
 			pogAlignment.setCurrent(nodeId);
-
-			// get gap or character inference at phylogenetic nodes
-			Map<String, Integer[]> phyloTransition = getPhyloTransitions();
-
 			// perform character inference if not the dummy initial node
-			Character base = '-';
 			if (nodeId != -1) {
 				VarElim ve = new VarElim();
 				PhyloBNet phyloNet = createCharacterNetwork();
@@ -764,10 +860,28 @@ public class ASRPOG {
 					if (internalNode.getName().equalsIgnoreCase(marginalNode))
 						charNode = internalNode;
 				if (charNode != null) {
-					marginalDistributions[nodeId] = getMarginalDistrib(ve, charNode);
-					base = (char) marginalDistributions[nodeId].getMax();
+					if (this.threads < 1)
+						result.put(nodeId, getMarginalDistrib(ve, charNode));
+					else {
+						batch.addMarginalInference(nodeId, ve, charNode);
+						if (batch.isFull() || nodeQueue.isEmpty()) { // job list complete OR this was the last, so need to run batch
+							Map<Integer, EnumDistrib> rets = batch.run();
+							result.putAll(rets);
+						}
+					}
 				}
 			}
+		}
+		for (Map.Entry<Integer, EnumDistrib> entry : result.entrySet()) {
+			marginalDistributions[entry.getKey()] = entry.getValue();
+		}
+
+		for (Integer nodeId : nodeIDs) {
+			pogAlignment.setCurrent(nodeId);
+			Character base = '-';
+
+			// get gap or character inference at phylogenetic nodes
+			Map<String, Integer[]> phyloTransition = getPhyloTransitions();
 
 			// store inferred transitions
 			List<Integer> transitionIds = new ArrayList<>();
@@ -777,6 +891,8 @@ public class ASRPOG {
 
 			if (!ancestralInferences.containsKey(phyloNode))
 				ancestralInferences.put(phyloNode, new ArrayList<>());
+			if (nodeId >= 0)
+				base = (char) marginalDistributions[nodeId].getMax();
 			ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
 		}
 
@@ -784,6 +900,8 @@ public class ASRPOG {
 		populateTreeNodeSeq(marginalNode);
 		ancestralSeqLabels = new ArrayList<>();
 		ancestralSeqLabels.add(marginalNode);
+//		long elapsedTimeNs = System.nanoTime() - startTime;x
+//		System.out.printf("Elapsed time in secs: %5.3f\n", elapsedTimeNs/1000000000.0);
 	}
 
 	/**
@@ -826,15 +944,6 @@ public class ASRPOG {
         return d_marg;
     }
 
-	/**
-	 * Check to see if a node has an inferred character that is being contributed by one but not both children
-	 * @param node node to check
-	 */
-
-	public void checkBranchIsolation(String node){
-		System.out.println("Yo");
-
-	}
 
     /**
      * Helper class to store changes to an ancestral graph node
@@ -843,7 +952,7 @@ public class ASRPOG {
      * 		- POG structure index 
      * 		- Inferred base character: base character that is inferred or '-' to represent a gap (i.e. that the node needs to be deleted when updating the structure)
      */
-    private class Inference {
+    public class Inference {
     	Integer pogId;
     	char base;
     	List<Integer> transitions;
