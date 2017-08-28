@@ -700,7 +700,9 @@ public class POGraph {
 		String sequence = "";
 		Node current = initialNode;
 		while (current != finalNode) {
+			current.setConsensus(true);
 			Edge next = current.getNextTransitions().get(0);
+			next.setConsensus(true);
 			if (next.getNext() != finalNode)
 				sequence += next.getNext().getBase();
 			current = next.getNext();
@@ -710,11 +712,31 @@ public class POGraph {
 	}
 
 	/**
+	 * Get indication of if the current node is part of the consensus path.
+	 *
+	 * @return	indication of consensus membership
+	 */
+	public boolean getCurrentConsensusFlag() {
+		return current.getConsensus();
+	}
+
+	/**
+	 * Get the ID of the next node in the consensus path.
+	 *
+	 * @return	ID of the next consensus node
+	 */
+	public Integer getNextConsensusID() {
+		for (Edge edge : current.getNextTransitions())
+			if (edge.getConsensus())
+				return edge.getNext().getID();
+		return null;
+	}
+	/**
 	 * Get the ordered node IDs of the consensus sequence
 	 *
 	 * @return	Array of the node IDs that make up the supported sequence
 	 */
-	public Integer[] getSupportedSequenceIds() {
+	/*public Integer[] getSupportedSequenceIds() {
 		ArrayList<Integer> ids = new ArrayList<>();
 		Node current = initialNode;
 		while (current != finalNode) {
@@ -727,7 +749,7 @@ public class POGraph {
 		for (int i = 0; i < ids.size(); i++)
 			idArray[i] = ids.get(i);
 		return idArray;
-	}
+	}*/
 
 	/**
 	 * Save partial order alignment graph in a dot format in the given directory.
@@ -1357,6 +1379,7 @@ public class POGraph {
 		private List<Node> alignedTo = null;					// list of nodes that are aligned with this node
 		private HashMap<Integer, Character> seqChars;			// map of sequence Ids and their base character
 		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
+		private boolean consensus = false; 						// flag to indicate if belongs to the consensus path
 
 		/**
 		 * Constructor
@@ -1567,6 +1590,20 @@ public class POGraph {
 		}
 
 		/**
+		 * Set the consensus flag.
+		 *
+		 * @param flag	Indication of whether node belongs to the consensus path.
+		 */
+		private void setConsensus(boolean flag) { this.consensus = flag; }
+
+		/**
+		 * Get the consensus flag.
+		 *
+		 * @return	flag indicating consensus membership
+		 */
+		private boolean getConsensus() { return this.consensus; }
+
+		/**
 		 * Get list of next nodes.
 		 *
 		 * @return	list of next nodes
@@ -1670,6 +1707,7 @@ public class POGraph {
 	 */
 	private class Edge {
 		private Node next = null;
+		private boolean consensus = false;
 		private List<Integer> sequences;
 
 		private Edge() {
@@ -1680,6 +1718,10 @@ public class POGraph {
 			this();
 			this.next = nextNode;
 		}
+
+		private void setConsensus(boolean flag) { this.consensus = flag; }
+
+		private boolean getConsensus() { return this.consensus; }
 
 		private void addSequence(int seqId) {
 			this.sequences.add(seqId);

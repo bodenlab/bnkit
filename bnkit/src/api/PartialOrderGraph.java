@@ -40,11 +40,28 @@ public class PartialOrderGraph {
     }
 
     /**
-     * Get the node IDs that make up the consensus sequence.
+     * Get indication of consensus membership of the node with the provided ID.
      *
-     * @return      node IDs that make up the most supported sequence
+     * @param id    Node ID
+     * @return      Flag indicating consensus membership of the node with the provided ID
      */
-    public Integer[] getConsensusNodeIds() { return graph.getSupportedSequenceIds(); }
+    public Boolean getConsensusMembership(int id) {
+        if (!graph.setCurrent(id))
+            return null;
+        return graph.getCurrentConsensusFlag();
+    }
+
+    /**
+     * Get the ID of the next node in the consensus path.
+     *
+     * @param id    ID of the current node
+     * @return      ID of the next node in the consensus path.
+     */
+    public Integer getNextConsensusID(int id) {
+        if (!graph.setCurrent(id))
+            return null;
+        return graph.getNextConsensusID();
+    }
 
     /**
      * Get all node IDs in the graph.

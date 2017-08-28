@@ -1,5 +1,5 @@
 import api.PartialOrderGraph;
-import json.JSONObject;
+import dat.POGraph;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import reconstruction.ASRPOG;
@@ -15,19 +15,20 @@ public class ASRTests {
     @Test
     @DisplayName("Get ancestral partial order graph")
     public void getAncestralGraphTest() throws IOException {
-        String alnfilepath = "src/test/resources/2U1_aligned_trimmed.aln";
-        String nwkfilepath = "src/test/resources/2U1_final.nwk";
+        String alnfilepath = "src/test/resources/tawfik.aln";
+        String nwkfilepath = "src/test/resources/tawfik.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
-        asr.saveALN("src/test/cyp2u1", "fasta");
-        PartialOrderGraph msa = asr.getPartialOrderGraph();
-        asr.saveMSAGraph("src/test/msa");
-        asr.saveGraph("src/test/cyp2u1", "root");
-        System.out.println(msa.toString());
-
-        POAGJson msajson = new POAGJson(msa);
-        JSONObject msaObj = msajson.toJSON();
-        System.out.println(msaObj.toString());
+        //asr.saveALN("src/test/cyp2u1", "fasta");
+        POGraph msa = asr.getMSAGraph();
+        PartialOrderGraph root = asr.getGraph("root");
+        //PartialOrderGraph msa = asr.getPartialOrderGraph();
+        POAGJson jsongraph = new POAGJson(root);
+        System.out.println(root.getConsensusSequence());
+       // asr.saveMSAGraph("src/test/msa");
+       // asr.saveGraph("src/test/cyp2u1", "root");
+        //System.out.println(msa.toString());
     }
+
 
     @Test
     @DisplayName("Small ASR")

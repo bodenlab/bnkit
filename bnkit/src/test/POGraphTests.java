@@ -35,11 +35,10 @@ public class POGraphTests {
     public void smallPOGraph() throws IOException {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         POGraph graph = new POGraph(filepath);
-        List<Integer> ids = graph.getSortedIDs();
-        for (Integer id : ids)
-            System.out.println(id);
         System.out.println("Consensus sequence: " + graph.getSupportedSequence());
         assertEquals("PMAR", graph.getSupportedSequence());
+        POAGJson jsongraph = new POAGJson(new PartialOrderGraph(graph));
+        System.out.println(jsongraph.toJSON().toString());
         Map<Integer, List<Integer>> lists = graph.getSequenceNodeMapping();
         for (Integer nodeId : graph.getNodeIDs()) {
             graph.setCurrent(nodeId);

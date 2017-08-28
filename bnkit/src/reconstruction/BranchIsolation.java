@@ -218,7 +218,7 @@ public class BranchIsolation {
 
         System.out.println(sequencePath);
 
-        ASRPOG child = new ASRPOG(sequencePath, treePath, "/Users/gabefoley/Dropbox/Code/!Files/Reconstructions/2U1/Latest2U1/var_region1.aln", node, mp);
+        ASRPOG child = new ASRPOG(sequencePath, treePath, "/Users/gabefoley/Dropbox/Code/!Files/Reconstructions/2U1/Latest2U1/var_region1.aln", node, mp, null, 4);
 
         final long duration = System.nanoTime() - startTime;
 
