@@ -22,13 +22,17 @@ public class BranchIsolation {
     private String treePath;
     private String sequencePath;
     private boolean mp;
+    private String model;
+    private int threads;
 
-    public BranchIsolation(ASRPOG asr, Map<String,String> ancestralDict, String treePath, String sequencePath, String node, boolean mp) throws IOException {
+    public BranchIsolation(ASRPOG asr, Map<String,String> ancestralDict, String treePath, String sequencePath, String node, boolean mp, String model, int threads) throws IOException {
         this.asr = asr;
         this.ancestralDict = ancestralDict;
         this.treePath = treePath;
         this.sequencePath = sequencePath;
         this.mp = mp;
+        this.model = model;
+        this.threads = threads;
 
 
 
@@ -100,12 +104,12 @@ public class BranchIsolation {
                     boolean found = false;
 
                     if (leftCharacterDistrib < 0.5 && rightCharacterDistrib > 0.5){
-                        System.out.println("*********YEPPPERS********");
+//                        System.out.println("*********YEPPPERS********");
                         found = true;
                     }
 
                     else if (rightCharacterDistrib < 0.5 && leftCharacterDistrib > 0.5){
-                        System.out.println("***********YEPPERS********");
+//                        System.out.println("***********YEPPERS********");
                         found = true;
                     }
 
@@ -218,12 +222,9 @@ public class BranchIsolation {
 
         System.out.println(sequencePath);
 
-        ASRPOG child = new ASRPOG(sequencePath, treePath, "/Users/gabefoley/Dropbox/Code/!Files/Reconstructions/2U1/Latest2U1/var_region1.aln", node, mp);
+        ASRPOG child = new ASRPOG(sequencePath, treePath, "/Users/gabefoley/Dropbox/Code/!Files/Reconstructions/2U1/Latest2U1/var_region1.aln", node, mp, model, threads);
 
         final long duration = System.nanoTime() - startTime;
-
-
-
 
         System.out.println("Marginal reconstruction at  " + node + " complete");
 
