@@ -28,8 +28,9 @@ public class RunASRPOG {
 	 *  Optional flags:
 	 *  			-s		filepath of sequences (filetype: .aln, .fa or .fasta)
 	 *  			-o 		output filepath to save reconstructed partial order graphs of internal node of the phylogenetic tree
-	 * 				-p		inference type, 'marginal' or 'joint'. Default: joint. If 'marginal', specify the node name after 'marginal', default: root node.
-	 * 				-mp		use maximum parsimony to infer gaps positions. By default, maximum likelihood is used within a Bayesian network framework.
+	 * 				-inf	inference type, 'marginal' or 'joint'. Default: joint. If 'marginal', specify the node name after 'marginal', default: root node.
+	 * 			    -p      number of threads
+     * 				-mp		use maximum parsimony to infer gaps positions. By default, maximum likelihood is used within a Bayesian network framework.
 	 * 				-msa	generate dot file in output directory representing multiple sequence alignment of input sequences or partial order alignment graph. Default: no msa dot file is generated
 	 * 				-dot	generate dot file in output directory ancestral node sequence
 	 * 				-align	perform sequence alignment prior to reconstruction, otherwise assumes sequences are aligned
@@ -37,6 +38,7 @@ public class RunASRPOG {
 	 * @throws IOException
 	 */
 	public static void main(String[] args) throws IOException {
+
 		if (args.length > 1) {
 			ASRPOG asr = null;
 
@@ -121,28 +123,9 @@ public class RunASRPOG {
 				else
 					asr.save(outputPath, false, "fasta");
 			}
+
 			if (checkBranchIsolation){
 
-//				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
-//					add("N3");
-//					add("N4");
-//					add("N10");
-//					add("N14");
-//					add("N19");
-//				}};
-
-				// For PhyML data
-//				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
-////					add("NO");
-//					add("N1");
-//					add("N2");
-//					add("N104");
-//					add("N101");
-//					add("N79");
-//					add("N85");
-//					add("N4");
-//
-//				}};
 
 				ArrayList<String> ancestralNodes = new ArrayList<String>() {{
 					add("N1");
@@ -159,7 +142,7 @@ public class RunASRPOG {
 
 				// Code for using a specific list of Nodes
 				for (String node : ancestralNodes){
-					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, performAlignment);
+					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, performAlignment, model, numThreads);
 
 
 				}
@@ -171,8 +154,6 @@ public class RunASRPOG {
 				// Code for using all nodes
 //				for (String node : ancestralLabels.keySet()){
 //					BranchIsolation branchIsolation = new BranchIsolation(asr, ancestralLabels, treePath, sequencePath, node, mp);
-//
-//
 //				}
 
 
