@@ -26,6 +26,7 @@ public class ASRTests {
         System.out.println(root.getConsensusSequence());
        // asr.saveMSAGraph("src/test/msa");
        // asr.saveGraph("src/test/cyp2u1", "root");
+        asr.saveSupportedAncestors("src/test/root");
         //System.out.println(msa.toString());
     }
 
@@ -42,5 +43,10 @@ public class ASRTests {
         System.out.println(msa.toString());
         System.out.println(graph.toString());
         System.out.println(graph.getConsensusSequence());
+        System.out.println(graph.getConsensusGappySequence());
+        for (String node : asr.getAncestralDict().keySet()) {
+            PartialOrderGraph anc = asr.getGraph(node);
+            System.out.println(node + ": " + anc.getConsensusGappySequence());
+        }
     }
 }

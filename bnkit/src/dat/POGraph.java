@@ -323,7 +323,8 @@ public class POGraph {
 		for (Edge edge : current.getNextTransitions())
 			if (edge.getNext().getID() == removeId) {
 				// find edges to move sequence IDs to, based on the shortest path to the sequences actual next node
-				List<Node> path = findShortestPathToNode(current, edge.getNext(), null);
+				// TODO -------------------------------> (Decide to keep re-route or remove...)
+				/*List<Node> path = findShortestPathToNode(current, edge.getNext(), null);
 				if (path == null) {
 					// there is no alternative path to the node, for each sequence in the node, re-direct to it's next
 					// node
@@ -359,7 +360,7 @@ public class POGraph {
 						for (int i = 0; i < path.size() - 1; i++) {
 							path.get(i).addNextNode(path.get(i + 1), seqId);
 							path.get(i + 1).addPrevNode(path.get(i), seqId);
-						}
+						}*/
 				current.removeNextNode(edge.getNext());
 				if (edge.getNext().getPreviousNodes().isEmpty()) {
 					Node tmp = current;
@@ -523,6 +524,13 @@ public class POGraph {
 				characters += '-';
 			return sequence + characters;
 		}
+
+		// sequence did not traverse in a path, find the next ordered node with the sequence in it
+		for (int i = orderedNodeIds.indexOf(node.getID()); i < orderedNodeIds.size(); i++)
+			if (nodes.get(orderedNodeIds.get(i)).getSeqCharMapping().keySet().contains(seqId)) {
+				next = nodes.get(orderedNodeIds.get(i));
+				break;
+			}
 
 		if (next == null) { // sequence finishes in this node
 			// check if there are gaps at the end..
@@ -712,6 +720,36 @@ public class POGraph {
 	}
 
 	/**
+	 * Traverses the graph structure to construct the most supported sequence of characters.
+	 *
+	 * @return	most supported sequence of base characters
+	 */
+	public String getSupportedGappySequence() {
+
+		List<Integer> orderedNodeIds = topologicalSort();
+		String sequence = "";
+		Node current = initialNode;
+		while (current != finalNode) {
+			current.setConsensus(true);
+			Edge next = current.getNextTransitions().get(0);
+			next.setConsensus(true);
+			int numGaps;
+			if (next.getNext() != finalNode)
+				numGaps = orderedNodeIds.indexOf(next.getNext().getID()) - orderedNodeIds.indexOf(current.getID())-1;
+			else
+				numGaps = orderedNodeIds.size() - orderedNodeIds.indexOf(current.getID())-1;
+			for (int i = 0; i < numGaps; i++)
+				sequence += '-';
+			if (next.getNext() != finalNode)
+				sequence += next.getNext().getBase();
+
+			current = next.getNext();
+		}
+
+		return sequence;
+	}
+
+	/**
 	 * Get indication of if the current node is part of the consensus path.
 	 *
 	 * @return	indication of consensus membership
@@ -731,25 +769,6 @@ public class POGraph {
 				return edge.getNext().getID();
 		return null;
 	}
-	/**
-	 * Get the ordered node IDs of the consensus sequence
-	 *
-	 * @return	Array of the node IDs that make up the supported sequence
-	 */
-	/*public Integer[] getSupportedSequenceIds() {
-		ArrayList<Integer> ids = new ArrayList<>();
-		Node current = initialNode;
-		while (current != finalNode) {
-			Edge next = current.getNextTransitions().get(0);
-			if (next.getNext() != finalNode)
-				ids.add(next.getNext().getID());
-			current = next.getNext();
-		}
-		Integer[] idArray = new Integer[ids.size()];
-		for (int i = 0; i < ids.size(); i++)
-			idArray[i] = ids.get(i);
-		return idArray;
-	}*/
 
 	/**
 	 * Save partial order alignment graph in a dot format in the given directory.

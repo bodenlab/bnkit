@@ -511,7 +511,7 @@ public class ASRPOG {
 	private void populateTreeNodeSeq(String phyloNodeLabel) {
 		EnumSeq.Gappy<Enumerable> seq = new EnumSeq.Gappy<>(Enumerable.aacid_ext);
 		seq.setName(phyloNodeLabel);
-		String s = getAncestor(phyloNodeLabel).getSupportedSequence();
+		String s = getAncestor(phyloNodeLabel).getSupportedGappySequence();
 		seq.setInfo(s);
 		Object[] chars = new Object[s.length()];
 		for (int c = 0; c < s.length(); c++)
@@ -891,7 +891,7 @@ public class ASRPOG {
 
 			if (!ancestralInferences.containsKey(phyloNode))
 				ancestralInferences.put(phyloNode, new ArrayList<>());
-			if (nodeId >= 0)
+			if (nodeId >= 0 && marginalDistributions[nodeId] != null)
 				base = (char) marginalDistributions[nodeId].getMax();
 			ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
 		}
@@ -930,16 +930,7 @@ public class ASRPOG {
             CGTable r_marg = (CGTable)ve.infer(q_marg);
             d_marg = (EnumDistrib)r_marg.query(queryNode);
         } catch (NullPointerException npe) { //When node of interest has been removed from network of interest
-            if (npe.toString().contains("Invalid query")) {
-                double[] empty = new double[Enumerable.aacid.size()];
-                for (int d = 0; d < Enumerable.aacid.size(); d++) {
-                    empty[d] = 0.0;
-                }
-                d_marg = new EnumDistrib(Enumerable.aacid, empty);
-            } else {
-                npe.printStackTrace();
-            }
-
+			d_marg = null;//EnumDistrib.uniform(Enumerable.aacid);
         }
         return d_marg;
     }

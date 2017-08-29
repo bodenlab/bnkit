@@ -5,7 +5,6 @@ import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.prob.EnumDistrib;
 import dat.EnumVariable;
-import dat.Enumerable;
 import dat.Variable;
 
 import java.util.HashMap;
@@ -107,15 +106,7 @@ public class MarginalInferenceExecutor {
                 CGTable r_marg = (CGTable)ve.infer(q_marg);
                 d_marg = (EnumDistrib)r_marg.query(queryNode);
             } catch (NullPointerException npe) { //When node of interest has been removed from network of interest
-                if (npe.toString().contains("Invalid query")) {
-                    double[] empty = new double[Enumerable.aacid.size()];
-                    for (int d = 0; d < Enumerable.aacid.size(); d++) {
-                        empty[d] = 0.0;
-                    }
-                    d_marg = new EnumDistrib(Enumerable.aacid, empty);
-                } else {
-                    npe.printStackTrace();
-                }
+                d_marg = null;//EnumDistrib.uniform(Enumerable.aacid);
             }
             return d_marg;
         }
