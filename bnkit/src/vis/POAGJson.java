@@ -109,9 +109,8 @@ public class POAGJson {
             thisNode.put("consensus", poag.getConsensusMembership(id));
             nodesJSON.put(thisNode);
             //Check if it is the max depth
-            if (y > max_depth) {
+            if (y > max_depth)
                 max_depth = y;
-            }
             // Need to get the out egdes into JSON reaction object
             Map<Integer, Double> outedges = n.getOutedges();
             for (Map.Entry<Integer, Double> outNodes : outedges.entrySet()) {
@@ -131,6 +130,14 @@ public class POAGJson {
                     thisReaction.put("y2", y2);
                     thisReaction.put("weight", weight);
                     thisReaction.put("consensus", poag.getConsensusMembership(id) && n2id == poag.getNextConsensusID(id));
+                    Integer[] reciprocatedIds = poag.getReciprocatedNextIDs(id);
+                    boolean reciprocated = false;
+                    for (int r = 0; r < reciprocatedIds.length; r++)
+                        if (reciprocatedIds[r] == n2id) {
+                            reciprocated = true;
+                            break;
+                        }
+                    thisReaction.put("reciprocated", reciprocated);
                     reactions.put(rid, thisReaction);
                 } catch (Exception e) {
                     System.err.println("Error with reaction: " + nid);

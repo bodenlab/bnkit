@@ -535,17 +535,43 @@ public class ASRPOG {
 		for (Inference inferredBase : inferences)
 			if (ancestor.setCurrent(inferredBase.pogId)) {
 				// set inferred base, or remove node if inferred to be removed
-				if (inferredBase.pogId != -1)
+				if (inferredBase.pogId != null && inferredBase.pogId != -1)
 					if (inferredBase.base == '-')
 						// remove node from ancestor
 						ancestor.removeNode();
 					else
 						ancestor.setBase(inferredBase.base);
-				// if node is still there, remove transitions that are not inferred using maximum parsimony
-				if (ancestor.getCurrentId() == inferredBase.pogId)
-					for (Integer nextId : ancestor.getNextIDs())
-						if (!inferredBase.transitions.contains(nextId))
-							ancestor.removeNextTransition(nextId);
+				// if node is still there, check the parsimonious transitions. Because we are doing both backwards and forwards parsimony,
+				// get the intersection of the previous/next nodes and all inferred transitions of the current node
+				if (ancestor.getCurrentId() != inferredBase.pogId)
+					continue;
+
+				// find union of next/previous transitions and remove transitions that are not inferred
+				// 'next':
+				ArrayList<Integer> keepNext = new ArrayList<>();
+				for (Integer nextId : ancestor.getNextIDs()) {
+					// Identify if edge is reciprocated by backwards parsimony (if so, flag)
+					Inference next = null;
+					for (Inference i : inferences)
+						if (i.pogId == nextId) {
+							next = i;
+							break;
+						}
+					if (inferredBase.transitions.contains(nextId) && next != null && next.transitions.contains(inferredBase.pogId))
+						ancestor.setReciprocated(nextId);
+					if (next != null && next.transitions.contains(inferredBase.pogId))
+						keepNext.add(next.pogId);
+				}
+
+				// take the union of the inferred transitions (i.e. use all provided transitions from maximum parsimony)
+				for (Integer nextId : ancestor.getNextIDs())
+					if (inferredBase.transitions.contains(nextId) && !keepNext.contains(nextId))
+						keepNext.add(nextId);
+				// check previous transitions of future nodes to see if there has been a parsimonious edge to this node
+				// if so, add to keep
+				for (Integer nextId : ancestor.getNextIDs())
+					if (!keepNext.contains(nextId))
+						ancestor.removeNextTransition(nextId);
 			}
 
 		// if marginal, update each node with character distribution
@@ -677,37 +703,64 @@ public class ASRPOG {
 
 		// populate tree for transitional inference using max parsimony
 
-		// get ordered list of unique transitions based on MSA and num. seqs on the 'out' edges
-		ArrayList<Integer> orderedUnique = new ArrayList<>();
+		// get ordered list of unique transitions based on MSA and num. seqs on the 'out' edges: forward and backwards
+		ArrayList<Integer> orderedUniqueForward = new ArrayList<>();
+		ArrayList<Integer> orderedUniqueBackwards = new ArrayList<>();
 
-		Map<String, Object> map = new HashMap<>();
+		Map<String, Object> mapNext = new HashMap<>(); 			// map of extant label and 'next' transition
+		Map<String, Object> mapPrevious = new HashMap<>(); 		// map of extant label and 'previous' transition
+		Map<Object, Integer> nextCount = new HashMap<>();		// count of number of that next transition
+		Map<Object, Integer> previousCount = new HashMap<>();	// count of number of that previous transition
 		Map<Integer, List<Integer>> nodeSeqs = pogAlignment.getSequenceNodeMapping();
 		for (int seqId = 0; seqId < extantSequences.size(); seqId++) {
-			if (nodeId == -1) // initial node, set next node as the starting node
-				map.put(extantSequences.get(seqId).getName(), nodeSeqs.get(seqId).get(0));
-			else {
-				int ind = nodeSeqs.get(seqId).indexOf(nodeId);
-				if (ind != -1 && ind + 1 < nodeSeqs.get(seqId).size())
-					map.put(extantSequences.get(seqId).getName(), nodeSeqs.get(seqId).get(ind + 1));
+			int ind = (nodeId != null && nodeId == -1) ? -1 : nodeSeqs.get(seqId).indexOf(nodeId);
+			if ((nodeSeqs.get(seqId).contains(nodeId) || nodeId == -1) && ind + 1 < nodeSeqs.get(seqId).size()) {
+				mapNext.put(extantSequences.get(seqId).getName(), nodeSeqs.get(seqId).get(ind + 1));
+				if (!nextCount.containsKey(nodeSeqs.get(seqId).get(ind + 1)))
+					nextCount.put(nodeSeqs.get(seqId).get(ind + 1), 0);
+				nextCount.put(nodeSeqs.get(seqId).get(ind + 1), nextCount.get(nodeSeqs.get(seqId).get(ind + 1)) + 1);
 			}
-			// if the node doesn't occur in the sequence, move onto the next sequence
-			if (map.containsKey(extantSequences.get(seqId).getName()) && !orderedUnique.contains(map.get(extantSequences.get(seqId).getName()))) {
-				// add to ordered list, but first identify index for ordering
-				int index = -1;
-				for (int i = 0; i < orderedUnique.size(); i++)
-					if (pogAlignment.getEdgeWeights().get(map.get(extantSequences.get(seqId).getName())) <= pogAlignment.getEdgeWeights().get(orderedUnique.get(i)))
-						index = i + 1;
-				if (index == -1)
-					index = orderedUnique.size();
-				orderedUnique.add(index, (Integer)map.get(extantSequences.get(seqId).getName()));
+			if ((nodeSeqs.get(seqId).contains(nodeId) || nodeId == null) && (ind == 0 || ind - 1 > -1)) {
+				mapPrevious.put(extantSequences.get(seqId).getName(), (ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1));
+				if (!previousCount.containsKey((ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1)))
+					previousCount.put((ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1), 0);
+				previousCount.put((ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1), previousCount.get((ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1)) + 1);
 			}
 		}
-		Object[] unique = new Integer[orderedUnique.size()];
-		for (int v = 0; v < orderedUnique.size(); v++)
-			unique[v] = orderedUnique.get(v);
 
-		phyloTree.setContentByParsimony(map, unique);
+		// Order 'next' transitions based on max number of extants traversing to that node
+		while (!nextCount.isEmpty()) {
+			// find the largest value
+			int maxCount = -1;
+			Object maxNode = -1;
+			for (Object nextId : nextCount.keySet())
+				if (nextCount.get(nextId) > maxCount) {
+					maxCount = nextCount.get(nextId);
+					maxNode = nextId;
+				}
+			orderedUniqueForward.add((Integer)maxNode);
+			nextCount.remove(maxNode);
+		}
 
+		// Order 'previous' transitions based on max number of extants traversing to that node
+		while (!previousCount.isEmpty()) {
+			// find the largest value
+			int maxCount = -1;
+			Object maxNode = -1;
+			for (Object nextId : previousCount.keySet())
+				if (previousCount.get(nextId) > maxCount) {
+					maxCount = previousCount.get(nextId);
+					maxNode = nextId;
+				}
+			orderedUniqueBackwards.add((Integer)maxNode);
+			previousCount.remove(maxNode);
+		}
+
+		// 'Next' transitions
+		Object[] uniqueForward = new Integer[orderedUniqueForward.size()];
+		for (int v = 0; v < orderedUniqueForward.size(); v++)
+			uniqueForward[v] = orderedUniqueForward.get(v);
+		phyloTree.setContentByParsimony(mapNext, uniqueForward);
 		for (String phyloNode : ancestralSeqLabels) {
 			List<Object> values = phyloTree.find(phyloNode).getValues();
 			if (values == null) {
@@ -717,6 +770,28 @@ public class ASRPOG {
 			Integer[] ids = new Integer[values.size()];
 			for (int i = 0; i < values.size(); i++)
 				ids[i] = (Integer) values.get(i);
+			phyloTransition.put(phyloNode, ids);
+		}
+
+		// 'Previous' transitions
+		if (orderedUniqueBackwards.isEmpty())
+			return phyloTransition;
+
+		Object[] uniqueBackward = new Integer[orderedUniqueBackwards.size()];
+		for (int v = 0; v < orderedUniqueBackwards.size(); v++)
+			uniqueBackward[v] = orderedUniqueBackwards.get(v);
+		phyloTree.setContentByParsimony(mapPrevious, uniqueBackward);
+		for (String phyloNode : ancestralSeqLabels) {
+			List<Object> values = phyloTree.find(phyloNode).getValues();
+			if (values == null) {
+				values = new ArrayList<>();
+				values.add(null);
+			}
+			Integer[] ids = new Integer[values.size() + phyloTransition.get(phyloNode).length];
+			for (int i = 0; i < phyloTransition.get(phyloNode).length; i++)
+				ids[i] = phyloTransition.get(phyloNode)[i];
+			for (int i = 0; i < values.size(); i++)
+				ids[i+phyloTransition.get(phyloNode).length] = (Integer) values.get(i);
 			phyloTransition.put(phyloNode, ids);
 		}
 
@@ -757,7 +832,7 @@ public class ASRPOG {
 		while (!nodeQueue.isEmpty()) {
 			Integer nodeId = nodeQueue.poll(); // next job
 			pogAlignment.setCurrent(nodeId);
-			// perform character inference if not the dummy initial node
+			// perform character inference if not the dummy initial node or dummy final node
 			if (nodeId != -1) {
 				VarElim ve = new VarElim();
 				PhyloBNet charNet = createCharacterNetwork();
@@ -776,10 +851,11 @@ public class ASRPOG {
 			}
 		}
 		// last time through all nodes; this time serially, extracting results
+		nodeIDs.add(null); // add dummy final node for identifying backwards transitions
 		for (Integer nodeId : nodeIDs) {
 			pogAlignment.setCurrent(nodeId);
 			Variable.Assignment[] charAssignments = new Variable.Assignment[]{};
-			if (nodeId != -1)
+			if (nodeId != null && nodeId != -1)
 				charAssignments = result.get(nodeId);
 			// get gap or character inference at phylogenetic nodes
 			Map<String, Integer[]> phyloTransition = getPhyloTransitions();
@@ -830,6 +906,7 @@ public class ASRPOG {
 		List<Integer> nodeIDs = new ArrayList<>();
 		nodeIDs.add(-1);
 		nodeIDs.addAll(pogAlignment.getNodeIDs());
+		nodeIDs.add(null);
 
 		// First, create a queue with which all nodes will be inferred (by NodeID)
 		Queue<Integer> nodeQueue = new PriorityQueue<>();
@@ -850,7 +927,7 @@ public class ASRPOG {
 			Integer nodeId = nodeQueue.poll(); // next job
 			pogAlignment.setCurrent(nodeId);
 			// perform character inference if not the dummy initial node
-			if (nodeId != -1) {
+			if (nodeId != -1 && nodeId != null) {
 				VarElim ve = new VarElim();
 				PhyloBNet phyloNet = createCharacterNetwork();
 				ve.instantiate(phyloNet.getBN());
@@ -948,7 +1025,7 @@ public class ASRPOG {
     	char base;
     	List<Integer> transitions;
 
-    	public Inference(int id, char ch, List<Integer> tr){
+    	public Inference(Integer id, char ch, List<Integer> tr){
     		pogId = id;
     		base = ch;
     		transitions = tr;

@@ -147,15 +147,28 @@ public class POGraph {
 	}
 
 	/**
-	 * Get the out edge weights of the current node. Weights based on total sequence support.
+	 * Get the next out edge weights of the current node. Weights based on total sequence support.
 	 *
-	 * @return	mapping between next node ID and the edge weight to that node
+	 * @return	mapping between next node ID and the edge weight to the next node
 	 */
-	public Map<Integer, Double> getEdgeWeights(){
+	public Map<Integer, Double> getNextEdgeWeights(){
 		HashMap<Integer, Double> edgeWeights = new HashMap<>();
 		for (Edge next : current.getNextTransitions())
 			//if (next.getNext() != finalNode)
 				edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
+		return edgeWeights;
+	}
+
+	/**
+	 * Get the previous out edge weights of the current node. Weights based on total sequence support.
+	 *
+	 * @return	mapping between next node ID and the edge weight to the next node
+	 */
+	public Map<Integer, Double> getPreviousEdgeWeights(){
+		HashMap<Integer, Double> edgeWeights = new HashMap<>();
+		for (Edge next : current.getPreviousTransitions())
+			//if (next.getNext() != finalNode)
+			edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
 		return edgeWeights;
 	}
 
@@ -295,8 +308,8 @@ public class POGraph {
 		if (current == null)
 			return prevIDs;
 		for (Node node : current.getPreviousNodes())
-			if (node.getID() != -1)
-				prevIDs.add(node.getID());
+			//if (node.getID() != -1)
+			prevIDs.add(node.getID());
 		return prevIDs;
 	}
 
@@ -315,6 +328,34 @@ public class POGraph {
 	}
 
 	/**
+	 * Sets the edge between the current node and the node with the provided nextId as reciprocated.
+	 *
+	 * @param nextId	ID of the next node that the reciprocated edge points to
+	 */
+	public void setReciprocated(Integer nextId) {
+		for (Edge e : current.getNextTransitions())
+			if (e.getNext().getID() == nextId) {
+				e.setReciprocated(true);
+				for (Edge p : e.getNext().getPreviousTransitions())
+					if (p.getNext().getID() == current.getID())
+						p.setReciprocated(true);
+			}
+	}
+
+	/**
+	 * Get the set of next node IDs that have reciprocated edges from the current node.
+	 *
+	 * @return	List of next node IDs with reciprocated edges
+	 */
+	public List<Integer> getReciprocatedNextIDs() {
+		ArrayList<Integer> next = new ArrayList<>();
+		for (Edge e : current.getNextTransitions())
+			if (e.getReciprocated())
+				next.add(e.getNext().getID());
+		return next;
+	}
+
+	/**
 	 * Remove transition to next node with the provided ID
 	 *
 	 * @param removeId	ID of the 'next' node transition to remove
@@ -322,51 +363,29 @@ public class POGraph {
 	public void removeNextTransition(Integer removeId) {
 		for (Edge edge : current.getNextTransitions())
 			if (edge.getNext().getID() == removeId) {
-				// find edges to move sequence IDs to, based on the shortest path to the sequences actual next node
-				// TODO -------------------------------> (Decide to keep re-route or remove...)
-				/*List<Node> path = findShortestPathToNode(current, edge.getNext(), null);
-				if (path == null) {
-					// there is no alternative path to the node, for each sequence in the node, re-direct to it's next
-					// node
-					for (Integer seqId : edge.getSequences()) {
-						// get the 'next' node for the sequence
-						Edge nextEdge = null;
-						for (Edge e : edge.getNext().getNextTransitions())
-							if (e.getSequences().contains(seqId)) {
-								nextEdge = e;
-								break;
-							}
-						// find the alternative path for the sequence
-						if (nextEdge != null)
-							// sequence continues to another node, so re-direct (otherwise ignore because it ends here)
-							if (current.getNextNodes().contains(nextEdge.getNext())) {
-								// add sequence to this edge
-								current.addNextNode(nextEdge.getNext(), seqId);
-								nextEdge.getNext().addPrevNode(current, seqId);
-							} else {
-								// find alternative path to next node for the sequence
-								path = findShortestPathToNode(current, nextEdge.getNext(), edge.getNext());
-								if (path == null) // there is no alternative path, therefore node is removed
-									continue;
-								for (int i = 0; i < path.size() - 1; i++) {
-									path.get(i).addNextNode(path.get(i + 1), seqId);
-									path.get(i + 1).addPrevNode(path.get(i), seqId);
-								}
-							}
-					}
-
-				} else
-					for (Integer seqId : edge.getSequences())
-						for (int i = 0; i < path.size() - 1; i++) {
-							path.get(i).addNextNode(path.get(i + 1), seqId);
-							path.get(i + 1).addPrevNode(path.get(i), seqId);
-						}*/
 				current.removeNextNode(edge.getNext());
 				if (edge.getNext().getPreviousNodes().isEmpty()) {
 					Node tmp = current;
 					setCurrent(edge.getNext().getID());
 					removeNode();
 					current = tmp;
+				}
+				return;
+			}
+	}
+
+	/**
+	 * Remove transition to the previous node with the provided ID
+	 *
+	 * @param removeId	ID of the 'previous' node transition to remove
+	 */
+	public void removePreviousTransition(Integer removeId) {
+		for (Edge edge : current.getPreviousTransitions())
+			if (edge.getNext().getID() == removeId) {
+				current.removePrevNode(edge.getNext());
+				if (current.getPreviousNodes().isEmpty()) {
+					removeNode();
+					current = initialNode;
 				}
 				return;
 			}
@@ -709,7 +728,15 @@ public class POGraph {
 		Node current = initialNode;
 		while (current != finalNode) {
 			current.setConsensus(true);
-			Edge next = current.getNextTransitions().get(0);
+			// find next edge as first reciprocated edge in the ordered extant list, if no reciprocated, then
+			// default to the first edge (extant support)
+			Edge next = null;
+			for (int n = 0; n < current.getNextTransitions().size(); n++)
+				if (current.getNextTransitions().get(n).reciprocated) {
+					next = current.getNextTransitions().get(n);
+					break;
+				}
+			next = (next == null) ? current.getNextTransitions().get(0) : next;
 			next.setConsensus(true);
 			if (next.getNext() != finalNode)
 				sequence += next.getNext().getBase();
@@ -1727,6 +1754,7 @@ public class POGraph {
 	private class Edge {
 		private Node next = null;
 		private boolean consensus = false;
+		private boolean reciprocated = false;
 		private List<Integer> sequences;
 
 		private Edge() {
@@ -1741,6 +1769,11 @@ public class POGraph {
 		private void setConsensus(boolean flag) { this.consensus = flag; }
 
 		private boolean getConsensus() { return this.consensus; }
+
+		private void setReciprocated(boolean flag) { this.reciprocated = flag; }
+
+		private boolean getReciprocated() { return this.reciprocated; }
+
 
 		private void addSequence(int seqId) {
 			this.sequences.add(seqId);

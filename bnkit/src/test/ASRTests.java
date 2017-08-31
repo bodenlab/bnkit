@@ -34,9 +34,11 @@ public class ASRTests {
     @Test
     @DisplayName("Small ASR")
     public void performSmallASR() throws IOException {
+        //String alnfilepath = "src/test/resources/270717_2U1_var_region1.aln";
+        //String nwkfilepath = "src/test/resources/270717_2U1.nwk";
         String alnfilepath = "src/test/resources/small.aln";
         String nwkfilepath = "src/test/resources/small.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, "Dayhoff", 1);
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
         asr.saveGraph("src/test/cyp2u1", "root");
         PartialOrderGraph msa = asr.getPartialOrderGraph();
         PartialOrderGraph graph = asr.getGraph("root");

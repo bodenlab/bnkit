@@ -75,6 +75,20 @@ public class PartialOrderGraph {
     }
 
     /**
+     * Get the set of next node IDs that have reciprocated edges.
+     *
+     * @param id    ID of the current node
+     * @return      Set of next node IDs that have reciprocated edges
+     */
+    public Integer[] getReciprocatedNextIDs(int id) {
+        if (!graph.setCurrent(id))
+            return null;
+        Integer[] ids = new Integer[graph.getReciprocatedNextIDs().size()];
+        graph.getReciprocatedNextIDs().toArray(ids);
+        return ids;
+    }
+
+    /**
      * Get all node IDs in the graph.
      *
      * @return      IDs of nodes in the graph
@@ -138,7 +152,7 @@ public class PartialOrderGraph {
     public Map<Integer, Double> getOutEdgeWeights(int id) {
         if (!graph.setCurrent(id))
             return null;
-        return new HashMap<>(graph.getEdgeWeights());
+        return new HashMap<>(graph.getNextEdgeWeights());
     }
 
     /**
