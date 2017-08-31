@@ -906,7 +906,6 @@ public class ASRPOG {
 		List<Integer> nodeIDs = new ArrayList<>();
 		nodeIDs.add(-1);
 		nodeIDs.addAll(pogAlignment.getNodeIDs());
-		nodeIDs.add(null);
 
 		// First, create a queue with which all nodes will be inferred (by NodeID)
 		Queue<Integer> nodeQueue = new PriorityQueue<>();
@@ -927,7 +926,7 @@ public class ASRPOG {
 			Integer nodeId = nodeQueue.poll(); // next job
 			pogAlignment.setCurrent(nodeId);
 			// perform character inference if not the dummy initial node
-			if (nodeId != -1 && nodeId != null) {
+			if (nodeId != -1) {
 				VarElim ve = new VarElim();
 				PhyloBNet phyloNet = createCharacterNetwork();
 				ve.instantiate(phyloNet.getBN());
@@ -953,6 +952,7 @@ public class ASRPOG {
 			marginalDistributions[entry.getKey()] = entry.getValue();
 		}
 
+		nodeIDs.add(null); // add dummy final node for identifying backwards transitions
 		for (Integer nodeId : nodeIDs) {
 			pogAlignment.setCurrent(nodeId);
 			Character base = '-';
@@ -968,7 +968,7 @@ public class ASRPOG {
 
 			if (!ancestralInferences.containsKey(phyloNode))
 				ancestralInferences.put(phyloNode, new ArrayList<>());
-			if (nodeId >= 0 && marginalDistributions[nodeId] != null)
+			if (nodeId != null && nodeId >= 0 && marginalDistributions[nodeId] != null)
 				base = (char) marginalDistributions[nodeId].getMax();
 			ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
 		}
