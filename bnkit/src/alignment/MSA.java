@@ -263,13 +263,10 @@ public class MSA {
         for (int i = 0; i < this.graph.getNodeIDs().size(); ++i) {
             this.graph.setCurrent(sortedIDs.get(i));
             List<Integer> prevIdxs = this.graph.getPreviousIDs();
-            if (prevIdxs.isEmpty()){
+            if (prevIdxs.isEmpty() || prevIdxs.get(0) == -1){
                 pos = 0;
                 scores[i + 1][0] = openGapPenalty;
-
-            }
-
-            else {
+            } else {
                 pos = nodeIDToIndex.get(prevIdxs.get(0)) + 1;
             }
             scores[0][0] = openGapPenalty - extendGapPenalty;
@@ -278,6 +275,8 @@ public class MSA {
 
             double best = scores[pos][0] + this.extendGapPenalty;
             for (Integer prevIdx : prevIdxs) {
+                if (prevIdx == -1)
+                    continue;
                 double prevScore = scores[nodeIDToIndex.get(prevIdx) + 1][0] + this.extendGapPenalty;
                 //TODO: In event of a tie for score... just defaults to the previous existing best
                 if (best <= prevScore) {

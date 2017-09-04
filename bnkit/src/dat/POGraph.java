@@ -545,11 +545,12 @@ public class POGraph {
 		}
 
 		// sequence did not traverse in a path, find the next ordered node with the sequence in it
-		for (int i = orderedNodeIds.indexOf(node.getID()); i < orderedNodeIds.size(); i++)
-			if (nodes.get(orderedNodeIds.get(i)).getSeqCharMapping().keySet().contains(seqId)) {
-				next = nodes.get(orderedNodeIds.get(i));
-				break;
-			}
+		if (next == null)
+			for (int i = orderedNodeIds.indexOf(node.getID()); i < orderedNodeIds.size(); i++)
+				if (nodes.get(orderedNodeIds.get(i)).getSeqCharMapping().keySet().contains(seqId)) {
+					next = nodes.get(orderedNodeIds.get(i));
+					break;
+				}
 
 		if (next == null) { // sequence finishes in this node
 			// check if there are gaps at the end..
