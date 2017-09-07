@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
  *  @author Gabe
  *
  */
-public class BranchIsolation {
+class BranchIsolation {
 
     private ASRPOG asr;
     private Map<String, String> ancestralDict;
@@ -25,7 +25,7 @@ public class BranchIsolation {
     private String model;
     private int threads;
 
-    public BranchIsolation(ASRPOG asr, Map<String,String> ancestralDict, String treePath, String sequencePath, String node, boolean mp, String model, int threads) throws IOException {
+    BranchIsolation(ASRPOG asr, Map<String, String> ancestralDict, String treePath, String sequencePath, String node, boolean mp, String model, int threads) throws IOException {
         this.asr = asr;
         this.ancestralDict = ancestralDict;
         this.treePath = treePath;
@@ -56,16 +56,12 @@ public class BranchIsolation {
         // Get the marginal distributions for each child
         if (ancestralDict.get(leftNode) != null && ancestralDict.get(rightNode) != null) {
 
-//            System.out.println("This node is a goer " + node);
 //        }
 
 
-          EnumDistrib[] parentDistrib = getDistrib(node.toString());
+            EnumDistrib[] parentDistrib = getDistrib(node);
             EnumDistrib[] leftDistrib = getDistrib(childrenList.get(0).getLabel().toString());
             EnumDistrib[] rightDistrib = getDistrib(childrenList.get(1).getLabel().toString());
-
-            System.out.println(rightDistrib);
-
 
 
             // Iterate through the MSA distributions
@@ -78,107 +74,96 @@ public class BranchIsolation {
 
                 Character maxMSACharacter = Collections.max(distribution.entrySet(), Map.Entry.comparingByValue()).getKey();
 
-                Map<String, List<ASRPOG.Inference>>ancestralInferences = asr.getAncestralInferences();
+                Map<String, List<ASRPOG.Inference>> ancestralInferences = asr.getAncestralInferences();
                 Character maxDistribCharacter = ancestralInferences.get(node).get(k).base;
                 Character rootDistribCharacter = ancestralInferences.get("N0").get(k).base;
 
                 if (maxDistribCharacter != '-' && rootDistribCharacter != '-') {
 
-                    Character leftDistribMax = getDistribCharacter(leftDistrib[currentNode].getMaxIndex());
-                    Character rightDistribMax = getDistribCharacter(rightDistrib[currentNode].getMaxIndex());
-
-
-
-
-
-
-                    double leftCharacterDistrib = leftDistrib[currentNode].get(getDistibPostion(maxDistribCharacter));
-                    double rightCharacterDistrib = rightDistrib[currentNode].get(getDistibPostion(maxDistribCharacter));
-
-                    double leftMSADistrib = leftDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
-                    double rightMSADistrib = rightDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
-
-                    double leftRootDistrib = leftDistrib[currentNode].get(getDistibPostion(rootDistribCharacter));
-                    double rightRootDistrib = rightDistrib[currentNode].get(getDistibPostion(rootDistribCharacter));
-
-                    boolean found = false;
-
-                    if (leftCharacterDistrib < 0.5 && rightCharacterDistrib > 0.5){
-//                        System.out.println("*********YEPPPERS********");
-                        found = true;
+                    if (k == 26) {
+                        System.out.println("here");
                     }
 
-                    else if (rightCharacterDistrib < 0.5 && leftCharacterDistrib > 0.5){
-//                        System.out.println("***********YEPPERS********");
-                        found = true;
+                    //TODO: Add check for Distrib even existing here
+
+                    if (leftDistrib[currentNode] == null) {
+                        System.out.println(childrenList.get(0).getLabel().toString() + " doesn't have a graph node at position " + k);
                     }
 
-                    if (found) {
+                    if (rightDistrib[currentNode] == null) {
+                        System.out.println(childrenList.get(1).getLabel().toString() + " doesn't have a graph node at position " + k);
+
+                    }
+
+                    if (leftDistrib[currentNode] != null && rightDistrib[currentNode] != null) {
+
+                        Character leftDistribMax = getDistribCharacter(leftDistrib[currentNode].getMaxIndex());
+                        Character rightDistribMax = getDistribCharacter(rightDistrib[currentNode].getMaxIndex());
+
+
+                        double leftCharacterDistrib = leftDistrib[currentNode].get(getDistibPostion(maxDistribCharacter));
+                        double rightCharacterDistrib = rightDistrib[currentNode].get(getDistibPostion(maxDistribCharacter));
+
+                        double leftMSADistrib = leftDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
+                        double rightMSADistrib = rightDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
+
+                        double leftRootDistrib = leftDistrib[currentNode].get(getDistibPostion(rootDistribCharacter));
+                        double rightRootDistrib = rightDistrib[currentNode].get(getDistibPostion(rootDistribCharacter));
+
+                        boolean foundDistrib = false;
+                        boolean foundMSA = false;
+
+                        if (leftCharacterDistrib < 0.5 && rightCharacterDistrib > 0.5) {
+                            System.out.println("*********YEPPPERS********");
+                            foundDistrib = true;
+                        } else if (rightCharacterDistrib < 0.5 && leftCharacterDistrib > 0.5) {
+                            System.out.println("***********YEPPERS********");
+                            foundDistrib = true;
+                        }
+
+                        if (leftMSADistrib < 0.5 && rightMSADistrib > 0.5) {
+                            System.out.println("*********MSA DISTRIB********");
+                            foundMSA = true;
+                        } else if (rightMSADistrib < 0.5 && leftMSADistrib > 0.5) {
+                            System.out.println("***********MSA DISTRIB********");
+                            foundMSA = true;
+                        }
+
+                        if (foundDistrib || foundMSA) {
 
 //                if (leftCharacterDistrib < 0.1 && rightCharacterDistrib > 0.5) {
 //                    unsupportedLeft.add(k);
-                        System.out.println();
-                        System.out.println("We are at node " + node + " in the phylogenetic tree");
-                        System.out.println("Node in the partial order graph is " + k);
-                        System.out.println("Node distrib character we're checking is " + maxDistribCharacter);
-                        System.out.println("Root distrib character is " + rootDistribCharacter);
-                        System.out.println("MSA highest character is " + maxMSACharacter);
+                            System.out.println();
+                            System.out.println("We are at node " + node + " in the phylogenetic tree");
+                            System.out.println("Node in the partial order graph is " + k);
+                            System.out.println("Node distrib character we're checking is " + maxDistribCharacter);
+                            System.out.println("Root distrib character is " + rootDistribCharacter);
+                            System.out.println("MSA highest character is " + maxMSACharacter);
 
-                        System.out.println("Left distrib max character is " + leftDistribMax);
-                        System.out.println("Right distrib max character is " + rightDistribMax);
+                            System.out.println("Left distrib max character is " + leftDistribMax);
+                            System.out.println("Right distrib max character is " + rightDistribMax);
 
 
-                        System.out.println("MSA distribution of max character here is " + distribution.get(maxMSACharacter));
+                            System.out.println("MSA distribution of max character here is " + distribution.get(maxMSACharacter));
 //                    System.out.println("MSA distribution of character we're checking is " + distribution.get(maxMSACharacter));
 
-                        System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftCharacterDistrib + " of the max parent character " + maxDistribCharacter);
-                        System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightCharacterDistrib + " of the max parent character " + maxDistribCharacter);
+                            System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftCharacterDistrib + " of the max parent character " + maxDistribCharacter);
+                            System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightCharacterDistrib + " of the max parent character " + maxDistribCharacter);
 
-                        System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftMSADistrib + " of the  max MSA character " + maxMSACharacter);
-                        System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightMSADistrib + " of the max MSA character " + maxMSACharacter);
+                            System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftMSADistrib + " of the  max MSA character " + maxMSACharacter);
+                            System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightMSADistrib + " of the max MSA character " + maxMSACharacter);
 
-                        System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftRootDistrib + "of the root character " + rootDistribCharacter);
-                        System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightRootDistrib + "of the root character " + rootDistribCharacter);
-                        found = false;
+                            System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftRootDistrib + "of the root character " + rootDistribCharacter);
+                            System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightRootDistrib + "of the root character " + rootDistribCharacter);
+                            foundDistrib = false;
+                            foundMSA = false;
+
+                        }
                     }
-//                }
-//
-//                if (rightCharacterDistrib < 0.1 && leftCharacterDistrib > 0.5) {
-//                    unsupportedRight.add(k);
-//                }
 
-
-//                double leftCharacterDistrib = leftDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
-//                double rightCharacterDistrib = rightDistrib[currentNode].get(getDistibPostion(maxMSACharacter));
-//
-//
-//
-//
-////                if (leftCharacterDistrib < 0.1 && rightCharacterDistrib > 0.5) {
-////                    unsupportedLeft.add(k);
-//                    System.out.println();
-//                    System.out.println("We are at node " + node + " in the phylogenetic tree");
-//                    System.out.println("Node in the partial order graph is " + k);
-//                    System.out.println("Character we're checking is " + maxMSACharacter);
-//                    System.out.println("MSA distribution here is " + distribution.get(maxMSACharacter));
-//                    System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftCharacterDistrib);
-//                    System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightCharacterDistrib);
-////                }
-////
-////                if (rightCharacterDistrib < 0.1 && leftCharacterDistrib > 0.5) {
-////                    unsupportedRight.add(k);
-//                    System.out.println();
-//                    System.out.println("We are at node " + node + " in the phylogenetic tree");
-//                    System.out.println("Node in the partial order graph is " + k);
-//                    System.out.println("Character we're checking is " + maxMSACharacter);
-//                    System.out.println("MSA distribution here is " + distribution.get(maxMSACharacter));
-//                    System.out.println("Child node " + leftNode + " in the phylogenetic tree has distribution " + leftCharacterDistrib);
-//                    System.out.println("Child node " + rightNode + " in the phylogenetic tree has distribution " + rightCharacterDistrib);
-////                }
                 }
 
             }
-
         }
 
         else {
@@ -218,11 +203,8 @@ public class BranchIsolation {
 
         final long startTime = System.nanoTime();
 
-//        ASRPOG child = new ASRPOG(sequencePath, treePath, sequencePath, node, mp);
 
-        System.out.println(sequencePath);
-
-        ASRPOG child = new ASRPOG(sequencePath, treePath, "/Users/gabefoley/Dropbox/Code/!Files/Reconstructions/2U1/Latest2U1/var_region1.aln", node, mp, model, threads);
+        ASRPOG child = new ASRPOG(sequencePath, treePath, sequencePath, node, mp, model, threads);
 
         final long duration = System.nanoTime() - startTime;
 

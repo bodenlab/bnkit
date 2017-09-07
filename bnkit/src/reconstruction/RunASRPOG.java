@@ -111,13 +111,14 @@ public class RunASRPOG {
 				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), performAlignment, model, numThreads);
 
 			if (!outputPath.isEmpty()) {
+				outputPath += "/";
 				if (dotFile)
 					asr.saveGraph(outputPath);
 				if (msaFile)
 					asr.saveMSAGraph(outputPath);
 				asr.saveSupportedAncestors(outputPath);
 				asr.saveGraph(outputPath);
-				asr.saveDistrib(outputPath + "/" + marginalNode);
+				asr.saveDistrib(outputPath  + marginalNode);
 				if (inference.equalsIgnoreCase("joint"))
 					asr.save(outputPath, true, "fasta");
 				else

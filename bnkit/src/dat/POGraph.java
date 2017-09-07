@@ -97,11 +97,11 @@ public class POGraph {
 		for (int baseInd = 0; baseInd < bases.length; baseInd++) {
 			Integer curId = nodeIds.get(baseInd);
 			Integer prevId = -1;
-			if (nodeIds.indexOf(curId) > 0)
-				prevId = nodeIdsAdded.get(nodeIdsAdded.size()-1);
-			if (curId == -1 || !setCurrent(curId)) {
+			if (nodeIds.indexOf(curId) >= 0)
+				prevId = (nodeIdsAdded.size() == 0) ? -1 : nodeIdsAdded.get(nodeIdsAdded.size()-1);
+			if (curId == -2 || !setCurrent(curId)) {
 				// base did not align with graph or node doesn't currently exist in the graph, create it
-				current = new Node(curId == -1 ? nodes.size() : curId);
+				current = new Node(curId == -2 ? nodes.size() : curId);
 				nodes.put(current.getID(), current);
 			}
 			if (prevId == -1){

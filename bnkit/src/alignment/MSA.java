@@ -56,6 +56,7 @@ public class MSA {
                 // align sequence with the graph
                 List<Integer> alignment = alignSeqToGraph(seqs.get(seqId).toString(), false, partialOrder, partialOrderTraceback);
                 graph.addSequence(seqId, seqs.get(seqId).getName(), seqs.get(seqId).toString(), alignment);
+//                graph.saveSequences(filepath + seqId, "fasta");
             }
             saveMSA(filepath);
 
@@ -371,11 +372,11 @@ public class MSA {
             if (nextj != bestj)
                 profile2Indexes.add(0, profile2Index);
             else
-                profile2Indexes.add(0, -1);
+                profile2Indexes.add(0, -2);
             if (nexti != besti)
                 profile1Indexes.add(0, profile1Index);
             else
-                profile1Indexes.add(0, -1);
+                profile1Indexes.add(0, -2);
 
             besti = nexti;
             bestj = nextj;
@@ -384,14 +385,14 @@ public class MSA {
         // Fill out the remaining indexes of each profile
         while (profile1Indexes.get(0) != null && profile1Index > 0) {
             profile1Indexes.add(0, profile1Index - 1);
-            profile2Indexes.add(0, -1);
+            profile2Indexes.add(0, -2);
             profile1Index -= 1;
 
         }
 
         while (profile2Indexes.get(0) != null && profile2Index > 0) {
             profile2Indexes.add(0, profile2Index - 1);
-            profile1Indexes.add(0, -1);
+            profile1Indexes.add(0, -2);
             profile2Index -= 1;
 
         }
@@ -410,8 +411,8 @@ public class MSA {
         //TODO: Does this mess with normal NW alignment?
         for (int i = 0; i < profile2Indexes.size(); i++){
 
-            if (profile2Indexes.get(i) != -1){
-                int index = profile1Indexes.get(i) == -1 ? -1: orderedNodes.get(profile1Indexes.get(i));
+            if (profile2Indexes.get(i) != -2){
+                int index = profile1Indexes.get(i) == -2 ? -2: orderedNodes.get(profile1Indexes.get(i));
 
                 matchesIndex.add(index);
             }
