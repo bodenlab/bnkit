@@ -829,7 +829,7 @@ public class ASRPOG {
 
 		// Create a thread coordinator, set the number of threads it should be using
 		JointInferenceExecutor batch = null;
-		if (this.threads > 0)
+		if (this.threads > 1)
 			batch = new JointInferenceExecutor(this.threads);
 
 		// Here's where all results will end up
@@ -846,16 +846,15 @@ public class ASRPOG {
 				PhyloBNet charNet = createCharacterNetwork();
 				rates[nodeId] = charNet.getRate();
 				ve.instantiate(charNet.getBN());
-				if (this.threads < 1) {
+				if (this.threads <= 1) {
 					Variable.Assignment[] charAssignments = getJointAssignment(ve);
 					result.put(nodeId, charAssignments);
-				} else {
+				} else
 					batch.addJointInference(nodeId, ve);
-					if (batch.isFull() || nodeQueue.isEmpty()) { // job list complete OR this was the last, so need to run batch
-						Map<Integer, Variable.Assignment[]> rets = batch.run();
-						result.putAll(rets);
-					}
-				}
+			}
+			if (batch != null && nodeQueue.isEmpty()) { // job list complete OR this was the last, so need to run batch
+				Map<Integer, Variable.Assignment[]> rets = batch.run();
+				result.putAll(rets);
 			}
 		}
 		// last time through all nodes; this time serially, extracting results
@@ -922,7 +921,7 @@ public class ASRPOG {
 
 		// Create a thread coordinator, set the number of threads it should be using
 		MarginalInferenceExecutor batch = null;
-		if (this.threads > 0)
+		if (this.threads > 1)
 			batch = new MarginalInferenceExecutor(this.threads);
 
 		// Here's where all results will end up
@@ -944,15 +943,14 @@ public class ASRPOG {
 					if (internalNode.getName().equalsIgnoreCase(marginalNode))
 						charNode = internalNode;
 				if (charNode != null) {
-					if (this.threads < 1)
+					if (this.threads <= 1)
 						result.put(nodeId, getMarginalDistrib(ve, charNode));
-					else {
+					else
 						batch.addMarginalInference(nodeId, ve, charNode);
-						if (batch.isFull() || nodeQueue.isEmpty()) { // job list complete OR this was the last, so need to run batch
-							Map<Integer, EnumDistrib> rets = batch.run();
-							result.putAll(rets);
-						}
-					}
+				}
+				if (batch != null && nodeQueue.isEmpty()) { // job list complete OR this was the last, so need to run batch
+					Map<Integer, EnumDistrib> rets = batch.run();
+					result.putAll(rets);
 				}
 			}
 		}

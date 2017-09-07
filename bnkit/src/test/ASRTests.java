@@ -34,12 +34,13 @@ public class ASRTests {
     @Test
     @DisplayName("Small ASR")
     public void performSmallASR() throws IOException {
-        String alnfilepath = "src/test/resources/small_example.fasta";
-        String nwkfilepath = "src/test/resources/small_example.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, true, null, 1);
+        String alnfilepath = "src/test/resources/default.aln";
+        String nwkfilepath = "src/test/resources/default.nwk";
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, "N3_72.0", false, null, 5);
        // asr.saveGraph("src/test/cyp2u1", "root");
         PartialOrderGraph msa = asr.getPartialOrderGraph();
-        PartialOrderGraph graph = asr.getGraph("root");
+        PartialOrderGraph graph = asr.getGraph("N3_72.0");
+        POAGJson msaGraph = new POAGJson(msa);
         POAGJson jsongraph = new POAGJson(graph);
         System.out.println(jsongraph.toJSON().toString());
         System.out.println(msa.toString());
@@ -51,4 +52,5 @@ public class ASRTests {
             System.out.println(node + ": " + anc.getConsensusGappySequence());
         }
     }
+
 }

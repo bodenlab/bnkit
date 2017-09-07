@@ -38,11 +38,11 @@ public class PathGen {
     public PriorityQueue<Integer> unsearchedPaths;
     // Store the ends of the gaps in a similar manner
     public PriorityQueue<Integer> gapEnds;
-    
+
     private LinkedHashMap<Integer, Object> searchedList = null;
     private LinkedHashMap<Integer, Map<Integer, Double>> nodesWithEdges;
 
-    private final int size;
+    private Integer size;
 
     Integer[] sorted;
     public int goalID;
@@ -79,8 +79,9 @@ public class PathGen {
                 System.err.println("Not in nodes: " + i);
             }
         }
-        
+
         addNodes(remainingNodes, depth);
+
     }
 
     public LinkedHashMap<Integer, Map<Integer, Double>> initNodesWithEdges() {
