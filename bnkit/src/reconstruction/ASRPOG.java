@@ -838,7 +838,7 @@ public class ASRPOG {
 				PhyloBNet charNet = createCharacterNetwork();
 				rates[nodeId] = charNet.getRate();
 				ve.instantiate(charNet.getBN());
-				if (this.threads < 1) {
+				if (this.threads <= 1) {
 					Variable.Assignment[] charAssignments = getJointAssignment(ve);
 					result.put(nodeId, charAssignments);
 				} else {
@@ -936,7 +936,7 @@ public class ASRPOG {
 					if (internalNode.getName().equalsIgnoreCase(marginalNode))
 						charNode = internalNode;
 				if (charNode != null) {
-					if (this.threads < 1)
+					if (this.threads <= 1)
 						result.put(nodeId, getMarginalDistrib(ve, charNode));
 					else {
 						batch.addMarginalInference(nodeId, ve, charNode);
