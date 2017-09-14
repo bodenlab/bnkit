@@ -471,15 +471,20 @@ final public class SubstitutionMatrix {
 
 
 
-    public double getDistance(char a1, char a2) throws NullPointerException {
+    public double getDistance(char a1, char a2) throws NullPointerException, ArrayIndexOutOfBoundsException {
         double distance = 0.0;
+//        distance = matrix[getIndex(a1)][getIndex(a2)];
+
 
         try {
             distance = matrix[getIndex(a1)][getIndex(a2)];
 
-        } catch (NullPointerException e){
-            System.out.println("Unrecognised character");
+        } catch (NullPointerException | ArrayIndexOutOfBoundsException e){
+            System.out.println("Unrecognised character when trying to align " + a1 + " and " + a2);
+            System.exit(1);
         }
+
+
 
         return distance;
     }
