@@ -80,9 +80,6 @@ class BranchIsolation {
 
                 if (maxDistribCharacter != '-' && rootDistribCharacter != '-') {
 
-                    if (k == 26) {
-                        System.out.println("here");
-                    }
 
                     //TODO: Add check for Distrib even existing here
 
