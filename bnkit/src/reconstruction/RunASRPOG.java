@@ -116,8 +116,8 @@ public class RunASRPOG {
 					asr.saveGraph(outputPath);
 				if (msaFile)
 					asr.saveMSAGraph(outputPath);
-				asr.saveSupportedAncestors(outputPath);
-				asr.saveGraph(outputPath);
+				//asr.saveSupportedAncestors(outputPath);
+				//asr.saveGraph(outputPath);
 				asr.saveDistrib(outputPath  + marginalNode);
 				if (inference.equalsIgnoreCase("joint"))
 					asr.save(outputPath, true, "fasta");

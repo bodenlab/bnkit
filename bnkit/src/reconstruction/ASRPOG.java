@@ -187,6 +187,9 @@ public class ASRPOG {
 	 * @param filepath	Output filepath
 	 */
 	public void saveSupportedAncestors(String filepath) throws IOException {
+		for (String phyloNodeLabel : ancestralSeqLabels)
+			if (phyloTree.find(phyloNodeLabel).getSequence() == null)
+				populateTreeNodeSeq(phyloNodeLabel);
 		Map<String, String> ancestralSeqs = new HashMap<>();
 		if (marginalNode == null)
 			for (String phyloNodeLabel : ancestralSeqLabels) {
@@ -229,6 +232,8 @@ public class ASRPOG {
 		if (label.equalsIgnoreCase("root"))
 			label = (String)phyloTree.getRoot().getLabel();
 		Map<String, String> ancestralSeqs = new HashMap<>();
+		if (phyloTree.find(label).getSequence() == null)
+			populateTreeNodeSeq(label);
 		if (marginalNode == null)
 			ancestralSeqs.put(label, phyloTree.find(label).getSequence().toString());
 		else
@@ -270,23 +275,31 @@ public class ASRPOG {
 	 * @param format	format to save ALN, "clustal" or "fasta", default: fasta
 	 */
 	public void saveALN(String filepath, String format) throws IOException {
+		for (String phyloNodeLabel : ancestralSeqLabels)
+			if (phyloTree.find(phyloNodeLabel).getSequence() == null)
+				populateTreeNodeSeq(phyloNodeLabel);
 		PhyloTree.Node[] nodes = phyloTree.toNodesBreadthFirst();
-		EnumSeq.Gappy<Enumerable>[] allSeqs = new EnumSeq.Gappy[nodes.length];
+		ArrayList<EnumSeq.Gappy<Enumerable>> allSeqs = new ArrayList<>();
 		for (int n = 0; n < nodes.length; n++) {
 			EnumSeq.Gappy<Enumerable> seq = (EnumSeq.Gappy) nodes[n].getSequence();
+			if (seq == null)
+				continue;
 			String seqName = nodes[n].toString();
 			String seqLab = seq.getName();
 			if (seqLab != null)
 				seq.setName(seqLab + " " + seqName + ";"); //Newick strings require a ';' to indicate completion
-			allSeqs[n] = seq;
+			allSeqs.add(seq);
 		}
+		EnumSeq.Gappy<Enumerable>[] seqs = new EnumSeq.Gappy[allSeqs.size()];
+		for (int n = 0; n < allSeqs.size(); n++)
+			seqs[n] = allSeqs.get(n);
 		if (format.equalsIgnoreCase("clustal")) {
 			AlnWriter aw = new AlnWriter(filepath + ".aln");
-			aw.save(allSeqs);
+			aw.save(seqs);
 			aw.close();
 		} else {
 			FastaWriter fw = new FastaWriter(filepath + ".fa");
-			fw.save(allSeqs);
+			fw.save(seqs);
 			fw.close();
 		}
 	}
@@ -890,8 +903,9 @@ public class ASRPOG {
 			}
 		}
 		// save sequence information in internal nodes of the phylogenetic tree
-		for (String phyloNodeLabel : ancestralSeqLabels)
-			populateTreeNodeSeq(phyloNodeLabel);
+		// TODO:
+		//for (String phyloNodeLabel : ancestralSeqLabels)
+		//	populateTreeNodeSeq(phyloNodeLabel);
 //		long elapsedTimeNs = System.nanoTime() - startTime;
 //		System.out.printf("Elapsed time in secs: %5.3f\n", elapsedTimeNs/1000000000.0);
 	}

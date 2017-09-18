@@ -36,10 +36,11 @@ public class ASRTests {
     public void performSmallASR() throws IOException {
         String alnfilepath = "src/test/resources/default.aln";
         String nwkfilepath = "src/test/resources/default.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, "N3_72.0", false, null, 5);
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 5);
        // asr.saveGraph("src/test/cyp2u1", "root");
         PartialOrderGraph msa = asr.getPartialOrderGraph();
         PartialOrderGraph graph = asr.getGraph("N3_72.0");
+        asr.saveALN("src/test/resources/", "clustal");
         POAGJson msaGraph = new POAGJson(msa);
         POAGJson jsongraph = new POAGJson(graph);
         System.out.println(jsongraph.toJSON().toString());
