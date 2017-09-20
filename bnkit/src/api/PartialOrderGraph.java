@@ -142,6 +142,15 @@ public class PartialOrderGraph {
         return new HashMap<>(graph.getSequenceCharacterMapping());
     }
 
+    /**
+     * Return the number of sequences in the graph.
+     *
+     * @return  number of sequences
+     */
+    public int getNumberSequences() {
+        return graph.getSequences().size();
+    }
+
 
     /**
      * Get the weights of the out edges of the node with the given ID.

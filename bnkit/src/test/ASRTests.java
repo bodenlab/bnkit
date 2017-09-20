@@ -34,24 +34,26 @@ public class ASRTests {
     @Test
     @DisplayName("Small ASR")
     public void performSmallASR() throws IOException {
-        String alnfilepath = "src/test/resources/default.aln";
-        String nwkfilepath = "src/test/resources/default.nwk";
+        String alnfilepath = "src/test/resources/cyp2u1.aln";
+        String nwkfilepath = "src/test/resources/cyp2u1.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 5);
        // asr.saveGraph("src/test/cyp2u1", "root");
         PartialOrderGraph msa = asr.getPartialOrderGraph();
-        PartialOrderGraph graph = asr.getGraph("N3_72.0");
-        asr.saveALN("src/test/resources/", "clustal");
+        PartialOrderGraph graph = asr.getGraph("N3");
+        //asr.saveALN("src/test/resources/", "clustal");
         POAGJson msaGraph = new POAGJson(msa);
         POAGJson jsongraph = new POAGJson(graph);
-        System.out.println(jsongraph.toJSON().toString());
-        System.out.println(msa.toString());
-        System.out.println(graph.toString());
-        System.out.println(graph.getConsensusSequence());
-        System.out.println(graph.getConsensusGappySequence());
-        for (String node : asr.getAncestralDict().keySet()) {
-            PartialOrderGraph anc = asr.getGraph(node);
-            System.out.println(node + ": " + anc.getConsensusGappySequence());
-        }
+        jsongraph.toJSON();
+       // System.out.println(jsongraph.toJSON().toString(1));
+
+        //System.out.println(msa.toString());
+       // System.out.println(graph.toString());
+       // System.out.println(graph.getConsensusSequence());
+       // System.out.println(graph.getConsensusGappySequence());
+       // for (String node : asr.getAncestralDict().keySet()) {
+       //     PartialOrderGraph anc = asr.getGraph(node);
+       //     System.out.println(node + ": " + anc.getConsensusGappySequence());
+        //}
     }
 
 }

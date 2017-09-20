@@ -138,9 +138,10 @@ public class POAGJson {
                             break;
                         }
                     thisReaction.put("reciprocated", reciprocated);
+                    thisReaction.put("single", outNodes.getValue()*poag.getNumberSequences() <= 1.5);
                     reactions.put(rid, thisReaction);
                 } catch (Exception e) {
-                    System.err.println("Error with reaction: " + nid);
+                    System.err.println("Error with reaction: " + nid + e.getMessage());
                 }
 
             }

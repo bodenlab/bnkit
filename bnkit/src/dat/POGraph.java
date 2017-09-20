@@ -415,8 +415,8 @@ public class POGraph {
 				// re-order transitions so that the transitions stay in order of max number of sequence traversal
 				if (nextEdge != null) {
 					// update seqId to go from the previous node to the next
-					prev.getNext().addNextNode(nextEdge.getNext(), seqId);
-					nextEdge.getNext().addPrevNode(prev.getNext(), seqId);
+					prev.getNext().addNextNode(nextEdge.getNext(), null);
+					nextEdge.getNext().addPrevNode(prev.getNext(), null);
 				}
 			}
 			prev.getNext().removeNextNode(current);
@@ -1494,7 +1494,7 @@ public class POGraph {
 		 * Add transition from this to the given next node.
 		 *
 		 * @param next	Next node where transition points
-		 * @param seq	List of sequences that traverse to the next node
+		 * @param seq	Sequences that traverse to the next node
 		 */
 		private void addNextNode(Node next, Integer seq) {
 			Edge nextT = null;
@@ -1530,7 +1530,8 @@ public class POGraph {
 			for (Edge edge : prevTransitions)
 				if (edge.getNext().getID() == prev.getID()) {
 					// edge already exists, just add sequence
-					edge.addSequence(seq);
+					if (seq != null)
+						edge.addSequence(seq);
 					return;
 				}
 			// edge doesn't already exist, create new transition
