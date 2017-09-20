@@ -209,6 +209,7 @@ public class FastaReader {
                                 syms.add(current);
                             } else {
                                 throw new RuntimeException("Unrecognized symbol: " + current);
+
                             }
                         }
                     }
@@ -320,6 +321,7 @@ public class FastaReader {
                     sequences.add(sbuf);
                 } catch (RuntimeException e) {
                     System.err.println("Sequence \"" + seqdef[0].substring(1) + "\" is using an illegal symbol - " + e.getMessage());
+                    System.exit(1);
                 }
             } else {
                 line = reader.readLine();
