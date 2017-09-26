@@ -202,8 +202,6 @@ public class ASRPOG {
 		else
 			ancestralSeqs.put(marginalNode, phyloTree.find(marginalNode).getSequence().toString());
 
-		System.out.println(filepath);
-
 		File directory = new File(filepath);
 		if (! directory.exists()){
 			directory.mkdir();

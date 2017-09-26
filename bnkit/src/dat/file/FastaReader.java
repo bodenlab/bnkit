@@ -238,7 +238,7 @@ public class FastaReader {
      * @return all sequences in the file
      * @throws IOException if the file can not be read
      */
-    public EnumSeq[] load() throws IOException {
+    public EnumSeq[] load() throws IOException, RuntimeException {
         Pattern pattern = Pattern.compile(SEQ_FILE_SEPARATOR);
         String line;
         line = reader.readLine();
@@ -270,7 +270,7 @@ public class FastaReader {
                     EnumSeq sbuf = extract(seqdef, false);
                     sequences.add(sbuf);
                 } catch (RuntimeException e) {
-                    System.err.println("Sequence \"" + seqdef[0].substring(1) + "\" is using an illegal symbol - " + e.getMessage());
+                    throw new RuntimeException("Sequence \"" + seqdef[0].substring(1) + "\" is using an illegal symbol - " + e.getMessage());
                 }
             } else {
                 line = reader.readLine();
@@ -320,8 +320,7 @@ public class FastaReader {
                     //FIXME - untested
                     sequences.add(sbuf);
                 } catch (RuntimeException e) {
-                    System.err.println("Sequence \"" + seqdef[0].substring(1) + "\" is using an illegal symbol - " + e.getMessage());
-                    System.exit(1);
+                    throw new RuntimeException("Sequence \"" + seqdef[0].substring(1) + "\" is using an illegal symbol - " + e.getMessage());
                 }
             } else {
                 line = reader.readLine();
