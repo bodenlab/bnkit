@@ -772,6 +772,7 @@ public class POGraph {
 				sequence += next.getNext().getBase();
 
 			current = next.getNext();
+
 		}
 
 		return sequence;

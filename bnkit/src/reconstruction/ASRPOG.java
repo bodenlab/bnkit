@@ -589,7 +589,7 @@ public class ASRPOG {
 				// check previous transitions of future nodes to see if there has been a parsimonious edge to this node
 				// if so, add to keep
 				for (Integer nextId : ancestor.getNextIDs())
-					if (!keepNext.contains(nextId))
+					if (!keepNext.contains(nextId) && nextId != null)
 						ancestor.removeNextTransition(nextId);
 			}
 
@@ -644,12 +644,9 @@ public class ASRPOG {
 
 		Set<String> eNodes = new HashSet<>();
 		for (PhyloTree.Node en : extNodes)
-			try {
-				if (!eNodes.add(en.getLabel().toString()))
-					throw new RuntimeException("Extant node names must be unique - " + en.getLabel().toString() + " is duplicated");
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			if (!eNodes.add(en.getLabel().toString()))
+				throw new RuntimeException("Extant node names must be unique - " + en.getLabel().toString() + " is duplicated");
+
 
 		// Check if there are duplicate sequence names in the extant sequences
 		// Duplicate sequence names not allowed - will influence reconstruction outcomes
