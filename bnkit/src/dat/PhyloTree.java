@@ -173,13 +173,23 @@ public class PhyloTree {
             } else { // there's a distance
                 String label = str.substring(0, split_index).trim();
                 node = new Node(label);
-                double dist = Double.parseDouble(str.substring(split_index + 1, str.length()));
-                if (dist == 0.0) {
-                    dist = 0.00001;
-                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                try {
+
+
+                    double dist = Double.parseDouble(str.substring(split_index + 1, str.length()));
+
+                    if (dist == 0.0) {
+                        dist = 0.00001;
+                        System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                    }
+                    node.setDistance(dist);
+                    node.setParent(parent);
                 }
-                node.setDistance(dist);
-                node.setParent(parent);
+                catch (NumberFormatException ex) {
+                    System.err.println("This value in your Newick file couldn't be parsed as a number - "  + str.substring(split_index + 1, str.length()));
+                    System.exit(1);
+                }
+
             }
         } else if (start_index >= 0 && end_index >= 0) { // balanced parentheses
             //end_index = str.length() - end_index - 1; // correct index to refer from start instead of end of string
