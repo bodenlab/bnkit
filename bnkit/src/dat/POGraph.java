@@ -483,7 +483,7 @@ public class POGraph {
 				writer.save(seqs);
 				writer.close();
 			} else
-				System.err.print("Incorrect file type. Must be 'fasta' or 'clustal'.");
+				System.err.print("Incorrect file type. Must be FASTA or Clustal.");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -885,7 +885,7 @@ public class POGraph {
 			} else if (line.startsWith(">")) {
 				seqs = EnumSeq.Gappy.loadFasta(seqPath, Enumerable.aacid_ext, '-');
 			} else {
-				throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+				throw new RuntimeException("Alignment should be in Clustal or FASTA format");
 			}
 			seqfile.close();
 		} catch (IOException e) {

@@ -138,7 +138,7 @@ public class MSA {
                 Character gap = "-".charAt(0);
                 seqs = EnumSeq.Gappy.loadFasta(filepath, Enumerable.aacid, gap);
             } else {
-                throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+                throw new RuntimeException("Alignment should be in Clustal or FASTA format");
             }
             br.close();
 

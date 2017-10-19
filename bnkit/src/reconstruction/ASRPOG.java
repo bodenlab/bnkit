@@ -621,7 +621,7 @@ public class ASRPOG {
 		} else if (line.startsWith(">")) {
 			extantSequences = EnumSeq.Gappy.loadFasta(sequenceFile, Enumerable.aacid_ext, '-');
 		} else {
-			throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+			throw new RuntimeException("Alignment should be in Clustal or FASTA format");
 		}
 		aln_file.close();
 

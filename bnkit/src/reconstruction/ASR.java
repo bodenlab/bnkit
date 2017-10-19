@@ -159,7 +159,7 @@ public class ASR {
                 Character gap = "-".charAt(0);
                 seqs = EnumSeq.Gappy.loadFasta(file_aln, Enumerable.aacid, gap);
             } else {
-                throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+                throw new RuntimeException("Alignment should be in Clustal or FASTA format");
             }
 
             //Duplicate extant node names not allowed - will influence reconstruction outcomes

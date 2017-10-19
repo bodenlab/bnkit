@@ -87,7 +87,7 @@ public class AlnReader {
                 if (titleLine == null) {
                     titleLine = line.toUpperCase();
                     if (!titleLine.startsWith("CLUSTAL")) {
-                        throw new RuntimeException("Not a CLUSTAL file: \"" + file.getAbsolutePath() + "\". First row should contain \"CLUSTAL\".");
+                        throw new RuntimeException("Not a Clustal file: \"" + file.getAbsolutePath() + "\". First row should contain \"CLUSTAL\".");
                     }
                 } else {
                     if (Character.isLetter(line.charAt(0)) || Character.isDigit(line.charAt(0))) { 			// this is a proper line starting with an identifier
