@@ -168,7 +168,8 @@ public class AlnReader {
                     else if (alpha.isValid(sym))
                         symlist.add(sym);
                     else
-                        throw new RuntimeException("Invalid symbol " + sym + " in sequence " + id + " at index " + index);
+                        throw new RuntimeException("Sequence \"" + id + "\" is using an invalid symbol. Unrecognised symbol: " + sym + " at index " + index);
+
                 }
                 Character[] symarr = new Character[symlist.size()];
                 symlist.toArray(symarr);

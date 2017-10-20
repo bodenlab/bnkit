@@ -661,7 +661,7 @@ public class POGraph {
 			} else if (line.startsWith(">")) {
 				seqs = EnumSeq.Gappy.loadFasta(seqPath, Enumerable.aacid_ext, '-');
 			} else {
-				throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+				throw new RuntimeException("Incorrect sequence or alignment format (requires FASTA or Clustal format .aln, .fa or .fasta)");
 			}
 			seqfile.close();
 
@@ -885,7 +885,7 @@ public class POGraph {
 			} else if (line.startsWith(">")) {
 				seqs = EnumSeq.Gappy.loadFasta(seqPath, Enumerable.aacid_ext, '-');
 			} else {
-				throw new RuntimeException("Alignment should be in Clustal or FASTA format");
+				throw new RuntimeException("Incorrect sequence or alignment format (requires FASTA or Clustal format .aln, .fa or .fasta)");
 			}
 			seqfile.close();
 		} catch (IOException e) {

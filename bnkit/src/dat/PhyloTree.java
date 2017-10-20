@@ -74,14 +74,21 @@ public class PhyloTree {
     }
 
     private void expandNodes(List<Node> done, List<Node> queue) {
-        if (queue.isEmpty())
-            return;
-        Node head = queue.remove(0);
-        for (Node child : head.getChildren()) {
-            done.add(child);
-            queue.add(child);
+        try {
+            if (queue.isEmpty())
+                return;
+            Node head = queue.remove(0);
+            for (Node child : head.getChildren()) {
+                done.add(child);
+                queue.add(child);
+            }
+            expandNodes(done, queue);
         }
-        expandNodes(done, queue);
+
+        catch (NullPointerException npe) {
+            System.err.println("There was a problem reading the Newick file");
+            System.exit(1);
+        }
     }
 
     public String[] toStringsBreadthFirst() {
@@ -186,7 +193,7 @@ public class PhyloTree {
                     node.setParent(parent);
                 }
                 catch (NumberFormatException ex) {
-                    System.err.println("This value in your Newick file couldn't be parsed as a number - "  + str.substring(split_index + 1, str.length()));
+                    System.err.println("A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
                     System.exit(1);
                 }
 
@@ -209,13 +216,21 @@ public class PhyloTree {
                     node = new Node("N" + count + "_" + tail.substring(0, split_index));
                 else
                     node = new Node("N" + count);
-                double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()).replace(";",""));
-                if (dist == 0.0) {
-                    dist = 0.00001;
-                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                try {
+
+
+                    double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()).replace(";", ""));
+                    if (dist == 0.0) {
+                        dist = 0.00001;
+                        System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                    }
+                    node.setDistance(dist);
+                    node.setParent(parent);
                 }
-                node.setDistance(dist);
-                node.setParent(parent);
+                catch (NumberFormatException ex) {
+                    System.err.println("A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
+                    System.exit(1);
+                }
             }
             nodeIds.add(count);
             // find where the commas are, and create children of node
