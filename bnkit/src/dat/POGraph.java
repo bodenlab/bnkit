@@ -1025,11 +1025,11 @@ public class POGraph {
 				reader = new BufferedReader(new FileReader(new File(structure)));
 				line = reader.readLine();
 			} catch (FileNotFoundException e) {
-				System.err.println("Cannot find partial order graph file.");
-				System.exit(1);
+				throw new RuntimeException("Cannot find partial order graph file.");
+//				System.exit(1);
 			} catch (IOException e) {
-				System.err.println("Incorrect partial order graph file format.");
-				System.exit(1);
+				throw new RuntimeException("Incorrect partial order graph file format.");
+//				System.exit(1);
 			}
 		} else {
 			// structure is a string representation

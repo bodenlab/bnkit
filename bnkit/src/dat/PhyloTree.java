@@ -86,8 +86,8 @@ public class PhyloTree {
         }
 
         catch (NullPointerException npe) {
-            System.err.println("There was a problem reading the Newick file");
-            System.exit(1);
+            throw new RuntimeException("Error: There was a problem reading the Newick file.");
+//            System.exit(1);
         }
     }
 
@@ -193,8 +193,8 @@ public class PhyloTree {
                     node.setParent(parent);
                 }
                 catch (NumberFormatException ex) {
-                    System.err.println("A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
-                    System.exit(1);
+                    throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
+//                    System.exit(1);
                 }
 
             }
@@ -228,8 +228,8 @@ public class PhyloTree {
                     node.setParent(parent);
                 }
                 catch (NumberFormatException ex) {
-                    System.err.println("A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
-                    System.exit(1);
+                    throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
+//                    System.exit(1);
                 }
             }
             nodeIds.add(count);

@@ -631,8 +631,8 @@ public class ASRPOG {
 		}
 
 		catch (NullPointerException npe) {
-			System.err.println("Incorrect sequence or alignment format (requires FASTA or Clustal format .aln, .fa or .fasta)");
-			System.exit(1);
+			throw new RuntimeException("Error: Incorrect sequence or alignment format (requires FASTA or Clustal format .aln, .fa or .fasta)");
+//			System.exit(1);
 
 
 		}
@@ -658,7 +658,7 @@ public class ASRPOG {
 		Set<String> eNodes = new HashSet<>();
 		for (PhyloTree.Node en : extNodes)
 			if (!eNodes.add(en.getLabel().toString()))
-				throw new RuntimeException("Extant node names must be unique.\nDuplicate names are - " + en.getLabel().toString());
+				throw new RuntimeException("Error: Extant node names must be unique.\nDuplicate names are - " + en.getLabel().toString());
 
 
 		// Check if there are duplicate sequence names in the extant sequences
@@ -666,7 +666,7 @@ public class ASRPOG {
 		Set<String> seqNames = new HashSet<>();
 		for (EnumSeq seq : extantSequences)
 			if (!seqNames.add(seq.getName()))
-				throw new RuntimeException("Sequence names must be unique.\nDuplicate names are - " + seq.getName());
+				throw new RuntimeException("Error: Sequence names must be unique.\nDuplicate names are - " + seq.getName());
 
 		// Check if the provided extant sequences match up to the provided tree
 		if (!eNodes.equals(seqNames)) {
@@ -679,7 +679,7 @@ public class ASRPOG {
             for (String eLabel : eNodes)
                 if (!seqNames.contains(eLabel))
                     eLabels += " " + eLabel;
-            throw new RuntimeException("The sequence names in the provided alignment must all have a match" +
+            throw new RuntimeException("Error: The sequence names in the provided alignment must all have a match" +
                     " in the provided tree.\nUnique labels in the alignment: " + seqLabels + ": unique labels in the tree: " + eLabels);
         }
 
