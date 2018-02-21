@@ -53,6 +53,15 @@ public class POGraph {
 		loadSequencesWithGraphStructure(structure, seqPath);
 	}
 
+	public POGraph(List<EnumSeq.Gappy<Enumerable>> seqs) {
+		this();
+
+		for (Integer seqId = 0; seqId < seqs.size(); seqId++)
+			sequences.put(seqId, seqs.get(seqId).getName());
+
+		current = loadPOGraph(seqs);
+	}
+
 	/**
 	 * Constructor to initialise a partial order graph using a dot structure.
 	 *
@@ -77,8 +86,8 @@ public class POGraph {
 		this.initialNode = copy.initialNode.copy();
 		for (Node node : this.initialNode.getNextNodes())
 			addNode(node);
-		this.finalNode = this.nodes.get(null);
-		this.nodes.remove(null);
+		this.finalNode = this.nodes.get(this.nodes.size()-1);
+		this.nodes.remove(this.nodes.size()-1);
 		this.current = initialNode.getNextNodes().get(0);
 	}
 
@@ -535,7 +544,7 @@ public class POGraph {
 				break;
 			}
 
-		if (next.getID() == null) { // end of sequence
+		if (next.getNextNodes().isEmpty()) { // end of sequence
 			// check if there are gaps at the end..
 			int numGaps = orderedNodeIds.size() - orderedNodeIds.indexOf(node.getID()) - 1;
 			characters = node.getSeqCharMapping().get(seqId) + "";
@@ -723,7 +732,7 @@ public class POGraph {
 	 *
 	 * @return	most supported sequence of base characters
 	 */
-	public String getSupportedSequence() {
+	public String getSupportedSequence(boolean gappy) {
 
 		String sequence = "";
 		Node current = initialNode;
@@ -739,6 +748,17 @@ public class POGraph {
 				}
 			next = (next == null) ? current.getNextTransitions().get(0) : next;
 			next.setConsensus(true);
+			if (gappy) {
+				Integer n = next.getNext().getID();
+				if (next.getNext() == finalNode)
+					for (Node prev : next.getNext().getPreviousNodes())
+						if (n == null || prev.getID() > n)
+							n = prev.getID() + 1;
+				n = n - current.getID() - 1;
+				if (n > 0)
+					for (int g = 0; g < n; g++)
+						sequence += '-';
+			}
 			if (next.getNext() != finalNode)
 				sequence += next.getNext().getBase();
 			current = next.getNext();
@@ -747,36 +767,6 @@ public class POGraph {
 		return sequence;
 	}
 
-	/**
-	 * Traverses the graph structure to construct the most supported sequence of characters.
-	 *
-	 * @return	most supported sequence of base characters
-	 */
-	public String getSupportedGappySequence() {
-
-		List<Integer> orderedNodeIds = topologicalSort();
-		String sequence = "";
-		Node current = initialNode;
-		while (current != finalNode) {
-			current.setConsensus(true);
-			Edge next = current.getNextTransitions().get(0);
-			next.setConsensus(true);
-			int numGaps;
-			if (next.getNext() != finalNode)
-				numGaps = orderedNodeIds.indexOf(next.getNext().getID()) - orderedNodeIds.indexOf(current.getID())-1;
-			else
-				numGaps = orderedNodeIds.size() - orderedNodeIds.indexOf(current.getID())-1;
-			for (int i = 0; i < numGaps; i++)
-				sequence += '-';
-			if (next.getNext() != finalNode)
-				sequence += next.getNext().getBase();
-
-			current = next.getNext();
-
-		}
-
-		return sequence;
-	}
 
 	/**
 	 * Get indication of if the current node is part of the consensus path.
@@ -1151,6 +1141,7 @@ public class POGraph {
 				}
 			if (node.getNextTransitions().isEmpty())
 				for (Integer seqId : node.getSeqIds()) {
+					finalNode.ID = nodes.size();
 					finalNode.addPrevNode(node, seqId);
 					node.addNextNode(finalNode, seqId);
 				}
@@ -1168,7 +1159,7 @@ public class POGraph {
 		// input:	seqLabel	sequence(with gap character)
 		// each Node is a column of the aln file
 		initialNode = new Node(-1);
-		finalNode = new Node();
+		finalNode = new Node(seqs.get(0).toString().length());
 		nodes = new HashMap<>();
 		HashMap<Integer, List<Node>> seqNodeMap = new HashMap<>();
 
@@ -1181,16 +1172,16 @@ public class POGraph {
 			seqNodeMap.put(seqId, new ArrayList<>());
 
 			char[] bases = seqs.get(seqId).toString().toCharArray();
-			List<Character> filteredBases = new ArrayList<>();
+			//List<Character> filteredBases = new ArrayList<>();
 			for (int baseInd = 0; baseInd < bases.length; baseInd++)
 				if (bases[baseInd] != '-') {
-					filteredBases.add(bases[baseInd]);
+					//filteredBases.add(bases[baseInd]);
 					nodes.get(baseInd).addSequence(seqId, bases[baseInd]);
 					seqNodeMap.get(seqId).add(nodes.get(baseInd));
 				}
-			Character[] chars = new Character[filteredBases.size()];
-			filteredBases.toArray(chars);
-			seqs.get(seqId).set(chars);
+			//Character[] chars = new Character[filteredBases.size()];
+			//filteredBases.toArray(chars);
+			//seqs.get(seqId).set(chars);
 		}
 
 		// iterate through the lists of nodes in the sequence mapping and assign edges to other nodes
@@ -1336,7 +1327,7 @@ public class POGraph {
 			successors.clear();
 
 			for (Node next : nodes.get(nodeID).getNextNodes())
-				if (next.getID() != null && !completed.contains(next.getID()))
+				if (!next.getNextNodes().isEmpty() && !completed.contains(next.getID()))
 					successors.add(0, next.getID());
 
 			started.add(nodeID);
@@ -1365,7 +1356,7 @@ public class POGraph {
 		allNodes.add(finalNode);
 
 		for (Node node : allNodes) {
-			if (node.getID() != null && !adjacency.keySet().contains(node))
+			if (!node.getNextNodes().isEmpty() && !adjacency.keySet().contains(node))
 				adjacency.put(node, new ArrayList<>());
 			for (Node next : node.getNextNodes()) {
 				if (!adjacency.keySet().contains(next))
@@ -1394,7 +1385,7 @@ public class POGraph {
 			if (!adjacency.containsKey(next) || adjacency.get(next).isEmpty())
 				adjacency.get(next);
 			for (Node adjacent : adjacency.get(next)) {
-				if (path.contains(adjacent) || adjacent.getID() == null || (end.getID() != null && sortedIds.indexOf(adjacent.getID()) > sortedIds.indexOf(end.getID()))
+				if (path.contains(adjacent) || adjacent.getNextNodes().isEmpty() || (!end.getNextNodes().isEmpty() && sortedIds.indexOf(adjacent.getID()) > sortedIds.indexOf(end.getID()))
 						|| adjacent == ignore || (sortedIds.indexOf(adjacent.getID()) < sortedIds.indexOf(start.getID())))
 					continue;
 				ArrayList<Node> newpath = new ArrayList<>();
@@ -1718,10 +1709,10 @@ public class POGraph {
 		 * @return		String representation in reduced dot format
 		 */
 		public String toString() {
-			String sb = "\"" + ((ID == null) ? "null" : Integer.toString(ID)) + "\"" + "[label=\"" + base + "\"];\n";
+			String sb = "\"" + Integer.toString(ID) + "\"" + "[label=\"" + base + "\"];\n";
 			for (Node nextNode : getNextNodes())
-				if (nextNode.getID() != null)
-					sb += "\"" + ((ID == null) ? "null" : Integer.toString(ID)) + "\"->\"" + Integer.toString(nextNode.getID())+ "\"" + "[]\n;";
+				if (!nextNode.getNextNodes().isEmpty())
+					sb += "\"" + Integer.toString(ID) + "\"->\"" + Integer.toString(nextNode.getID())+ "\"" + "[]\n;";
 			return sb;
 		}
 

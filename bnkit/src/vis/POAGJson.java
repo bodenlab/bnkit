@@ -30,6 +30,11 @@ public class POAGJson {
         poag.getConsensusSequence(); // populate consensus flags
         pathGen = new PathGen(poag);
         this.nodes = pathGen.nodes;
+        // add start and end nodes
+        Node initialNode = new Node(-1, -1, 0, null, poag.getOutEdgeWeights(-1), poag.getSeqChars(-1));
+        Node finalNode = new Node(this.nodes.size(), nodes.size()+1, 0, null, poag.getOutEdgeWeights(null), poag.getSeqChars(null));
+        this.nodes.put(initialNode.getID(), initialNode);
+        this.nodes.put(finalNode.getID(), finalNode);
         jsonMap = new JSONObject();
         xcoords = new HashMap<>();
     }
@@ -87,12 +92,12 @@ public class POAGJson {
        // for (int c = 0; c < poag.getConsensusNodeIds().length; c++)
        //     consensusIds.add(poag.getConsensusNodeIds()[c]);
 
-        for (int i : ns) {
+        for (Integer i : ns) {
             JSONObject thisNode = new JSONObject();
             n = nodes.get(i);
             x = n.getX();
             y = n.getY();
-            int id = n.getID();
+            Integer id = n.getID();
             String nid = "node-" + id;
             // Extra things for the multi view poag
             thisNode.put("class", ""); // Some sort of class
@@ -100,10 +105,10 @@ public class POAGJson {
             thisNode.put("lane", y);
 
             // Ones needed for tthe actual poag
-            thisNode.put("label", poag.getLabel(id));
+            thisNode.put("label", n.getOutedges().isEmpty() ? "final" : id == -1 ? "initial" : poag.getLabel(id));
             thisNode.put("x", x);
             thisNode.put("y", y);
-            thisNode.put("graph", map2JSON(n.getGraph()));
+            thisNode.put("graph", n.getGraph() == null? null : map2JSON(n.getGraph()));
             thisNode.put("seq", seq2JSON(n.getSeq()));
             thisNode.put("mutants", seq2JSON(n.getSeq()));
             thisNode.put("consensus", poag.getConsensusMembership(id));
@@ -116,7 +121,7 @@ public class POAGJson {
             for (Map.Entry<Integer, Double> outNodes : outedges.entrySet()) {
                 try {
                     JSONObject thisReaction = new JSONObject();
-                    int n2id = outNodes.getKey();
+                    Integer n2id = outNodes.getKey();
                     Node tempNode = nodes.get(n2id);
                     String rid = "edges_" + id + ":" + n2id;
                     int x2 = tempNode.getX();

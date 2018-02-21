@@ -17,10 +17,10 @@ public class Node {
     private int y;
     private final Map<Character, Double> graph;
     private Map<Character, Double> seqChars;
-    private final int id;
+    private final Integer id;
     private Map<Integer, Double> outedges;
     
-    public Node(int id, int x, int y, Map<Character, Double> graph, 
+    public Node(Integer id, int x, int y, Map<Character, Double> graph,
                         Map<Integer, Double> outedges, Map<Integer, Character> seqChars) {
         this.id = id;
         this.x = x;
@@ -38,6 +38,9 @@ public class Node {
      */
     private Map<Character, Double> makeDistSeqChars(Map<Integer, Character> rawSeq) {
         seqChars = new HashMap<>();
+
+        if (graph == null)
+            return seqChars;
 
         int numSequences = rawSeq.size();
         for (Character base : graph.keySet())
@@ -67,7 +70,7 @@ public class Node {
         return x;
     }
     
-    public int getID() {
+    public Integer getID() {
         return id;
     }
     

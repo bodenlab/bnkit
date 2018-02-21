@@ -16,6 +16,8 @@ import bn.prob.EnumDistrib;
 import dat.*;
 import dat.file.AlnWriter;
 import dat.file.FastaWriter;
+import json.JSONArray;
+import json.JSONObject;
 
 import java.io.*;
 import java.util.*;
@@ -31,17 +33,17 @@ import java.util.*;
  */
 public class ASRPOG {
 
-	private PhyloTree phyloTree; 										// Phylogenetic tree structure
-	private List<EnumSeq.Gappy<Enumerable>> extantSequences;			// List of sequences (label,bases)
-	private List<String> ancestralSeqLabels;							// Ancestral sequences labels (internal nodes of phylogenetic tree structure)
-	private POGraph pogAlignment;										// partial order alignment graph structure template
-	private EnumDistrib[] marginalDistributions; 						// Marginal distributions for nodes if doing a marginal reconstruction
+	private PhyloTree phyloTree = null; 								// Phylogenetic tree structure
+	private List<EnumSeq.Gappy<Enumerable>> extantSequences = null;		// List of sequences (label,bases)
+	private List<String> ancestralSeqLabels = null;						// Ancestral sequences labels (internal nodes of phylogenetic tree structure)
+	private POGraph pogAlignment = null;								// partial order alignment graph structure template
+	private EnumDistrib[] marginalDistributions = null; 				// Marginal distributions for nodes if doing a marginal reconstruction
 	private String marginalNode = null;									// Label of node to perform marginal reconstruction (if applicable)
-	private Map<String, List<Inference>> ancestralInferences;			// stores updates to the POGStructure for the ancestral node <node label, changes>
+	private Map<String, List<Inference>> ancestralInferences = null;	// stores updates to the POGStructure for the ancestral node <node label, changes>
 	private Double[] rates = null; 										// Rates at positions in alignment
 	private String model = "JTT";										// Evolutionary model to use for character inference
 	private int threads = 1;											// Number of threads to use for performing the reconstruction
-
+	private boolean performMSA = false;									// Flag to track whether the input sequences required alignment or not
 
 	/**
 	 * Infer ancestral sequences given an alignment file (fasta or aln).
@@ -111,14 +113,79 @@ public class ASRPOG {
 	 * @param treeFile		filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param sequenceFile	filepath to the sequences (expected extension .fa, .fasta or .aln)
 	 * @param marginalNode	node label for maginal inference
-	 * @param performMSA		flag for indicating whether to perform the alignment prior to reconstruction
-	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
-	 * @param threads			number of threads to use for reconstruction. Default: 1
+	 * @param performMSA	flag for indicating whether to perform the alignment prior to reconstruction
+	 * @param model			evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
+	 * @param threads		number of threads to use for reconstruction. Default: 1
 	 */
 	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException {
 		setupASRPOG(model, marginalNode, threads);
 		performASR(pog, treeFile, sequenceFile, false, performMSA);
 	}
+
+
+	public ASRPOG(String model, int threads) {
+		setupASRPOG(model, null, threads);
+	}
+
+	public ASRPOG(String model, int threads, String marginalNode) {
+		setupASRPOG(model, marginalNode, threads);
+	}
+
+	public ASRPOG(String model, int threads, JSONObject inferences, List<EnumSeq.Gappy<Enumerable>> sequences, String tree) {
+		setupASRPOG(model, null, threads);
+		extantSequences = new ArrayList<>(sequences);
+		importInferencesFromJSON(inferences);
+		phyloTree = PhyloTree.parseNewick(tree);
+		pogAlignment = new POGraph(sequences);
+	}
+
+	public void runReconstruction(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException {
+		performASR(pog, treeFile, sequenceFile, jointInference, performMSA);
+	}
+
+	public void runReconstruction(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws IOException {
+		performASR(msa, treeFile, sequenceFile, jointInference);
+	}
+
+	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa) {
+
+		extantSequences = new ArrayList<>(sequences);
+
+		// create phylogenetic tree structure
+		phyloTree = PhyloTree.parseNewick(treeNewick);
+
+		// Check if there are duplicate extant node names in the phylogenetic tree
+		// Duplicate extant node names not allowed - will influence reconstruction outcomes
+		// Check if there are duplicate sequence names in the extant sequences
+		// Duplicate sequence names not allowed - will influence reconstruction outcomes
+		// Check if the provided extant sequences match up to the provided tree
+		checkData();
+
+		// save sequence information in internal nodes of the phylogenetic tree
+		for (EnumSeq.Gappy<Enumerable> extant : extantSequences)
+			phyloTree.find(extant.getName()).setSequence(extant);
+
+		if (msa == null)
+			pogAlignment = new POGraph(extantSequences);
+		else
+			pogAlignment = new POGraph(msa);
+
+		// perform inference
+		if (jointInference) {
+			marginalDistributions = null;
+			queryBNJoint();
+		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
+			queryBNMarginal(marginalNode);
+		} else {
+			if (marginalNode == null)
+				System.out.println("No node was specified for the marginal inference: inferring the root node");
+			else
+				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
+			marginalNode = phyloTree.getRoot().getLabel().toString();
+			queryBNMarginal(phyloTree.getRoot().getLabel().toString());
+		}
+	}
+
 
 	/**
 	 * Constructs partial order alignment graphs for each of the internal nodes of the phylogenetic tree.
@@ -181,32 +248,140 @@ public class ASRPOG {
 	}
 
 	/**
+	 * Save the ASR Object in JSON format to the given filepath.
+	 *
+	 * @param filepath		Filepath to save JSON export details
+	 * @throws IOException
+	 */
+	public void saveJSONExport(String filepath) throws IOException {
+		BufferedWriter bw = new BufferedWriter(new FileWriter(filepath + "export.json", false));
+		bw.write(exportToJSON().toString());
+		bw.close();
+	}
+
+	public JSONObject exportInferencesToJSON() {
+		JSONObject infJSON = new JSONObject();
+
+		// add ancestral inferences
+		JSONArray allInferences = new JSONArray();
+		for (String ancestor : ancestralInferences.keySet()) {
+			JSONObject ancestorsInferences = new JSONObject();
+			JSONArray inferences = new JSONArray();
+			for (Inference i : ancestralInferences.get(ancestor)) {
+				JSONObject infDetails = new JSONObject();
+				infDetails.put("id", i.pogId);
+				infDetails.put("base", i.base + "");
+				JSONArray transitions = new JSONArray();
+				for (Integer transition : i.transitions)
+					transitions.put(transition);
+				infDetails.put("transitions", transitions);
+				inferences.put(infDetails);
+			}
+			ancestorsInferences.put("label", ancestor);
+			ancestorsInferences.put("inferences", inferences);
+			allInferences.put(ancestorsInferences);
+		}
+		infJSON.put("inferences", allInferences);
+
+		return infJSON;
+	}
+
+	public void importInferencesFromJSON(JSONObject inferences) {
+		ancestralInferences = new HashMap<>();
+		ancestralSeqLabels = new ArrayList<>();
+
+		JSONArray allInfArray = inferences.getJSONArray("inferences");
+		for (Object ancestor : allInfArray){
+			JSONObject anc = (JSONObject)ancestor;
+			List<Inference> infs = new ArrayList<>();
+			JSONArray ancInfArray = anc.getJSONArray("inferences");
+			for (Object inf : ancInfArray) {
+				JSONObject infJSON = (JSONObject)inf;
+				List<Integer> transitions = new ArrayList<>();
+				JSONArray jTransitions = infJSON.getJSONArray("transitions");
+				for (int i = 0; i < jTransitions.length(); i++)
+					try {
+						transitions.add(jTransitions.getInt(i));
+					} catch (Exception e) {
+						transitions.add(null); // final node pointer
+					}
+				Character base = infJSON.getString("base").toCharArray()[0];
+				try {
+					infs.add(new Inference(infJSON.getInt("id"), base, transitions));
+				} catch (Exception e) {
+					infs.add(new Inference(null, base, transitions)); // final node pointer
+				}
+			}
+			ancestralInferences.put(anc.getString("label"), infs);
+			ancestralSeqLabels.add(anc.getString("label"));
+		}
+	}
+
+	/**
+	 * Export the ASR object to JSON format.
+	 *
+	 * @return	JSON representation of current ASR details
+	 */
+	public JSONObject exportToJSON() {
+		JSONObject asrJSON = new JSONObject();
+
+		// Add extant sequences
+		JSONArray extants = new JSONArray();
+		for (EnumSeq.Gappy<Enumerable> extantSeq : extantSequences) {
+			JSONObject extant = new JSONObject();
+			extant.put("label", extantSeq.getName());
+			extant.put("sequence", extantSeq.toString());
+			extants.put(extant);
+		}
+		asrJSON.put("extants", extants);
+
+		// add ancestral inferences
+		JSONArray allInferences = new JSONArray();
+		for (String ancestor : ancestralInferences.keySet()) {
+			JSONObject ancestorsInferences = new JSONObject();
+			JSONArray inferences = new JSONArray();
+			for (Inference i : ancestralInferences.get(ancestor)) {
+				JSONObject infDetails = new JSONObject();
+				infDetails.put("id", i.pogId);
+				infDetails.put("base", i.base + "");
+				JSONArray transitions = new JSONArray();
+				for (Integer transition : i.transitions)
+					transitions.put(transition);
+				infDetails.put("transitions", transitions);
+				inferences.put(infDetails);
+			}
+			ancestorsInferences.put("label", ancestor);
+			ancestorsInferences.put("inferences", inferences);
+			allInferences.put(ancestorsInferences);
+		}
+		asrJSON.put("inferences", allInferences);
+
+		asrJSON.put("model", model);
+		asrJSON.put("threads", threads);
+		asrJSON.put("marginal_node", marginalNode);
+		asrJSON.put("phylotree", phyloTree.toString());
+
+		return asrJSON;
+	}
+
+
+	/**
 	 * Save the reconstructed sequences that have the most support through the partial order graph in FASTA format.
 	 * Saved in output path as "reconstructed_sequences.fasta"
 	 *
 	 * @param filepath	Output filepath
+	 * @param gappy		Flag to save gappy sequence (true) or not (false)
 	 */
-	public void saveSupportedAncestors(String filepath) throws IOException {
-		for (String phyloNodeLabel : ancestralSeqLabels)
-			if (phyloTree.find(phyloNodeLabel).getSequence() == null)
-				populateTreeNodeSeq(phyloNodeLabel);
+	public void saveSupportedAncestors(String filepath, boolean gappy) throws IOException {
 		Map<String, String> ancestralSeqs = new HashMap<>();
-		if (marginalNode == null)
-			for (String phyloNodeLabel : ancestralSeqLabels) {
-				try {
-					ancestralSeqs.put(phyloNodeLabel, phyloTree.find(phyloNodeLabel).getSequence().toString());
-				} catch (NullPointerException npe) {
-					System.err.println("Could not save sequence " + phyloNodeLabel + ": " + npe);
-				}
-			}
-		else
-			ancestralSeqs.put(marginalNode, phyloTree.find(marginalNode).getSequence().toString());
-
+		for (String node : ancestralSeqLabels) {
+			POGraph ancestor = getAncestor(node);
+			ancestralSeqs.put(node, ancestor.getSupportedSequence(gappy));
+		}
 		File directory = new File(filepath);
 		if (! directory.exists()){
 			directory.mkdir();
 		}
-
 
 		BufferedWriter bw = new BufferedWriter(new FileWriter(filepath + "_recon.fa", false));
 		for (String node : ancestralSeqs.keySet()) {
@@ -225,26 +400,18 @@ public class ASRPOG {
 	 *
 	 * @param filepath	Output filepath
 	 * @param label		label of ancestor to save (tree node label)
+	 * @param gappy		Flag to save gappy sequence (true) or not (false)
 	 */
-	public void saveSupportedAncestor(String filepath, String label) throws IOException {
+	public void saveSupportedAncestor(String filepath, String label, boolean gappy) throws IOException {
 		if (label.equalsIgnoreCase("root"))
 			label = (String)phyloTree.getRoot().getLabel();
-		Map<String, String> ancestralSeqs = new HashMap<>();
-		if (phyloTree.find(label).getSequence() == null)
-			populateTreeNodeSeq(label);
-		if (marginalNode == null)
-			ancestralSeqs.put(label, phyloTree.find(label).getSequence().toString());
-		else
-			ancestralSeqs.put(marginalNode, phyloTree.find(marginalNode).getSequence().toString());
+
+		POGraph ancestor = getAncestor(label);
 
 		BufferedWriter bw = new BufferedWriter(new FileWriter(filepath + "_recon.fa", false));
-		for (String node : ancestralSeqs.keySet()) {
-			bw.write(">" + node);
-			bw.newLine();
-			bw.write(ancestralSeqs.get(node));
-			bw.newLine();
-			bw.newLine();
-		}
+		bw.write(">" + label);
+		bw.newLine();
+		bw.write(ancestor.getSupportedSequence(gappy));
 		bw.close();
 	}
 
@@ -273,21 +440,21 @@ public class ASRPOG {
 	 * @param format	format to save ALN, "clustal" or "fasta", default: fasta
 	 */
 	public void saveALN(String filepath, String format) throws IOException {
-		for (String phyloNodeLabel : ancestralSeqLabels)
-			if (phyloTree.find(phyloNodeLabel).getSequence() == null)
-				populateTreeNodeSeq(phyloNodeLabel);
-		PhyloTree.Node[] nodes = phyloTree.toNodesBreadthFirst();
 		ArrayList<EnumSeq.Gappy<Enumerable>> allSeqs = new ArrayList<>();
-		for (int n = 0; n < nodes.length; n++) {
-			EnumSeq.Gappy<Enumerable> seq = (EnumSeq.Gappy) nodes[n].getSequence();
-			if (seq == null)
-				continue;
-			String seqName = nodes[n].toString();
-			String seqLab = seq.getName();
-			if (seqLab != null)
-				seq.setName(seqLab + " " + seqName + ";"); //Newick strings require a ';' to indicate completion
+
+		for (String node : ancestralSeqLabels) {
+			POGraph ancestor = getAncestor(node);
+			EnumSeq.Gappy<Enumerable> seq = new EnumSeq.Gappy<>(Enumerable.aacid_ext);
+			String seqName = ancestor.getSupportedSequence(true);
+			String seqLab = node;
+			seq.setName(seqLab + " " + seqName + ";"); //Newick strings require a ';' to indicate completion
+			Object[] s = new Object[seqName.length()];
+			for (int n = 0; n < seqName.length(); n++)
+				s[n] = seqName.toCharArray()[n];
+			seq.set(s);
 			allSeqs.add(seq);
 		}
+
 		EnumSeq.Gappy<Enumerable>[] seqs = new EnumSeq.Gappy[allSeqs.size()];
 		for (int n = 0; n < allSeqs.size(); n++)
 			seqs[n] = allSeqs.get(n);
@@ -414,17 +581,16 @@ public class ASRPOG {
 	 */
 	public Collection<PhyloTree.Node> getChildren(String node) {
 		return this.phyloTree.find(node).getChildren();
+	}
 
+	public String getReconstructedNewick() {
+		return phyloTree.getRoot().toString();
 	}
 
 	public Map<String, String> getAncestralDict(){
-
 		Map<String, String> ancestralDict = new HashMap<>();
-
-		for (String label : this.ancestralSeqLabels){
+		for (String label : this.ancestralSeqLabels)
 			ancestralDict.put(label, "");
-		}
-
 		return ancestralDict;
 	}
 
@@ -439,6 +605,16 @@ public class ASRPOG {
 	 */
 	public EnumDistrib[] getMarginalDistributions(){
 		return this.marginalDistributions;
+	}
+
+
+	/**
+	 * Get the current node ID of the alignment PO graph.
+	 *
+	 * @return	ID of current node in alignment PO graph
+	 */
+	public int getGraphReconNodeId() {
+		return pogAlignment.getCurrentId();
 	}
 
 	/* ****************************************************************************************************************************************************
@@ -456,6 +632,10 @@ public class ASRPOG {
 		if (model != null)
 			this.model = model;
 		this.marginalNode = node;
+
+		// initialise ancestral sequence labels and list for tracking changes to the POG structure for the ancestral nodes
+		ancestralSeqLabels = new ArrayList<>();
+		ancestralInferences = new HashMap<>();
 	}
 
 	/**
@@ -467,6 +647,7 @@ public class ASRPOG {
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 */
 	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws RuntimeException, IOException {
+		this.performMSA = performMSA;
 		loadData(treeFile, sequenceFile);
 		if (pog == null || pog.equals(""))	// load graph structure from alignment file
 			pog = sequenceFile;
@@ -527,10 +708,10 @@ public class ASRPOG {
 	 *
 	 * @param phyloNodeLabel	label of ancestral node
 	 */
-	private void populateTreeNodeSeq(String phyloNodeLabel) {
+	/*private void populateTreeNodeSeq(String phyloNodeLabel) {
 		EnumSeq.Gappy<Enumerable> seq = new EnumSeq.Gappy<>(Enumerable.aacid_ext);
 		seq.setName(phyloNodeLabel);
-		String s = getAncestor(phyloNodeLabel).getSupportedGappySequence();
+		String s = getAncestor(phyloNodeLabel).getSupportedSequence(false);
 		seq.setInfo(s);
 		Object[] chars = new Object[s.length()];
 		for (int c = 0; c < s.length(); c++)
@@ -538,7 +719,8 @@ public class ASRPOG {
 		seq.length();
 		seq.set(chars);
 		phyloTree.find(phyloNodeLabel).setSequence(seq);
-	}
+	}*/
+
 
 	/**
 	 * Generates the ancestor by applying the inference changes stored in the ancestralInferences log.
@@ -546,7 +728,7 @@ public class ASRPOG {
 	 * @param label	Ancestral sequence label
 	 * @return		POGStructure of ancestor
 	 */
-	private POGraph getAncestor(String label) {
+	public POGraph getAncestor(String label) {
 		POGraph ancestor = new POGraph(pogAlignment);
 		if (label.equalsIgnoreCase("root"))
 			label = (String)phyloTree.getRoot().getLabel();
@@ -562,8 +744,9 @@ public class ASRPOG {
 						ancestor.setBase(inferredBase.base);
 				// if node is still there, check the parsimonious transitions. Because we are doing both backwards and forwards parsimony,
 				// get the intersection of the previous/next nodes and all inferred transitions of the current node
-				if (ancestor.getCurrentId() != inferredBase.pogId)
+				if ((ancestor.getCurrentId() == null && inferredBase.pogId != null) || (ancestor.getCurrentId() != null && !ancestor.getCurrentId().equals(inferredBase.pogId)))
 					continue;
+
 
 				// find union of next/previous transitions and remove transitions that are not inferred
 				// 'next':
@@ -572,7 +755,7 @@ public class ASRPOG {
 					// Identify if edge is reciprocated by backwards parsimony (if so, flag)
 					Inference next = null;
 					for (Inference i : inferences)
-						if (i.pogId == nextId) {
+						if ((i.pogId == null && nextId == null) || i.pogId.equals(nextId)) {
 							next = i;
 							break;
 						}
@@ -625,13 +808,22 @@ public class ASRPOG {
 		}
 		aln_file.close();
 
-		// initialise ancestral sequence labels and list for tracking changes to the POG structure for the ancestral nodes
-		ancestralSeqLabels = new ArrayList<>();
-		ancestralInferences = new HashMap<>();
-
 		// create phylogenetic tree structure
 		phyloTree = PhyloTree.loadNewick(treeFile);
 
+		// Check if there are duplicate extant node names in the phylogenetic tree
+		// Duplicate extant node names not allowed - will influence reconstruction outcomes
+		// Check if there are duplicate sequence names in the extant sequences
+		// Duplicate sequence names not allowed - will influence reconstruction outcomes
+		// Check if the provided extant sequences match up to the provided tree
+		checkData();
+
+		// save sequence information in internal nodes of the phylogenetic tree
+		for (EnumSeq.Gappy<Enumerable> extant : extantSequences)
+			phyloTree.find(extant.getName()).setSequence(extant);
+	}
+
+	private void checkData(){
 		// Check if there are duplicate extant node names in the phylogenetic tree
 		// Duplicate extant node names not allowed - will influence reconstruction outcomes
 		PhyloTree.Node[] nodes = phyloTree.toNodesBreadthFirst(); //tree to nodes - recursive
@@ -657,22 +849,18 @@ public class ASRPOG {
 
 		// Check if the provided extant sequences match up to the provided tree
 		if (!eNodes.equals(seqNames)) {
-		    // find labels that don't match
-            String seqLabels = "";
-            for (String seqLabel : seqNames)
-                if (!eNodes.contains(seqLabel))
-                    seqLabels += " " + seqLabel;
-            String eLabels = "";
-            for (String eLabel : eNodes)
-                if (!seqNames.contains(eLabel))
-                    eLabels += " " + eLabel;
-            throw new RuntimeException("The sequence names in the provided alignment must all have a match" +
-                    " in the provided tree. Unique labels in the alignment: " + seqLabels + ": unique labels in the tree: " + eLabels);
-        }
-
-		// save sequence information in internal nodes of the phylogenetic tree
-		for (EnumSeq.Gappy<Enumerable> extant : extantSequences)
-			phyloTree.find(extant.getName()).setSequence(extant);
+			// find labels that don't match
+			String seqLabels = "";
+			for (String seqLabel : seqNames)
+				if (!eNodes.contains(seqLabel))
+					seqLabels += " " + seqLabel;
+			String eLabels = "";
+			for (String eLabel : eNodes)
+				if (!seqNames.contains(eLabel))
+					eLabels += " " + eLabel;
+			throw new RuntimeException("The sequence names in the provided alignment must all have a match" +
+					" in the provided tree. Unique labels in the alignment: " + seqLabels + ": unique labels in the tree: " + eLabels);
+		}
 	}
 	
 	/**
@@ -897,10 +1085,6 @@ public class ASRPOG {
 				ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
 			}
 		}
-		// save sequence information in internal nodes of the phylogenetic tree
-		// TODO:
-		//for (String phyloNodeLabel : ancestralSeqLabels)
-		//	populateTreeNodeSeq(phyloNodeLabel);
 //		long elapsedTimeNs = System.nanoTime() - startTime;
 //		System.out.printf("Elapsed time in secs: %5.3f\n", elapsedTimeNs/1000000000.0);
 	}
@@ -989,7 +1173,6 @@ public class ASRPOG {
 		}
 
 		// save sequence information in internal nodes of the phylogenetic tree
-		populateTreeNodeSeq(marginalNode);
 		ancestralSeqLabels = new ArrayList<>();
 		ancestralSeqLabels.add(marginalNode);
 //		long elapsedTimeNs = System.nanoTime() - startTime;x
