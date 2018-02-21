@@ -59,8 +59,8 @@ public class ASR {
             System.out.println("*Information*\nNo node specification: returning marginal distribution of root node");
             queryNetsMarg(pbnets);
         } else {
-            System.out.println("Inference must be either 'Joint' or 'Marginal'");
-            System.exit(1);
+            throw new RuntimeException("Error: Inference must be either 'Joint' or 'Marginal'");
+//            System.exit(1);
         }
     }
 
@@ -83,8 +83,8 @@ public class ASR {
             System.out.println("*Information*\nNo node specification: returning marginal distribution of root node");
             queryNetsMarg(pbnets);
         } else {
-            System.out.println("Inference must be either 'Joint' or 'Marginal'");
-            System.exit(1);
+            throw new RuntimeException("Error: Inference must be either 'Joint' or 'Marginal'");
+//            System.exit(1);
         }
 
         Character gap = "-".charAt(0);
@@ -124,13 +124,13 @@ public class ASR {
             getSequences();
         } else if (inference.equals("Marginal")) {
             if (tree.find(nodeLabel) == null) {
-                System.out.println("Invalid node label" + nodeLabel + " - exiting");
-                System.exit(1);
+                throw new RuntimeException("Error: Invalid node label" + nodeLabel + " - exiting");
+//                System.exit(1);
             }
             queryNetsMarg(pbnets, tree.find(nodeLabel));
         } else {
-            System.out.println("Inference must be either 'Joint' or 'Marginal' - exiting");
-            System.exit(1);
+            throw new RuntimeException("Error: Inference must be either 'Joint' or 'Marginal' - exiting");
+//            System.exit(1);
         }
     }
 
@@ -159,7 +159,7 @@ public class ASR {
                 Character gap = "-".charAt(0);
                 seqs = EnumSeq.Gappy.loadFasta(file_aln, Enumerable.aacid, gap);
             } else {
-                throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+                throw new RuntimeException("Incorrect sequence or alignment format (requires FASTA or Clustal format .aln, .fa or .fasta)");
             }
 
             //Duplicate extant node names not allowed - will influence reconstruction outcomes

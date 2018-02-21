@@ -96,7 +96,7 @@ public class RunASRPOG {
 			if (treePath.isEmpty())
 				usage("Filepath to the phylogenetic tree must be provided as an input parameter.");
 			if (poagRepresentation.isEmpty() && sequencePath.isEmpty())
-				usage("A partial order alignment graph structure or filepath must be input as a parameter, or a sequence fasta filepath must be specified using the [-s] parameter.");
+				usage("A partial order alignment graph structure or filepath must be input as a parameter, or a sequence FASTA filepath must be specified using the [-s] parameter.");
 
 			if (poagRepresentation.isEmpty()) {
 				if (performAlignment) { // generate a partial order alignment graph if the alignment has not been specified

@@ -480,8 +480,9 @@ final public class SubstitutionMatrix {
             distance = matrix[getIndex(a1)][getIndex(a2)];
 
         } catch (NullPointerException | ArrayIndexOutOfBoundsException e){
-            System.out.println("Unrecognised character when trying to align " + a1 + " and " + a2);
-            System.exit(1);
+            throw new RuntimeException("Error: Unrecognised character when trying to align " + a1 + " and " + a2);
+
+//            System.exit(1);
         }
 
 

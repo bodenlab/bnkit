@@ -492,7 +492,7 @@ public class POGraph {
 				writer.save(seqs);
 				writer.close();
 			} else
-				System.err.print("Incorrect file type. Must be 'fasta' or 'clustal'.");
+				System.err.print("Incorrect file type. Must be FASTA or Clustal.");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -670,7 +670,7 @@ public class POGraph {
 			} else if (line.startsWith(">")) {
 				seqs = EnumSeq.Gappy.loadFasta(seqPath, Enumerable.aacid_ext, '-');
 			} else {
-				throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+				throw new RuntimeException("Incorrect sequence or alignment format (requires FASTA or Clustal format .aln, .fa or .fasta)");
 			}
 			seqfile.close();
 
@@ -875,7 +875,7 @@ public class POGraph {
 			} else if (line.startsWith(">")) {
 				seqs = EnumSeq.Gappy.loadFasta(seqPath, Enumerable.aacid_ext, '-');
 			} else {
-				throw new RuntimeException("Alignment should be in Clustal or Fasta format");
+				throw new RuntimeException("Incorrect sequence or alignment format (requires FASTA or Clustal format .aln, .fa or .fasta)");
 			}
 			seqfile.close();
 		} catch (IOException e) {
@@ -1015,11 +1015,11 @@ public class POGraph {
 				reader = new BufferedReader(new FileReader(new File(structure)));
 				line = reader.readLine();
 			} catch (FileNotFoundException e) {
-				System.err.println("Cannot find partial order graph file.");
-				System.exit(1);
+				throw new RuntimeException("Cannot find partial order graph file.");
+//				System.exit(1);
 			} catch (IOException e) {
-				System.err.println("Incorrect partial order graph file format.");
-				System.exit(1);
+				throw new RuntimeException("Incorrect partial order graph file format.");
+//				System.exit(1);
 			}
 		} else {
 			// structure is a string representation

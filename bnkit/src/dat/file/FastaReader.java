@@ -208,7 +208,7 @@ public class FastaReader {
                             } else if (alphabet.isValid(current)) { // sequence component
                                 syms.add(current);
                             } else {
-                                throw new RuntimeException("Unrecognized symbol: " + current);
+                                throw new RuntimeException("Unrecognised symbol: " + current + " at index " + s);
 
                             }
                         }
@@ -270,7 +270,7 @@ public class FastaReader {
                     EnumSeq sbuf = extract(seqdef, false);
                     sequences.add(sbuf);
                 } catch (RuntimeException e) {
-                    throw new RuntimeException("Sequence \"" + seqdef[0].substring(1) + "\" is using an illegal symbol - " + e.getMessage());
+                    throw new RuntimeException("Sequence \"" + seqdef[0].substring(1) + "\" is using an invalid symbol. " + e.getMessage());
                 }
             } else {
                 line = reader.readLine();
@@ -320,7 +320,7 @@ public class FastaReader {
                     //FIXME - untested
                     sequences.add(sbuf);
                 } catch (RuntimeException e) {
-                    throw new RuntimeException("Sequence \"" + seqdef[0].substring(1) + "\" is using an illegal symbol - " + e.getMessage());
+                    throw new RuntimeException("Sequence \"" + seqdef[0].substring(1) + "\" is using an invalid symbol. " + e.getMessage());
                 }
             } else {
                 line = reader.readLine();
