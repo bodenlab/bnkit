@@ -113,6 +113,12 @@ public class PartialOrderGraph {
         return ids;
     }
 
+    public Integer getFinalNodeID(){
+        return graph.getFinalNodeID();
+    }
+
+    public Integer getInitialNodeID() { return graph.getInitialNodeID(); }
+
     /**
      * Get the IDs of the previous nodes of the node with the given ID.
      *

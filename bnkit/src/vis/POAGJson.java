@@ -31,8 +31,8 @@ public class POAGJson {
         pathGen = new PathGen(poag);
         this.nodes = pathGen.nodes;
         // add start and end nodes
-        Node initialNode = new Node(-1, -1, 0, null, poag.getOutEdgeWeights(-1), poag.getSeqChars(-1));
-        Node finalNode = new Node(this.nodes.size(), nodes.size()+1, 0, null, poag.getOutEdgeWeights(null), poag.getSeqChars(null));
+        Node initialNode = new Node(poag.getInitialNodeID(), -1, 0, null, poag.getOutEdgeWeights(poag.getInitialNodeID()), poag.getSeqChars(-1));
+        Node finalNode = new Node(poag.getFinalNodeID(), poag.getFinalNodeID(), 0, null, poag.getOutEdgeWeights(poag.getFinalNodeID()), poag.getSeqChars(poag.getFinalNodeID()));
         this.nodes.put(initialNode.getID(), initialNode);
         this.nodes.put(finalNode.getID(), finalNode);
         jsonMap = new JSONObject();
@@ -105,7 +105,7 @@ public class POAGJson {
             thisNode.put("lane", y);
 
             // Ones needed for tthe actual poag
-            thisNode.put("label", n.getOutedges().isEmpty() ? "final" : id == -1 ? "initial" : poag.getLabel(id));
+            thisNode.put("label", n.getID().equals(poag.getFinalNodeID()) ? "final" : id.equals(poag.getInitialNodeID()) ? "initial" : poag.getLabel(id));
             thisNode.put("x", x);
             thisNode.put("y", y);
             thisNode.put("graph", n.getGraph() == null? null : map2JSON(n.getGraph()));
@@ -134,11 +134,11 @@ public class POAGJson {
                     thisReaction.put("y1", y);
                     thisReaction.put("y2", y2);
                     thisReaction.put("weight", weight);
-                    thisReaction.put("consensus", poag.getConsensusMembership(id) && n2id == poag.getNextConsensusID(id));
+                    thisReaction.put("consensus", poag.getConsensusMembership(id) && n2id.equals(poag.getNextConsensusID(id)));
                     Integer[] reciprocatedIds = poag.getReciprocatedNextIDs(id);
                     boolean reciprocated = false;
                     for (int r = 0; r < reciprocatedIds.length; r++)
-                        if (reciprocatedIds[r] == n2id) {
+                        if (reciprocatedIds[r].equals(n2id)) {
                             reciprocated = true;
                             break;
                         }

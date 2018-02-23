@@ -19,13 +19,17 @@ public class ASRTests {
     @Test
     @DisplayName("Get ancestral partial order graph")
     public void getAncestralGraphTest() throws IOException {
-        String alnfilepath = "src/test/resources/hudson.aln";
-        String nwkfilepath = "src/test/resources/hudson.nwk";
+        String alnfilepath = "src/test/resources/tawfik.aln";
+        String nwkfilepath = "src/test/resources/tawfik.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
-        PartialOrderGraph root = asr.getGraph("N9");
+        PartialOrderGraph root = asr.getGraph("N22_68");
+        POGraph pog = asr.getAncestor("N22_68");
         System.out.println(root.getConsensusGappySequence());
+        System.out.println(pog.getSupportedSequence(true));
         POAGJson json = new POAGJson(root);
         JSONObject grap =  json.toJSON();
+
+
     }
 
 
@@ -37,6 +41,7 @@ public class ASRTests {
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 3);
         asr.saveSupportedAncestor("src/test/t", "root", true);
         asr.saveALN("src/test/t", "aln");
+        System.out.println(asr.getGraph("N9").getConsensusGappySequence());
     }
 
     @Test
