@@ -55,7 +55,7 @@ public class ASRPOG {
 	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException {
+	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, null, threads);
 		performASR("", treeFile, alignmentFile, jointInference, performMSA);
 	}
@@ -70,7 +70,7 @@ public class ASRPOG {
 	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException {
+	public ASRPOG(String alignmentFile, String treeFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, marginalNode, threads);
 		performASR("", treeFile, alignmentFile, false, performMSA);
 	}
@@ -86,7 +86,7 @@ public class ASRPOG {
 	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException {
+	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, null, threads);
 		performASR(pog, treeFile, sequenceFile, jointInference, performMSA);
 	}
@@ -101,7 +101,7 @@ public class ASRPOG {
 	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, String model, int threads) throws IOException {
+	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, null, threads);
 		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
@@ -117,7 +117,7 @@ public class ASRPOG {
 	 * @param model			evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads		number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException {
+	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, marginalNode, threads);
 		performASR(pog, treeFile, sequenceFile, false, performMSA);
 	}
@@ -139,15 +139,15 @@ public class ASRPOG {
 		pogAlignment = new POGraph(sequences);
 	}
 
-	public void runReconstruction(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException {
+	public void runReconstruction(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException, InterruptedException {
 		performASR(pog, treeFile, sequenceFile, jointInference, performMSA);
 	}
 
-	public void runReconstruction(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws IOException {
+	public void runReconstruction(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws IOException, InterruptedException {
 		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
 
-	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa) {
+	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa) throws InterruptedException {
 
 		extantSequences = new ArrayList<>(sequences);
 
@@ -365,8 +365,22 @@ public class ASRPOG {
 	 * @param gappy		Flag to save gappy sequence (true) or not (false)
 	 */
 	public void saveSupportedAncestors(String filepath, boolean gappy) throws IOException {
+		String[] labels = new String[ancestralSeqLabels.size()];
+		ancestralSeqLabels.toArray(labels);
+		saveSupportedAncestors(filepath, labels, gappy);
+	}
+
+	/**
+	 * Save the reconstructed sequences that have the most support through the partial order graph in FASTA format.
+	 * Saved in output path as "reconstructed_sequences.fasta"
+	 *
+	 * @param filepath	Output filepath
+	 * @param nodes		Array of ancestral nodes to save
+	 * @param gappy		Flag to save gappy sequence (true) or not (false)
+	 */
+	public void saveSupportedAncestors(String filepath, String[] nodes, boolean gappy) throws IOException {
 		Map<String, String> ancestralSeqs = new HashMap<>();
-		for (String node : ancestralSeqLabels) {
+		for (String node : nodes) {
 			POGraph ancestor = getAncestor(node);
 			ancestralSeqs.put(node, ancestor.getSupportedSequence(gappy));
 		}
@@ -384,6 +398,7 @@ public class ASRPOG {
 		}
 		bw.close();
 	}
+
 
 	/**
 	 * Save the reconstructed sequences that have the most support through the partial order graph in FASTA format.
@@ -641,7 +656,7 @@ public class ASRPOG {
 	 * @param pog				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 */
-	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws RuntimeException, IOException {
+	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws RuntimeException, IOException, InterruptedException {
 		this.performMSA = performMSA;
 		loadData(treeFile, sequenceFile);
 		if (pog == null || pog.equals(""))	// load graph structure from alignment file
@@ -677,7 +692,7 @@ public class ASRPOG {
 	 * @param msa				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 */
-	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws RuntimeException, IOException {
+	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws RuntimeException, IOException, InterruptedException {
 		loadData(treeFile, sequenceFile);
 
 		pogAlignment = msa;
@@ -998,7 +1013,7 @@ public class ASRPOG {
 	/**
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using joint inference.
 	 */
-	private void queryBNJoint(){
+	private void queryBNJoint() throws InterruptedException {
 
 //		long startTime = System.nanoTime();
 
@@ -1087,7 +1102,7 @@ public class ASRPOG {
 	 *
 	 * @param phyloNode		ancestral node to perform marginal reconstruction of
 	 */
-	private void queryBNMarginal(String phyloNode) {
+	private void queryBNMarginal(String phyloNode) throws InterruptedException {
 		marginalDistributions = new EnumDistrib[pogAlignment.getNumNodes()];
 //		long startTime = System.nanoTime();
 

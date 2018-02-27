@@ -25,7 +25,7 @@ class BranchIsolation {
     private String model;
     private int threads;
 
-    BranchIsolation(ASRPOG asr, Map<String, String> ancestralDict, String treePath, String sequencePath, String node, boolean mp, String model, int threads) throws IOException {
+    BranchIsolation(ASRPOG asr, Map<String, String> ancestralDict, String treePath, String sequencePath, String node, boolean mp, String model, int threads) throws IOException, InterruptedException {
         this.asr = asr;
         this.ancestralDict = ancestralDict;
         this.treePath = treePath;
@@ -189,7 +189,7 @@ class BranchIsolation {
 
     }
 
-    private EnumDistrib[] getDistrib(String node) throws IOException {
+    private EnumDistrib[] getDistrib(String node) throws IOException, InterruptedException {
 
 
 
