@@ -287,11 +287,11 @@ public class VarElim implements Inference {
                         for (int j = 0; j < margin.length; j ++) 
                             margin[j] = b.vars.get(j);
                         if (q.getStatus() == STATUS_MPE)
-                            result = Factorize.getMaxMargin(result, margin);      // max-out variables of bucket
+                            result = Factorize.getMaxMargin(result, margin); // max-out variables of bucket
                         else
-                            result = Factorize.getMargin(result, margin);   // sum-out variables of bucket
+                            result = Factorize.getMargin(result, margin);    // sum-out variables of bucket
                         
-                        if (!result.hasEnumVars())          // if no enumerable variables, we may still have non-enumerables
+                        if (!result.hasEnumVars())      // if no enumerable variables, we may still have non-enumerables
                             buckets.get(0).put(result); // so we put the factor in the first bucket
                         else {                          // there are enumerables so...
                             for (int jj = i - 1; jj >= 0; jj--) { // find a new bucket for the result factor
