@@ -68,7 +68,7 @@ public class JointInferenceExecutor {
      * Run all jobs and wait for them to be finished
      * @return all results
      */
-    public Map<Integer, Variable.Assignment[]> run() {
+    public Map<Integer, Variable.Assignment[]> run() throws InterruptedException {
         for (Map.Entry<Integer, ASRPOGJointInference> entry : batchInferences.entrySet()) {
             Callable<Variable.Assignment[]> worker = entry.getValue();
             Future<Variable.Assignment[]> submit = executor.submit(worker);
@@ -81,8 +81,6 @@ public class JointInferenceExecutor {
             Future<Variable.Assignment[]> future = entry.getValue();
             try {
                 res.put(nodeId, future.get());
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             } catch (ExecutionException e) {
                 e.printStackTrace();
             }

@@ -105,15 +105,15 @@ public class POGraph {
 		sequences.put(id, label);
 		for (int baseInd = 0; baseInd < bases.length; baseInd++) {
 			Integer curId = nodeIds.get(baseInd);
-			Integer prevId = -1;
+			Integer prevId = initialNode.getID();
 			if (nodeIds.indexOf(curId) >= 0)
-				prevId = (nodeIdsAdded.size() == 0) ? -1 : nodeIdsAdded.get(nodeIdsAdded.size()-1);
+				prevId = (nodeIdsAdded.size() == 0) ? initialNode.getID() : nodeIdsAdded.get(nodeIdsAdded.size()-1);
 			if (curId == -2 || !setCurrent(curId)) {
 				// base did not align with graph or node doesn't currently exist in the graph, create it
 				current = new Node(curId == -2 ? nodes.size() : curId);
 				nodes.put(current.getID(), current);
 			}
-			if (prevId == -1){
+			if (prevId == initialNode.getID()){
 				initialNode.addNextNode(current, id);
 				current.addPrevNode(initialNode, id);
 			} else {
@@ -136,9 +136,9 @@ public class POGraph {
 	 * @return			indication of whether setting the node succeeded or not
 	 */
 	public boolean setCurrent(Integer nodeID){
-		if (nodeID == null)
+		if (nodeID.equals(finalNode.getID()))
 			current = finalNode;
-		else if (nodeID == -1)
+		else if (nodeID.equals(initialNode.getID()))
 			current = initialNode;
 		else
 			current = nodes.get(nodeID);
@@ -317,7 +317,6 @@ public class POGraph {
 		if (current == null)
 			return prevIDs;
 		for (Node node : current.getPreviousNodes())
-			//if (node.getID() != -1)
 			prevIDs.add(node.getID());
 		return prevIDs;
 	}
@@ -343,10 +342,10 @@ public class POGraph {
 	 */
 	public void setReciprocated(Integer nextId) {
 		for (Edge e : current.getNextTransitions())
-			if (e.getNext().getID() == nextId) {
+			if (e.getNext().getID().equals(nextId)) {
 				e.setReciprocated(true);
 				for (Edge p : e.getNext().getPreviousTransitions())
-					if (p.getNext().getID() == current.getID())
+					if (p.getNext().getID().equals(current.getID()))
 						p.setReciprocated(true);
 			}
 	}
@@ -371,7 +370,7 @@ public class POGraph {
 	 */
 	public void removeNextTransition(Integer removeId) {
 		for (Edge edge : current.getNextTransitions())
-			if (edge.getNext().getID() == removeId) {
+			if (edge.getNext().getID().equals(removeId)) {
 				current.removeNextNode(edge.getNext());
 				if (edge.getNext().getPreviousNodes().isEmpty()) {
 					Node tmp = current;
@@ -383,6 +382,12 @@ public class POGraph {
 			}
 	}
 
+	public Integer getFinalNodeID(){
+		return finalNode.getID();
+	}
+
+	public Integer getInitialNodeID() { return initialNode.getID(); }
+
 	/**
 	 * Remove transition to the previous node with the provided ID
 	 *
@@ -390,7 +395,7 @@ public class POGraph {
 	 */
 	public void removePreviousTransition(Integer removeId) {
 		for (Edge edge : current.getPreviousTransitions())
-			if (edge.getNext().getID() == removeId) {
+			if (edge.getNext().getID().equals(removeId)) {
 				current.removePrevNode(edge.getNext());
 				if (current.getPreviousNodes().isEmpty()) {
 					removeNode();
@@ -749,12 +754,7 @@ public class POGraph {
 			next = (next == null) ? current.getNextTransitions().get(0) : next;
 			next.setConsensus(true);
 			if (gappy) {
-				Integer n = next.getNext().getID();
-				if (next.getNext() == finalNode)
-					for (Node prev : next.getNext().getPreviousNodes())
-						if (n == null || prev.getID() > n)
-							n = prev.getID() + 1;
-				n = n - current.getID() - 1;
+				Integer n = next.getNext().getID() - current.getID() - 1;
 				if (n > 0)
 					for (int g = 0; g < n; g++)
 						sequence += '-';
@@ -1477,7 +1477,7 @@ public class POGraph {
 				}
 			// find node with ID
 			for (Node node : map.values())
-				if (node.getID() == this.getID())
+				if (node.getID().equals(this.getID()))
 					return node;
 			return null;
 		}
@@ -1491,7 +1491,7 @@ public class POGraph {
 		private void addNextNode(Node next, Integer seq) {
 			Edge nextT = null;
 			for (Edge edge : nextTransitions)
-				if (edge.getNext().getID() == next.getID()) {
+				if (edge.getNext().getID().equals(next.getID())) {
 					// edge already exists, just add sequence
 					nextT = edge;
 					this.nextTransitions.remove(nextT);
@@ -1520,7 +1520,7 @@ public class POGraph {
 		 */
 		private void addPrevNode(Node prev, Integer seq) {
 			for (Edge edge : prevTransitions)
-				if (edge.getNext().getID() == prev.getID()) {
+				if (edge.getNext().getID().equals(prev.getID())) {
 					// edge already exists, just add sequence
 					if (seq != null)
 						edge.addSequence(seq);
@@ -1595,7 +1595,7 @@ public class POGraph {
 		 */
 		private void removePrevNode(Node prev){
 			for (Edge edge : prevTransitions)
-				if (edge.getNext().getID() == prev.getID()) {
+				if (edge.getNext().getID().equals(prev.getID())) {
 					prevTransitions.remove(edge);
 					prev.removeNextNode(this);
 					return;
@@ -1609,7 +1609,7 @@ public class POGraph {
 		 */
 		private void removeNextNode(Node next){
 			for (Edge edge : nextTransitions)
-				if (edge.getNext().getID() == next.getID()) {
+				if (edge.getNext().getID().equals(next.getID())) {
 					nextTransitions.remove(edge);
 					next.removePrevNode(this);
 					return;

@@ -25,7 +25,7 @@ public class VisTests {
 
     @Test
     @DisplayName("Generate JSON graph for ASR output")
-    public void getJSONASRTest() throws IOException {
+    public void getJSONASRTest() throws IOException, InterruptedException {
         String alnfilepath = "src/test/resources/small.aln";
         String treefilepath = "src/test/resources/small.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, treefilepath, false, false, null, 1);

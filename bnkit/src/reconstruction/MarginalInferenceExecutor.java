@@ -64,7 +64,7 @@ public class MarginalInferenceExecutor {
      * Run all jobs and wait for them to be finished
      * @return all results
      */
-    public Map<Integer, EnumDistrib> run() {
+    public Map<Integer, EnumDistrib> run() throws InterruptedException {
         for (Map.Entry<Integer, ASRPOGMarginalInference> entry : batchInferences.entrySet()) {
             Callable<EnumDistrib> worker = entry.getValue();
             Future<EnumDistrib> submit = executor.submit(worker);
@@ -77,8 +77,6 @@ public class MarginalInferenceExecutor {
             Future<EnumDistrib> future = entry.getValue();
             try {
                 res.put(nodeId, future.get());
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             } catch (ExecutionException e) {
                 e.printStackTrace();
             }

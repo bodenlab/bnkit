@@ -55,7 +55,7 @@ public class ASRPOG {
 	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException {
+	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, null, threads);
 		performASR("", treeFile, alignmentFile, jointInference, performMSA);
 	}
@@ -70,7 +70,7 @@ public class ASRPOG {
 	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException {
+	public ASRPOG(String alignmentFile, String treeFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, marginalNode, threads);
 		performASR("", treeFile, alignmentFile, false, performMSA);
 	}
@@ -86,7 +86,7 @@ public class ASRPOG {
 	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException {
+	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, null, threads);
 		performASR(pog, treeFile, sequenceFile, jointInference, performMSA);
 	}
@@ -101,7 +101,7 @@ public class ASRPOG {
 	 * @param model				evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads			number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, String model, int threads) throws IOException {
+	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, null, threads);
 		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
@@ -117,7 +117,7 @@ public class ASRPOG {
 	 * @param model			evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads		number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException {
+	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, marginalNode, threads);
 		performASR(pog, treeFile, sequenceFile, false, performMSA);
 	}
@@ -139,15 +139,15 @@ public class ASRPOG {
 		pogAlignment = new POGraph(sequences);
 	}
 
-	public void runReconstruction(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException {
+	public void runReconstruction(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException, InterruptedException {
 		performASR(pog, treeFile, sequenceFile, jointInference, performMSA);
 	}
 
-	public void runReconstruction(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws IOException {
+	public void runReconstruction(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws IOException, InterruptedException {
 		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
 
-	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa) {
+	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa) throws InterruptedException {
 
 		extantSequences = new ArrayList<>(sequences);
 
@@ -300,17 +300,9 @@ public class ASRPOG {
 				List<Integer> transitions = new ArrayList<>();
 				JSONArray jTransitions = infJSON.getJSONArray("transitions");
 				for (int i = 0; i < jTransitions.length(); i++)
-					try {
-						transitions.add(jTransitions.getInt(i));
-					} catch (Exception e) {
-						transitions.add(null); // final node pointer
-					}
+					transitions.add(jTransitions.getInt(i));
 				Character base = infJSON.getString("base").toCharArray()[0];
-				try {
-					infs.add(new Inference(infJSON.getInt("id"), base, transitions));
-				} catch (Exception e) {
-					infs.add(new Inference(null, base, transitions)); // final node pointer
-				}
+				infs.add(new Inference(infJSON.getInt("id"), base, transitions));
 			}
 			ancestralInferences.put(anc.getString("label"), infs);
 			ancestralSeqLabels.add(anc.getString("label"));
@@ -373,15 +365,28 @@ public class ASRPOG {
 	 * @param gappy		Flag to save gappy sequence (true) or not (false)
 	 */
 	public void saveSupportedAncestors(String filepath, boolean gappy) throws IOException {
+		String[] labels = new String[ancestralSeqLabels.size()];
+		ancestralSeqLabels.toArray(labels);
+		saveSupportedAncestors(filepath, labels, gappy);
+	}
+
+	/**
+	 * Save the reconstructed sequences that have the most support through the partial order graph in FASTA format.
+	 * Saved in output path as "reconstructed_sequences.fasta"
+	 *
+	 * @param filepath	Output filepath
+	 * @param nodes		Array of ancestral nodes to save
+	 * @param gappy		Flag to save gappy sequence (true) or not (false)
+	 */
+	public void saveSupportedAncestors(String filepath, String[] nodes, boolean gappy) throws IOException {
 		Map<String, String> ancestralSeqs = new HashMap<>();
-		for (String node : ancestralSeqLabels) {
+		for (String node : nodes) {
 			POGraph ancestor = getAncestor(node);
 			ancestralSeqs.put(node, ancestor.getSupportedSequence(gappy));
 		}
 		File directory = new File(filepath);
-		if (! directory.exists()){
+		if (! directory.exists())
 			directory.mkdir();
-		}
 
 		BufferedWriter bw = new BufferedWriter(new FileWriter(filepath + "_recon.fa", false));
 		for (String node : ancestralSeqs.keySet()) {
@@ -393,6 +398,7 @@ public class ASRPOG {
 		}
 		bw.close();
 	}
+
 
 	/**
 	 * Save the reconstructed sequences that have the most support through the partial order graph in FASTA format.
@@ -594,6 +600,10 @@ public class ASRPOG {
 		return ancestralDict;
 	}
 
+	public String getRootLabel() {
+		return (String)phyloTree.getRoot().getLabel();
+	}
+
 	public Map<String, List<Inference>> getAncestralInferences(){
 		return this.ancestralInferences;
 	}
@@ -646,7 +656,7 @@ public class ASRPOG {
 	 * @param pog				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 */
-	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws RuntimeException, IOException {
+	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws RuntimeException, IOException, InterruptedException {
 		this.performMSA = performMSA;
 		loadData(treeFile, sequenceFile);
 		if (pog == null || pog.equals(""))	// load graph structure from alignment file
@@ -682,7 +692,7 @@ public class ASRPOG {
 	 * @param msa				POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param jointInference	flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 */
-	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws RuntimeException, IOException {
+	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws RuntimeException, IOException, InterruptedException {
 		loadData(treeFile, sequenceFile);
 
 		pogAlignment = msa;
@@ -704,25 +714,6 @@ public class ASRPOG {
 	}
 
 	/**
-	 * Set the sequence of the given ancestral node.
-	 *
-	 * @param phyloNodeLabel	label of ancestral node
-	 */
-	/*private void populateTreeNodeSeq(String phyloNodeLabel) {
-		EnumSeq.Gappy<Enumerable> seq = new EnumSeq.Gappy<>(Enumerable.aacid_ext);
-		seq.setName(phyloNodeLabel);
-		String s = getAncestor(phyloNodeLabel).getSupportedSequence(false);
-		seq.setInfo(s);
-		Object[] chars = new Object[s.length()];
-		for (int c = 0; c < s.length(); c++)
-			chars[c] = s.toCharArray()[c];
-		seq.length();
-		seq.set(chars);
-		phyloTree.find(phyloNodeLabel).setSequence(seq);
-	}*/
-
-
-	/**
 	 * Generates the ancestor by applying the inference changes stored in the ancestralInferences log.
 	 *
 	 * @param label	Ancestral sequence label
@@ -736,7 +727,7 @@ public class ASRPOG {
 		for (Inference inferredBase : inferences)
 			if (ancestor.setCurrent(inferredBase.pogId)) {
 				// set inferred base, or remove node if inferred to be removed
-				if (inferredBase.pogId != null && inferredBase.pogId != -1)
+				if (!inferredBase.pogId.equals(ancestor.getFinalNodeID()) && !inferredBase.pogId.equals(pogAlignment.getInitialNodeID()))
 					if (inferredBase.base == '-')
 						// remove node from ancestor
 						ancestor.removeNode();
@@ -744,7 +735,7 @@ public class ASRPOG {
 						ancestor.setBase(inferredBase.base);
 				// if node is still there, check the parsimonious transitions. Because we are doing both backwards and forwards parsimony,
 				// get the intersection of the previous/next nodes and all inferred transitions of the current node
-				if ((ancestor.getCurrentId() == null && inferredBase.pogId != null) || (ancestor.getCurrentId() != null && !ancestor.getCurrentId().equals(inferredBase.pogId)))
+				if (ancestor.getCurrentId().equals(ancestor.getFinalNodeID()) && !inferredBase.pogId.equals(ancestor.getFinalNodeID()) || (!ancestor.getCurrentId().equals(ancestor.getFinalNodeID()) && !ancestor.getCurrentId().equals(inferredBase.pogId)))
 					continue;
 
 
@@ -755,7 +746,7 @@ public class ASRPOG {
 					// Identify if edge is reciprocated by backwards parsimony (if so, flag)
 					Inference next = null;
 					for (Inference i : inferences)
-						if ((i.pogId == null && nextId == null) || i.pogId.equals(nextId)) {
+						if ((i.pogId.equals(ancestor.getFinalNodeID()) && (nextId.equals(ancestor.getFinalNodeID()))) || i.pogId.equals(nextId)) {
 							next = i;
 							break;
 						}
@@ -772,7 +763,7 @@ public class ASRPOG {
 				// check previous transitions of future nodes to see if there has been a parsimonious edge to this node
 				// if so, add to keep
 				for (Integer nextId : ancestor.getNextIDs())
-					if (!keepNext.contains(nextId) && nextId != null)
+					if (!keepNext.contains(nextId) && !nextId.equals(pogAlignment.getFinalNodeID()))
 						ancestor.removeNextTransition(nextId);
 			}
 
@@ -914,7 +905,8 @@ public class ASRPOG {
 
 	private Map<String, Integer[]> getPhyloTransitions() {
 
-		Integer nodeId = pogAlignment.getCurrentId();
+
+		Integer nodeId = nodeId = pogAlignment.getCurrentId();
 
 		Map<String, Integer[]> phyloTransition = new HashMap<>();
 
@@ -930,18 +922,18 @@ public class ASRPOG {
 		Map<Object, Integer> previousCount = new HashMap<>();	// count of number of that previous transition
 		Map<Integer, List<Integer>> nodeSeqs = pogAlignment.getSequenceNodeMapping();
 		for (int seqId = 0; seqId < extantSequences.size(); seqId++) {
-			int ind = (nodeId != null && nodeId == -1) ? -1 : nodeSeqs.get(seqId).indexOf(nodeId);
-			if ((nodeSeqs.get(seqId).contains(nodeId) || nodeId == -1) && ind + 1 < nodeSeqs.get(seqId).size()) {
+			int ind = (!nodeId.equals(pogAlignment.getFinalNodeID()) && nodeId.equals(pogAlignment.getInitialNodeID())) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).indexOf(nodeId);
+			if ((nodeSeqs.get(seqId).contains(nodeId) || nodeId.equals(pogAlignment.getInitialNodeID())) && ind + 1 < nodeSeqs.get(seqId).size()) {
 				mapNext.put(extantSequences.get(seqId).getName(), nodeSeqs.get(seqId).get(ind + 1));
 				if (!nextCount.containsKey(nodeSeqs.get(seqId).get(ind + 1)))
 					nextCount.put(nodeSeqs.get(seqId).get(ind + 1), 0);
 				nextCount.put(nodeSeqs.get(seqId).get(ind + 1), nextCount.get(nodeSeqs.get(seqId).get(ind + 1)) + 1);
 			}
-			if ((nodeSeqs.get(seqId).contains(nodeId) || nodeId == null) && (ind == 0 || ind - 1 > -1)) {
-				mapPrevious.put(extantSequences.get(seqId).getName(), (ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1));
-				if (!previousCount.containsKey((ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1)))
-					previousCount.put((ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1), 0);
-				previousCount.put((ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1), previousCount.get((ind == 0) ? -1 : nodeSeqs.get(seqId).get(ind - 1)) + 1);
+			if ((nodeSeqs.get(seqId).contains(nodeId) || nodeId.equals(pogAlignment.getFinalNodeID())) && (ind == 0 || ind - 1 > pogAlignment.getInitialNodeID())) {
+				mapPrevious.put(extantSequences.get(seqId).getName(), (ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1));
+				if (!previousCount.containsKey((ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1)))
+					previousCount.put((ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1), 0);
+				previousCount.put((ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1), previousCount.get((ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1)) + 1);
 			}
 		}
 
@@ -982,7 +974,7 @@ public class ASRPOG {
 			List<Object> values = phyloTree.find(phyloNode).getValues();
 			if (values == null) {
 				values = new ArrayList<>();
-				values.add(null);
+				values.add(pogAlignment.getFinalNodeID());
 			}
 			Integer[] ids = new Integer[values.size()];
 			for (int i = 0; i < values.size(); i++)
@@ -1002,7 +994,7 @@ public class ASRPOG {
 			List<Object> values = phyloTree.find(phyloNode).getValues();
 			if (values == null) {
 				values = new ArrayList<>();
-				values.add(null);
+				values.add(pogAlignment.getFinalNodeID());
 			}
 			Integer[] ids = new Integer[values.size() + phyloTransition.get(phyloNode).length];
 			for (int i = 0; i < phyloTransition.get(phyloNode).length; i++)
@@ -1021,13 +1013,13 @@ public class ASRPOG {
 	/**
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using joint inference.
 	 */
-	private void queryBNJoint(){
+	private void queryBNJoint() throws InterruptedException {
 
 //		long startTime = System.nanoTime();
 
 		// infer base/gap of each aligned node
 		List<Integer> nodeIDs = new ArrayList<>();
-		nodeIDs.add(-1);
+		nodeIDs.add(pogAlignment.getInitialNodeID());
 		nodeIDs.addAll(pogAlignment.getNodeIDs());
 		rates = new Double[nodeIDs.get(nodeIDs.size()-1) + 1]; //Rate matrix
 
@@ -1050,7 +1042,7 @@ public class ASRPOG {
 			Integer nodeId = nodeQueue.poll(); // next job
 			pogAlignment.setCurrent(nodeId);
 			// perform character inference if not the dummy initial node or dummy final node
-			if (nodeId != -1) {
+			if (!nodeId.equals(pogAlignment.getInitialNodeID())) {
 				VarElim ve = new VarElim();
 				PhyloBNet charNet = createCharacterNetwork();
 				rates[nodeId] = charNet.getRate();
@@ -1067,11 +1059,11 @@ public class ASRPOG {
 			}
 		}
 		// last time through all nodes; this time serially, extracting results
-		nodeIDs.add(null); // add dummy final node for identifying backwards transitions
+		nodeIDs.add(pogAlignment.getFinalNodeID()); // add dummy final node for identifying backwards transitions
 		for (Integer nodeId : nodeIDs) {
 			pogAlignment.setCurrent(nodeId);
 			Variable.Assignment[] charAssignments = new Variable.Assignment[]{};
-			if (nodeId != null && nodeId != -1)
+			if (!nodeId.equals(pogAlignment.getFinalNodeID()) && !nodeId.equals(pogAlignment.getInitialNodeID()))
 				charAssignments = result.get(nodeId);
 			// get gap or character inference at phylogenetic nodes
 			Map<String, Integer[]> phyloTransition = getPhyloTransitions();
@@ -1110,14 +1102,14 @@ public class ASRPOG {
 	 *
 	 * @param phyloNode		ancestral node to perform marginal reconstruction of
 	 */
-	private void queryBNMarginal(String phyloNode) {
+	private void queryBNMarginal(String phyloNode) throws InterruptedException {
 		marginalDistributions = new EnumDistrib[pogAlignment.getNumNodes()];
 //		long startTime = System.nanoTime();
 
 		// infer base/gap of each aligned node
 
 		List<Integer> nodeIDs = new ArrayList<>();
-		nodeIDs.add(-1);
+		nodeIDs.add(pogAlignment.getInitialNodeID());
 		nodeIDs.addAll(pogAlignment.getNodeIDs());
 
 		// First, create a queue with which all nodes will be inferred (by NodeID)
@@ -1139,7 +1131,7 @@ public class ASRPOG {
 			Integer nodeId = nodeQueue.poll(); // next job
 			pogAlignment.setCurrent(nodeId);
 			// perform character inference if not the dummy initial node
-			if (nodeId != -1) {
+			if (!nodeId.equals(pogAlignment.getInitialNodeID())) {
 				VarElim ve = new VarElim();
 				PhyloBNet phyloNet = createCharacterNetwork();
 				ve.instantiate(phyloNet.getBN());
@@ -1164,7 +1156,7 @@ public class ASRPOG {
 			marginalDistributions[entry.getKey()] = entry.getValue();
 		}
 
-		nodeIDs.add(null); // add dummy final node for identifying backwards transitions
+		nodeIDs.add(pogAlignment.getFinalNodeID()); // add dummy final node for identifying backwards transitions
 		for (Integer nodeId : nodeIDs) {
 			pogAlignment.setCurrent(nodeId);
 			Character base = '-';
@@ -1180,7 +1172,7 @@ public class ASRPOG {
 
 			if (!ancestralInferences.containsKey(phyloNode))
 				ancestralInferences.put(phyloNode, new ArrayList<>());
-			if (nodeId != null && nodeId >= 0 && marginalDistributions[nodeId] != null)
+			if (!nodeId.equals(pogAlignment.getFinalNodeID()) && nodeId >= 0 && marginalDistributions[nodeId] != null)
 				base = (char) marginalDistributions[nodeId].getMax();
 			ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
 		}
