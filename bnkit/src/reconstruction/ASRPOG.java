@@ -4,6 +4,7 @@ package reconstruction;
 import alignment.MSA;
 import api.PartialOrderGraph;
 import bn.alg.CGTable;
+import bn.alg.Inference;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.PhyloBNet;
@@ -905,9 +906,6 @@ public class ASRPOG {
 
 	private Map<String, Integer[]> getPhyloTransitions() {
 
-
-		Integer nodeId = nodeId = pogAlignment.getCurrentId();
-
 		Map<String, Integer[]> phyloTransition = new HashMap<>();
 
 		// populate tree for transitional inference using max parsimony
@@ -916,59 +914,17 @@ public class ASRPOG {
 		ArrayList<Integer> orderedUniqueForward = new ArrayList<>();
 		ArrayList<Integer> orderedUniqueBackwards = new ArrayList<>();
 
-		Map<String, Object> mapNext = new HashMap<>(); 			// map of extant label and 'next' transition
-		Map<String, Object> mapPrevious = new HashMap<>(); 		// map of extant label and 'previous' transition
-		Map<Object, Integer> nextCount = new HashMap<>();		// count of number of that next transition
-		Map<Object, Integer> previousCount = new HashMap<>();	// count of number of that previous transition
-		Map<Integer, List<Integer>> nodeSeqs = pogAlignment.getSequenceNodeMapping();
-		for (int seqId = 0; seqId < extantSequences.size(); seqId++) {
-			int ind = (!nodeId.equals(pogAlignment.getFinalNodeID()) && nodeId.equals(pogAlignment.getInitialNodeID())) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).indexOf(nodeId);
-			if ((nodeSeqs.get(seqId).contains(nodeId) || nodeId.equals(pogAlignment.getInitialNodeID())) && ind + 1 < nodeSeqs.get(seqId).size()) {
-				mapNext.put(extantSequences.get(seqId).getName(), nodeSeqs.get(seqId).get(ind + 1));
-				if (!nextCount.containsKey(nodeSeqs.get(seqId).get(ind + 1)))
-					nextCount.put(nodeSeqs.get(seqId).get(ind + 1), 0);
-				nextCount.put(nodeSeqs.get(seqId).get(ind + 1), nextCount.get(nodeSeqs.get(seqId).get(ind + 1)) + 1);
-			}
-			if ((nodeSeqs.get(seqId).contains(nodeId) || nodeId.equals(pogAlignment.getFinalNodeID())) && (ind == 0 || ind - 1 > pogAlignment.getInitialNodeID())) {
-				mapPrevious.put(extantSequences.get(seqId).getName(), (ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1));
-				if (!previousCount.containsKey((ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1)))
-					previousCount.put((ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1), 0);
-				previousCount.put((ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1), previousCount.get((ind == 0) ? pogAlignment.getInitialNodeID() : nodeSeqs.get(seqId).get(ind - 1)) + 1);
-			}
-		}
+		Map<String, Object> mapNext = pogAlignment.getNextMapping();				// map of extant label and 'next' transition
+		Map<String, Object> mapPrevious = pogAlignment.getPrevMapping();			// map of extant label and 'previous' transition
 
-		// Order 'next' transitions based on max number of extants traversing to that node
-		while (!nextCount.isEmpty()) {
-			// find the largest value
-			int maxCount = -1;
-			Object maxNode = -1;
-			for (Object nextId : nextCount.keySet())
-				if (nextCount.get(nextId) > maxCount) {
-					maxCount = nextCount.get(nextId);
-					maxNode = nextId;
-				}
-			orderedUniqueForward.add((Integer)maxNode);
-			nextCount.remove(maxNode);
-		}
-
-		// Order 'previous' transitions based on max number of extants traversing to that node
-		while (!previousCount.isEmpty()) {
-			// find the largest value
-			int maxCount = -1;
-			Object maxNode = -1;
-			for (Object nextId : previousCount.keySet())
-				if (previousCount.get(nextId) > maxCount) {
-					maxCount = previousCount.get(nextId);
-					maxNode = nextId;
-				}
-			orderedUniqueBackwards.add((Integer)maxNode);
-			previousCount.remove(maxNode);
-		}
+		ArrayList<Integer> orderedNext = pogAlignment.getOrderedNext();
+		Object[] uniqueForward = new Object[orderedNext.size()];
+		orderedNext.toArray(uniqueForward);
+		ArrayList<Integer> orderedPrev = pogAlignment.getOrderedPrev();
+		Object[] uniqueBackward = new Object[orderedPrev.size()];
+		orderedNext.toArray(uniqueBackward);
 
 		// 'Next' transitions
-		Object[] uniqueForward = new Integer[orderedUniqueForward.size()];
-		for (int v = 0; v < orderedUniqueForward.size(); v++)
-			uniqueForward[v] = orderedUniqueForward.get(v);
 		phyloTree.setContentByParsimony(mapNext, uniqueForward);
 		for (String phyloNode : ancestralSeqLabels) {
 			List<Object> values = phyloTree.find(phyloNode).getValues();
@@ -986,9 +942,6 @@ public class ASRPOG {
 		if (orderedUniqueBackwards.isEmpty())
 			return phyloTransition;
 
-		Object[] uniqueBackward = new Integer[orderedUniqueBackwards.size()];
-		for (int v = 0; v < orderedUniqueBackwards.size(); v++)
-			uniqueBackward[v] = orderedUniqueBackwards.get(v);
 		phyloTree.setContentByParsimony(mapPrevious, uniqueBackward);
 		for (String phyloNode : ancestralSeqLabels) {
 			List<Object> values = phyloTree.find(phyloNode).getValues();

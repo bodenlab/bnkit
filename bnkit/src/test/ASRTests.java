@@ -27,21 +27,16 @@ public class ASRTests {
         System.out.println(root.getConsensusGappySequence());
         System.out.println(pog.getSupportedSequence(true));
         POAGJson json = new POAGJson(root);
-        JSONObject grap =  json.toJSON();
-
-
     }
 
 
     @Test
     @DisplayName("huge ASR")
     public void performSmallASR() throws IOException, InterruptedException {
-        String alnfilepath = "src/test/resources/hudson.aln";
-        String nwkfilepath = "src/test/resources/hudson.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 3);
-        asr.saveSupportedAncestor("src/test/t", "root", true);
-        asr.saveALN("src/test/t", "aln");
-        System.out.println(asr.getGraph("N9").getConsensusGappySequence());
+        String alnfilepath = "src/test/resources/dhad.fasta";
+        String nwkfilepath = "src/test/resources/dhad.nwk";
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
+        System.out.println(asr.getGraph("root").getConsensusGappySequence());
     }
 
     @Test

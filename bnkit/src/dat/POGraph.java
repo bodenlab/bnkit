@@ -1,6 +1,8 @@
 package dat;
 
 import alignment.utilities.MutableInt;
+import com.sun.deploy.util.OrderedHashSet;
+import com.sun.javafx.geom.Edge;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
@@ -718,6 +720,104 @@ public class POGraph {
 		return edgeCount;
 	}
 
+	public Map<String, Object> getNextMapping() {
+		Map<String, Object> extantNextIDs = new HashMap<>();
+		for (Edge next : current.getNextTransitions())
+			for (Integer seq : next.getSequences())
+				extantNextIDs.put(sequences.get(seq), next.getNext().getID());
+		return extantNextIDs;
+	}
+
+	public Map<String, Object> getPrevMapping() {
+		Map<String, Object> extantPrevIDs = new HashMap<>();
+		for (Edge next : current.getPreviousTransitions())
+			for (Integer seq : next.getSequences())
+				extantPrevIDs.put(sequences.get(seq), next.getNext().getID());
+		return extantPrevIDs;
+	}
+
+	/**
+	 * Returns ordered list of next transitions, order by extant support.
+	 *
+	 * @return	ordered list of next transitions
+	 */
+	public ArrayList<Integer> getOrderedNext() {
+		Integer[] ids = new Integer[current.getNextTransitions().size()];
+		HashMap<Integer, Integer> weights = new HashMap<>();
+		int i = 0;
+		for (Edge edge : current.getNextTransitions()) {
+			ids[i++] = edge.getNext().getID();
+			weights.put(edge.getNext().getID(), edge.getSequences().size());
+		}
+		quickSortIDsExtantSupport(ids, weights, true, 0, ids.length-1);
+
+		return new ArrayList<>(Arrays.asList(ids));
+	}
+
+	/**
+	 * Returns ordered list of previous transitions, order by extant support.
+	 *
+	 * @return	ordered list of previous transitions
+	 */
+	public ArrayList<Integer> getOrderedPrev() {
+		Integer[] ids = new Integer[current.getPreviousTransitions().size()];
+		HashMap<Integer, Integer> weights = new HashMap<>();
+		int i = 0;
+		for (Edge edge : current.getPreviousTransitions()) {
+			ids[i++] = edge.getNext().getID();
+			weights.put(edge.getNext().getID(), edge.getSequences().size());
+		}
+		quickSortIDsExtantSupport(ids, weights, false, 0, ids.length-1);
+
+		return new ArrayList<>(Arrays.asList(ids));
+	}
+
+	/**
+	 * Quick sort ids based on weights in the specified direction
+	 *
+	 * @param ids
+	 * @param weights
+	 * @param highToLow
+	 * @param left
+	 * @param right
+	 */
+	private void quickSortIDsExtantSupport(Integer[] ids, Map<Integer, Integer> weights, boolean highToLow, int left, int right) {
+		// pivot is middle number between left and right
+
+		if (ids.length <= 1)
+			return;
+
+		int pivotId = ids[left + (right - left) / 2];
+		int pivot = weights.get(pivotId);
+
+		int i = left;
+		int j = right;
+
+		while (i < j) {
+			// find next array index (i) who's associated extant weight is less than the pivot (sorting high -> low)
+			// if highToLow is true, otherwise greater than the pivot (sorting low -> high)
+			// (moving from left to wards the pivot)
+			while ((highToLow && weights.get(ids[i]) > pivot) || (!highToLow && weights.get(ids[i]) < pivot))
+				i++;
+			// find next array index (j) who's associated extant weight is greater/less than than the pivot (moving from
+			// right towards the pivot)
+			while ((highToLow && weights.get(ids[j]) < pivot) || (!highToLow && weights.get(ids[j]) > pivot))
+				j--;
+			// switch i and j over pivot
+			Integer tmp = ids[i];
+			ids[i] = ids[j];
+			ids[j] = tmp;
+			// increment indices and continue sorting
+			i++;
+			j--;
+		}
+
+		if (left < j)
+			quickSortIDsExtantSupport(ids, weights, highToLow, left, j);
+		if (i < right)
+			quickSortIDsExtantSupport(ids, weights, highToLow, i, right);
+	}
+
 	/**
 	 * Recursive function to calculate minimum distance to node.
 	 *
@@ -1410,7 +1510,7 @@ public class POGraph {
 	 * Node for encapsulating a partial order graph alignment of nodes. 'Aligned' POG nodes are combined to represent
 	 * a single node.
 	 */
-	private class Node {
+	public class Node {
 		private Integer ID = null;								// alignment ID
 		private Character base;									// base character
 		private List<Edge> nextTransitions;						// transitions to next nodes
@@ -1745,7 +1845,7 @@ public class POGraph {
 	 * Edge for storing transitions between nodes. This is required to easily track sequence paths when edges and nodes
 	 * are removed from the graph.
 	 */
-	private class Edge {
+	public class Edge {
 		private Node next = null;
 		private boolean consensus = false;
 		private boolean reciprocated = false;
