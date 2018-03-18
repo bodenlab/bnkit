@@ -36,7 +36,7 @@ import dat.Variable.Assignment;
  * @author mikael
  */
 public class SubstExample {
-    static SubstModel model = new Dayhoff();
+    static SubstModel model = new LG();
     // The value n in the PAM-n matrix represents the number of mutations per 100 amino acids
     // r is the rate of accepted mutation accumulation in mutations per amino acid site per million years
     // static double r_base = 2.2e-9 * 1e6; // per base pair per million years, in mammalian genomes according to Kumar,  803–808, doi: 10.1073/pnas.022629899

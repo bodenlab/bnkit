@@ -17,6 +17,7 @@
  */
 package bn.ctmc;
 
+import bn.factor.Factorize;
 import bn.prob.EnumDistrib;
 import bn.factor.Factor;
 import dat.EnumVariable;
@@ -30,12 +31,8 @@ import bn.ctmc.matrix.*;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import dat.Enumerable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 
 /**
  *
@@ -657,12 +654,12 @@ public class SubstNode implements BNode, TiedNode {
         System.out.println();
     }
     
-    public static void main(String[] args) {
-        // here are all the variables, representing the sequence at a position
+    public static void main1(String[] args) {
+        // all the variables, representing the sequence at a position
         EnumVariable x1 = Predef.AminoAcid("X1");
         EnumVariable x2 = Predef.AminoAcid("X2");
         EnumVariable x3 = Predef.AminoAcid("X3");
-        // here's the phylogenetic tree represented by a BN
+        // next link variables to nodes forming a tree
         SubstNode snx1 = new SubstNode(x1, new WAG());
         SubstNode snx2 = new SubstNode(x2, x1, new WAG(), 1.0);
         SubstNode snx3 = new SubstNode(x3, x1, new WAG(), 1.0);
@@ -726,6 +723,151 @@ public class SubstNode implements BNode, TiedNode {
         for (int i = 0; i < S.length; i ++) {
             System.out.println(S[i] + "\t" + myd[i]);
         }
+    }
+
+    /**
+     * Example in tutorial
+     * @param args
+     */
+    public static void main(String[] args) {
+        // all the variables, representing the sequence at a position
+        // each variable can be instantiated to one of twenty amino acids
+        // we use a predefined alphabet
+        EnumVariable n0 = Predef.AminoAcid("N0");
+        EnumVariable n1 = Predef.AminoAcid("N1");
+        EnumVariable n2 = Predef.AminoAcid("N2");
+        EnumVariable a18 = Predef.AminoAcid("A18");
+        EnumVariable a57 = Predef.AminoAcid("A57");
+        EnumVariable a25 = Predef.AminoAcid("A25");
+        EnumVariable a59 = Predef.AminoAcid("A59");
+        // next link variables to nodes forming a tree;
+        // each node will represent a conditional probability table;
+        // the structure they form collectively is specific to a position,
+        // below is index 6 for the example in the tutorial
+        SubstNode sn0 = new SubstNode(n0, new LG());
+        SubstNode sa18 = new SubstNode(a18, n0, new LG(), 0.07);
+        SubstNode sn1 = new SubstNode(n1, n0, new LG(), 0.01);
+        SubstNode sa57 = new SubstNode(a57, n1, new LG(), 0.07);
+        // Option 0: be naive and loop through all possible instantiations of ancestral variables n0 and n1
+        Object[] aa = Predef.AminoAcid().getDomain().getValues();
+        EnumTable<Double> table = new EnumTable<>(n0, n1); // table for storing all products
+        double sum = 0; // keep total so we can normalise later
+        for (int i = 0; i < aa.length; i ++) {
+            for (int j = 0; j < aa.length; j ++) {
+                double p = // here's the product
+                        sn0.get(aa[i]) *             // P(N0)
+                        sn1.get(aa[j], aa[i]) *      // P(N1 | N0)
+                        sa18.get('E', aa[i]) * // P(a18=E | N0)
+                        sa57.get('D', aa[j]);  // P(a57=D | N1)
+                table.setValue(new Object[] {aa[i], aa[j]}, p); // we save the product in a table keyed by n0 and n1
+                sum += p;
+            }
+        }
+        // table.display(); // prints out all entries we've saved, NOT normalised
+        // below we normalise the table using the sum above
+        for (int i = 0; i < aa.length; i ++) {
+            for (int j = 0; j < aa.length; j ++) {
+                int index = table.getIndex(new Object[] {aa[i], aa[j]});
+                // we can access the entry in the table by a separate index, defined by the n0|n1 key
+                table.setValue(index, table.getValue(index) / sum);
+            }
+        }
+        // table.display(); // prints out all entries again but now normalised
+        // below we access only a sub-set of the entres of specific interest
+        Object[] select = new Object[] {'D','E'};
+        for (int i = 0; i < select.length; i ++) {
+            for (int j = 0; j < select.length; j ++)
+                System.out.println("P(N0=" + select[i] + ", N1=" + select[j] + " | a18=E, a57=D) = " + table.getValue(new Object[] {select[i], select[j]}));
+        }
+        // Option 1: use variable elimination as implemented in bnkit, so make a BN and perform inference much much more efficiently
+        BNet bn = new BNet();
+        bn.add(sn0, sa18, sn1, sa57);
+        // assign values to some variables, what we observe at the leaves of the tree
+        sa18.setInstance('E');
+        sa57.setInstance('D');
+        // instantiate inference engine on BN
+        VarElim ve = new VarElim();
+        ve.instantiate(bn);
+        // construct a query, this one to determine the "most probable explanation" (MPE) to the observations above
+        // where each variable is assigned the value which jointly is most probable
+        Query q = ve.makeMPE();  // the inference engine will figure out what variables that have been instantiated to form the condition
+        CGTable qr = (CGTable) ve.infer(q);
+        Variable.Assignment[] assigned = qr.getMPE(); // extract the answer; for MPE this means all un-instantiated variable assignments
+        for (Variable.Assignment a : assigned) {
+            System.out.println(a.var + " = " + a.val.toString());
+        }
+
+        // lets work on index 17; we re-use the variables above but we need a few more nodes
+        SubstNode sn2 = new SubstNode(n2, n1, new LG(), 0.02);
+        SubstNode sa25 = new SubstNode(a25, n2, new LG(), 0.01);
+        SubstNode sa59 = new SubstNode(a59, n2, new LG(), 0.02);
+
+        bn = new BNet();
+        bn.add(sn0, sa18, sn1, sa57, sn2, sa25, sa59);
+        // assign values to some variables, what we observe at the leaves of the tree
+        sa18.setInstance('N');
+        sa57.setInstance('D');
+        sa25.setInstance('E');
+        sa59.setInstance('E');
+
+        // Option 0: 8,000 possibilities? yikes!
+        // Also, we now need to nest three loops (with four variables, nest four loops, not great...)
+        // Option half-way: make factor tables
+        // To make a factor table we need to provide a map of instantiated variables
+        Map<Variable,Object> evidence = new HashMap<>();
+        for (BNode node : bn.getOrdered()) {
+            Variable var = node.getVariable();
+            Object val = node.getInstance(); // will be null if not instantiated
+            evidence.put(var, val);
+        }
+        AbstractFactor f0 = sn0.makeDenseFactor(evidence);
+        f0.display();
+        AbstractFactor f1 = sn1.makeDenseFactor(evidence);
+        f1.display();
+        AbstractFactor f2 = sn2.makeDenseFactor(evidence);
+        f2.display();
+        AbstractFactor f18 = sa18.makeDenseFactor(evidence);
+        f18.display();
+        AbstractFactor f57 = sa57.makeDenseFactor(evidence);
+        f57.display();
+        AbstractFactor f25 = sa25.makeDenseFactor(evidence);
+        f25.display();
+        AbstractFactor f59 = sa59.makeDenseFactor(evidence);
+        f59.display();
+        // now just multiply them;
+        // in theory it does not matter in what order; in practice it influences the time and space complexity hugely...
+        // the factors can get very big
+        AbstractFactor f0p1 = Factorize.getProduct(f0, f1);
+        AbstractFactor f0p1p2 = Factorize.getProduct(f0p1, f2);
+        AbstractFactor f0p1p2pa18 = Factorize.getProduct(f0p1p2, f18);
+        AbstractFactor f0p1p2pa18pa57 = Factorize.getProduct(f0p1p2pa18, f57);
+        AbstractFactor f0p1p2pa18pa57pa25 = Factorize.getProduct(f0p1p2pa18pa57, f25);
+        AbstractFactor f0p1p2pa18pa57pa25pa59 = Factorize.getProduct(f0p1p2pa18pa57pa25, f59);
+        // extract the entry with the greatest value, and normalise to make a probability of it
+        double fsum = f0p1p2pa18pa57pa25pa59.getSum();
+        double maxp = 0;
+        int maxidx = -1;
+        for (int idx : f0p1p2pa18pa57pa25pa59) {
+            double p = f0p1p2pa18pa57pa25pa59.getValue(idx);
+            if (p > maxp) {
+                maxidx = idx;
+                maxp = p;
+            }
+        }
+        Object[] maxkey = f0p1p2pa18pa57pa25pa59.getKey(maxidx);
+        EnumVariable[] evars = f0p1p2pa18pa57pa25pa59.getEnumVars();
+        System.out.println("Key with greatest probability: " + evars[0] + "=" + maxkey[0] + ", " + evars[1] + "=" + maxkey[1] + ", " + evars[2] + "=" + maxkey[2] + " P=" + maxp);
+
+        // Option 1: instantiate inference engine on BN
+        ve = new VarElim();
+        ve.instantiate(bn);
+        q = ve.makeMPE();  // the inference engine will figure out what variables that have been instantiated to form the condition
+        qr = (CGTable) ve.infer(q);
+        assigned = qr.getMPE(); // extract the answer; for MPE this means all un-instantiated variable assignments
+        for (Variable.Assignment a : assigned) {
+            System.out.println(a.var + " = " + a.val.toString());
+        }
+
     }
 
 

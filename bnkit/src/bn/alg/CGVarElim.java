@@ -40,7 +40,7 @@ import java.util.Map;
  * The idea of conditional Gaussians is discussed in Lauritzen SL and Jensen F, 
  * Stable local computation with conditional Gaussian distributions, Statistics and
  * Computing 2001 11:191-203.
- * 
+ * @deprecated use {@link bn.alg.VarElim} instead
  * @author mikael
  */
 public class CGVarElim implements Inference {

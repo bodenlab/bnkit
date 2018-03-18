@@ -72,7 +72,7 @@ public class Matrix {
         }
         
     }
-    
+
     public static void print(double[][] m) {
         for (int i = 0; i < m.length; i ++) {
             for (int j = 0; j < m[i].length; j ++) {
@@ -81,7 +81,36 @@ public class Matrix {
             System.out.println();
         }
     }
-    
+
+    public static void printLaTeX(double[][] m, Object[] rowsym, Object[] colsym) {
+        /*
+            \begin{matrix}
+    & A       &    R  &    N  &    D  &    C  &    Q  &    E  & ... \\
+    A & 0.989 & 0.000 & 0.000 & 0.000 & 0.000 & 0.000 & 0.001 & ...  \\
+    R & 0.001 & 0.990 & 0.000 & 0.000 & 0.000 & 0.001 & 0.000 & ...  \\
+    N & 0.000 & 0.000 & 0.986 & 0.003 & 0.000 & 0.001 & 0.001 & ...  \\
+    D & 0.001 & 0.000 & 0.002 & 0.990 & 0.000 & 0.000 & 0.004 & ...  \\
+    C & 0.001 & 0.000 & 0.000 & 0.000 & 0.995 & 0.000 & 0.000 & ...  \\
+    Q & 0.001 & 0.001 & 0.001 & 0.000 & 0.000 & 0.986 & 0.003 & ...  \\
+    E & 0.001 & 0.000 & 0.000 & 0.004 & 0.000 & 0.002 & 0.988 & ...  \\
+    ... & ... \\
+    \end{matrix}
+
+         */
+        System.out.println("\\begin{matrix}");
+        for (int j = 0; j < colsym.length; j ++)
+            System.out.printf("& %5s ", colsym[j]);
+        System.out.println("\\\\");
+        for (int i = 0; i < m.length; i ++) {
+            System.out.printf("%s ", rowsym[i]);
+            for (int j = 0; j < m[i].length; j ++) {
+                System.out.printf("& %5.3f ", m[i][j]);
+            }
+            System.out.println("\\\\");
+        }
+        System.out.println("\\end{matrix}");
+    }
+
     /**
      * Based on NETLIB/EISPACK/elmhes.f which is a translation of the Algol 
      * procedure elmhes:

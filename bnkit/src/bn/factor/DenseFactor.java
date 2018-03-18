@@ -42,8 +42,7 @@ import java.util.*;
  * natural logarithm of each factor, so that operations can be performed entirely in log space,
  * to avoid numerical issues, e.g. underflow.
  * 
- * TODO: Consider improving efficiency further to exploit the fact that now all variables are sorted
- * in the constructor. (Currently, some code does not assume order.)
+ * TODO: Consider improving efficiency further to exploit the fact that now all variables are sorted in the constructor. (Currently, some code does not assume order.)
  *
  * @author mikael
  */

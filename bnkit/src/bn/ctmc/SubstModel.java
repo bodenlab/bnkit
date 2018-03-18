@@ -134,7 +134,14 @@ public abstract class SubstModel {
     private double[][] probs = null;
     private double time = 0.0;
     // private boolean updateRequired = true;
-    
+
+    /**
+     * Get conditional probability P(X=x|Y=y,time)
+     * @param X
+     * @param Y
+     * @param time
+     * @return
+     */
     public double getProb(Object X, Object Y, double time) {
         if (this.time != time || probs == null) // only re-compute matrix if time has changed
             probs = getProbs(time);
@@ -152,7 +159,12 @@ public abstract class SubstModel {
         int index_Y = alpha.getIndex(Y);
         return probMatrix[index_Y][index_X];
     }
-    
+
+    /**
+     * Get probability P(X=x)
+     * @param X
+     * @return
+     */
     public double getProb(Object X) {
         int index_X = alpha.getIndex(X);
         return F[index_X];
@@ -233,11 +245,12 @@ public abstract class SubstModel {
         System.out.println("\nTransition probabilities of R (LG) @ time = " + time);
         prob = sm_lg.getProbs(time);
         bn.math.Matrix.print(prob);
-        
+        bn.math.Matrix.printLaTeX(prob, sm_lg.getDomain().getValues(), sm_lg.getDomain().getValues());
+
         System.out.println("\nTransition probabilities of R (JTT) @ time = " + time);
         prob = sm_jtt.getProbs(time);
         bn.math.Matrix.print(prob);
-        
+
         System.out.println("\nTransition probabilities of R (Dayhoff) @ time = " + time);
         prob = sm_dh.getProbs(time);
         bn.math.Matrix.print(prob);
