@@ -767,7 +767,7 @@ public class POGraph {
 			ids[i++] = edge.getNext().getID();
 			weights.put(edge.getNext().getID(), edge.getSequences().size());
 		}
-		quickSortIDsExtantSupport(ids, weights, false, 0, ids.length-1);
+		quickSortIDsExtantSupport(ids, weights, true, 0, ids.length-1);
 
 		return new ArrayList<>(Arrays.asList(ids));
 	}

@@ -162,10 +162,6 @@ public class ASRPOG {
 		// Check if the provided extant sequences match up to the provided tree
 		checkData();
 
-		// save sequence information in internal nodes of the phylogenetic tree
-		for (EnumSeq.Gappy<Enumerable> extant : extantSequences)
-			phyloTree.find(extant.getName()).setSequence(extant);
-
 		if (msa == null)
 			pogAlignment = new POGraph(extantSequences);
 		else
@@ -875,7 +871,7 @@ public class ASRPOG {
 	 */
 	private PhyloBNet createCharacterNetwork(){
 		// create a bayesian network with the phylogenetic tree structure and the JTT substitution model for amino acids
-		PhyloBNet phyloBN = null;
+		PhyloBNet phyloBN;
 		if (this.model.equalsIgnoreCase("Dayhoff"))
 			phyloBN = PhyloBNet.create(phyloTree, new Dayhoff());
 		else if (this.model.equalsIgnoreCase("LG"))
@@ -911,18 +907,14 @@ public class ASRPOG {
 		// populate tree for transitional inference using max parsimony
 
 		// get ordered list of unique transitions based on MSA and num. seqs on the 'out' edges: forward and backwards
-		ArrayList<Integer> orderedUniqueForward = new ArrayList<>();
-		ArrayList<Integer> orderedUniqueBackwards = new ArrayList<>();
-
 		Map<String, Object> mapNext = pogAlignment.getNextMapping();				// map of extant label and 'next' transition
 		Map<String, Object> mapPrevious = pogAlignment.getPrevMapping();			// map of extant label and 'previous' transition
-
 		ArrayList<Integer> orderedNext = pogAlignment.getOrderedNext();
 		Object[] uniqueForward = new Object[orderedNext.size()];
 		orderedNext.toArray(uniqueForward);
 		ArrayList<Integer> orderedPrev = pogAlignment.getOrderedPrev();
 		Object[] uniqueBackward = new Object[orderedPrev.size()];
-		orderedNext.toArray(uniqueBackward);
+		orderedPrev.toArray(uniqueBackward);
 
 		// 'Next' transitions
 		phyloTree.setContentByParsimony(mapNext, uniqueForward);
@@ -939,7 +931,7 @@ public class ASRPOG {
 		}
 
 		// 'Previous' transitions
-		if (orderedUniqueBackwards.isEmpty())
+		if (orderedPrev.isEmpty())
 			return phyloTransition;
 
 		phyloTree.setContentByParsimony(mapPrevious, uniqueBackward);

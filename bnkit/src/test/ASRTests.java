@@ -33,8 +33,8 @@ public class ASRTests {
     @Test
     @DisplayName("huge ASR")
     public void performSmallASR() throws IOException, InterruptedException {
-        String alnfilepath = "src/test/resources/dhad.fasta";
-        String nwkfilepath = "src/test/resources/dhad.nwk";
+        String alnfilepath = "src/test/resources/tawfik.aln";
+        String nwkfilepath = "src/test/resources/tawfik.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
         System.out.println(asr.getGraph("root").getConsensusGappySequence());
     }
