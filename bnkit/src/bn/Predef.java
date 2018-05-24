@@ -183,8 +183,14 @@ public class Predef {
     public static Object getObject(Variable var, String vstr) {
         try {
             switch (var.getPredef()) {
-                case "Boolean":
-                    return Boolean.parseBoolean(vstr);
+                case "Boolean": {
+                    if (vstr.charAt(0) == '0')
+                        return false;
+                    else if (vstr.charAt(0) == '1')
+                        return true;
+                    else
+                        return Boolean.parseBoolean(vstr);
+                }
                 case "Nucleic acid":
                     {
                         Character ch = vstr.charAt(0);
