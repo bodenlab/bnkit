@@ -386,11 +386,15 @@ public class ASRPOG {
 			directory.mkdir();
 
 		BufferedWriter bw = new BufferedWriter(new FileWriter(filepath + "_recon.fa", false));
-		for (String node : nodes) {
-			POGraph ancestor = getAncestor(node);
-			bw.write(">" + node);
+		bw.write(">" + nodes[nodes.length - 1]);
+		bw.newLine();
+		bw.write(ancestralSeqs.get(nodes[nodes.length - 1]));
+		bw.newLine();
+		bw.newLine();
+		for (int i = 0; i < nodes.length - 1; i ++) {
+			bw.write(">" + nodes[i]);
 			bw.newLine();
-			bw.write(ancestor.getSupportedSequence(gappy));
+			bw.write(ancestralSeqs.get(nodes[i]));
 			bw.newLine();
 			bw.newLine();
 		}
