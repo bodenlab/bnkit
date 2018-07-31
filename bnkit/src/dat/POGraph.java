@@ -1296,8 +1296,7 @@ public class POGraph {
 			// if no sequences in node, remove (i.e. was a full gap column in aln)
 			if (node.getSeqCharMapping().size() == 0) {
 				setCurrent(node.getID());
-				removeNode();
-				continue;
+				throw new RuntimeException("A column in your multiple sequence alignment contained only gaps. Remove this column or realign.");
 			}
 
 			// for all nodes, if only one unique character, set as base
