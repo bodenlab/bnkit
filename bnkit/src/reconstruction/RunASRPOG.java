@@ -125,6 +125,8 @@ public class RunASRPOG {
 					asr.save(outputPath, false, "fasta");
 			}
 
+//			System.out.println((asr.getIndelDifferences(5)));
+
 			if (checkBranchIsolation){
 
 
@@ -163,6 +165,8 @@ public class RunASRPOG {
 		} else {
 			usage("");
 		}
+
+
 
 	}
 

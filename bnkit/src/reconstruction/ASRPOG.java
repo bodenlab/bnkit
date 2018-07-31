@@ -14,6 +14,7 @@ import bn.ctmc.matrix.JTT;
 import bn.ctmc.matrix.LG;
 import bn.ctmc.matrix.WAG;
 import bn.prob.EnumDistrib;
+import com.sun.xml.internal.bind.v2.TODO;
 import dat.*;
 import dat.file.AlnWriter;
 import dat.file.FastaWriter;
@@ -22,6 +23,8 @@ import json.JSONObject;
 
 import java.io.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Reconstruct ancestral sequences using partial order graphs to represent indels. Each node of the resulting phylogenetic tree
@@ -600,14 +603,32 @@ public class ASRPOG {
 		return this.phyloTree.find(node).getChildren();
 	}
 
+
+	public PhyloTree.Node getParent(String node) {
+		return this.phyloTree.find(node).getParent();
+	}
+
+
 	public String getReconstructedNewick() {
 		return phyloTree.getRoot().toString();
 	}
 
+	/**
+	 * Return a dictionary mapping ancestral label to inferred ancestral sequence
+	 *
+	 */
+
 	public Map<String, String> getAncestralDict(){
 		Map<String, String> ancestralDict = new HashMap<>();
-		for (String label : this.ancestralSeqLabels)
-			ancestralDict.put(label, "");
+		for (String label : this.ancestralSeqLabels) {
+			List<ASRPOG.Inference> inferences = this.ancestralInferences.get(label);
+			String inferenceString = "";
+			for (ASRPOG.Inference inference : inferences) {
+				inferenceString += inference.base;
+			}
+
+			ancestralDict.put(label, inferenceString);
+		}
 		return ancestralDict;
 	}
 
@@ -617,6 +638,11 @@ public class ASRPOG {
 
 	public Map<String, List<Inference>> getAncestralInferences(){
 		return this.ancestralInferences;
+	}
+
+	public List<String> getAncestralSeqLabels(){
+		return this.ancestralSeqLabels;
+
 	}
 
 	/**
@@ -1173,6 +1199,113 @@ public class ASRPOG {
         }
         return d_marg;
     }
+
+	/**
+	 * Get the pairs of parent / child nodes that differ in insertion / deletion content
+	 *
+	 * @return				marginal distribution of query node using ve
+	 */
+	public HashMap<String, List> getIndelDifferences(int length){
+
+		HashMap<String, List> pairs = new HashMap<>();
+		Map<String, String> ancestralDict = this.getAncestralDict();
+
+		System.out.println(ancestralDict);
+
+
+
+		for (String ancestor: this.getAncestralSeqLabels()){
+			String inference = ancestralDict.get(ancestor);
+
+			Pattern pattern = Pattern.compile("\\-{" + length + ",}");
+			Matcher matcher = pattern.matcher((inference));
+			while (matcher.find()) {
+				String parent = this.getParent(ancestor).getLabel().toString();
+
+				System.out.println(matcher.start() + " " + matcher.end());
+
+
+
+				String parent_inference = ancestralDict.get(parent);
+
+				String parent_substring = parent_inference.substring(matcher.start(), matcher.end());
+
+				Map<Integer, Integer> position_mapping = new HashMap<Integer, Integer>();
+
+				int count = 0;
+				for (int actual = matcher.start(); actual <= matcher.end(); actual ++){
+
+					position_mapping.put(count, actual);
+					count ++;
+
+
+				}
+
+				System.out.println(position_mapping);
+				System.out.println("Found inference string is");
+				System.out.println(inference);
+
+				System.out.println("Parent inference string is");
+				System.out.println(parent_inference);
+
+				System.out.println("Exact locations are");
+				System.out.println(inference.substring(matcher.start(), matcher.end()));
+				System.out.println(parent_substring);
+
+
+
+				Pattern parent_pattern = Pattern.compile("\\w{" + length + ",}");
+				Matcher parent_matcher = parent_pattern.matcher(parent_substring);
+				while (parent_matcher.find()) {
+					System.out.println("found");
+
+					//TODO: Add to list if already exists.
+
+
+					System.out.println(parent_matcher.start() + " " + parent_matcher.end());
+
+					System.out.println(parent_substring.substring(parent_matcher.start(), parent_matcher.end()));
+
+					String pair_key = parent + ":" + ancestor;
+
+					if (pairs.containsKey(pair_key)){
+						pairs.get(pair_key).add(position_mapping.get(parent_matcher.start()) + ":" + position_mapping.get(parent_matcher.end()));
+					}
+					else {
+						ArrayList<String> pair_list = new ArrayList<String>();
+						pair_list.add(position_mapping.get(parent_matcher.start()) + ":" + position_mapping.get(parent_matcher.end()));
+						pairs.put(pair_key, pair_list);
+
+
+					}
+
+
+				}
+
+
+
+			}
+
+		}
+		return pairs;
+	}
+
+	public JSONArray getIndelDifferencesJSON(int length){
+
+		HashMap<String, List> indelDifferences = this.getIndelDifferences(length);
+
+		JSONArray pairs = new JSONArray();
+
+		for (Map.Entry<String, List> list : indelDifferences.entrySet()) {
+
+			JSONObject pair = new JSONObject();
+			pair.put("label", list.getKey().toString());
+			pair.put("value", list.getValue());
+			pairs.put(pair);
+		}
+		return pairs;
+
+	}
 
 
     /**
