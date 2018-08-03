@@ -518,6 +518,7 @@ public class ASRPOG {
 			System.err.println("Marginal reconstruction has not been performed. Cannot save distribution.");
 			return;
 		}
+
 		POGraph ancestor = getAncestor(marginalNode);
 		Writer writer = new PrintWriter(filename + "_dist.tsv", "UTF-8");
 		Object[] aacid = Enumerable.aacid.getValues();
@@ -1257,9 +1258,6 @@ public class ASRPOG {
 				Pattern parent_pattern = Pattern.compile("\\w{" + length + ",}");
 				Matcher parent_matcher = parent_pattern.matcher(parent_substring);
 				while (parent_matcher.find()) {
-					System.out.println("found");
-
-					//TODO: Add to list if already exists.
 
 
 					System.out.println(parent_matcher.start() + " " + parent_matcher.end());
