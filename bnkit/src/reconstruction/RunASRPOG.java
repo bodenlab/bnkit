@@ -1,7 +1,12 @@
 package reconstruction;
 
+import dat.EnumSeq;
+import dat.Enumerable;
+import dat.POGraph;
+
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Map;
 
 
@@ -30,7 +35,7 @@ public class RunASRPOG {
 	 *  			-o 		output filepath to save reconstructed partial order graphs of internal node of the phylogenetic tree
 	 * 				-inf	inference type, 'marginal' or 'joint'. Default: joint. If 'marginal', specify the node name after 'marginal', default: root node.
 	 * 			    -p      number of threads
-     * 				-mp		use maximum parsimony to infer gaps positions. By default, maximum likelihood is used within a Bayesian network framework.
+	 * 				-mp		use maximum parsimony to infer gaps positions. By default, maximum likelihood is used within a Bayesian network framework.
 	 * 				-msa	generate dot file in output directory representing multiple sequence alignment of input sequences or partial order alignment graph. Default: no msa dot file is generated
 	 * 				-dot	generate dot file in output directory ancestral node sequence
 	 * 				-align	perform sequence alignment prior to reconstruction, otherwise assumes sequences are aligned
@@ -49,6 +54,7 @@ public class RunASRPOG {
 			String treePath = "";
 			String poagRepresentation = "";
 			String alignmentType = "";
+			String perturbNode = "";
 			String model = null;
 			int numThreads = 1;
 			if (!args[0].contains("-"))
@@ -60,6 +66,8 @@ public class RunASRPOG {
 			boolean msaFile = false;
 			boolean performAlignment = false;
 			boolean checkBranchIsolation = false;
+			boolean perturbAncestors = false;
+			boolean indelDifferences = false;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {
@@ -90,6 +98,12 @@ public class RunASRPOG {
 					performAlignment = true;
 					alignmentType = args[arg + 1];
 				}
+				else if (args[arg].equalsIgnoreCase("-perturb")) {
+					perturbAncestors = true;
+					perturbNode = args[arg + 1];
+				}
+
+
 			}
 
 			// exit if the phylogenetic tree has not been specified, or the partial order alignment structure and sequence filepath both have not been specified (need one or the other)
@@ -100,18 +114,18 @@ public class RunASRPOG {
 
 			if (poagRepresentation.isEmpty()) {
 				if (performAlignment) { // generate a partial order alignment graph if the alignment has not been specified
-					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), true, model, numThreads);
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), "None", true, model, numThreads);
 				} else if (marginalNode != null)
 					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, false, model, numThreads);
 				else
-					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), false, model, numThreads);
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), "None", false, model, numThreads);
 			} else if (marginalNode != null)
 				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, performAlignment, model, numThreads);
 			else
-				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), performAlignment, model, numThreads);
+				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), "None", performAlignment, model, numThreads);
 
 			if (!outputPath.isEmpty()) {
-				outputPath += "/";
+//				outputPath += "/";
 				if (dotFile)
 					asr.saveGraph(outputPath);
 				if (msaFile)
@@ -125,8 +139,20 @@ public class RunASRPOG {
 					asr.save(outputPath, false, "fasta");
 			}
 
-//			System.out.println((asr.getIndelDifferences(5)));
-q
+			if (indelDifferences){
+				System.out.println("Get the indel differences");
+				System.out.println((asr.getIndelDifferences(5)));
+			}
+
+			if (perturbAncestors){
+
+				ArrayList<EnumSeq.Gappy<Enumerable>>  allSeqs = asr.getInferenceFromPerturbation(outputPath, perturbNode, sequencePath, treePath, inference, performAlignment, model, numThreads);
+				asr.outputALN(allSeqs, outputPath + "_all_ancestors", "fasta");
+
+
+			}
+
+
 			if (checkBranchIsolation){
 
 

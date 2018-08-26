@@ -525,10 +525,10 @@ public class ASR {
         if (infSequence) {
 //            saveJSON(id + "_JSON_output.txt");
             saveALN(id + "_aln_full.fa");
-            saveTree(id + "_new_tree.txt");
+            saveTree(id + "_new_tree.nwk");
             saveRate(id + "_rates.txt");
         } else {
-            saveTree(id + "_new_tree.txt");
+            saveTree(id + "_new_tree.nwk");
             saveDistrib(id + "_distribution.txt");
         }
         return true;

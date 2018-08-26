@@ -1,3 +1,6 @@
+package test;
+
+
 import api.PartialOrderGraph;
 import dat.POGraph;
 import json.JSONObject;
@@ -7,6 +10,7 @@ import reconstruction.ASRPOG;
 import vis.POAGJson;
 
 import java.io.IOException;
+
 
 /**
  * Created by marnie on 27/4/17.
@@ -28,7 +32,7 @@ public class VisTests {
     public void getJSONASRTest() throws IOException, InterruptedException {
         String alnfilepath = "src/test/resources/small.aln";
         String treefilepath = "src/test/resources/small.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, treefilepath, false, false, null, 1);
+        ASRPOG asr = new ASRPOG(alnfilepath, treefilepath, false, "None", false, null, 1);
         PartialOrderGraph msa = asr.getPartialOrderGraph();
         PartialOrderGraph graph = asr.getGraph("root");
         POAGJson msajson = new POAGJson(msa);

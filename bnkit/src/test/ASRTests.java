@@ -21,7 +21,7 @@ public class ASRTests {
     public void getAncestralGraphTest() throws IOException, InterruptedException {
         String alnfilepath = "src/test/resources/tawfik.aln";
         String nwkfilepath = "src/test/resources/tawfik.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, "None", false, null, 1);
         PartialOrderGraph root = asr.getGraph("N22_68");
         POGraph pog = asr.getAncestor("N22_68");
         System.out.println(root.getConsensusGappySequence());
@@ -35,7 +35,7 @@ public class ASRTests {
     public void performSmallASR() throws IOException, InterruptedException {
         String alnfilepath = "src/test/resources/tawfik.aln";
         String nwkfilepath = "src/test/resources/tawfik.nwk";
-        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
+        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, "None", false, null, 1);
         System.out.println(asr.getGraph("root").getConsensusGappySequence());
     }
 
@@ -49,7 +49,7 @@ public class ASRTests {
 
         ASRPOG asr = null;
         System.out.println("running joint... ");
-        asr =  new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
+        asr =  new ASRPOG(alnfilepath, nwkfilepath, true, "None", false, null, 1);
 
         JSONObject infs = asr.exportInferencesToJSON();
         ASRPOG test  = new ASRPOG(null, 1, infs, seqs, treeNwk);

@@ -36,29 +36,43 @@ import java.util.Set;
  * @author mikael
  */
 public class PhyloBNet {
-    
+
     private final BNet bn;
     private final SubstModel model;
     private double rate = 1.0;
     private List<EnumVariable> leaves;
     private SubstNode bnroot;
-    
+
     private PhyloBNet(SubstModel model) {
         bn = new BNet();
         this.leaves = new ArrayList<>();
         this.model = model;
     }
-    
+
     public BNet getBN() {
         return bn;
     }
-    
+
     public BNode getRoot() {
         return bnroot;
     }
-    
+
     protected void addBNode(BNode node) {
         bn.add(node);
+    }
+
+    protected void removeBNode(BNode node){
+        bn.remove(node);
+    }
+
+    /**
+     * Construct a BN for specified phylogenetic tree using supplied model.
+     * @param tree phylogenetic tree
+     * @param model evolutionary model
+     * @return the phylogenetic Bayesian network
+     */
+    public static PhyloBNet create(PhyloTree tree, String excludeNode, SubstModel model) {
+        return create(tree, excludeNode, model, 1.0);
     }
 
     /**
@@ -68,9 +82,19 @@ public class PhyloBNet {
      * @return the phylogenetic Bayesian network
      */
     public static PhyloBNet create(PhyloTree tree, SubstModel model) {
-        return create(tree, model, 1.0);
+        return create(tree, "None", model, 1.0);
     }
-    
+
+    /**
+     * Construct a BN for specified phylogenetic tree using supplied model.
+     * @param tree phylogenetic tree
+     * @param model evolutionary model
+     * @return the phylogenetic Bayesian network
+     */
+    public static PhyloBNet create(PhyloTree tree, SubstModel model, double rate) {
+        return create(tree, "None", model, rate);
+    }
+
     /**
      * Construct a BN for specified phylogenetic tree using supplied model.
      * @param tree phylogenetic tree
@@ -78,7 +102,7 @@ public class PhyloBNet {
      * @param rate the evolutionary rate to be applied
      * @return the phylogenetic Bayesian network
      */
-    public static PhyloBNet create(PhyloTree tree, SubstModel model, double rate) {
+    public static PhyloBNet create(PhyloTree tree, String excludeNode, SubstModel model, double rate) {
         PhyloBNet pbn = new PhyloBNet(model);
         pbn.rate = rate;
         Node root = tree.getRoot();
@@ -86,7 +110,17 @@ public class PhyloBNet {
 //        EnumVariable rvar = Predef.AminoAcid(root.toString());
         pbn.bnroot = new SubstNode(rvar, model);
         pbn.addBNode(pbn.bnroot);
-        pbn.createNodesForSubtree(root, rvar);
+        pbn.createNodesForSubtree(root, rvar, excludeNode);
+//        if (!excludeNode.equals("None")){
+//            BNode nodeToRemove = pbn.getBN().getNode(excludeNode);
+//            pbn.removeBNode(nodeToRemove);
+//            pbn.getBN().compile();
+//
+//
+//
+//
+//
+//        }
         return pbn;
     }
 
@@ -118,7 +152,7 @@ public class PhyloBNet {
         pbn.createNodesForSubtreeGap(root, rvar);
         return pbn;
     }
-    
+
     /**
      * Get variables that are found at the leaf nodes.
      * @return list of leaf variables
@@ -126,7 +160,7 @@ public class PhyloBNet {
     public List<EnumVariable> getLeaves() {
         return leaves;
     }
-    
+
     public List<EnumVariable> getInternal() {
         List<Variable> vars = bn.getOrderedVariables();
         List<EnumVariable> internal = new ArrayList<>();
@@ -151,7 +185,7 @@ public class PhyloBNet {
         for (BNode node : bn.getNodes()) {
             // only consider leaf nodes
             if (!bn.hasChildren(node)) {
-                int nChanges = 0; // no of different instantiations 
+                int nChanges = 0; // no of different instantiations
                 double cumTime = 0; // cumulative time according to nodes
                 SubstNode snode = null;
                 Object prev = node.getInstance();
@@ -189,17 +223,21 @@ public class PhyloBNet {
             return 0;
     }
 
-    private void createNodesForSubtree(Node pnode, EnumVariable evar) {
+    private void createNodesForSubtree(Node pnode, EnumVariable evar, String excludeNode) {
         Collection<Node> children = pnode.getChildren();
         if (children.isEmpty()) {
-            leaves.add(evar);
+
+            if (!evar.getName().equals(excludeNode)) {
+
+                leaves.add(evar);
+            }
         } else {
             for (Node child : children) {
                 EnumVariable cvar = Predef.AminoAcid(child.getLabel().toString());
 //                EnumVariable cvar = Predef.AminoAcid(child.toString());
                 SubstNode cnode = new SubstNode(cvar, evar, model, child.getDistance() * this.rate);
                 this.addBNode(cnode);
-                createNodesForSubtree(child, cvar);
+                createNodesForSubtree(child, cvar, excludeNode);
             }
         }
     }
@@ -218,7 +256,7 @@ public class PhyloBNet {
             }
         }
     }
-    
+
     public int purgeGaps() {
         List<BNode> nodes = bn.getOrdered();
         if (nodes == null)
@@ -237,12 +275,12 @@ public class PhyloBNet {
         bn.compile();
         return purgedAlready.size();
     }
-    
+
     /**
      * Identify the top-most nodes above the specified, that can be purged safely.
      * This will only be one in the case of phylogenetic trees.
      * @param me
-     * @return 
+     * @return
      */
     private void purgeMe(BNode me, Set<BNode> purgedAlready) {
         Set<BNode> parents = bn.getParents(me); // should only be one in the case of a phylogenetic tree
@@ -250,7 +288,7 @@ public class PhyloBNet {
             return;
         else {
             for (BNode p : parents) { // only one
-                Set<BNode> children = bn.getChildren(p); 
+                Set<BNode> children = bn.getChildren(p);
                 int purged = 0;
                 for (BNode c : children) {
                     if (purgedAlready.contains(c))
@@ -258,12 +296,12 @@ public class PhyloBNet {
                 }
                 if (children.size() - purged == 0) { // any other children (than me)?
                     purgedAlready.add(p);              // if not, we can continue up the tree
-                    purgeMe(p, purgedAlready); 
+                    purgeMe(p, purgedAlready);
                 }
             }
         }
     }
-    
+
     /**
      * Remove internal nodes that are singly connected, with exactly one child.
      * @return number of collapsed nodes
@@ -278,7 +316,7 @@ public class PhyloBNet {
             SubstNode parent = (SubstNode)node;
             if (parent.getInstance() != null)
                 continue;
-            Set<BNode> children = bn.getChildren(parent); 
+            Set<BNode> children = bn.getChildren(parent);
             if (children == null)
                 continue;
             if (children.size() == 1) { // a "single-child" parent
@@ -306,7 +344,7 @@ public class PhyloBNet {
                         if (childrensChildren.size() != 1) // more nodes below, but they cannot be purged
                             break;
                         child = (SubstNode)(childrensChildren.toArray()[0]); // only one child, let's look at that...
-                    } 
+                    }
                     // found the most specific child in a chain of single-child parents
                     // find more details to construct replacement
                     EnumVariable childVar = (EnumVariable)child.getVariable();
@@ -323,7 +361,7 @@ public class PhyloBNet {
                 }
             }
         }
-        for (BNode node : toBePurged) 
+        for (BNode node : toBePurged)
             bn.remove(node);
         for (BNode node : toBeAdded)
             bn.add(node);

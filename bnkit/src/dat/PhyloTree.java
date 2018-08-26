@@ -496,6 +496,16 @@ public class PhyloTree {
             children.add(child);
         }
 
+
+        /**
+         * Remove child from node.
+         * @param child
+         */
+        public void removeChild(Node child) {
+            children.remove(child);
+        }
+
+
         /**
          * Retrieve all the children of the node.
          * @return
