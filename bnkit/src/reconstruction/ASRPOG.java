@@ -1290,6 +1290,12 @@ public class ASRPOG {
 
 				Map<Integer, Integer> position_mapping = new HashMap<Integer, Integer>();
 
+				Pattern parent_pattern = Pattern.compile("\\w{" + length + ",}");
+				Matcher parent_matcher = parent_pattern.matcher(parent_substring);
+				while (parent_matcher.find()) {
+
+
+
 				if (!parent_substring.matches("-")) {
 
 					int count = 0;
@@ -1313,9 +1319,6 @@ public class ASRPOG {
 					System.out.println(parent_substring);
 
 
-					Pattern parent_pattern = Pattern.compile("\\w{" + length + ",}");
-					Matcher parent_matcher = parent_pattern.matcher(parent_substring);
-					while (parent_matcher.find()) {
 
 
 						System.out.println(parent_matcher.start() + " " + parent_matcher.end());

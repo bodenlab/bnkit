@@ -6,8 +6,9 @@ import dat.POGraph;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Map;
+import java.util.List;
+import java.util.HashMap;
 
 
 /**
@@ -67,7 +68,7 @@ public class RunASRPOG {
 			boolean performAlignment = false;
 			boolean checkBranchIsolation = false;
 			boolean perturbAncestors = false;
-			boolean indelDifferences = false;
+			boolean indelDifferences = true;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {
@@ -141,7 +142,9 @@ public class RunASRPOG {
 
 			if (indelDifferences){
 				System.out.println("Get the indel differences");
-				System.out.println((asr.getIndelDifferences(5)));
+				HashMap<String, List> pairs = (asr.getIndelDifferences(2));
+				System.out.println("Here are the pairs");
+				System.out.println(pairs);
 			}
 
 			if (perturbAncestors){
