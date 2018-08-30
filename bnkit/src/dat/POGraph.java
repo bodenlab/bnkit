@@ -831,22 +831,21 @@ public class POGraph {
 	}
 
 	/**
-	 * Method of adding in heuristics to the Astar search algorithm.
+	 * Method of adding in heuristics to the AStar search algorithm.
+	 * The aim is to get the path that has the most sequences in agreement.
+	 * However we also want the longest sequence (as this will contain the
+	 * fewest gaps).
+	 *
+	 * To do this we use the edge.getSequences().size() and multiply it by a
+	 * factor that penalises long gappy regions i.e. (1 + (1/gap_size))
+	 *
+	 * ToDo: optimise the heuristic function.
 	 *
 	 * @return
 	 */
-	private Integer heuristicCostEstimate(Node start, Node goal) {
-		return (goal.getID() - start.getID()) + 1;
-	}
-
-	/**
-	 * Calculate the distance between two nodes.
-	 * @param current
-	 * @param neighbor
-	 * @return
-	 */
-	private Integer distBetween(Node current, Node neighbor) {
-		return (neighbor.getID() - current.getID()) + 1;
+	private Integer heuristicCostEstimate(Edge edge, Node from, Node to) {
+		return edge.getSequences().size() * (1 +
+				(1 / java.lang.Math.abs(to.getID() - from.getID())));
 	}
 
 
@@ -880,7 +879,6 @@ public class POGraph {
 					}
 				}
 			}
-
 			cameFrom.remove(current);
 			current = next;
 
@@ -895,41 +893,42 @@ public class POGraph {
 	/**
 	 * Helper that updates the current path and assigns costs.
 	 * @param cameFrom
-	 * @param gScore
-	 * @param fScore
+	 * @param cost
 	 * @param closedSet
 	 * @param openSet
 	 * @param neighbor
 	 * @param current
 	 */
 	private void updatePath(HashMap<Node, Node> cameFrom, HashMap<Node,
-			Integer> gScore, HashMap<Node, Integer> fScore, ArrayList<Node>
-			closedSet, PriorityQueue<Node> openSet, Node neighbor, Node current) {
+			Integer> cost, ArrayList<Node>
+			closedSet, PriorityQueue<Node> openSet, Node neighbor, Node
+			current, Edge edge) {
+		int thisCost = heuristicCostEstimate(edge,
+				current, neighbor);
 		if (closedSet.contains(neighbor)) {
 			return; // ignore as it has already been visited
 		}
-		// Otherwise we set the distance to this node
-		int tentativeGScore = gScore.get(current) + distBetween
-				(current, neighbor);
+		// Otherwise we set the cost to this node
+		int tentativeCost = cost.get(current) + thisCost;
 
 		// Check if we have discovered a new node
 		if (!openSet.contains(neighbor)) {
 			// Assign the cost to the node
-			neighbor.setCost(tentativeGScore);
+			neighbor.setCost(tentativeCost);
 			openSet.add(neighbor);
-		} else if (tentativeGScore >= gScore.get(neighbor)) {
-			return; // This isn't a better path
+		} else if (tentativeCost <= cost.get(neighbor)) {
+			return; // This isn't a better path we want the highest cost
 		}
 		// If we have made it here this is the best path so let's
 		cameFrom.put(neighbor, current);
-		gScore.put(neighbor, tentativeGScore);
-		fScore.put(neighbor, tentativeGScore +
-				heuristicCostEstimate(neighbor, finalNode));
+		cost.put(neighbor, tentativeCost);
 
 	}
 
 	/**
 	 * Gets the consensus sequences using an A star search algorithm.
+	 *
+	 *
 	 *
 	 * @param gappy
 	 * @return
@@ -945,15 +944,12 @@ public class POGraph {
 		openSet.add(initialNode);
 		// Storing the previous node
 		HashMap<Node, Node> cameFrom = new HashMap<>();
-		// Cost of getting to each node
-		HashMap<Node, Integer> gScore = new HashMap<>();
-		// Set the starting cost
-		gScore.put(initialNode, 0);
 		// Map with heuristics - here we assign the heruristics of we want to
 		// prioritise the paths with the most sequences.
-		HashMap<Node, Integer> fScore = new HashMap<>();
-		// Add the initial node's heuristic
-		fScore.put(initialNode, heuristicCostEstimate(initialNode, finalNode));
+		HashMap<Node, Integer> cost = new HashMap<>();
+		// Add the initial node's cost, we want to maximise it so we set this
+		// to 0.
+		cost.put(initialNode, 0);
 		while (!openSet.isEmpty()) {
 			current = openSet.poll();
 			if (current.equals(finalNode)) {
@@ -965,24 +961,31 @@ public class POGraph {
 			// find next edge as first reciprocated edge in the ordered extant list, if no reciprocated, then
 			// default to the first edge (extant support)
 			Edge next = null;
+			// We also want to keep track of the maximum number of sequences
+			// that follow a particular edge, this will allow us to make a
+			// decision if no edges are bi-directional.
+			int maxSeqNum = 0;
+			int maxSeqIdx = 0;
 			for (int n = 0; n < current.getNextTransitions().size(); n++) {
 				if (current.getNextTransitions().get(n).reciprocated) {
 					next = current.getNextTransitions().get(n);
 					// This means this is a possible path so we want to check
 					// if we have already evaluated it.
 					Node neighbor = next.getNext();
-					updatePath(cameFrom, gScore, fScore, closedSet, openSet,
-							neighbor,
-							current);
+					updatePath(cameFrom, cost, closedSet, openSet,
+							neighbor, current, next);
+					if (next.getSequences().size() > maxSeqNum) {
+						maxSeqNum = next.getSequences().size();
+						maxSeqIdx = n;
+					}
 				}
 			}
-			// If there were no next edges we want to at least add the first
-			// one in there.
 			if (next == null)  {
-				Node neighbor = current.getNextTransitions().get(0).getNext();
-				updatePath(cameFrom, gScore, fScore, closedSet, openSet,
-						neighbor,
-						current);
+				// Choose the neighbor that has the greatest number of
+				// sequences in agreement from above
+				Node neighbor = current.getNextTransitions().get(maxSeqIdx).getNext();
+				updatePath(cameFrom, cost, closedSet, openSet,
+						neighbor, current, current.getNextTransitions().get(maxSeqIdx));
 			}
 
 		}
@@ -991,8 +994,12 @@ public class POGraph {
 
 
 	/**
-	 * Comparator class for ensuring the nodes with the smallest cost are
+	 * Comparator class for ensuring the nodes with the largest cost are
 	 * kept at the front of the queue.
+	 *
+	 * Here, we want to maximise the cost as we are trying to get either:
+	 * 		a. the longest sequence, or
+	 * 		b. the path which the greatest number of sequences agree on.
 	 */
 	public class NodeComparator implements Comparator<Node>
 	{
@@ -1001,11 +1008,11 @@ public class POGraph {
 		{
 			if (x.getCost() < y.getCost())
 			{
-				return 1;
+				return -1;
 			}
 			if (x.getCost() > y.getCost())
 			{
-				return -1;
+				return 1;
 			}
 			return 0;
 		}
