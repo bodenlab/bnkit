@@ -1,8 +1,6 @@
 package dat;
 
 import alignment.utilities.MutableInt;
-import com.sun.deploy.util.OrderedHashSet;
-import com.sun.javafx.geom.Edge;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
@@ -833,11 +831,192 @@ public class POGraph {
 	}
 
 	/**
+	 * Method of adding in heuristics to the Astar search algorithm.
+	 *
+	 * @return
+	 */
+	private Integer heuristicCostEstimate(Node start, Node goal) {
+		return (goal.getID() - start.getID()) + 1;
+	}
+
+	/**
+	 * Calculate the distance between two nodes.
+	 * @param current
+	 * @param neighbor
+	 * @return
+	 */
+	private Integer distBetween(Node current, Node neighbor) {
+		return (neighbor.getID() - current.getID()) + 1;
+	}
+
+
+	/**
+	 * Reconstructs the consensus sequence based on the A* search. We need to
+	 * reverse the path and add in the gaps.
+	 *
+	 * @param cameFrom
+	 * @param current
+	 * @param gappy
+	 * @return
+	 */
+	private String reconstructPath(HashMap<Node, Node> cameFrom, Node
+			current, boolean gappy) {
+		Stack<Character> sequence = new Stack<>();
+		String sequenceString = "";
+		while (cameFrom.keySet().contains(current)) {
+			Node next = cameFrom.get(current);
+			// If we have a character we want to add it
+			if (current.getBase() != null) {
+				sequence.push(current.getBase());
+			}
+			// If we have a gappy sequence we need to add in the gaps
+			if (gappy == true) {
+				int cameFromPosition = current.getID();
+				int nextPosition = next.getID();
+				int numGaps = -1 * ((nextPosition - cameFromPosition) + 1);
+				if (numGaps > 0) {
+					for (int g = 0; g < numGaps; g++) {
+						sequence.push('-');
+					}
+				}
+			}
+
+			cameFrom.remove(current);
+			current = next;
+
+		}
+		// Reverse and create a string
+		while (!sequence.empty()) {
+			sequenceString += sequence.pop();
+		}
+		return sequenceString;
+	}
+
+	/**
+	 * Helper that updates the current path and assigns costs.
+	 * @param cameFrom
+	 * @param gScore
+	 * @param fScore
+	 * @param closedSet
+	 * @param openSet
+	 * @param neighbor
+	 * @param current
+	 */
+	private void updatePath(HashMap<Node, Node> cameFrom, HashMap<Node,
+			Integer> gScore, HashMap<Node, Integer> fScore, ArrayList<Node>
+			closedSet, PriorityQueue<Node> openSet, Node neighbor, Node current) {
+		if (closedSet.contains(neighbor)) {
+			return; // ignore as it has already been visited
+		}
+		// Otherwise we set the distance to this node
+		int tentativeGScore = gScore.get(current) + distBetween
+				(current, neighbor);
+
+		// Check if we have discovered a new node
+		if (!openSet.contains(neighbor)) {
+			// Assign the cost to the node
+			neighbor.setCost(tentativeGScore);
+			openSet.add(neighbor);
+		} else if (tentativeGScore >= gScore.get(neighbor)) {
+			return; // This isn't a better path
+		}
+		// If we have made it here this is the best path so let's
+		cameFrom.put(neighbor, current);
+		gScore.put(neighbor, tentativeGScore);
+		fScore.put(neighbor, tentativeGScore +
+				heuristicCostEstimate(neighbor, finalNode));
+
+	}
+
+	/**
+	 * Gets the consensus sequences using an A star search algorithm.
+	 *
+	 * @param gappy
+	 * @return
+	 */
+	public String getSupportedSequence(boolean gappy) {
+		// Intanciate the comparator class
+		Comparator<Node> comparator = new NodeComparator();
+		// Already visited nodes
+		ArrayList<Node> closedSet = new ArrayList<>();
+		// Unvisted nodes keep track of the best options
+		PriorityQueue<Node> openSet = new PriorityQueue<>(10, comparator);
+		// Add the initial node to the open set
+		openSet.add(initialNode);
+		// Storing the previous node
+		HashMap<Node, Node> cameFrom = new HashMap<>();
+		// Cost of getting to each node
+		HashMap<Node, Integer> gScore = new HashMap<>();
+		// Set the starting cost
+		gScore.put(initialNode, 0);
+		// Map with heuristics - here we assign the heruristics of we want to
+		// prioritise the paths with the most sequences.
+		HashMap<Node, Integer> fScore = new HashMap<>();
+		// Add the initial node's heuristic
+		fScore.put(initialNode, heuristicCostEstimate(initialNode, finalNode));
+		while (!openSet.isEmpty()) {
+			current = openSet.poll();
+			if (current.equals(finalNode)) {
+				// Reconstruct the path
+				return reconstructPath(cameFrom, current, gappy);
+			}
+			// Otherwise add this to the closedSet
+			closedSet.add(current);
+			// find next edge as first reciprocated edge in the ordered extant list, if no reciprocated, then
+			// default to the first edge (extant support)
+			Edge next = null;
+			for (int n = 0; n < current.getNextTransitions().size(); n++) {
+				if (current.getNextTransitions().get(n).reciprocated) {
+					next = current.getNextTransitions().get(n);
+					// This means this is a possible path so we want to check
+					// if we have already evaluated it.
+					Node neighbor = next.getNext();
+					updatePath(cameFrom, gScore, fScore, closedSet, openSet,
+							neighbor,
+							current);
+				}
+			}
+			// If there were no next edges we want to at least add the first
+			// one in there.
+			if (next == null)  {
+				Node neighbor = current.getNextTransitions().get(0).getNext();
+				updatePath(cameFrom, gScore, fScore, closedSet, openSet,
+						neighbor,
+						current);
+			}
+
+		}
+		return null;
+	}
+
+
+	/**
+	 * Comparator class for ensuring the nodes with the smallest cost are
+	 * kept at the front of the queue.
+	 */
+	public class NodeComparator implements Comparator<Node>
+	{
+		@Override
+		public int compare(Node x, Node y)
+		{
+			if (x.getCost() < y.getCost())
+			{
+				return 1;
+			}
+			if (x.getCost() > y.getCost())
+			{
+				return -1;
+			}
+			return 0;
+		}
+	}
+
+	/**
 	 * Traverses the graph structure to construct the most supported sequence of characters.
 	 *
 	 * @return	most supported sequence of base characters
 	 */
-	public String getSupportedSequence(boolean gappy) {
+	public String getSupportedSequenceOld(boolean gappy) {
 
 		String sequence = "";
 		Node current = initialNode;
@@ -1518,6 +1697,8 @@ public class POGraph {
 		private HashMap<Integer, Character> seqChars;			// map of sequence Ids and their base character
 		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
 		private boolean consensus = false; 						// flag to indicate if belongs to the consensus path
+		private int cost = 10000;								// cost to  reach this node from the start
+
 
 		/**
 		 * Constructor
@@ -1536,6 +1717,22 @@ public class POGraph {
 		public Node(Integer ID) {
 			this();
 			this.ID = ID;
+		}
+
+		/**
+		 * Sets the cost based on a heuristic.
+		 * @param cost
+		 */
+		public void setCost(int cost) {
+			this.cost = cost;
+		}
+
+		/**
+		 * Gets the cost to this node.
+		 * @return
+		 */
+		public int getCost() {
+			return this.cost;
 		}
 
 		/**
