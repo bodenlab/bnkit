@@ -1,8 +1,6 @@
 package dat;
 
 import alignment.utilities.MutableInt;
-import com.sun.deploy.util.OrderedHashSet;
-import com.sun.javafx.geom.Edge;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
@@ -833,11 +831,222 @@ public class POGraph {
 	}
 
 	/**
+	 * Method of adding in heuristics to the AStar search algorithm.
+	 * The aim is to get the path that has the most sequences in agreement.
+	 * However we also want the longest sequence (as this will contain the
+	 * fewest gaps).
+	 *
+	 * To do this we use the edge.getSequences().size() and multiply it by a
+	 * factor that penalises long gappy regions i.e. (1 + (1/gap_size))
+	 *
+	 * ToDo: optimise the heuristic function.
+	 *
+	 * @return
+	 */
+	private Integer heuristicCostEstimate(Edge edge, Node from, Node to) {
+		return edge.getSequences().size() * (1 +
+				(1 / java.lang.Math.abs(to.getID() - from.getID())));
+	}
+
+
+	/**
+	 * Reconstructs the consensus sequence based on the A* search. We need to
+	 * reverse the path and add in the gaps.
+	 *
+	 * @param cameFrom
+	 * @param current
+	 * @param gappy
+	 * @return
+	 */
+	private String reconstructPath(HashMap<Node, Path> cameFrom, Node
+			current, boolean gappy) {
+		Stack<Character> sequence = new Stack<>();
+		String sequenceString = "";
+		while (cameFrom.keySet().contains(current)) {
+			Path prevPath = cameFrom.get(current);
+			Node prevNode = prevPath.getNode();
+			// Set the edge to have a true consensus flag
+			prevPath.getEdge().setConsensus(true);
+			// If we have a character we want to add it
+			if (current.getBase() != null) {
+				sequence.push(current.getBase());
+			}
+			// If we have a gappy sequence we need to add in the gaps
+			if (gappy == true) {
+				int cameFromPosition = current.getID();
+				int nextPosition = prevNode.getID();
+				int numGaps = -1 * ((nextPosition - cameFromPosition) + 1);
+				if (numGaps > 0) {
+					for (int g = 0; g < numGaps; g++) {
+						sequence.push('-');
+					}
+				}
+			}
+			cameFrom.remove(current);
+			current = prevNode;
+
+		}
+		// Reverse and create a string
+		while (!sequence.empty()) {
+			sequenceString += sequence.pop();
+		}
+		return sequenceString;
+	}
+
+	/**
+	 * Helper that updates the current path and assigns costs.
+	 * @param cameFrom
+	 * @param cost
+	 * @param closedSet
+	 * @param openSet
+	 * @param neighbor
+	 * @param current
+	 */
+	private void updatePath(HashMap<Node, Path> cameFrom, HashMap<Node,
+			Integer> cost, ArrayList<Node>
+			closedSet, PriorityQueue<Node> openSet, Node neighbor, Node
+			current, Edge edge) {
+		int thisCost = heuristicCostEstimate(edge,
+				current, neighbor);
+		if (closedSet.contains(neighbor)) {
+			return; // ignore as it has already been visited
+		}
+		// Otherwise we set the cost to this node
+		int tentativeCost = cost.get(current) + thisCost;
+
+		// Check if we have discovered a new node
+		if (!openSet.contains(neighbor)) {
+			// Assign the cost to the node
+			neighbor.setCost(tentativeCost);
+			openSet.add(neighbor);
+		} else if (tentativeCost <= cost.get(neighbor)) {
+			return; // This isn't a better path we want the highest cost
+		}
+		// If we have made it here this is the best path so let's
+		cameFrom.put(neighbor, new Path(current, edge));
+		cost.put(neighbor, tentativeCost);
+
+	}
+
+	/**
+	 * Gets the consensus sequences using an A star search algorithm.
+	 *
+	 *
+	 *
+	 * @param gappy
+	 * @return
+	 */
+	public String getSupportedSequence(boolean gappy) {
+		// Intanciate the comparator class
+		Comparator<Node> comparator = new NodeComparator();
+		// Already visited nodes
+		ArrayList<Node> closedSet = new ArrayList<>();
+		// Unvisted nodes keep track of the best options
+		PriorityQueue<Node> openSet = new PriorityQueue<>(10, comparator);
+		// Add the initial node to the open set
+		openSet.add(initialNode);
+		// Storing the previous node
+		HashMap<Node, Path> cameFrom = new HashMap<>();
+		// Map with heuristics - here we assign the heruristics of we want to
+		// prioritise the paths with the most sequences.
+		HashMap<Node, Integer> cost = new HashMap<>();
+		// Add the initial node's cost, we want to maximise it so we set this
+		// to 0.
+		cost.put(initialNode, 0);
+		while (!openSet.isEmpty()) {
+			current = openSet.poll();
+			if (current.equals(finalNode)) {
+				// Reconstruct the path
+				return reconstructPath(cameFrom, current, gappy);
+			}
+			// Otherwise add this to the closedSet
+			closedSet.add(current);
+			// find next edge as first reciprocated edge in the ordered extant list, if no reciprocated, then
+			// default to the first edge (extant support)
+			Edge next = null;
+			// We also want to keep track of the maximum number of sequences
+			// that follow a particular edge, this will allow us to make a
+			// decision if no edges are bi-directional.
+			int maxSeqNum = 0;
+			int maxSeqIdx = 0;
+			for (int n = 0; n < current.getNextTransitions().size(); n++) {
+				if (current.getNextTransitions().get(n).reciprocated) {
+					next = current.getNextTransitions().get(n);
+					// This means this is a possible path so we want to check
+					// if we have already evaluated it.
+					Node neighbor = next.getNext();
+					updatePath(cameFrom, cost, closedSet, openSet,
+							neighbor, current, next);
+					if (next.getSequences().size() > maxSeqNum) {
+						maxSeqNum = next.getSequences().size();
+						maxSeqIdx = n;
+					}
+				}
+			}
+			if (next == null)  {
+				// Choose the neighbor that has the greatest number of
+				// sequences in agreement from above
+				Node neighbor = current.getNextTransitions().get(maxSeqIdx).getNext();
+				updatePath(cameFrom, cost, closedSet, openSet,
+						neighbor, current, current.getNextTransitions().get(maxSeqIdx));
+			}
+
+		}
+		return null;
+	}
+
+
+	/**
+	 * Comparator class for ensuring the nodes with the largest cost are
+	 * kept at the front of the queue.
+	 *
+	 * Here, we want to maximise the cost as we are trying to get either:
+	 * 		a. the longest sequence, or
+	 * 		b. the path which the greatest number of sequences agree on.
+	 */
+	public class NodeComparator implements Comparator<Node>
+	{
+		@Override
+		public int compare(Node x, Node y)
+		{
+			if (x.getCost() < y.getCost())
+			{
+				return -1;
+			}
+			if (x.getCost() > y.getCost())
+			{
+				return 1;
+			}
+			return 0;
+		}
+	}
+
+	/**
+	 * Helper class to store the path. Keeps track of the edge and the node
+	 * that lead to a particular path. We need to keep track of the edge to
+	 * be able to set it as 'consensus' and the node to be able to get the
+	 * character.
+	 */
+	public class Path {
+		private Node node;
+		private Edge edge;
+
+		public Path(Node node, Edge edge) {
+			this.edge = edge;
+			this.node = node;
+		}
+
+		public Node getNode() { return this.node; }
+
+		public Edge getEdge() { return this.edge; }
+	}
+
+	/**
 	 * Traverses the graph structure to construct the most supported sequence of characters.
 	 *
 	 * @return	most supported sequence of base characters
 	 */
-	public String getSupportedSequence(boolean gappy) {
+	public String getSupportedSequenceOld(boolean gappy) {
 
 		String sequence = "";
 		Node current = initialNode;
@@ -1518,6 +1727,8 @@ public class POGraph {
 		private HashMap<Integer, Character> seqChars;			// map of sequence Ids and their base character
 		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
 		private boolean consensus = false; 						// flag to indicate if belongs to the consensus path
+		private int cost = 10000;								// cost to  reach this node from the start
+
 
 		/**
 		 * Constructor
@@ -1536,6 +1747,22 @@ public class POGraph {
 		public Node(Integer ID) {
 			this();
 			this.ID = ID;
+		}
+
+		/**
+		 * Sets the cost based on a heuristic.
+		 * @param cost
+		 */
+		public void setCost(int cost) {
+			this.cost = cost;
+		}
+
+		/**
+		 * Gets the cost to this node.
+		 * @return
+		 */
+		public int getCost() {
+			return this.cost;
 		}
 
 		/**

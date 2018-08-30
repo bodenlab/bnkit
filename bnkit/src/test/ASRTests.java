@@ -30,13 +30,28 @@ public class ASRTests {
     }
 
 
+
     @Test
     @DisplayName("huge ASR")
     public void performSmallASR() throws IOException, InterruptedException {
         String alnfilepath = "src/test/resources/tawfik.aln";
         String nwkfilepath = "src/test/resources/tawfik.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, "None", false, null, 1);
-        System.out.println(asr.getGraph("root").getConsensusGappySequence());
+        String consensus = asr.getGraph("root").getConsensusGappySequence();
+        System.out.println
+                ("------------------------------------------------");
+        System.out.println
+                ("          Running AStar Consensus:");
+        System.out.println
+                ("------------------------------------------------");
+        System.out.println("    - Generated: " + consensus);
+        String expectedConsensus =
+                "GYVMTVLG-PLPINEMGVTLMHEHILLDASGKWVPPCCCSDRHLAEMPVKMENLGELSLNPLMSRDNCQLFDVDVAIDELTKYRALGGETVVDPTNIGIGRDPKALARIARLT-GLNIIMGTGLYLEPSHPEWVKIS-----------SVEQLTERLIYDLGGAEEKPEVLAGLIGEIGISS-RFTPDEEKSLRAAGRASAATGVPIEVHLPGWERLGHRVLDILE-QEGADLRHTVLCHMNPSFADKRYQRELAQRGAFLEYDMIGMSYYYADES------AQSPSDEENARAIRELIDDGYIQQILLSQDVFLKTM----------LTRYGGHGYGYILKHFVPRLRRHGVSGEQLETLMIGNPQRVFGG-----";
+        System.out.println("    - Expected:  " + expectedConsensus);
+        System.out.println
+                ("------------------------------------------------");
+        assert(expectedConsensus.equals(consensus));
+
     }
 
     @Test
