@@ -858,12 +858,15 @@ public class POGraph {
 	 * @param gappy
 	 * @return
 	 */
-	private String reconstructPath(HashMap<Node, Node> cameFrom, Node
+	private String reconstructPath(HashMap<Node, Path> cameFrom, Node
 			current, boolean gappy) {
 		Stack<Character> sequence = new Stack<>();
 		String sequenceString = "";
 		while (cameFrom.keySet().contains(current)) {
-			Node next = cameFrom.get(current);
+			Path prevPath = cameFrom.get(current);
+			Node prevNode = prevPath.getNode();
+			// Set the edge to have a true consensus flag
+			prevPath.getEdge().setConsensus(true);
 			// If we have a character we want to add it
 			if (current.getBase() != null) {
 				sequence.push(current.getBase());
@@ -871,7 +874,7 @@ public class POGraph {
 			// If we have a gappy sequence we need to add in the gaps
 			if (gappy == true) {
 				int cameFromPosition = current.getID();
-				int nextPosition = next.getID();
+				int nextPosition = prevNode.getID();
 				int numGaps = -1 * ((nextPosition - cameFromPosition) + 1);
 				if (numGaps > 0) {
 					for (int g = 0; g < numGaps; g++) {
@@ -880,7 +883,7 @@ public class POGraph {
 				}
 			}
 			cameFrom.remove(current);
-			current = next;
+			current = prevNode;
 
 		}
 		// Reverse and create a string
@@ -899,7 +902,7 @@ public class POGraph {
 	 * @param neighbor
 	 * @param current
 	 */
-	private void updatePath(HashMap<Node, Node> cameFrom, HashMap<Node,
+	private void updatePath(HashMap<Node, Path> cameFrom, HashMap<Node,
 			Integer> cost, ArrayList<Node>
 			closedSet, PriorityQueue<Node> openSet, Node neighbor, Node
 			current, Edge edge) {
@@ -920,7 +923,7 @@ public class POGraph {
 			return; // This isn't a better path we want the highest cost
 		}
 		// If we have made it here this is the best path so let's
-		cameFrom.put(neighbor, current);
+		cameFrom.put(neighbor, new Path(current, edge));
 		cost.put(neighbor, tentativeCost);
 
 	}
@@ -943,7 +946,7 @@ public class POGraph {
 		// Add the initial node to the open set
 		openSet.add(initialNode);
 		// Storing the previous node
-		HashMap<Node, Node> cameFrom = new HashMap<>();
+		HashMap<Node, Path> cameFrom = new HashMap<>();
 		// Map with heuristics - here we assign the heruristics of we want to
 		// prioritise the paths with the most sequences.
 		HashMap<Node, Integer> cost = new HashMap<>();
@@ -1016,6 +1019,26 @@ public class POGraph {
 			}
 			return 0;
 		}
+	}
+
+	/**
+	 * Helper class to store the path. Keeps track of the edge and the node
+	 * that lead to a particular path. We need to keep track of the edge to
+	 * be able to set it as 'consensus' and the node to be able to get the
+	 * character.
+	 */
+	public class Path {
+		private Node node;
+		private Edge edge;
+
+		public Path(Node node, Edge edge) {
+			this.edge = edge;
+			this.node = node;
+		}
+
+		public Node getNode() { return this.node; }
+
+		public Edge getEdge() { return this.edge; }
 	}
 
 	/**
