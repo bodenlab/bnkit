@@ -58,6 +58,7 @@ public class RunASRPOG {
 			String perturbNode = "";
 			String model = null;
 			int numThreads = 1;
+			int indelLength = 0;
 			if (!args[0].contains("-"))
 				if (!args[0].contains(".nwk"))
 					poagRepresentation = args[0];
@@ -104,6 +105,12 @@ public class RunASRPOG {
 					perturbNode = args[arg + 1];
 				}
 
+				else if (args[arg].equalsIgnoreCase("-indeldiff")) {
+					indelDifferences = true;
+					indelLength = Integer.parseInt(args[arg + 1]);
+
+				}
+
 
 			}
 
@@ -142,7 +149,7 @@ public class RunASRPOG {
 
 			if (indelDifferences){
 				System.out.println("Get the indel differences");
-				HashMap<String, List> pairs = (asr.getIndelDifferences(2));
+				HashMap<String, List> pairs = (asr.getIndelDifferences(indelLength));
 				System.out.println("Here are the pairs");
 				System.out.println(pairs);
 			}
