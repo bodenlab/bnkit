@@ -843,9 +843,16 @@ public class POGraph {
 	 *
 	 * @return
 	 */
-	private Integer heuristicCostEstimate(Edge edge, Node from, Node to) {
-		return edge.getSequences().size() * (1 +
-				(1 / java.lang.Math.abs(to.getID() - from.getID())));
+	private Integer heuristicCostEstimate(Edge edge, Node from, Node to, boolean isBidirectional) {
+		int multiplier = 1;
+		if (!isBidirectional) {
+			multiplier = 1000;
+		}
+		int positionDiff = java.lang.Math.abs(to.getID() - from.getID());
+		positionDiff = (positionDiff != 0) ? positionDiff : 1;
+		return multiplier * (this.sequences.size() - edge.getSequences().size
+				() + 1) *
+				positionDiff;
 	}
 
 
@@ -884,7 +891,6 @@ public class POGraph {
 			}
 			cameFrom.remove(current);
 			current = prevNode;
-
 		}
 		// Reverse and create a string
 		while (!sequence.empty()) {
@@ -893,45 +899,9 @@ public class POGraph {
 		return sequenceString;
 	}
 
-	/**
-	 * Helper that updates the current path and assigns costs.
-	 * @param cameFrom
-	 * @param cost
-	 * @param closedSet
-	 * @param openSet
-	 * @param neighbor
-	 * @param current
-	 */
-	private void updatePath(HashMap<Node, Path> cameFrom, HashMap<Node,
-			Integer> cost, ArrayList<Node>
-			closedSet, PriorityQueue<Node> openSet, Node neighbor, Node
-			current, Edge edge) {
-		int thisCost = heuristicCostEstimate(edge,
-				current, neighbor);
-		if (closedSet.contains(neighbor)) {
-			return; // ignore as it has already been visited
-		}
-		// Otherwise we set the cost to this node
-		int tentativeCost = cost.get(current) + thisCost;
-
-		// Check if we have discovered a new node
-		if (!openSet.contains(neighbor)) {
-			// Assign the cost to the node
-			neighbor.setCost(tentativeCost);
-			openSet.add(neighbor);
-		} else if (tentativeCost <= cost.get(neighbor)) {
-			return; // This isn't a better path we want the highest cost
-		}
-		// If we have made it here this is the best path so let's
-		cameFrom.put(neighbor, new Path(current, edge));
-		cost.put(neighbor, tentativeCost);
-
-	}
 
 	/**
 	 * Gets the consensus sequences using an A star search algorithm.
-	 *
-	 *
 	 *
 	 * @param gappy
 	 * @return
@@ -947,11 +917,9 @@ public class POGraph {
 		openSet.add(initialNode);
 		// Storing the previous node
 		HashMap<Node, Path> cameFrom = new HashMap<>();
-		// Map with heuristics - here we assign the heruristics of we want to
-		// prioritise the paths with the most sequences.
+		// Map with heuristics
 		HashMap<Node, Integer> cost = new HashMap<>();
-		// Add the initial node's cost, we want to maximise it so we set this
-		// to 0.
+		// Add the initial node cost
 		cost.put(initialNode, 0);
 		while (!openSet.isEmpty()) {
 			current = openSet.poll();
@@ -961,36 +929,29 @@ public class POGraph {
 			}
 			// Otherwise add this to the closedSet
 			closedSet.add(current);
-			// find next edge as first reciprocated edge in the ordered extant list, if no reciprocated, then
-			// default to the first edge (extant support)
-			Edge next = null;
-			// We also want to keep track of the maximum number of sequences
-			// that follow a particular edge, this will allow us to make a
-			// decision if no edges are bi-directional.
-			int maxSeqNum = 0;
-			int maxSeqIdx = 0;
 			for (int n = 0; n < current.getNextTransitions().size(); n++) {
-				if (current.getNextTransitions().get(n).reciprocated) {
-					next = current.getNextTransitions().get(n);
-					// This means this is a possible path so we want to check
-					// if we have already evaluated it.
-					Node neighbor = next.getNext();
-					updatePath(cameFrom, cost, closedSet, openSet,
-							neighbor, current, next);
-					if (next.getSequences().size() > maxSeqNum) {
-						maxSeqNum = next.getSequences().size();
-						maxSeqIdx = n;
-					}
+				Edge next = current.getNextTransitions().get(n);
+				Node neighbor = next.getNext();
+				int thisCost = heuristicCostEstimate(next,
+						current, neighbor, current.getNextTransitions().get(n).reciprocated);
+				if (closedSet.contains(neighbor)) {
+					continue; // ignore as it has already been visited
 				}
-			}
-			if (next == null)  {
-				// Choose the neighbor that has the greatest number of
-				// sequences in agreement from above
-				Node neighbor = current.getNextTransitions().get(maxSeqIdx).getNext();
-				updatePath(cameFrom, cost, closedSet, openSet,
-						neighbor, current, current.getNextTransitions().get(maxSeqIdx));
-			}
+				// Otherwise we set the cost to this node
+				int tentativeCost = cost.get(current) + thisCost;
 
+				// Check if we have discovered a new node
+				if (!openSet.contains(neighbor)) {
+					// Assign the cost to the node
+					neighbor.setCost(tentativeCost);
+					openSet.add(neighbor);
+				} else if (tentativeCost >= cost.get(neighbor)) {
+					continue; // This isn't a better path
+				}
+				// If we have made it here this is the best path so let's
+				cameFrom.put(neighbor, new Path(current, next));
+				cost.put(neighbor, tentativeCost);
+			}
 		}
 		return null;
 	}
@@ -1055,11 +1016,12 @@ public class POGraph {
 			// find next edge as first reciprocated edge in the ordered extant list, if no reciprocated, then
 			// default to the first edge (extant support)
 			Edge next = null;
-			for (int n = 0; n < current.getNextTransitions().size(); n++)
+			for (int n = 0; n < current.getNextTransitions().size(); n++) {
 				if (current.getNextTransitions().get(n).reciprocated) {
 					next = current.getNextTransitions().get(n);
 					break;
 				}
+			}
 			next = (next == null) ? current.getNextTransitions().get(0) : next;
 			next.setConsensus(true);
 			if (gappy) {
