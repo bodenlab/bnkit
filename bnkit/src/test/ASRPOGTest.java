@@ -35,7 +35,7 @@ class ASRPOGTest {
             int n = nthread[i];
             long startTime = System.nanoTime(); // N3_72.0
 //            apm[i] = new ASRPOG("test/resources/default.aln", "test/resources/default.nwk", "N0_32.0", false, "JTT", n);
-            apm[i] = new ASRPOG("src/test/resources/default.aln", "src/test/resources/default.nwk", "N3_72.0", "None", false, "JTT", n);
+            apm[i] = new ASRPOG("src/test/resources/default.aln", "src/test/resources/default.nwk", "N3_72.0",  false, "JTT", n);
 //            apm[i] = new ASRPOG("/Users/mikael/simhome/ASR/Tawfik/tawfikMSA.aln", "/Users/mikael/simhome/ASR/Tawfik/tawfikTree1.nwk", "N0", false, "JTT", n);
             long elapsedTimeNs = System.nanoTime() - startTime;
             System.out.printf("Threads=%d\tElapsed time=%5.3f ms\n", n, elapsedTimeNs / 1000000.0);

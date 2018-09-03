@@ -79,10 +79,19 @@ public class PhyloBNet {
      * Construct a BN for specified phylogenetic tree using supplied model.
      * @param tree phylogenetic tree
      * @param model evolutionary model
+     * @param rate the evolutionary rate to be applied
      * @return the phylogenetic Bayesian network
      */
     public static PhyloBNet create(PhyloTree tree, SubstModel model, double rate) {
-        return create(tree, model, rate);
+        PhyloBNet pbn = new PhyloBNet(model);
+        pbn.rate = rate;
+        Node root = tree.getRoot();
+        EnumVariable rvar = Predef.AminoAcid(root.getLabel().toString());
+//        EnumVariable rvar = Predef.AminoAcid(root.toString());
+        pbn.bnroot = new SubstNode(rvar, model);
+        pbn.addBNode(pbn.bnroot);
+        pbn.createNodesForSubtree(root, rvar);
+        return pbn;
     }
 
 
