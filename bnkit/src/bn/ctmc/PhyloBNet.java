@@ -71,18 +71,8 @@ public class PhyloBNet {
      * @param model evolutionary model
      * @return the phylogenetic Bayesian network
      */
-    public static PhyloBNet create(PhyloTree tree, String excludeNode, SubstModel model) {
-        return create(tree, excludeNode, model, 1.0);
-    }
-
-    /**
-     * Construct a BN for specified phylogenetic tree using supplied model.
-     * @param tree phylogenetic tree
-     * @param model evolutionary model
-     * @return the phylogenetic Bayesian network
-     */
     public static PhyloBNet create(PhyloTree tree, SubstModel model) {
-        return create(tree, "None", model, 1.0);
+        return create(tree, model, 1.0);
     }
 
     /**
@@ -92,37 +82,10 @@ public class PhyloBNet {
      * @return the phylogenetic Bayesian network
      */
     public static PhyloBNet create(PhyloTree tree, SubstModel model, double rate) {
-        return create(tree, "None", model, rate);
+        return create(tree, model, rate);
     }
 
-    /**
-     * Construct a BN for specified phylogenetic tree using supplied model.
-     * @param tree phylogenetic tree
-     * @param model evolutionary model
-     * @param rate the evolutionary rate to be applied
-     * @return the phylogenetic Bayesian network
-     */
-    public static PhyloBNet create(PhyloTree tree, String excludeNode, SubstModel model, double rate) {
-        PhyloBNet pbn = new PhyloBNet(model);
-        pbn.rate = rate;
-        Node root = tree.getRoot();
-        EnumVariable rvar = Predef.AminoAcid(root.getLabel().toString());
-//        EnumVariable rvar = Predef.AminoAcid(root.toString());
-        pbn.bnroot = new SubstNode(rvar, model);
-        pbn.addBNode(pbn.bnroot);
-        pbn.createNodesForSubtree(root, rvar, excludeNode);
-//        if (!excludeNode.equals("None")){
-//            BNode nodeToRemove = pbn.getBN().getNode(excludeNode);
-//            pbn.removeBNode(nodeToRemove);
-//            pbn.getBN().compile();
-//
-//
-//
-//
-//
-//        }
-        return pbn;
-    }
+
 
     /**
      * Construct a BN for specified phylogenetic tree using supplied model.
@@ -223,21 +186,18 @@ public class PhyloBNet {
             return 0;
     }
 
-    private void createNodesForSubtree(Node pnode, EnumVariable evar, String excludeNode) {
+    private void createNodesForSubtree(Node pnode, EnumVariable evar) {
         Collection<Node> children = pnode.getChildren();
         if (children.isEmpty()) {
+            leaves.add(evar);
 
-            if (!evar.getName().equals(excludeNode)) {
-
-                leaves.add(evar);
-            }
         } else {
             for (Node child : children) {
                 EnumVariable cvar = Predef.AminoAcid(child.getLabel().toString());
 //                EnumVariable cvar = Predef.AminoAcid(child.toString());
                 SubstNode cnode = new SubstNode(cvar, evar, model, child.getDistance() * this.rate);
                 this.addBNode(cnode);
-                createNodesForSubtree(child, cvar, excludeNode);
+                createNodesForSubtree(child, cvar);
             }
         }
     }

@@ -59,9 +59,9 @@ public class ASRPOG {
 	 * @param model          evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads        number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, String excludeNode, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
+	public ASRPOG(String alignmentFile, String treeFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, null, threads);
-		performASR("", treeFile, alignmentFile, jointInference, excludeNode, performMSA);
+		performASR("", treeFile, alignmentFile, jointInference, performMSA);
 	}
 
 	/**
@@ -74,9 +74,9 @@ public class ASRPOG {
 	 * @param model         evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads       number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String alignmentFile, String treeFile, String marginalNode, String excludeNode, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
+	public ASRPOG(String alignmentFile, String treeFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, marginalNode, threads);
-		performASR("", treeFile, alignmentFile, false, excludeNode, performMSA);
+		performASR("", treeFile, alignmentFile, false, performMSA);
 	}
 
 	/**
@@ -90,9 +90,9 @@ public class ASRPOG {
 	 * @param model          evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads        number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, String excludeNode, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
+	public ASRPOG(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, null, threads);
-		performASR(pog, treeFile, sequenceFile, jointInference, excludeNode, performMSA);
+		performASR(pog, treeFile, sequenceFile, jointInference, performMSA);
 	}
 
 	/**
@@ -106,9 +106,9 @@ public class ASRPOG {
 	 * @param model          evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads        number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, String excludeNode, String model, int threads) throws IOException, InterruptedException {
+	public ASRPOG(POGraph msa, String treeFile, String sequenceFile, boolean jointInference, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, null, threads);
-		performASR(msa, treeFile, sequenceFile, excludeNode, jointInference);
+		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
 
 	/**
@@ -122,9 +122,9 @@ public class ASRPOG {
 	 * @param model        evolutionary model to use for inference (e.g. JTT, LG, WAG, Dayhoff)
 	 * @param threads      number of threads to use for reconstruction. Default: 1
 	 */
-	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA, String excludeNode, String model, int threads) throws IOException, InterruptedException {
+	public ASRPOG(String pog, String treeFile, String sequenceFile, String marginalNode, boolean performMSA, String model, int threads) throws IOException, InterruptedException {
 		setupASRPOG(model, marginalNode, threads);
-		performASR(pog, treeFile, sequenceFile, false, excludeNode, performMSA);
+		performASR(pog, treeFile, sequenceFile, false, performMSA);
 	}
 
 
@@ -144,15 +144,15 @@ public class ASRPOG {
 		pogAlignment = new POGraph(sequences);
 	}
 
-	public void runReconstruction(String pog, String treeFile, String sequenceFile, boolean jointInference, String excludeNode, boolean performMSA) throws IOException, InterruptedException {
-		performASR(pog, treeFile, sequenceFile, jointInference, excludeNode, performMSA);
+	public void runReconstruction(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws IOException, InterruptedException {
+		performASR(pog, treeFile, sequenceFile, jointInference, performMSA);
 	}
 
-	public void runReconstruction(POGraph msa, String treeFile, String sequenceFile, String excludeNode, boolean jointInference) throws IOException, InterruptedException {
-		performASR(msa, treeFile, sequenceFile, excludeNode, jointInference);
+	public void runReconstruction(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws IOException, InterruptedException {
+		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
 
-	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa, String excludeNode) throws InterruptedException {
+	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa) throws InterruptedException {
 
 		extantSequences = new ArrayList<>(sequences);
 
@@ -174,16 +174,16 @@ public class ASRPOG {
 		// perform inference
 		if (jointInference) {
 			marginalDistributions = null;
-			queryBNJoint("None");
+			queryBNJoint();
 		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
-			queryBNMarginal(marginalNode, "None");
+			queryBNMarginal(marginalNode);
 		} else {
 			if (marginalNode == null)
 				System.out.println("No node was specified for the marginal inference: inferring the root node");
 			else
 				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
 			marginalNode = phyloTree.getRoot().getLabel().toString();
-			queryBNMarginal(phyloTree.getRoot().getLabel().toString(), "None");
+			queryBNMarginal(phyloTree.getRoot().getLabel().toString());
 		}
 	}
 
@@ -731,9 +731,9 @@ public class ASRPOG {
 	 * @param pog            POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param jointInference flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 */
-	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, String excludeNode, boolean performMSA) throws RuntimeException, IOException, InterruptedException {
+	private void performASR(String pog, String treeFile, String sequenceFile, boolean jointInference, boolean performMSA) throws RuntimeException, IOException, InterruptedException {
 		this.performMSA = performMSA;
-		loadData(treeFile, sequenceFile, excludeNode);
+		loadData(treeFile, sequenceFile);
 		if (pog == null || pog.equals(""))    // load graph structure from alignment file
 			pog = sequenceFile;
 		if (performMSA) {
@@ -746,16 +746,16 @@ public class ASRPOG {
 		// perform inference
 		if (jointInference) {
 			marginalDistributions = null;
-			queryBNJoint(excludeNode);
+			queryBNJoint();
 		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
-			queryBNMarginal(marginalNode, excludeNode);
+			queryBNMarginal(marginalNode);
 		} else {
 			if (marginalNode == null)
 				System.out.println("No node was specified for the marginal inference: inferring the root node");
 			else
 				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
 			marginalNode = phyloTree.getRoot().getLabel().toString();
-			queryBNMarginal(phyloTree.getRoot().getLabel().toString(), excludeNode);
+			queryBNMarginal(phyloTree.getRoot().getLabel().toString());
 		}
 	}
 
@@ -767,24 +767,24 @@ public class ASRPOG {
 	 * @param msa            POG dot string or filepath to the partial order alignment graph (expected extension .dot)
 	 * @param jointInference flag for indicating joint inference (true: 'joint' or false: 'marginal')
 	 */
-	private void performASR(POGraph msa, String treeFile, String sequenceFile, String excludeNode, boolean jointInference) throws RuntimeException, IOException, InterruptedException {
-		loadData(treeFile, sequenceFile, excludeNode);
+	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws RuntimeException, IOException, InterruptedException {
+		loadData(treeFile, sequenceFile);
 
 		pogAlignment = msa;
 
 		// perform inference
 		if (jointInference) {
 			marginalDistributions = null;
-			queryBNJoint(excludeNode);
+			queryBNJoint();
 		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
-			queryBNMarginal(marginalNode, excludeNode);
+			queryBNMarginal(marginalNode);
 		} else {
 			if (marginalNode == null)
 				System.out.println("No node was specified for the marginal inference: inferring the root node");
 			else
 				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
 			marginalNode = phyloTree.getRoot().getLabel().toString();
-			queryBNMarginal(phyloTree.getRoot().getLabel().toString(), excludeNode);
+			queryBNMarginal(phyloTree.getRoot().getLabel().toString());
 		}
 	}
 
@@ -861,7 +861,7 @@ public class ASRPOG {
 	 * @param treeFile     filepath to the phylogenetic tree (expected extension .nwk)
 	 * @param sequenceFile filepath to the sequences (expected extension .aln, .fa or .fasta)
 	 */
-	private void loadData(String treeFile, String sequenceFile, String excludeNode) throws IOException {
+	private void loadData(String treeFile, String sequenceFile) throws IOException {
 		// load extant sequences
 		BufferedReader aln_file = new BufferedReader(new FileReader(sequenceFile));
 		String line = aln_file.readLine();
@@ -888,22 +888,7 @@ public class ASRPOG {
 		// create phylogenetic tree structure
 		phyloTree = PhyloTree.loadNewick(treeFile);
 
-		if (!excludeNode.equals("None")) {
 
-			for (int i = 0; i < extantSequences.size(); i++) {
-				if (extantSequences.get(i).getName().equals(excludeNode)) {
-					extantSequences.remove(i);
-
-				}
-
-			}
-
-			PhyloTree.Node nodeToRemove = phyloTree.find(excludeNode);
-			PhyloTree.Node parentNode = nodeToRemove.getParent();
-			parentNode.removeChild(nodeToRemove);
-
-
-		}
 
 		// Check if there are duplicate extant node names in the phylogenetic tree
 		// Duplicate extant node names not allowed - will influence reconstruction outcomes
@@ -963,7 +948,7 @@ public class ASRPOG {
 	 *
 	 * @return Bayesian networks for node position in pogAlignment
 	 */
-	private PhyloBNet createCharacterNetwork(String excludeNode) {
+	private PhyloBNet createCharacterNetwork() {
 		// create a bayesian network with the phylogenetic tree structure and the JTT substitution model for amino acids
 		PhyloBNet phyloBN;
 		if (this.model.equalsIgnoreCase("Dayhoff"))
@@ -973,7 +958,7 @@ public class ASRPOG {
 		else if (this.model.equalsIgnoreCase("WAG"))
 			phyloBN = PhyloBNet.create(phyloTree, new WAG());
 		else
-			phyloBN = PhyloBNet.create(phyloTree, excludeNode, new JTT());
+			phyloBN = PhyloBNet.create(phyloTree, new JTT());
 		Map<Integer, Character> sequenceCharacterMapping = pogAlignment.getSequenceCharacterMapping();
 
 		// for all extant sequences, if sequence is in this alignment, find where the location is in the phylogenetic tree and assign base to that position in the bayesian network
@@ -1052,7 +1037,7 @@ public class ASRPOG {
 	/**
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using joint inference.
 	 */
-	private void queryBNJoint(String excludeNode) throws InterruptedException {
+	private void queryBNJoint() throws InterruptedException {
 
 //		long startTime = System.nanoTime();
 
@@ -1084,12 +1069,7 @@ public class ASRPOG {
 			if (!nodeId.equals(pogAlignment.getInitialNodeID())) {
 				VarElim ve = new VarElim();
 				PhyloBNet charNet;
-				if (excludeNode.equals("None")) {
-					charNet = createCharacterNetwork(excludeNode);
-
-				} else {
-					charNet = createCharacterNetwork(excludeNode);
-				}
+				charNet = createCharacterNetwork();
 				rates[nodeId] = charNet.getRate();
 				ve.instantiate(charNet.getBN());
 				if (this.threads <= 1) {
@@ -1147,7 +1127,7 @@ public class ASRPOG {
 	 *
 	 * @param phyloNode ancestral node to perform marginal reconstruction of
 	 */
-	private void queryBNMarginal(String phyloNode, String excludeNode) throws InterruptedException {
+	private void queryBNMarginal(String phyloNode) throws InterruptedException {
 		marginalDistributions = new EnumDistrib[pogAlignment.getNumNodes()];
 //		long startTime = System.nanoTime();
 
@@ -1178,7 +1158,7 @@ public class ASRPOG {
 			// perform character inference if not the dummy initial node
 			if (!nodeId.equals(pogAlignment.getInitialNodeID())) {
 				VarElim ve = new VarElim();
-				PhyloBNet phyloNet = createCharacterNetwork(excludeNode);
+				PhyloBNet phyloNet = createCharacterNetwork();
 				ve.instantiate(phyloNet.getBN());
 				// get character variable representing current phylogenetic tree node using marginal probability
 				EnumVariable charNode = null;
@@ -1365,32 +1345,32 @@ public class ASRPOG {
 
 	}
 
-	public ArrayList<EnumSeq.Gappy<Enumerable>> getInferenceFromPerturbation(String outputPath, String node, String sequencePath, String treePath, String inference, boolean performMSA, String model, int numThreads) throws IOException, InterruptedException {
-		ArrayList<EnumSeq.Gappy<Enumerable>> allSeqs = new ArrayList<>();
-
-		int count = 1;
-		for (String sequence : this.getMSAGraph().getSequences().values()) {
-			System.out.println("Perturbing ancestor " + count + " of " + this.getMSAGraph().getSequences().size());
-
-			ASRPOG asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), sequence, false, model, numThreads);
-			asr.save(outputPath + sequence, true, "fasta");
-
-			EnumSeq.Gappy<Enumerable> seq = asr.getSeq(node, node + "_without_" + sequence);
-			allSeqs.add(seq);
-			count ++;
-			System.out.println(seq.getName());
-			System.out.println(seq);
-
-
-		}
-
-		return allSeqs;
-
-
-
-
-
-	}
+//	public ArrayList<EnumSeq.Gappy<Enumerable>> getInferenceFromPerturbation(String outputPath, String node, String sequencePath, String treePath, String inference, boolean performMSA, String model, int numThreads) throws IOException, InterruptedException {
+//		ArrayList<EnumSeq.Gappy<Enumerable>> allSeqs = new ArrayList<>();
+//
+//		int count = 1;
+//		for (String sequence : this.getMSAGraph().getSequences().values()) {
+//			System.out.println("Perturbing ancestor " + count + " of " + this.getMSAGraph().getSequences().size());
+//
+//			ASRPOG asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), sequence, false, model, numThreads);
+//			asr.save(outputPath + sequence, true, "fasta");
+//
+//			EnumSeq.Gappy<Enumerable> seq = asr.getSeq(node, node + "_without_" + sequence);
+//			allSeqs.add(seq);
+//			count ++;
+//			System.out.println(seq.getName());
+//			System.out.println(seq);
+//
+//
+//		}
+//
+//		return allSeqs;
+//
+//
+//
+//
+//
+//	}
 
 
 	/**

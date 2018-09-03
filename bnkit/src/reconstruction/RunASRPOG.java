@@ -122,15 +122,15 @@ public class RunASRPOG {
 
 			if (poagRepresentation.isEmpty()) {
 				if (performAlignment) { // generate a partial order alignment graph if the alignment has not been specified
-					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), "None", true, model, numThreads);
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), true, model, numThreads);
 				} else if (marginalNode != null)
 					asr = new ASRPOG(sequencePath, treePath, sequencePath, marginalNode, false, model, numThreads);
 				else
-					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), "None", false, model, numThreads);
+					asr = new ASRPOG(sequencePath, treePath, inference.equalsIgnoreCase("joint"), false, model, numThreads);
 			} else if (marginalNode != null)
 				asr = new ASRPOG(poagRepresentation, treePath, sequencePath, marginalNode, performAlignment, model, numThreads);
 			else
-				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), "None", performAlignment, model, numThreads);
+				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), performAlignment, model, numThreads);
 
 			if (!outputPath.isEmpty()) {
 //				outputPath += "/";
@@ -154,13 +154,13 @@ public class RunASRPOG {
 				System.out.println(pairs);
 			}
 
-			if (perturbAncestors){
-
-				ArrayList<EnumSeq.Gappy<Enumerable>>  allSeqs = asr.getInferenceFromPerturbation(outputPath, perturbNode, sequencePath, treePath, inference, performAlignment, model, numThreads);
-				asr.outputALN(allSeqs, outputPath + "_all_ancestors", "fasta");
-
-
-			}
+//			if (perturbAncestors){
+//
+//				ArrayList<EnumSeq.Gappy<Enumerable>>  allSeqs = asr.getInferenceFromPerturbation(outputPath, perturbNode, sequencePath, treePath, inference, performAlignment, model, numThreads);
+//				asr.outputALN(allSeqs, outputPath + "_all_ancestors", "fasta");
+//
+//
+//			}
 
 
 			if (checkBranchIsolation){
