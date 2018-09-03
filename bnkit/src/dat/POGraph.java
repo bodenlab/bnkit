@@ -689,7 +689,8 @@ public class POGraph {
 			for (Integer seqId = 0; seqId < seqs.size(); seqId++)
 				// check that all sequences have the same length (i.e. check that they are aligned)
 				if (seqs.get(seqId).toString().length() != seqLen)
-					throw new RuntimeException("Aligned sequences must have the same length.");
+					throw new RuntimeException("Error: The alignment file is not correctly aligned.\n" + seqs.get(seqId).getName() +
+							" is a different length to " + seqs.get(0).getName());
 			// load graph from aligned sequences
 			current = loadPOGraph(seqs);
 		} else
@@ -1276,8 +1277,15 @@ public class POGraph {
 			for (int baseInd = 0; baseInd < bases.length; baseInd++)
 				if (bases[baseInd] != '-') {
 					//filteredBases.add(bases[baseInd]);
-					nodes.get(baseInd).addSequence(seqId, bases[baseInd]);
-					seqNodeMap.get(seqId).add(nodes.get(baseInd));
+					try {
+						nodes.get(baseInd).addSequence(seqId, bases[baseInd]);
+						seqNodeMap.get(seqId).add(nodes.get(baseInd));
+					}
+					catch (NullPointerException e) {
+
+
+					}
+
 				}
 			//Character[] chars = new Character[filteredBases.size()];
 			//filteredBases.toArray(chars);

@@ -740,6 +740,7 @@ public class ASRPOG {
 			MSA alignment = new MSA(pog);
 			pogAlignment = alignment.getMSAGraph();
 		} else
+			checkAlignment();
 			pogAlignment = new POGraph(pog, sequenceFile);
 		pog = null;
 
@@ -904,6 +905,19 @@ public class ASRPOG {
 	}
 
 	private void checkData() {
+//		// Check if the alignment file is actually aligned
+//
+//		int alignedLength = extantSequences.get(0).length();
+//
+//		for (EnumSeq seq : extantSequences) {
+//			if (seq.length() != alignedLength){
+//				throw new RuntimeException("Error: The alignment file is not correctly aligned - " + seq.getName() +
+//						" is a different length to " + extantSequences.get(0).getName());
+//			}
+//
+//		}
+
+
 		// Check if there are duplicate extant node names in the phylogenetic tree
 		// Duplicate extant node names not allowed - will influence reconstruction outcomes
 		PhyloTree.Node[] nodes = phyloTree.toNodesBreadthFirst(); //tree to nodes - recursive
@@ -940,6 +954,20 @@ public class ASRPOG {
 					eLabels += " " + eLabel;
 			throw new RuntimeException("Error: The sequence names in the provided alignment must all have a match" +
 					" in the provided tree.\nUnique labels in the alignment: " + seqLabels + ": unique labels in the tree: " + eLabels);
+		}
+	}
+
+	private void checkAlignment() {
+		// Check if the alignment file is actually aligned
+
+		int alignedLength = extantSequences.get(0).length();
+
+		for (EnumSeq seq : extantSequences) {
+			if (seq.length() != alignedLength) {
+				throw new RuntimeException("Error: The alignment file is not correctly aligned.\n" + seq.getName() +
+						" is a different length to " + extantSequences.get(0).getName());
+			}
+
 		}
 	}
 
