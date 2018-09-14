@@ -69,7 +69,7 @@ public class RunASRPOG {
 			boolean performAlignment = false;
 			boolean checkBranchIsolation = false;
 			boolean perturbAncestors = false;
-			boolean indelDifferences = true;
+			boolean indelDifferences = false;
 
 			// parse parameters
 			for (int arg = 0; arg < args.length; arg++) {
