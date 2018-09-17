@@ -1,2 +1,4 @@
-/bnkit/out/*
-/bnkit/.idea/*
+*out*
+*idea*
+*DS_Store
+*bnkit.iml
