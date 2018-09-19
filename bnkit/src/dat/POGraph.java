@@ -941,8 +941,7 @@ public class POGraph {
             for (int n = 0; n < current.getNextTransitions().size(); n++) {
                 Edge next = current.getNextTransitions().get(n);
                 Node neighbor = next.getNext();
-                int thisCost = heuristicCostEstimate(next,
-                        current, neighbor, current.getNextTransitions().get(n).reciprocated);
+                int thisCost = heuristicCostEstimate(next, current, neighbor, current.getNextTransitions().get(n).reciprocated);
                 if (closedSet.contains(neighbor)) {
                     continue; // ignore as it has already been visited
                 }

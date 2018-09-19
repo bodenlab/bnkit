@@ -24,8 +24,6 @@ import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.PhyloBNet;
 import bn.ctmc.matrix.WAG;
-import bn.factor.Factorize;
-import bn.file.BNBuf;
 import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
 import dat.EnumSeq;
@@ -36,11 +34,9 @@ import dat.PhyloTree.Node;
 import dat.Variable.Assignment;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  *
@@ -65,7 +61,8 @@ public class ASRExample {
     
     public static void main(String[] args) {
         try {
-            tree = PhyloTree.loadNewick(file_tree); //load tree - tree not in Newick?
+            PhyloTree phyloTree = new PhyloTree();
+            tree = phyloTree.loadNewick(file_tree); //load tree - tree not in Newick?
             Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
             List<String> indexForNodes = new ArrayList<>(); // Newick string for subtree
             Map<String, String> mapForNodes = new HashMap<>(); // Shortname --> Newick string for subtree

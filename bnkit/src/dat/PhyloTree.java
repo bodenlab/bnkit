@@ -17,7 +17,6 @@
  */
 package dat;
 
-import com.sun.org.apache.xalan.internal.xsltc.compiler.sym;
 import dat.EnumSeq.Alignment;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -50,7 +49,6 @@ public class PhyloTree {
 
     /**
      * Private constructor for tree from a root with all nodes connected off that.
-     * @param root root node
      */
     private PhyloTree(ArrayList<Node> nodeList) { this.nodeList = nodeList; }
 
@@ -342,8 +340,9 @@ public class PhyloTree {
         Set<Object> values = new HashSet<>(map.values());
         Object[] unique = values.toArray();
         Node root = this.getRoot();
+        System.out.println(" ----------------- Node: " + root.getLabel() + " ----------------------");
         root.forwardParsimony(map, unique);
-        root.backwardParsimony(unique);
+        // root.backwardParsimony(unique);
     }
 
     /**
@@ -353,12 +352,27 @@ public class PhyloTree {
      * @param unique array with the unique states in order of preference
      * (which decides what states that are preferred when multiple states contribute to optimal solution)
      */
-    public void setContentByParsimony(Map<String, Object> map, Object[] unique) {
+    public void setContentByParsimony(Map<String, Object> map, Object[] unique, String type) {
         // reset node values (otherwise stores previous uses)
         reset_values(this.getRoot());
         Node root = this.getRoot();
-        root.forwardParsimony(map, unique);
+        System.out.println(" ----------------- " + type + " ----------------------");
+        int[] scores = root.forwardParsimony(map, unique);
+        System.out.print("Position:    ");
+
+        for (Object v : unique) {
+            System.out.print(v + "      ");
+        }
+        System.out.println();
+        System.out.print("Score:       ");
+        for (int s: scores) {
+            System.out.print(s + "      ");
+        }
+        /* Backward parsiomony is actually just iterating again through the traceback to assign
+         * the node ID of the child with the highest score to the parent. Note it performs no maximum
+         * parsimony. */
         root.backwardParsimony(unique);
+        System.out.println("\n ------------------------------------------------");
     }
 
     private void reset_values(Node node) {
@@ -379,7 +393,7 @@ public class PhyloTree {
         // MB-Fix: now a list of values, previously just a single "value"
         private List<Object> values = null; // values of node
         private EnumSeq sequence = null;    // sequence
-        private double[] scores = null;     // the optimal score for each parent value
+        private int[] scores = null;     // the optimal score for each parent value
         // MB-Fix: added third index, to allow multiple child symbols to contribute to the same parent score
         private int[][][] traceback = null; // [parent value][child branch] = [value in child that gives optimal value, next value in same child ...]
         private Double dist = null;         // optional distance (from this node to its parent)
@@ -416,7 +430,7 @@ public class PhyloTree {
             return values.get(index);
         }
 
-        public double[] getScores() {
+        public int[] getScores() {
             return scores;
         }
 
@@ -600,8 +614,8 @@ public class PhyloTree {
          * @param unique all possible values, in order; order matters if SET_ONE_TARGET_PARSIMONY is true
          * @return the scores of the unique values at the root
          */
-        protected double[] forwardParsimony(Map<String, Object> assign, Object[] unique) {
-            this.scores = new double[unique.length]; // a score for each possible value; pushed from leaves to this node; starts at 0
+        protected int[] forwardParsimony(Map<String, Object> assign, Object[] unique) {
+            this.scores = new int[unique.length]; // a score for each possible value; pushed from leaves to this node; starts at 0
             this.values = null;
             HashMap<Node, Integer> nodeScore = new HashMap<>();
             Object sym = assign.get(this.label);     // check if this node has a definitive state (symbol) assigned to it (via its name/label)
@@ -611,7 +625,7 @@ public class PhyloTree {
                     if (sym.equals(unique[index]))   // found it
                         break;
                 setValue(unique[index]);             // definitive state is assigned to node
-                Arrays.fill(this.scores, Double.POSITIVE_INFINITY); // the default score is Infinity
+                Arrays.fill(this.scores, Integer.MAX_VALUE - 20); // the default score is Infinity
                 this.scores[index] = 0; // the actual assignment is scored 0, all others impossible, so positive infinity
                 return this.scores;     // done with this leaf node
             } else { // this node is NOT instantiated
@@ -619,23 +633,23 @@ public class PhyloTree {
                     throw new RuntimeException("Leaf " + this + " has not been assigned a value");
                 } else { // recurse into children nodes...
                     // determine scores contributed by each child (cscores) BEFORE substitution penalties
-                    double[][] cscores = new double[children.size()][];
+                    int[][] cscores = new int[children.size()][];
                     for (int c = 0; c < children.size(); c ++) {
                         Node child = children.get(c);
                         cscores[c] = child.forwardParsimony(assign, unique); // one score from child c for each symbol
                     }
                     // traceback array needs to hold all child symbol indices that contribute to (indexed) parent symbol score via (indexed) child
                     this.traceback = new int[unique.length][children.size()][];
-                    double best_parent_score = Double.POSITIVE_INFINITY; // need to work out best parent score for "scores"; they all start at 0 (init at allocation above)
+                    int best_parent_score = Integer.MAX_VALUE - 20; // need to work out best parent score for "scores"; they all start at 0 (init at allocation above)
                     for (int c = 0;  c < children.size(); c ++) {
                         // loop through each possible parent assignment, record what symbol in each child that best supports this (adding substitution penalties as we go)
                         for (int i = 0; i < scores.length; i ++) {
-                            double best_score = Double.POSITIVE_INFINITY;
+                            int best_score = Integer.MAX_VALUE - 20;
                             int best_cnt = 0; // this is how many symbols in child that need to be recorded (multiple are possible)
                             // next, loop through each possible value in this child to find best parent score (may be the score from multiple origins)
                             for (int j = 0; j < cscores[c].length; j ++) {
                                 int subst_penalty = (i == j ? 0 : 1);
-                                double parent_score = cscores[c][j] + subst_penalty;
+                                int parent_score = cscores[c][j] + subst_penalty;
                                 if (parent_score < best_score) { // new best, reset count to 1
                                     best_score = parent_score;
                                     best_cnt = 1;
@@ -648,7 +662,7 @@ public class PhyloTree {
                             int k = 0; // index for holding possible origins
                             for (int j = 0; j < cscores[c].length; j ++) { // loop through each possible child symbol, again adding substitution penalties
                                 int subst_penalty = (i == j ? 0 : 1);
-                                double parent_score = cscores[c][j] + subst_penalty;
+                                int parent_score = cscores[c][j] + subst_penalty;
                                 if (parent_score == best_score) {
                                     traceback[i][c][k++] = j;
                                 }
@@ -657,22 +671,22 @@ public class PhyloTree {
                             scores[i] += best_score; // the best we can do with parent symbol i, from child c
                         } // finished the score for a parent i, for one child c
                     } // finished all children here
-                    for (Node n: nodeScore.keySet()) {
-                        System.out.println("P: " + nodeScore.get(n) + "     C: " + n.getLabel() + "     S: " + scores[nodeScore.get(n)]);
-                    }
+//                    for (Node n: nodeScore.keySet()) {
+//                        System.out.println("P: " + this.getLabel() + ", S: " + scores[nodeScore.get(n)] +  ", V: " + n.getValue() + ", C: " + n.getLabel());
+//                    }
                     return this.scores; // done, return parent scores (recursing them as child scores up the tree)
                 }
             }
         }
 
-        public double getParsimonyScore() {
+        public int getParsimonyScore() {
             return getParsimonyScore(null);
         }
-        private double getParsimonyScore(Object parent_state) {
+        private int getParsimonyScore(Object parent_state) {
             Object my_state = this.values.get(0);
             if (my_state == null)
                 return 0;
-            double score = 0;
+            int score = 0;
             if (parent_state != null)
                 score = (parent_state == my_state ? 0 : 1);
             for (Node child : children) {

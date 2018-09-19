@@ -20,7 +20,7 @@ import java.util.*;
  */
 public class Analysis {
 
-    private PhyloTree tree;
+    private PhyloTree tree = new PhyloTree();
     private PhyloBNet pbn; //only to be used for navigating branches
     private EnumSeq.Alignment<Enumerable> aln;
     private Map<Object, Map<Object, Integer>> transitions = new HashMap<>();
@@ -68,7 +68,7 @@ public class Analysis {
      */
     public Analysis(String file_tree, String file_aln) {
         try {
-            tree = PhyloTree.loadNewick(file_tree); //load tree - tree not in Newick
+            tree = tree.loadNewick(file_tree); //load tree - tree not in Newick
             PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
 
             List<EnumSeq.Gappy<Enumerable>> seqs = EnumSeq.Gappy.loadClustal(file_aln, Enumerable.aacid);

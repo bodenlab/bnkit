@@ -1025,7 +1025,6 @@ public class ASRPOG {
 	}
 
 	private Map<String, Integer[]> getPhyloTransitions() {
-
 		Map<String, Integer[]> phyloTransition = new HashMap<>();
 
 		// populate tree for transitional inference using max parsimony
@@ -1041,7 +1040,8 @@ public class ASRPOG {
 		orderedPrev.toArray(uniqueBackward);
 
 		// 'Next' transitions
-		phyloTree.setContentByParsimony(mapNext, uniqueForward);
+		phyloTree.setContentByParsimony(mapNext, uniqueForward, "forward");
+
 		for (String phyloNode : ancestralSeqLabels) {
 			List<Object> values = phyloTree.find(phyloNode).getValues();
 			if (values == null) {
@@ -1058,7 +1058,7 @@ public class ASRPOG {
 		if (orderedPrev.isEmpty())
 			return phyloTransition;
 
-		phyloTree.setContentByParsimony(mapPrevious, uniqueBackward);
+		phyloTree.setContentByParsimony(mapPrevious, uniqueBackward, "backward");
 		for (String phyloNode : ancestralSeqLabels) {
 			List<Object> values = phyloTree.find(phyloNode).getValues();
 			if (values == null) {
