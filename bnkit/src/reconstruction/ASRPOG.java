@@ -4,7 +4,6 @@ package reconstruction;
 import alignment.MSA;
 import api.PartialOrderGraph;
 import bn.alg.CGTable;
-import bn.alg.Inference;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.PhyloBNet;
@@ -14,17 +13,35 @@ import bn.ctmc.matrix.JTT;
 import bn.ctmc.matrix.LG;
 import bn.ctmc.matrix.WAG;
 import bn.prob.EnumDistrib;
-import com.sun.xml.internal.bind.v2.TODO;
-import dat.*;
+import dat.EnumSeq;
+import dat.EnumVariable;
+import dat.Enumerable;
+import dat.POGraph;
+import dat.PhyloTree;
+import dat.Variable;
 import dat.file.AlnWriter;
 import dat.file.FastaWriter;
-import json.JSONArray;
-import json.JSONObject;
-
-import java.io.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.Writer;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import json.JSONArray;
+import json.JSONObject;
 
 /**
  * Reconstruct ancestral sequences using partial order graphs to represent indels. Each node of the resulting phylogenetic tree
@@ -37,7 +54,7 @@ import java.util.regex.Pattern;
  */
 public class ASRPOG {
 
-	private PhyloTree phyloTree = null;                                // Phylogenetic tree structure
+	private PhyloTree phyloTree = new PhyloTree();                                // Phylogenetic tree structure
 	private List<EnumSeq.Gappy<Enumerable>> extantSequences = null;        // List of sequences (label,bases)
 	private List<String> ancestralSeqLabels = null;                        // Ancestral sequences labels (internal nodes of phylogenetic tree structure)
 	private POGraph pogAlignment = null;                                // partial order alignment graph structure template
@@ -140,7 +157,7 @@ public class ASRPOG {
 		setupASRPOG(model, null, threads);
 		extantSequences = new ArrayList<>(sequences);
 		importInferencesFromJSON(inferences);
-		phyloTree = PhyloTree.parseNewick(tree);
+		phyloTree = phyloTree.parseNewick(tree);
 		pogAlignment = new POGraph(sequences);
 	}
 
@@ -157,7 +174,7 @@ public class ASRPOG {
 		extantSequences = new ArrayList<>(sequences);
 
 		// create phylogenetic tree structure
-		phyloTree = PhyloTree.parseNewick(treeNewick);
+		phyloTree = phyloTree.parseNewick(treeNewick);
 
 		// Check if there are duplicate extant node names in the phylogenetic tree
 		// Duplicate extant node names not allowed - will influence reconstruction outcomes
@@ -887,7 +904,7 @@ public class ASRPOG {
 
 
 		// create phylogenetic tree structure
-		phyloTree = PhyloTree.loadNewick(treeFile);
+		phyloTree = phyloTree.loadNewick(treeFile);
 
 
 
