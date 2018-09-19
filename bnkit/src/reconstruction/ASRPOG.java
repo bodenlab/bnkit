@@ -320,7 +320,8 @@ public class ASRPOG {
 				for (int i = 0; i < jTransitions.length(); i++)
 					transitions.add(jTransitions.getInt(i));
 				Character base = infJSON.getString("base").toCharArray()[0];
-				infs.add(new Inference(infJSON.getInt("id"), base, transitions));
+				// ARIANE ToDo: Will need to update this as we are passing null at the moment.
+				infs.add(new Inference(infJSON.getInt("id"), base, transitions, null));
 			}
 			ancestralInferences.put(anc.getString("label"), infs);
 			ancestralSeqLabels.add(anc.getString("label"));
@@ -814,62 +815,84 @@ public class ASRPOG {
 	 */
 	public POGraph getAncestor(String label) {
 		POGraph ancestor = new POGraph(pogAlignment);
-		if (label.equalsIgnoreCase("root"))
-			label = (String) phyloTree.getRoot().getLabel();
+		if (label.equalsIgnoreCase("root")) {
+        label = (String) phyloTree.getRoot().getLabel();
+    }
 		List<Inference> inferences = ancestralInferences.get(label);
-		for (Inference inferredBase : inferences)
-			if (ancestor.setCurrent(inferredBase.pogId)) {
-				// set inferred base, or remove node if inferred to be removed
-				if (!inferredBase.pogId.equals(ancestor.getFinalNodeID()) && !inferredBase.pogId.equals(pogAlignment.getInitialNodeID()))
-					if (inferredBase.base == '-')
-						// remove node from ancestor
-						ancestor.removeNode();
-					else
-						ancestor.setBase(inferredBase.base);
-				// if node is still there, check the parsimonious transitions. Because we are doing both backwards and forwards parsimony,
-				// get the intersection of the previous/next nodes and all inferred transitions of the current node
-				if (ancestor.getCurrentId().equals(ancestor.getFinalNodeID()) && !inferredBase.pogId.equals(ancestor.getFinalNodeID()) || (!ancestor.getCurrentId().equals(ancestor.getFinalNodeID()) && !ancestor.getCurrentId().equals(inferredBase.pogId)))
-					continue;
+		for (Inference inferredBase : inferences) {
+        if (ancestor.setCurrent(inferredBase.pogId)) {
+            // set inferred base, or remove node if inferred to be removed
+            if (!inferredBase.pogId.equals(ancestor.getFinalNodeID()) && !inferredBase.pogId
+                    .equals(pogAlignment.getInitialNodeID())) {
+                if (inferredBase.base == '-') {
+                    // remove node from ancestor
+                    ancestor.removeNode();
+                }
+                else {
+                    ancestor.setBase(inferredBase.base);
+                    ancestor.setTransitionCost(inferredBase.transitionsCost);
 
+                }
+            }
+            // if node is still there, check the parsimonious transitions. Because we are doing both backwards and forwards parsimony,
+            // get the intersection of the previous/next nodes and all inferred transitions of the current node
+            if (ancestor.getCurrentId().equals(ancestor.getFinalNodeID()) && !inferredBase.pogId
+                    .equals(ancestor.getFinalNodeID()) || (
+                    !ancestor.getCurrentId().equals(ancestor.getFinalNodeID()) && !ancestor
+                            .getCurrentId().equals(inferredBase.pogId))) {
+                continue;
+            }
 
-				// find union of next/previous transitions and remove transitions that are not inferred
-				// 'next':
-				ArrayList<Integer> keepNext = new ArrayList<>();
-				for (Integer nextId : ancestor.getNextIDs()) {
-					// Identify if edge is reciprocated by backwards parsimony (if so, flag)
-					Inference next = null;
-					for (Inference i : inferences)
-						if ((i.pogId.equals(ancestor.getFinalNodeID()) && (nextId.equals(ancestor.getFinalNodeID()))) || i.pogId.equals(nextId)) {
-							next = i;
-							break;
-						}
-					if (inferredBase.transitions.contains(nextId) && next != null && next.transitions.contains(inferredBase.pogId))
-						ancestor.setReciprocated(nextId);
-					if (next != null && next.transitions.contains(inferredBase.pogId))
-						keepNext.add(next.pogId);
-				}
+            // find union of next/previous transitions and remove transitions that are not inferred
+            // 'next':
+            ArrayList<Integer> keepNext = new ArrayList<>();
+            for (Integer nextId : ancestor.getNextIDs()) {
+                // Identify if edge is reciprocated by backwards parsimony (if so, flag)
+                Inference next = null;
+                for (Inference i : inferences)
+                    if ((i.pogId.equals(ancestor.getFinalNodeID()) && (nextId
+                            .equals(ancestor.getFinalNodeID()))) || i.pogId.equals(nextId)) {
+                        next = i;
+                        break;
+                    }
+                if (inferredBase.transitions.contains(nextId) && next != null && next.transitions
+                        .contains(inferredBase.pogId)) {
+                    ancestor.setReciprocated(nextId);
+                }
+                if (next != null && next.transitions.contains(inferredBase.pogId)) {
+                    keepNext.add(next.pogId);
 
-				// take the union of the inferred transitions (i.e. use all provided transitions from maximum parsimony)
-				for (Integer nextId : ancestor.getNextIDs())
-					if (inferredBase.transitions.contains(nextId) && !keepNext.contains(nextId))
-						keepNext.add(nextId);
-				// check previous transitions of future nodes to see if there has been a parsimonious edge to this node
-				// if so, add to keep
-				for (Integer nextId : ancestor.getNextIDs())
-					if (!keepNext.contains(nextId) && !nextId.equals(pogAlignment.getFinalNodeID()))
-						ancestor.removeNextTransition(nextId);
-			}
+                }
+            }
 
+            // take the union of the inferred transitions (i.e. use all provided transitions from maximum parsimony)
+            for (Integer nextId : ancestor.getNextIDs()) {
+                if (inferredBase.transitions.contains(nextId) && !keepNext.contains(nextId)) {
+                    keepNext.add(nextId);
+                }
+            }
+            // check previous transitions of future nodes to see if there has been a parsimonious edge to this node
+            // if so, add to keep
+            for (Integer nextId : ancestor.getNextIDs()) {
+                if (!keepNext.contains(nextId) && !nextId.equals(pogAlignment.getFinalNodeID())) {
+                    ancestor.removeNextTransition(nextId);
+                    ancestor.removeTransitionCost(nextId);
+                }
+            }
+        }
+    }
 		// if marginal, update each node with character distribution
-		if (marginalNode != null)
-			for (Integer nodeId : ancestor.getNodeIDs()) {
-				double[] dist = marginalDistributions[nodeId].get();
-				HashMap<Character, Double> distribution = new HashMap<>();
-				for (int ind = 0; ind < dist.length; ind++)
-					distribution.put((char) marginalDistributions[nodeId].getDomain().get(ind), dist[ind]);
-				ancestor.setCurrent(nodeId);
-				ancestor.setCharacterDistribution(distribution);
-			}
+		if (marginalNode != null) {
+        for (Integer nodeId : ancestor.getNodeIDs()) {
+            double[] dist = marginalDistributions[nodeId].get();
+            HashMap<Character, Double> distribution = new HashMap<>();
+            for (int ind = 0; ind < dist.length; ind++) {
+                distribution.put((char) marginalDistributions[nodeId].getDomain().get(ind), dist[ind]);
+            }
+            ancestor.setCurrent(nodeId);
+            ancestor.setCharacterDistribution(distribution);
+        }
+    }
 		return ancestor;
 	}
 
@@ -1024,8 +1047,8 @@ public class ASRPOG {
 		return phyloBN;
 	}
 
-	private Map<String, Integer[]> getPhyloTransitions() {
-		Map<String, Integer[]> phyloTransition = new HashMap<>();
+	private Map<String, HashMap<Integer, Integer>> getPhyloTransitions() {
+		Map<String, HashMap<Integer, Integer>> phyloTransition = new HashMap<>();
 
 		// populate tree for transitional inference using max parsimony
 
@@ -1040,17 +1063,23 @@ public class ASRPOG {
 		orderedPrev.toArray(uniqueBackward);
 
 		// 'Next' transitions
-		phyloTree.setContentByParsimony(mapNext, uniqueForward, "forward");
+		 phyloTree.setContentByParsimony(mapNext, uniqueForward, "forward");
 
 		for (String phyloNode : ancestralSeqLabels) {
 			List<Object> values = phyloTree.find(phyloNode).getValues();
+			int[] scores = phyloTree.find(phyloNode).getScores();
 			if (values == null) {
 				values = new ArrayList<>();
 				values.add(pogAlignment.getFinalNodeID());
 			}
-			Integer[] ids = new Integer[values.size()];
-			for (int i = 0; i < values.size(); i++)
-				ids[i] = (Integer) values.get(i);
+			HashMap<Integer, Integer> ids = new HashMap<>();
+			for (int i = 0; i < values.size(); i++) {
+			    try {
+              ids.put((Integer) values.get(i), scores[i]);
+          } catch (Exception e) {
+			        System.out.println(scores.toString());
+          }
+      }
 			phyloTransition.put(phyloNode, ids);
 		}
 
@@ -1060,21 +1089,33 @@ public class ASRPOG {
 
 		phyloTree.setContentByParsimony(mapPrevious, uniqueBackward, "backward");
 		for (String phyloNode : ancestralSeqLabels) {
-			List<Object> values = phyloTree.find(phyloNode).getValues();
-			if (values == null) {
-				values = new ArrayList<>();
-				values.add(pogAlignment.getFinalNodeID());
-			}
-			Integer[] ids = new Integer[values.size() + phyloTransition.get(phyloNode).length];
-			for (int i = 0; i < phyloTransition.get(phyloNode).length; i++)
-				ids[i] = phyloTransition.get(phyloNode)[i];
-			for (int i = 0; i < values.size(); i++)
-				ids[i + phyloTransition.get(phyloNode).length] = (Integer) values.get(i);
-			phyloTransition.put(phyloNode, ids);
-		}
-
+        List<Object> values = phyloTree.find(phyloNode).getValues();
+        int[] scores = phyloTree.find(phyloNode).getScores();
+        if (values == null) {
+            values = new ArrayList<>();
+            values.add(pogAlignment.getFinalNodeID());
+        }
+        /* Get the ids we stored during the forward parsimony */
+        HashMap<Integer, Integer> ids = phyloTransition.get(phyloNode);
+        for (int i = 0; i < values.size(); i++) {
+        /* Check if the score here is greater than the previous score, if so this is the one we
+        choose. */
+            if (ids.get(values.get(i)) != null && ids.get(values.get(i)) < scores[i]) {
+                ids.put((Integer) values.get(i), scores[i]);
+            }
+        }
+        /* Re add back the phylo node */
+        phyloTransition.put(phyloNode, ids);
+    }
+    // Add the
 		return phyloTransition;
 	}
+
+      //			for (int i = 0; i < phyloTransition.get(phyloNode).length; i++)
+//				ids[i] = phyloTransition.get(phyloNode)[i];
+//			for (int i = 0; i < values.size(); i++)
+//				ids[i + phyloTransition.get(phyloNode).length] = (Integer) values.get(i);
+//			phyloTransition.put(phyloNode, ids);
 
 	// MB's laptop on 2U1 data (145 seqs) queryBNJoint for different number of threads:
 	// 0: 30 secs; 1: 29 secs; 2: 22 secs; 3: 21 secs; 4: 20 secs; 5: 19 secs; 6: 19 secs; 7: 19 secs; 8: 20 secs
@@ -1136,7 +1177,7 @@ public class ASRPOG {
 			if (!nodeId.equals(pogAlignment.getFinalNodeID()) && !nodeId.equals(pogAlignment.getInitialNodeID()))
 				charAssignments = result.get(nodeId);
 			// get gap or character inference at phylogenetic nodes
-			Map<String, Integer[]> phyloTransition = getPhyloTransitions();
+			Map<String, HashMap<Integer, Integer>> phyloTransition = getPhyloTransitions();
 			// for each node in the phylogenetic tree, if character is inferred at position, set inferred base,
 			// otherwise gap is inferred, remove from alignment and set transitions of previous nodes to the
 			// inferred transition
@@ -1150,14 +1191,10 @@ public class ASRPOG {
 					}
 				}
 				// store inferred transitions
-				List<Integer> transitionIds = new ArrayList<>();
-				Integer[] transitions = phyloTransition.get(phyloNode);
-				for (int i = 0; i < transitions.length; i++)
-					transitionIds.add(transitions[i]);
-
+				HashMap<Integer, Integer> transitions = phyloTransition.get(phyloNode);
 				if (!ancestralInferences.containsKey(phyloNode))
 					ancestralInferences.put(phyloNode, new ArrayList<>());
-				ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
+				ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, new ArrayList<>(transitions.keySet()), transitions));
 			}
 		}
 //		long elapsedTimeNs = System.nanoTime() - startTime;
@@ -1232,19 +1269,16 @@ public class ASRPOG {
 			Character base = '-';
 
 			// get gap or character inference at phylogenetic nodes
-			Map<String, Integer[]> phyloTransition = getPhyloTransitions();
+			Map<String, HashMap<Integer, Integer>> phyloTransition = getPhyloTransitions();
 
 			// store inferred transitions
-			List<Integer> transitionIds = new ArrayList<>();
-			Integer[] transitions = phyloTransition.get(phyloNode);
-			for (int i = 0; i < transitions.length; i++)
-				transitionIds.add(transitions[i]);
+			HashMap<Integer, Integer> transitions = phyloTransition.get(phyloNode);
 
 			if (!ancestralInferences.containsKey(phyloNode))
 				ancestralInferences.put(phyloNode, new ArrayList<>());
 			if (!nodeId.equals(pogAlignment.getFinalNodeID()) && nodeId >= 0 && marginalDistributions[nodeId] != null)
 				base = (char) marginalDistributions[nodeId].getMax();
-			ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
+			ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, new ArrayList<>(transitions.keySet()), transitions));
 		}
 
 		// save sequence information in internal nodes of the phylogenetic tree
@@ -1429,12 +1463,15 @@ public class ASRPOG {
 		Integer pogId;
 		char base;
 		List<Integer> transitions;
+		HashMap<Integer, Integer> transitionsCost;
 
-		public Inference(Integer id, char ch, List<Integer> tr){
+		public Inference(Integer id, char ch, List<Integer> tr, HashMap<Integer, Integer> transitionsCost){
 			pogId = id;
 			base = ch;
 			transitions = tr;
+			this.transitionsCost = transitionsCost;
 		}
+
 		public String toString(){
 			return pogId + "->" + base;
 		}

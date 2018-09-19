@@ -92,6 +92,39 @@ public class POGraph {
     }
 
     /**
+     * Store the cost of a particular transition.
+     * @param transitionCost
+     */
+    public void setTransitionCost(HashMap<Integer, Integer> transitionCost) {
+        current.transitionCost = transitionCost;
+    }
+
+    /**
+     * Ass the cost of a particular transition.
+     * @param edge
+     * @param cost
+     */
+    public void addTransitionCost(Integer edge, Integer cost) {
+        current.transitionCost.put(edge, cost);
+    }
+
+    /**
+     * Remove the cost of a particular transition.
+     * @param edge
+     */
+    public void removeTransitionCost(Integer edge) {
+        current.transitionCost.remove(edge);
+    }
+
+    /**
+     * Gets the cost of a particular transition.
+     * @param transitionId
+     */
+    public Integer getTransitionCost(Integer transitionId) {
+        return current.transitionCost.get(transitionId);
+    }
+
+    /**
      * Add sequence to the graph with characters in the order specified in nodeIds.
      *
      * @param id		Sequence ID
@@ -1698,7 +1731,7 @@ public class POGraph {
         private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
         private boolean consensus = false; 						// flag to indicate if belongs to the consensus path
         private int cost = 10000;								// cost to  reach this node from the start
-
+        private Map<Integer, Integer> transitionCost; // Keeps track of the cost of a particular transition
 
         /**
          * Constructor
@@ -1707,6 +1740,16 @@ public class POGraph {
             this.prevTransitions = new ArrayList<>();
             this.nextTransitions = new ArrayList<>();
             this.seqChars = new HashMap<>();
+            this.transitionCost = new HashMap<>();
+        }
+
+        /**
+         * Gets the maximum parsimony score of transitioning from one node to another.
+         * @param nodeId
+         * @return
+         */
+        public Integer getTransitionCost(Integer nodeId) {
+            return transitionCost.get(nodeId);
         }
 
         /**

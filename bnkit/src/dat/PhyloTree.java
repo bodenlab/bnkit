@@ -372,6 +372,16 @@ public class PhyloTree {
          * the node ID of the child with the highest score to the parent. Note it performs no maximum
          * parsimony. */
         root.backwardParsimony(unique);
+        System.out.print("\nPosition:    ");
+
+        for (Object v : root.getValues()) {
+            System.out.print(v + "      ");
+        }
+        System.out.println();
+        System.out.print("Score:       ");
+        for (int s: scores) {
+            System.out.print(s + "      ");
+        }
         System.out.println("\n ------------------------------------------------");
     }
 
