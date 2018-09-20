@@ -24,11 +24,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 
 /**
  * Class to represent a phylogenetic tree.
@@ -40,11 +38,6 @@ import java.util.Set;
 public class PhyloTree {
 
     private Node root = null; // the root of the tree
-    private String newikStr;
-    private Node head; // current node being expanded
-    private List<Node> done;
-    private List<Node> queue;
-    private Node node; // Current node
     private ArrayList<Node> nodeList = new ArrayList<>();
 
     /**
@@ -82,41 +75,6 @@ public class PhyloTree {
     public Node[] toNodesBreadthFirst() {
         Node[] arr = new Node[nodeList.size()];
         nodeList.toArray(arr);
-        return arr;
-//        done = new ArrayList<>();
-//        queue = new ArrayList<>();
-//        queue.add(root);
-//        done.add(root);
-//        expandNodes();
-//        Node[] arr = new Node[done.size()];
-//        done.toArray(arr);
-//        return arr;
-    }
-
-    private void expandNodes() {
-        try {
-            System.out.println(" DONE NUMBER:   " + done.size() + "   QUEUE NUMBER:     " + queue.size());
-            if (queue.isEmpty())
-                return;
-            head = queue.remove(0);
-            for (Node child : head.getChildren()) {
-                done.add(child);
-                queue.add(child);
-            }
-            expandNodes();
-        }
-
-        catch (NullPointerException npe) {
-            throw new RuntimeException("Error: There was a problem reading the Newick file.");
-//            System.exit(1);
-        }
-    }
-
-    public String[] toStringsBreadthFirst() {
-        Node[] nodes = toNodesBreadthFirst();
-        String[] arr = new String[nodes.length];
-        for (int i = 0; i < nodes.length; i ++)
-            arr[i] = nodes[i].label.toString();
         return arr;
     }
 
@@ -176,9 +134,105 @@ public class PhyloTree {
      * @return the root node of tree
      */
     private Node parseNewick(String newikStr, Node parent) {
-        this.setNewikStr(newikStr);
         root = parseNewick(newikStr, parent, new ArrayList<>(), 0);
         return root;
+    }
+
+    /**
+     * Helper function to parse a leaf (extent sequence) in a Newick file.
+     * @param str           The Newick String
+     * @param parent        Parent Node
+     * @return
+     */
+    private Node parseLeafNewick(String str, Node parent) {
+        Node node;
+        String label;
+        int splitIdx = str.indexOf(':'); // check if a distance is specified
+        if (splitIdx == -1) {// no distance
+            return new Node(str, parent, null);
+        } else { // there's a distance
+            label = str.substring(0, splitIdx).trim();
+            try {
+                double dist = Double.parseDouble(str.substring(splitIdx + 1, str.length()));
+                if (dist == 0.0) {
+                    dist = 0.00001;
+                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                }
+                node = new Node(label, parent, dist);
+                if (root == null) {
+                    root = node;
+                }
+                return node;
+            }
+            catch (NumberFormatException ex) {
+                throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(splitIdx + 1, str.length()));
+            }
+        }
+    }
+
+
+    /**
+     * Helper function to parse an internal node (i.e. the template for an ancestor) in the
+     * Newick file.
+     *
+     * @param embed         Part of Newick String containing the ancestoral node
+     * @param tail          End of the String
+     * @param parent        Parent of the Node
+     * @param nodeIds       List of traversed NodeIds
+     * @param count         Number of nodeIds visited
+     * @return
+     */
+    private Node parseInternalNewick(String embed, String tail, Node parent, ArrayList<Integer> nodeIds, int count) {
+        String label;
+        Node node;
+        int splitIdx = tail.indexOf(':'); // check if a distance is specified
+        if (splitIdx == -1) { // no distance
+            if(!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty()) {
+                label = tail.substring(splitIdx + 1, tail.length()).replace(";", "");
+                node = new Node("N" + count + "_" + label, parent, null);
+            } else {
+                node = new Node("N" + count, parent, null);
+            }
+        } else { // there's a distance
+            if(tail.substring(0, splitIdx) != null && !tail.substring(0, splitIdx).isEmpty()) {
+                label = "N" + count + "_" + tail.substring(0, splitIdx);
+            } else {
+                label = "N" + count;
+            }
+            try {
+                double dist = Double.parseDouble(tail.substring(splitIdx + 1, tail.length()).replace(";", ""));
+                if (dist == 0.0) {
+                    dist = 0.00001;
+                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                }
+                node = new Node(label, parent, dist);
+                if (root == null) {
+                    root = node;
+                }
+            }
+            catch (NumberFormatException ex) {
+                throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + tail.substring(splitIdx + 1, tail.length()).replace(";", ""));
+            }
+        }
+        nodeIds.add(count);
+        // find where the commas are, and create children of node
+        int comma = getComma(embed);
+        String toProcess;
+        while (comma != -1) {
+            toProcess = embed.substring(0, comma);
+            //GOING TO HAVE TO PASS PARENT NODE WITH RECURSION TO RECORD IT
+            // get unique ID to pass through
+            while (nodeIds.contains(count)) {
+                count++;
+            }
+            node.addChild(parseNewick(toProcess, node, nodeIds, count));
+            if (comma + 1 > embed.length()) {
+                break;
+            }
+            embed = embed.substring(comma + 1);
+            comma = getComma(embed);
+        }
+        return node;
     }
 
     /**
@@ -191,92 +245,14 @@ public class PhyloTree {
     private Node parseNewick(String str, Node parent, ArrayList<Integer> nodeIds, int count) {
         Node node = null;
         str = str.replace("\t","");
-        int start_index = str.indexOf('('); // start parenthesis
-        int end_index = str.lastIndexOf(')'); // end parenthesis
-        if (start_index == -1 && end_index == -1) { // we are at leaf (no parentheses)
-            int split_index = str.indexOf(':'); // check if a distance is specified
-            if (split_index == -1) {// no distance
-                node = new Node(str, count);
-                node.setParent(parent);
-            } else { // there's a distance
-                String label = str.substring(0, split_index).trim();
-                node = new Node(label, count);
-                try {
-
-
-                    double dist = Double.parseDouble(str.substring(split_index + 1, str.length()));
-
-                    if (dist == 0.0) {
-                        dist = 0.00001;
-                        System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
-                    }
-                    node.setDistance(dist);
-                    node.setParent(parent);
-                    if (root == null) {
-                        root = node;
-                    }
-                }
-                catch (NumberFormatException ex) {
-                    throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
-//                    System.exit(1);
-                }
-
-            }
-        } else if (start_index >= 0 && end_index >= 0) { // balanced parentheses
-            //end_index = str.length() - end_index - 1; // correct index to refer from start instead of end of string
-            String embed = str.substring(start_index + 1, end_index);
-            String tail = str.substring(end_index + 1, str.length());
-            int split_index = tail.indexOf(':'); // check if a distance is specified
-            if (split_index == -1) { // no distance
-                if(!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty()) {
-                    String name = tail.substring(split_index + 1, tail.length()).replace(";", "");
-                    node = new Node("N" + count + "_" + name, count);
-                    //node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1)); // MB-Fix: replaced this line with the two above to fix cropped name endings
-                } else
-                    node = new Node("N" + count, count);
-                node.setParent(parent);
-            } else { // there's a distance
-                if(tail.substring(0, split_index) != null && !tail.substring(0, split_index).isEmpty())
-                    node = new Node("N" + count + "_" + tail.substring(0, split_index), count);
-                else
-                    node = new Node("N" + count, count);
-                try {
-
-
-                    double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()).replace(";", ""));
-                    if (dist == 0.0) {
-                        dist = 0.00001;
-                        System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
-                    }
-                    node.setDistance(dist);
-                    node.setParent(parent);
-                    if (root == null) {
-                        root = node;
-                    }
-                }
-                catch (NumberFormatException ex) {
-                    throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
-//                    System.exit(1);
-                }
-            }
-            nodeIds.add(count);
-            // find where the commas are, and create children of node
-            int comma = getComma(embed);
-            while (comma != -1) {
-                String process_me = embed.substring(0, comma);
-                //GOING TO HAVE TO PASS PARENT NODE WITH RECURSION TO RECORD IT
-                // get unique ID to pass through
-                while (nodeIds.contains(count))
-                    count++;
-                Node tmp = parseNewick(process_me, node, nodeIds, count);
-                if (tmp != null) {
-                    node.addChild(tmp); //pass the current node down as the parent
-                }
-                if (comma + 1 > embed.length())
-                    break;
-                embed = embed.substring(comma + 1);
-                comma = getComma(embed);
-            }
+        int startIdx = str.indexOf('('); // start parenthesis
+        int endIdx = str.lastIndexOf(')'); // end parenthesis
+        if (startIdx == -1 && endIdx == -1) { // we are at leaf (no parentheses)
+            node = parseLeafNewick(str, parent);
+        } else if (startIdx >= 0 && endIdx >= 0) { // balanced parentheses
+            String embed = str.substring(startIdx + 1, endIdx);
+            String tail = str.substring(endIdx + 1, str.length());
+            node = parseInternalNewick(embed, tail, parent, nodeIds, count);
         }
         if (!nodeList.contains(node)) {
             nodeList.add(node);
@@ -294,10 +270,6 @@ public class PhyloTree {
         return this;
     }
 
-    public void setNewikStr(String newikStr) {
-        this.newikStr = newikStr;
-    }
-
     /**
      * Factory method to create a tree instance from a Newick formatted file.
      * @param filename name of file
@@ -307,11 +279,10 @@ public class PhyloTree {
         BufferedReader reader = new BufferedReader(new FileReader(filename));
         StringBuilder sb = new StringBuilder();
         String line = null;
-        int cnt = 1;
         while ((line = reader.readLine()) != null)
             sb.append(line.trim());
-        String newick = sb.toString();
-        root = parseNewick(newick, null); //null parent for root
+
+        root = parseNewick(sb.toString(), null); //null parent for root
         reader.close();
         return this;
     }
@@ -337,11 +308,9 @@ public class PhyloTree {
     public void setContentByParsimony(Map<String, Object> map) {
         // reset node values (otherwise stores previous uses)
         reset_values(this.getRoot());
-        Set<Object> values = new HashSet<>(map.values());
-        Object[] unique = values.toArray();
         Node root = this.getRoot();
         System.out.println(" ----------------- Node: " + root.getLabel() + " ----------------------");
-        root.forwardParsimony(map, unique);
+        root.forwardParsimony(map, map.values().toArray());
         // root.backwardParsimony(unique);
     }
 
@@ -354,34 +323,25 @@ public class PhyloTree {
      */
     public void setContentByParsimony(Map<String, Object> map, Object[] unique, String type) {
         // reset node values (otherwise stores previous uses)
-        reset_values(this.getRoot());
-        Node root = this.getRoot();
+        root = this.getRoot();
+        reset_values(root);
         System.out.println(" ----------------- " + type + " ----------------------");
-        int[] scores = root.forwardParsimony(map, unique);
+        root.forwardParsimony(map, unique);
         System.out.print("Position:    ");
 
-        for (Object v : unique) {
-            System.out.print(v + "      ");
-        }
-        System.out.println();
-        System.out.print("Score:       ");
-        for (int s: scores) {
-            System.out.print(s + "      ");
-        }
+//        for (Object v : unique) {
+//            System.out.print(v + "      ");
+//        }
+//        System.out.println();
+//        System.out.print("Score:       ");
+//        for (int s: scores) {
+//            System.out.print(s + "      ");
+//        }
         /* Backward parsiomony is actually just iterating again through the traceback to assign
          * the node ID of the child with the highest score to the parent. Note it performs no maximum
          * parsimony. */
         root.backwardParsimony(unique);
-        System.out.print("\nPosition:    ");
 
-        for (Object v : root.getValues()) {
-            System.out.print(v + "      ");
-        }
-        System.out.println();
-        System.out.print("Score:       ");
-        for (int s: scores) {
-            System.out.print(s + "      ");
-        }
         System.out.println("\n ------------------------------------------------");
     }
 
@@ -399,27 +359,27 @@ public class PhyloTree {
      */
     public class Node {
         final private List<Node> children;  // the children of this node
-        final private Object label;         // arbitrary label of node
+        final private String label;         // arbitrary label of node
         // MB-Fix: now a list of values, previously just a single "value"
         private List<Object> values = null; // values of node
         private EnumSeq sequence = null;    // sequence
         private int[] scores = null;     // the optimal score for each parent value
         // MB-Fix: added third index, to allow multiple child symbols to contribute to the same parent score
         private int[][][] traceback = null; // [parent value][child branch] = [value in child that gives optimal value, next value in same child ...]
-        private Double dist = null;         // optional distance (from this node to its parent)
-        private List<Double> modelProb = new ArrayList<>(); // Every node has a single parent (bar root) so it can carry
+        final private Double dist;         // optional distance (from this node to its parent)
+        final private List<Double> modelProb = new ArrayList<>(); // Every node has a single parent (bar root) so it can carry
         // the value for the edge
-        private Node parent;
-        private int id; // Node id (used to recreate the string)
+        final private Node parent;
 
         /**
          * Construct node from label/label.
          * @param label label/label
          */
-        public Node(Object label, int id) {
+        public Node(String label, Node parent, Double dist) {
             this.label = label;
-            this.id = id;
             this.children = new ArrayList<>();
+            this.parent = parent;
+            this.dist= dist;
         }
 
         public Object getLabel() {
@@ -488,8 +448,6 @@ public class PhyloTree {
                 System.out.println("Model probability list must be initialised using addModelProb() prior to setting specific columns");
             }
         }
-
-        public void setParent(Node parent) { this.parent = parent; }
 
         public Node getParent() { return parent; }
 
@@ -585,24 +543,17 @@ public class PhyloTree {
          * @return the node that contains the specified label, or null if not found
          */
         public Node find(Object label) {
+            Node node;
             if (this.label.equals(label))
                 return this;
             else {
                 for (Node child : children) {
-                    Node node = child.find(label);
+                    node = child.find(label);
                     if (node != null)
                         return node;
                 }
                 return null;
             }
-        }
-
-        /**
-         * Set the distance for this node (from this node to its parent)
-         * @param dist the distance
-         */
-        public void setDistance(double dist) {
-            this.dist = dist;
         }
 
         /**
@@ -627,13 +578,14 @@ public class PhyloTree {
         protected int[] forwardParsimony(Map<String, Object> assign, Object[] unique) {
             this.scores = new int[unique.length]; // a score for each possible value; pushed from leaves to this node; starts at 0
             this.values = null;
-            HashMap<Node, Integer> nodeScore = new HashMap<>();
             Object sym = assign.get(this.label);     // check if this node has a definitive state (symbol) assigned to it (via its name/label)
             if (sym != null) {                       // yes, this node is instantiated
                 int index;                           // index of the assigned state
-                for (index = 0; index < unique.length; index ++)
-                    if (sym.equals(unique[index]))   // found it
+                for (index = 0; index < unique.length; index ++) {
+                    if (sym.equals(unique[index])) {   // found it
                         break;
+                    }
+                }
                 setValue(unique[index]);             // definitive state is assigned to node
                 Arrays.fill(this.scores, Integer.MAX_VALUE - 20); // the default score is Infinity
                 this.scores[index] = 0; // the actual assignment is scored 0, all others impossible, so positive infinity
@@ -644,46 +596,48 @@ public class PhyloTree {
                 } else { // recurse into children nodes...
                     // determine scores contributed by each child (cscores) BEFORE substitution penalties
                     int[][] cscores = new int[children.size()][];
+                    Node child;
                     for (int c = 0; c < children.size(); c ++) {
-                        Node child = children.get(c);
+                        child = children.get(c);
                         cscores[c] = child.forwardParsimony(assign, unique); // one score from child c for each symbol
                     }
                     // traceback array needs to hold all child symbol indices that contribute to (indexed) parent symbol score via (indexed) child
                     this.traceback = new int[unique.length][children.size()][];
-                    int best_parent_score = Integer.MAX_VALUE - 20; // need to work out best parent score for "scores"; they all start at 0 (init at allocation above)
+                    // Initialise all integers so we reuse the space allocated.
+                    int parentScore;
+                    int bestScore;
+                    int bestCount;
+                    int substPenalty;
+                    int originIdx;
                     for (int c = 0;  c < children.size(); c ++) {
                         // loop through each possible parent assignment, record what symbol in each child that best supports this (adding substitution penalties as we go)
                         for (int i = 0; i < scores.length; i ++) {
-                            int best_score = Integer.MAX_VALUE - 20;
-                            int best_cnt = 0; // this is how many symbols in child that need to be recorded (multiple are possible)
+                            bestScore = Integer.MAX_VALUE - 20;
+                            bestCount = 0; // this is how many symbols in child that need to be recorded (multiple are possible)
                             // next, loop through each possible value in this child to find best parent score (may be the score from multiple origins)
                             for (int j = 0; j < cscores[c].length; j ++) {
                                 int subst_penalty = (i == j ? 0 : 1);
-                                int parent_score = cscores[c][j] + subst_penalty;
-                                if (parent_score < best_score) { // new best, reset count to 1
-                                    best_score = parent_score;
-                                    best_cnt = 1;
-                                } else if (parent_score == best_score) { // new equal best, add +1 to count
-                                    best_cnt ++;
+                                parentScore = cscores[c][j] + subst_penalty;
+                                if (parentScore < bestScore) { // new best, reset count to 1
+                                    bestScore = parentScore;
+                                    bestCount = 1;
+                                } else if (parentScore == bestScore) { // new equal best, add +1 to count
+                                    bestCount ++;
                                 } // else, let this parent score slip
                             }
                             // now we know what the best parent score is; work out all assignments in child c that give it (could be multiple)
-                            traceback[i][c] = new int[best_cnt]; // allocate space to hold their indices
-                            int k = 0; // index for holding possible origins
+                            traceback[i][c] = new int[bestCount]; // allocate space to hold their indices
+                            originIdx = 0; // index for holding possible origins
                             for (int j = 0; j < cscores[c].length; j ++) { // loop through each possible child symbol, again adding substitution penalties
-                                int subst_penalty = (i == j ? 0 : 1);
-                                int parent_score = cscores[c][j] + subst_penalty;
-                                if (parent_score == best_score) {
-                                    traceback[i][c][k++] = j;
+                                substPenalty = (i == j ? 0 : 1);
+                                parentScore = cscores[c][j] + substPenalty;
+                                if (parentScore == bestScore) {
+                                    traceback[i][c][originIdx++] = j;
                                 }
                             }
-                            nodeScore.put(children.get(c), i);
-                            scores[i] += best_score; // the best we can do with parent symbol i, from child c
+                            scores[i] += bestScore; // the best we can do with parent symbol i, from child c
                         } // finished the score for a parent i, for one child c
                     } // finished all children here
-//                    for (Node n: nodeScore.keySet()) {
-//                        System.out.println("P: " + this.getLabel() + ", S: " + scores[nodeScore.get(n)] +  ", V: " + n.getValue() + ", C: " + n.getLabel());
-//                    }
                     return this.scores; // done, return parent scores (recursing them as child scores up the tree)
                 }
             }
