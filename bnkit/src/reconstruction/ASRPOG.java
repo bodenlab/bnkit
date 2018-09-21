@@ -1066,19 +1066,15 @@ public class ASRPOG {
 		 phyloTree.setContentByParsimony(mapNext, uniqueForward, "forward");
 
 		for (String phyloNode : ancestralSeqLabels) {
-			List<Object> values = phyloTree.find(phyloNode).getValues();
-			int[] scores = phyloTree.find(phyloNode).getScores();
+			List<Object> values = new ArrayList<>(); //phyloTree.find(phyloNode).getValues();
+			int score = phyloTree.find(phyloNode).getScores();
 			if (values == null) {
 				values = new ArrayList<>();
 				values.add(pogAlignment.getFinalNodeID());
 			}
 			HashMap<Integer, Integer> ids = new HashMap<>();
 			for (int i = 0; i < values.size(); i++) {
-			    try {
-              ids.put((Integer) values.get(i), scores[i]);
-          } catch (Exception e) {
-			        System.out.println(scores.toString());
-          }
+			   ids.put((Integer) values.get(i), score);
       }
 			phyloTransition.put(phyloNode, ids);
 		}
@@ -1089,8 +1085,8 @@ public class ASRPOG {
 
 		phyloTree.setContentByParsimony(mapPrevious, uniqueBackward, "backward");
 		for (String phyloNode : ancestralSeqLabels) {
-        List<Object> values = phyloTree.find(phyloNode).getValues();
-        int[] scores = phyloTree.find(phyloNode).getScores();
+        List<Object> values = new ArrayList<>(); //phyloTree.find(phyloNode).getValues();
+        int score = phyloTree.find(phyloNode).getScores();
         if (values == null) {
             values = new ArrayList<>();
             values.add(pogAlignment.getFinalNodeID());
@@ -1100,8 +1096,8 @@ public class ASRPOG {
         for (int i = 0; i < values.size(); i++) {
         /* Check if the score here is greater than the previous score, if so this is the one we
         choose. */
-            if (ids.get(values.get(i)) != null && ids.get(values.get(i)) < scores[i]) {
-                ids.put((Integer) values.get(i), scores[i]);
+            if (ids.get(values.get(i)) != null) {
+                ids.put((Integer) values.get(i), score);
             }
         }
         /* Re add back the phylo node */

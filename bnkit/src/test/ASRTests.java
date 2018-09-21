@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import reconstruction.ASRPOG;
 import vis.POAGJson;
 
+import java.lang.Runtime;
 import java.io.IOException;
 import java.util.List;
 
@@ -33,10 +34,47 @@ public class ASRTests {
     @Test
     @DisplayName("huge ASR")
     public void performSmallASR() throws IOException, InterruptedException {
+        int mb = 1024*1024;
+
+        //Getting the runtime reference from system
+        Runtime runtime = Runtime.getRuntime();
+
+        System.out.println("##### Heap utilization statistics [MB] #####");
+
+        //Print used memory
+        long startMem = (runtime.totalMemory() - runtime.freeMemory()) / mb;
+
+        //Print free memory
+        long freeMem = runtime.freeMemory() / mb;
+
+        //Print total available memory
+        long totMem = runtime.totalMemory() / mb;
+
+        //Print Maximum available memory
+        long maxMem = runtime.maxMemory() / mb;
+
         String alnfilepath = "src/test/resources/Edge_parsimony_example_with_non_bi_directional_transition_10.aln";
         String nwkfilepath = "src/test/resources/Edge_parsimony_example_10.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
         System.out.println(asr.getGraph("root").getConsensusGappySequence());
+        //Getting the runtime reference from system
+        runtime = Runtime.getRuntime();
+
+        System.out.println("##### Heap utilization statistics [MB] #####");
+
+        //Print used memory
+        System.out.println("Used Memory:"
+                + (((runtime.totalMemory() - runtime.freeMemory()) / mb)));
+
+        //Print free memory
+        System.out.println("Free Memory:"
+                + (runtime.freeMemory() / mb));
+
+        //Print total available memory
+        System.out.println("Total Memory:" + (runtime.totalMemory() / mb));
+
+        //Print Maximum available memory
+        System.out.println("Max Memory:" + (runtime.maxMemory() / mb));
     }
 
     @Test

@@ -22,11 +22,12 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.lang.Integer;
 
 /**
  * Class to represent a phylogenetic tree.
@@ -326,21 +327,29 @@ public class PhyloTree {
         root = this.getRoot();
         reset_values(root);
         System.out.println(" ----------------- " + type + " ----------------------");
-        root.forwardParsimony(map, unique);
-        System.out.print("Position:    ");
+        //root.forwardParsimony(map, unique);
+        System.out.print("Possibilities:     ");
+        HashSet<Integer> uniqueHs = new HashSet<>();
+        for (Object u: unique) {
+            uniqueHs.add((Integer) u);
+            System.out.print(u + "  ");
+        }
+        System.out.print("\n");
+        System.out.print("\nPosition:    " + root.calculateParsimony(map, uniqueHs));
 
-//        for (Object v : unique) {
-//            System.out.print(v + "      ");
-//        }
-//        System.out.println();
-//        System.out.print("Score:       ");
-//        for (int s: scores) {
-//            System.out.print(s + "      ");
+        System.out.println();
+        System.out.print("Score:       " + root.score);
+//        for (int s: root.newTraceback.keySet()) {
+//            System.out.print("P:" + s + "      ");
+//            for (Node n: root.newTraceback.get(s).keySet()) {
+//                System.out.print("C:" + n.getLabel() + "      S:" + root.newTraceback.get(s).get(n) + "   ");
+//
+//            }
 //        }
         /* Backward parsiomony is actually just iterating again through the traceback to assign
          * the node ID of the child with the highest score to the parent. Note it performs no maximum
          * parsimony. */
-        root.backwardParsimony(unique);
+        // root.backwardParsimony(root.bestUniqueSymbol);
 
         System.out.println("\n ------------------------------------------------");
     }
@@ -360,16 +369,23 @@ public class PhyloTree {
     public class Node {
         final private List<Node> children;  // the children of this node
         final private String label;         // arbitrary label of node
-        // MB-Fix: now a list of values, previously just a single "value"
-        private List<Object> values = null; // values of node
+
         private EnumSeq sequence = null;    // sequence
         private int[] scores = null;     // the optimal score for each parent value
         // MB-Fix: added third index, to allow multiple child symbols to contribute to the same parent score
         private int[][][] traceback = null; // [parent value][child branch] = [value in child that gives optimal value, next value in same child ...]
+        private HashMap<Integer, HashMap<Node, Integer>> newTraceback; // parent -> child -> value (i.e. position that gives the optimal value)
+        private HashMap<Integer, Integer> newScores; // scores in a Hashmap
         final private Double dist;         // optional distance (from this node to its parent)
         final private List<Double> modelProb = new ArrayList<>(); // Every node has a single parent (bar root) so it can carry
         // the value for the edge
         final private Node parent;
+        private int score = 0;                    // Minimum number of changes (two could share the same score).
+        private int valuePosition;            // The position of the value
+        private boolean isSet = false;                  // Whether this position has been set or decided on in maximum parsimony
+        private List<Object> values = null;     // values of node
+        HashSet<Object> childrensValues;
+
 
         /**
          * Construct node from label/label.
@@ -380,6 +396,10 @@ public class PhyloTree {
             this.children = new ArrayList<>();
             this.parent = parent;
             this.dist= dist;
+            this.newTraceback = new HashMap<>();
+            this.newScores = new HashMap<>();
+            this.childrensValues = new HashSet<>();
+            this.values = new ArrayList<>();
         }
 
         public Object getLabel() {
@@ -400,8 +420,8 @@ public class PhyloTree {
             return values.get(index);
         }
 
-        public int[] getScores() {
-            return scores;
+        public int getScores() {
+            return score;
         }
 
         // MB-Fix: new function, returns all values; should be run after parsimony
@@ -566,6 +586,190 @@ public class PhyloTree {
             return this.dist;
         }
 
+
+//        private short score;                    // Minimum number of changes (two could share the same score).
+//        private short valuePosition;            // The position of the value
+//        private boolean isSet;                  // Whether this position has been set or decided on in maximum parsimony
+//        private List<Object> values = null;     // values of node
+
+        private boolean assignedLeafParsimony (Map<String, Object> assign, HashSet<Integer> unique) {
+            Integer sym = (Integer)assign.get(label);     // check if this node has a definitive state (symbol) assigned to it (via its name/label)
+            if (sym != null) {                       // yes, this node is instantiated
+                if (unique.contains(sym)) {
+                    setValue(sym);
+                    valuePosition = sym;
+                    isSet = true;
+                    score = 0;
+                    return true;
+                } else {
+                    throw new RuntimeException("Leaf " + this + " has not been assigned a value");
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Here, we are taking a parents possible values, and seeing if any of these inform the
+         * decisions made lower down in the tree. As we are looking for the most parsimonious route,
+         * we want the choices that have the minimum number of changes. Note once this has been set,
+         * this informs the choices above and we don't need to re-iterate through.
+         *                 // Check if the child has been set
+         if (!child.isSet) {
+         // Otherwise we can't determine yet, so we need to know if any of the other children
+         // can inform the value choice. So we traverse down the child, with the possibilities
+         // that we have for the other children.
+         child.traverseDownForValue(this.childrensValues);
+         if (!child.isSet) {
+         // we weren't able to resolve the conflicts here, return and let the parent
+         // of this node resolve the conflicts.
+         return false;
+         }
+         }
+         * @param values
+         * @return
+         */
+        private void traverseDownForValue (HashSet<Object> values) {
+            short foundCount = 0;
+            // Check if this informs a decision at this point
+            for (Object value: values) {
+                if (this.values.contains(value)) {
+                    // potentially we have something which means that we can make a decision.
+                    // of possibilities.
+                    foundCount ++;
+                }
+            }
+            // If we only have a single value return, otherwise we need more information
+            if (foundCount > 1) {
+                return;
+            }
+            // Otherwise set this as being finished
+            this.isSet = true;
+            return;
+        }
+
+        private boolean determineScoreFromChildren () {
+            /*  Need to keep track of a number of things:
+                    1. Has child been set?
+                    2. Score and valuePosition of each child?
+                    3. Min number of changes to ensure this score is met.
+             */
+            HashMap<Object, Integer[]> value2numChildren = new HashMap<>();
+            int maxNumChildren = 0;
+            int numChildren;
+            Integer[] tmp;
+            for (Node child: children) {
+                // If we got here the child has been set so we want to add the choice to the list
+                // of possibilities.
+                if (child.values.size() < 1) {
+                    System.out.println("Child: " + child.getLabel());
+                }
+                for (Object v: child.values) {
+                    if (value2numChildren.get(v) == null) {
+                        tmp = new Integer[]{1, child.score};
+                        value2numChildren.put(v, tmp);
+                        numChildren = 1;
+                    } else {
+                        tmp = value2numChildren.get(v);
+                        tmp[0] = tmp[0] + 1;
+                        tmp[1] = tmp[1] + child.score;
+                        numChildren = tmp[0];
+                        value2numChildren.put(v, tmp);
+                    }
+                    if (numChildren > maxNumChildren) {
+                        maxNumChildren = numChildren;
+                    }
+                }
+
+            }
+            // Now we want to assign what is the best value for this node, that will mean which one
+            // gives us less change - i.e. do more children have a specific value than another,
+            // if they are all equal then this node is undecided and a higher up node's values will
+            // inform this choice.
+            this.values = new ArrayList<>();
+
+            for (Object value: value2numChildren.keySet()) {
+                tmp = value2numChildren.get(value);
+                if (tmp[0] == maxNumChildren) {
+                    setValue(value);
+                    isSet = true;
+                    score += tmp[1];
+                } else {
+                    // Add one onto the score as we know we need to have a change here or
+                    // some-point down the line.
+                    score ++;
+                }
+            }
+            return true;
+        }
+
+        private List<Object> calculateParsimony (Map<String, Object> assign, HashSet<Integer> unique) {
+            // Check if this node is a leaf
+            if (assignedLeafParsimony(assign, unique) == true) {
+                return this.values;
+            }
+            if (children == null) { // leaf node, no children, ouch... problem
+                throw new RuntimeException("Leaf " + this + " has not been assigned a value");
+            }
+            // Now we want to check each child has had it's values assigned.
+            childrensValues.clear();
+            for (Node child: children) {
+                child.values = new ArrayList<>();
+                child.calculateParsimony(assign, unique);
+            }
+            /*  Now each child has been assigned we need to perform a more complex traversal to
+                determine the most parsimonious route. If the children of this node were undecided,
+                we need to propagate the choice made here, to the child.
+             */
+            this.values = new ArrayList<>();
+            this.score = 0;
+            isSet = this.determineScoreFromChildren();
+            System.out.println("--------------------------" + this.getLabel() + "---------------------------------");
+            for (Object v: this.values) {
+                System.out.print(v + "  ");
+            }
+            System.out.println("\n----------------------------------------------------------------");
+            // Update the score
+
+            return this.values;
+        }
+
+        private int forwardParsimonyInternalNodes(HashMap<Integer, Integer> newCscore, Node child, int bestScore) {
+            int childScore;
+            if (newCscore == null) {
+                return Integer.MAX_VALUE - 20;
+            }
+            /* Want to iterate through the scores to determine the best score and
+               Add that to our hashMap, keeping track of the Child and Symbol that
+               it corresponds to. */
+            for (Integer childSymbol: newCscore.keySet()) {
+                /* Each score (key) has an int corresponding to the Symbol of the parent that gave this best score. */
+                childScore = newCscore.get(childSymbol);
+                if (childScore < bestScore) {
+                    // Want to add this to the traceback and remove the old best -> this will reduce the
+                    // computational complexity by removing the possibilities that we have already decided
+                    // are not possible.
+                    // this.newTraceback.remove(this.bestUniqueSymbol);
+                    // Check if that symbol already has an entry
+                    if (this.newTraceback.get(childSymbol) == null) {
+                        this.newTraceback.put(childSymbol, new HashMap<>());
+                    }
+                    HashMap<Node, Integer> childMap = this.newTraceback.get(childSymbol);
+                    childMap.put(child, childScore);
+                    this.newTraceback.put(childSymbol, childMap);
+                    bestScore = childScore;
+                } else if (childScore == bestScore) {
+                    // If they are equal we want to add this route
+                    if (this.newTraceback.get(childSymbol) == null) {
+                        this.newTraceback.put(childSymbol, new HashMap<>());
+                    }
+                    HashMap<Node, Integer> childMap = this.newTraceback.get(childSymbol);
+                    childMap.put(child, childScore);
+                    this.newTraceback.put(childSymbol, childMap);
+                }
+                // Otherwise do nothing as this isn't going to give us an optimal score.
+            }
+            return bestScore;
+        }
         /**
          * Internal function that operates recursively to first initialise each node (forward),
          * stopping only once a value has been assigned to the node,
@@ -575,72 +779,58 @@ public class PhyloTree {
          * @param unique all possible values, in order; order matters if SET_ONE_TARGET_PARSIMONY is true
          * @return the scores of the unique values at the root
          */
-        protected int[] forwardParsimony(Map<String, Object> assign, Object[] unique) {
-            this.scores = new int[unique.length]; // a score for each possible value; pushed from leaves to this node; starts at 0
-            this.values = null;
-            Object sym = assign.get(this.label);     // check if this node has a definitive state (symbol) assigned to it (via its name/label)
-            if (sym != null) {                       // yes, this node is instantiated
-                int index;                           // index of the assigned state
-                for (index = 0; index < unique.length; index ++) {
-                    if (sym.equals(unique[index])) {   // found it
-                        break;
-                    }
-                }
-                setValue(unique[index]);             // definitive state is assigned to node
-                Arrays.fill(this.scores, Integer.MAX_VALUE - 20); // the default score is Infinity
-                this.scores[index] = 0; // the actual assignment is scored 0, all others impossible, so positive infinity
-                return this.scores;     // done with this leaf node
-            } else { // this node is NOT instantiated
-                if (this.children == null) { // leaf node, no children, ouch... problem
-                    throw new RuntimeException("Leaf " + this + " has not been assigned a value");
-                } else { // recurse into children nodes...
-                    // determine scores contributed by each child (cscores) BEFORE substitution penalties
-                    int[][] cscores = new int[children.size()][];
-                    Node child;
-                    for (int c = 0; c < children.size(); c ++) {
-                        child = children.get(c);
-                        cscores[c] = child.forwardParsimony(assign, unique); // one score from child c for each symbol
-                    }
-                    // traceback array needs to hold all child symbol indices that contribute to (indexed) parent symbol score via (indexed) child
-                    this.traceback = new int[unique.length][children.size()][];
-                    // Initialise all integers so we reuse the space allocated.
-                    int parentScore;
-                    int bestScore;
-                    int bestCount;
-                    int substPenalty;
-                    int originIdx;
-                    for (int c = 0;  c < children.size(); c ++) {
-                        // loop through each possible parent assignment, record what symbol in each child that best supports this (adding substitution penalties as we go)
-                        for (int i = 0; i < scores.length; i ++) {
-                            bestScore = Integer.MAX_VALUE - 20;
-                            bestCount = 0; // this is how many symbols in child that need to be recorded (multiple are possible)
-                            // next, loop through each possible value in this child to find best parent score (may be the score from multiple origins)
-                            for (int j = 0; j < cscores[c].length; j ++) {
-                                int subst_penalty = (i == j ? 0 : 1);
-                                parentScore = cscores[c][j] + subst_penalty;
-                                if (parentScore < bestScore) { // new best, reset count to 1
-                                    bestScore = parentScore;
-                                    bestCount = 1;
-                                } else if (parentScore == bestScore) { // new equal best, add +1 to count
-                                    bestCount ++;
-                                } // else, let this parent score slip
-                            }
-                            // now we know what the best parent score is; work out all assignments in child c that give it (could be multiple)
-                            traceback[i][c] = new int[bestCount]; // allocate space to hold their indices
-                            originIdx = 0; // index for holding possible origins
-                            for (int j = 0; j < cscores[c].length; j ++) { // loop through each possible child symbol, again adding substitution penalties
-                                substPenalty = (i == j ? 0 : 1);
-                                parentScore = cscores[c][j] + substPenalty;
-                                if (parentScore == bestScore) {
-                                    traceback[i][c][originIdx++] = j;
-                                }
-                            }
-                            scores[i] += bestScore; // the best we can do with parent symbol i, from child c
-                        } // finished the score for a parent i, for one child c
-                    } // finished all children here
-                    return this.scores; // done, return parent scores (recursing them as child scores up the tree)
-                }
-            }
+        protected HashMap<Integer, Integer> forwardParsimony(Map<String, Object> assign, Object[] unique) {
+//            if (unique.length < 1) {
+//                return null;
+//            }
+//            this.newScores.clear();
+//            Object sym = assign.get(this.label);     // check if this node has a definitive state (symbol) assigned to it (via its name/label)
+//            if (sym != null) {                       // yes, this node is instantiated
+//                int index;                           // index of the assigned state
+//                for (index = 0; index < unique.length; index ++) {
+//                    if (sym.equals(unique[index])) {   // found it
+//                        break;
+//                    }
+//                }
+//                setValue(unique[index]);             // definitive state is assigned to node
+//                this.newScores.put((Integer)unique[index], new Integer(0)); // we store the symbol and it's score
+//                return this.newScores;  // done with this leaf node
+//            } else { // this node is NOT instantiated
+//                if (this.children == null) { // leaf node, no children, ouch... problem
+//                    throw new RuntimeException("Leaf " + this + " has not been assigned a value");
+//                } else { // recurse into children nodes...
+//                    // determine scores contributed by each child (cscores) BEFORE substitution penalties
+//                    HashMap<Integer, Integer> newCscore;
+//                    /* New traceback contains: <Key = Symbol of Parent> Value = <HashMap< Key=ChildId, Value:Score>>
+//                     * Note: Symbol is one of Unique. */
+//                    this.newTraceback.clear();
+//                    this.newScores.clear();
+//                    int bestScore = Integer.MAX_VALUE - 20;
+//
+//                    for (Node child: this.children) {
+//                        newCscore = child.forwardParsimony(assign, unique);
+//                        bestScore = forwardParsimonyInternalNodes(newCscore, child, bestScore);
+//                    }
+//                    // Now we have gone through each of the internal nodes we need to determine how
+//                    // few changes we can make. This means, choosing the most parsimonious path.
+//                    // This means iterating through the characters that have been assigned to each child. Since they propagate up
+//                    // we only need to go in the first depth.
+//                    // Get the minimum number of changes, this is the number of different children possibilities - 1
+//                    int minNumChanges = 0;
+//                    for (Integer symbol: this.newTraceback.keySet()) {
+//                        // Note as we are moving up the tree we are pruning off the scores and values
+//                        // we won't assign. This means that if we reach a child that has a score greater
+//                        // than the minNumChanges, that means that that was the minimum and we need to update
+//                        // the parent accordingly (and add the minNumChanges to this value).
+//                        minNumChanges = this.children.size() - this.newTraceback.get(symbol).size();
+//                        for (Node child: this.newTraceback.get(symbol).keySet()) {
+//                            this.newScores.put(symbol, minNumChanges + this.newTraceback.get(symbol).get(child));
+//                        }
+//                    }
+//                    return this.newScores; // done, return parent scores (recursing them as child scores up the tree)
+//                }
+//            }
+            return null;
         }
 
         public int getParsimonyScore() {
@@ -733,39 +923,47 @@ public class PhyloTree {
          * This handles the node as if it was root; goes by scores assigned to states/symbols.
          * @param unique array with the states/symbols that can be assigned, in the same order as provided to forwardParsimony.
          */
-        protected void backwardParsimony(Object[] unique) {
-            int best_index = 0; // find one index with the best score (could be many but one is enough)
-            for (int i = 1; i < scores.length; i ++) {
-                if (scores[i] < scores[best_index])
-                    best_index = i;
+        protected void backwardParsimony(Integer bestUniqueSymbol) {
+            // We already know which unique value will give us the best score
+            //int bestScoreKey = 0; // find one index with the best score (could be many but one is enough)
+//            if (setValue(bestUniqueSymbol)) {
+//                for (Integer bestSymbol: this.newTraceback.keySet()) {
+//                    for (Node child: this.newTraceback.get(bestSymbol).keySet()) {
+//                        child.backwardParsimony(bestSymbol);
+//                    }
+//                }
             }
-            // Go through each score and when it is "best", recurse into each child, propagating the state for the score
-            // This iteration could be randomised (SET_RANDOM_PARSIMONY=true) so that the states are assigned in different order
-            boolean butt_out = false;
-            for (int parent_index : range(scores.length, SET_RANDOM_PARSIMONY)) {
-                if (scores[parent_index] == scores[best_index]) {
-                    // now we know the index of (one of) the optimal parent state/s
-                    if (setValue(unique[parent_index])) { // will check so that the state is assigned only once... setValue returns false if already set
-                        if (this.children != null) {      // recurse into children nodes...
-                            for (int c = 0; c < children.size(); c++) {
-                                Node child = children.get(c);
-                                // Go through each optimal child state
-                                for (int child_index : range(traceback[parent_index][c].length, SET_RANDOM_PARSIMONY)) {
-                                    int best_index_in_child = traceback[parent_index][c][child_index]; // index of optimal child state
-                                    child.backwardParsimony(best_index_in_child, unique);
-                                    // if we are interested in only one optimal solution, we can butt out...
-                                    if (SET_ONE_TARGET_PARSIMONY) {
-                                        butt_out = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if (butt_out)
-                    break;
-            }
+//            for (int i = 1; i < newScores.length; i ++) {
+//                if (scores[i] < scores[best_index])
+//                    best_index = i;
+//            }
+//            // Go through each score and when it is "best", recurse into each child, propagating the state for the score
+//            // This iteration could be randomised (SET_RANDOM_PARSIMONY=true) so that the states are assigned in different order
+//            boolean butt_out = false;
+//            for (int parent_index : range(scores.length, SET_RANDOM_PARSIMONY)) {
+//                if (scores[parent_index] == scores[best_index]) {
+//                    // now we know the index of (one of) the optimal parent state/s
+//                    if (setValue(unique[parent_index])) { // will check so that the state is assigned only once... setValue returns false if already set
+//                        if (this.children != null) {      // recurse into children nodes...
+//                            for (int c = 0; c < children.size(); c++) {
+//                                Node child = children.get(c);
+//                                // Go through each optimal child state
+//                                for (int child_index : range(traceback[parent_index][c].length, SET_RANDOM_PARSIMONY)) {
+//                                    int best_index_in_child = traceback[parent_index][c][child_index]; // index of optimal child state
+//                                    child.backwardParsimony(best_index_in_child, unique);
+//                                    // if we are interested in only one optimal solution, we can butt out...
+//                                    if (SET_ONE_TARGET_PARSIMONY) {
+//                                        butt_out = true;
+//                                        break;
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//                if (butt_out)
+//                    break;
+//            }
         }
 
         /**
@@ -791,22 +989,22 @@ public class PhyloTree {
          */
         private void backwardParsimony(int value_index, Object[] unique) {
             // now we know the index of the parent
-            if (setValue(unique[value_index])) { // will return false if already set; if so, no point in recursing into children
-                if (this.children != null) {
-                    for (int c = 0; c < children.size(); c++) { // iterate over children...
-                        // For each child: choose the first optimal state, or go through each. Ordered randomly, or dictated by traceback/parent.
-                        for (int child_state_index : range(traceback[value_index][c].length, SET_RANDOM_PARSIMONY)) {
-                            int best_index_in_child = traceback[value_index][c][child_state_index];
-                            Node child = children.get(c);
-                            child.backwardParsimony(best_index_in_child, unique);
-                            if (SET_ONE_TARGET_PARSIMONY)
-                                break;
-                        }
-                    }
-                }
-            }
+//            if (setValue(unique[value_index])) { // will return false if already set; if so, no point in recursing into children
+//                if (this.children != null) {
+//                    for (int c = 0; c < children.size(); c++) { // iterate over children...
+//                        // For each child: choose the first optimal state, or go through each. Ordered randomly, or dictated by traceback/parent.
+//                        for (int child_state_index : range(traceback[value_index][c].length, SET_RANDOM_PARSIMONY)) {
+//                            int best_index_in_child = traceback[value_index][c][child_state_index];
+//                            Node child = children.get(c);
+//                            child.backwardParsimony(best_index_in_child, unique);
+//                            if (SET_ONE_TARGET_PARSIMONY)
+//                                break;
+//                        }
+//                    }
+//                }
+//            }
         }
-    }
+
 
     public void main(String[] args) {
         //null parent for root

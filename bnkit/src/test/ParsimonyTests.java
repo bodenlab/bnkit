@@ -46,33 +46,33 @@ public class ParsimonyTests {
          */
 //        PhyloTree.Node.SET_ONE_TARGET_PARSIMONY = true;
 //        PhyloTree.Node.SET_RANDOM_PARSIMONY = true;
-        for (int i = 0; i < trees.length; i ++) {
-//            System.out.println("Tree " + i);
-            for (int col = 0; col < alns[i].getWidth(); col++) {
-//                System.out.println("Col " + col);
-                double same = -1;
-                for (int r = 0; r < 20; r++) {
-                    trees[i].setContentByParsimony(alns[i].getNames(), alns[i].getColumn(col));
-                    int[] scores = trees[i].getRoot().getScores();
-                    double best = Double.POSITIVE_INFINITY;
-                    if (scores != null) {
-                        for (int s = 0; s < scores.length; s++) {
-//                            System.out.printf("\t%2.0f", scores[s]);
-                            if (scores[s] < best)
-                                best = scores[s];
-                        }
-                    }
-                    double score = trees[i].getRoot().getParsimonyScore();
-/*                    System.out.printf("\t%3.0f\n", score);
-                    if (i == 1)
-                        System.out.println("\t" + trees[i].printValues()); */
-                    if (same == -1)
-                        same = best;
-                    assertEquals(score, best); // make sure the independently calculated score is the same as that determined with parsimony
-                    assertEquals(same, best); // make sure the score is the same each time for the same col
-                }
-            }
-        }
+//        for (int i = 0; i < trees.length; i ++) {
+////            System.out.println("Tree " + i);
+//            for (int col = 0; col < alns[i].getWidth(); col++) {
+////                System.out.println("Col " + col);
+//                double same = -1;
+//                for (int r = 0; r < 20; r++) {
+//                    trees[i].setContentByParsimony(alns[i].getNames(), alns[i].getColumn(col));
+//                    int[] scores = trees[i].getRoot().getScores();
+//                    double best = Double.POSITIVE_INFINITY;
+//                    if (scores != null) {
+//                        for (int s = 0; s < scores.length; s++) {
+////                            System.out.printf("\t%2.0f", scores[s]);
+//                            if (scores[s] < best)
+//                                best = scores[s];
+//                        }
+//                    }
+//                    double score = trees[i].getRoot().getParsimonyScore();
+///*                    System.out.printf("\t%3.0f\n", score);
+//                    if (i == 1)
+//                        System.out.println("\t" + trees[i].printValues()); */
+//                    if (same == -1)
+//                        same = best;
+//                    assertEquals(score, best); // make sure the independently calculated score is the same as that determined with parsimony
+//                    assertEquals(same, best); // make sure the score is the same each time for the same col
+//                }
+//            }
+//        }
     }
 
     @Test
