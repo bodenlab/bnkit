@@ -72,7 +72,7 @@ public class ASRwGamma {
                 //System.out.println("Alpha = " + alphas[a]);
 
                 
-            tree = PhyloTree.loadNewick(file_tree);
+            tree = tree.loadNewick(file_tree);
             Node[] nodes = tree.toNodesBreadthFirst();
             List<String> indexForNodes = new ArrayList<>(); // Newick string for subtree
             Map<String, String> mapForNodes = new HashMap<>(); // Shortname --> Newick string for subtree
