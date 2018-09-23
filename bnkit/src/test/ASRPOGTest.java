@@ -1,14 +1,11 @@
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import api.PartialOrderGraph;
-import dat.POGraph;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import reconstruction.ASRPOG;
-
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Created by mikael on 27/8/17.

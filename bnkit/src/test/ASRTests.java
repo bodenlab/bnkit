@@ -1,15 +1,16 @@
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import api.PartialOrderGraph;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.POGraph;
+import java.io.IOException;
+import java.util.List;
 import json.JSONObject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import reconstruction.ASRPOG;
 import vis.POAGJson;
-
-import java.io.IOException;
-import java.util.List;
 
 /**
  * Created by marnie on 27/4/17.
@@ -36,7 +37,11 @@ public class ASRTests {
         String alnfilepath = "src/test/resources/tawfik.aln";
         String nwkfilepath = "src/test/resources/tawfik.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
-        System.out.println(asr.getGraph("root").getConsensusGappySequence());
+        String actual = asr.getGraph("root").getConsensusGappySequence();
+        String expected = "GYVMTVLG-PLPINEMGVTLMHEHILLDASGKWVPPCCCSDRHLAEMPVKMENLGELSLNPLMSRDNCQLFDVDVAIDELTKYRALGGETVVDPTNIGIGRDPKALARIARLT-GLNIIMGTGLYLEPSHPEWVKIS-----------SVEQLTERLIYDLGGAEEKPEVLAGLIGEIGISS-RFTPDEEKSLRAAGRASAATGVPIEVHLPGWERLGHRVLDILE-QEGADLRHTVLCHMNPSFADKRYQRELAQRGAFLEYDMIGMSYYYADES------AQSPSDEENARAIRELIDDGYIQQILLSQDVFLKTM----------LTRYGGHGYGYILKHFVPRLRRHGVSGEQLETLMIGNPQRVFGG-----";
+        assertEquals(actual, expected);
+        System.out.println("Expected:    " + expected);
+        System.out.println("Actual:      " + actual);
     }
 
     @Test
