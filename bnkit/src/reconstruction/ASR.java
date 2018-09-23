@@ -33,7 +33,7 @@ import json.JSONObject;
  */
 public class ASR {
     
-    private PhyloTree tree;
+    private PhyloTree tree = new PhyloTree();
     private PhyloBNet pbn; //only to be used for navigating branches
     private List<EnumSeq.Gappy<Enumerable>> seqs; //Ignores gaps in sequence
     private EnumSeq.Alignment<Enumerable> aln; //Store gaps in sequence
@@ -143,7 +143,7 @@ public class ASR {
   */
     public void loadData(String file_tree, String file_aln) {
         try {
-            tree = PhyloTree.loadNewick(file_tree); //load tree - tree not in Newick
+            tree = tree.loadNewick(file_tree); //load tree - tree not in Newick
             PhyloTree.Node[] nodes = tree.toNodesBreadthFirst(); //tree to nodes - recursive
             indexForNodes = new ArrayList<>(); // Newick string for subtree
             for (PhyloTree.Node n : nodes) {

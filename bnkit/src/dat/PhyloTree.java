@@ -32,15 +32,18 @@ import java.util.*;
  */
 public class PhyloTree {
 
-    final private Node root; // the root of the tree
+    private Node root = null; // the root of the tree
+    private ArrayList<Node> nodeList = new ArrayList<>();
 
     /**
      * Private constructor for tree from a root with all nodes connected off that.
      * Use factory methods to construct trees.
-     * @param root root node
      */
-    private PhyloTree(Node root) { this.root = root; }
+    private PhyloTree(ArrayList<Node> nodeList) { this.nodeList = nodeList; }
 
+    public PhyloTree() {
+
+    }
     /**
      * String representation in the Newick format.
      * @return string representation of tree
@@ -63,32 +66,9 @@ public class PhyloTree {
      * @return
      */
     public Node[] toNodesBreadthFirst() {
-        List<Node> done = new ArrayList<>();
-        List<Node> queue = new ArrayList<>();
-        queue.add(root);
-        done.add(root);
-        expandNodes(done, queue);
-        Node[] arr = new Node[done.size()];
-        done.toArray(arr);
+        Node[] arr = new Node[nodeList.size()];
+        nodeList.toArray(arr);
         return arr;
-    }
-
-    private void expandNodes(List<Node> done, List<Node> queue) {
-        try {
-            if (queue.isEmpty())
-                return;
-            Node head = queue.remove(0);
-            for (Node child : head.getChildren()) {
-                done.add(child);
-                queue.add(child);
-            }
-            expandNodes(done, queue);
-        }
-
-        catch (NullPointerException npe) {
-            throw new RuntimeException("Error: There was a problem reading the Newick file.");
-//            System.exit(1);
-        }
     }
 
     public String[] toStringsBreadthFirst() {
@@ -151,115 +131,142 @@ public class PhyloTree {
 
     /**
      * Utility method to parse an embedded string on the Newick format.
-     * @param str text on Newick format
      * @param parent the parent of the current node
      * @return the root node of tree
      */
-    private static Node parseNewick(String str, Node parent) {
-        return parseNewick(str, parent, new ArrayList<>(), 0);
+    private Node parseNewick(String newickStr, Node parent) {
+        root = parseNewick(newickStr, parent, new ArrayList<>(), 0);
+        return root;
+    }
+
+    /**
+     * Utility method to parse an embedded string on the Newick format.
+     * @return the tree
+     */
+    public PhyloTree parseNewick(String newickStr) {
+        root = parseNewick(newickStr, null, new ArrayList<>(), 0);
+        return this;
+    }
+    /**
+     * Helper function to parse a leaf (extent sequence) in a Newick file.
+     * @param str           The Newick String
+     * @param parent        Parent Node
+     * @return
+     */
+    private Node parseLeafNewick(String str, Node parent) {
+        Node node;
+        String label;
+        int splitIdx = str.indexOf(':'); // check if a distance is specified
+        if (splitIdx == -1) {// no distance
+            return new Node(str, parent, null);
+        } else { // there's a distance
+            label = str.substring(0, splitIdx).trim();
+            try {
+                double dist = Double.parseDouble(str.substring(splitIdx + 1, str.length()));
+                if (dist == 0.0) {
+                    dist = 0.00001;
+                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                }
+                node = new Node(label, parent, dist);
+                if (root == null) {
+                    root = node;
+                }
+                return node;
+            }
+            catch (NumberFormatException ex) {
+                throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(splitIdx + 1, str.length()));
+            }
+        }
+    }
+
+
+    /**
+     * Helper function to parse an internal node (i.e. the template for an ancestor) in the
+     * Newick file.
+     *
+     * @param embed         Part of Newick String containing the ancestoral node
+     * @param tail          End of the String
+     * @param parent        Parent of the Node
+     * @param nodeIds       List of traversed NodeIds
+     * @param count         Number of nodeIds visited
+     * @return
+     */
+    private Node parseInternalNewick(String embed, String tail, Node parent, ArrayList<Integer> nodeIds, int count) {
+        String label;
+        Node node;
+        int splitIdx = tail.indexOf(':'); // check if a distance is specified
+        if (splitIdx == -1) { // no distance
+            if(!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty()) {
+                label = tail.substring(splitIdx + 1, tail.length()).replace(";", "");
+                node = new Node("N" + count + "_" + label, parent, null);
+            } else {
+                node = new Node("N" + count, parent, null);
+            }
+        } else { // there's a distance
+            if(tail.substring(0, splitIdx) != null && !tail.substring(0, splitIdx).isEmpty()) {
+                label = "N" + count + "_" + tail.substring(0, splitIdx);
+            } else {
+                label = "N" + count;
+            }
+            try {
+                double dist = Double.parseDouble(tail.substring(splitIdx + 1, tail.length()).replace(";", ""));
+                if (dist == 0.0) {
+                    dist = 0.00001;
+                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                }
+                node = new Node(label, parent, dist);
+                if (root == null) {
+                    root = node;
+                }
+            }
+            catch (NumberFormatException ex) {
+                throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + tail.substring(splitIdx + 1, tail.length()).replace(";", ""));
+            }
+        }
+        nodeIds.add(count);
+        // find where the commas are, and create children of node
+        int comma = getComma(embed);
+        String toProcess;
+        while (comma != -1) {
+            toProcess = embed.substring(0, comma);
+            //GOING TO HAVE TO PASS PARENT NODE WITH RECURSION TO RECORD IT
+            // get unique ID to pass through
+            while (nodeIds.contains(count)) {
+                count++;
+            }
+            node.addChild(parseNewick(toProcess, node, nodeIds, count));
+            if (comma + 1 > embed.length()) {
+                break;
+            }
+            embed = embed.substring(comma + 1);
+            comma = getComma(embed);
+        }
+        return node;
     }
 
     /**
      * Utility method for recursively parse an embedded string on the Newick format.
      * MB-Fix: fixed a bug that meant that labels were missing the last character.
      * (Only last node or any node if distance is not given.)
-     * @param str text on Newick format
      * @param parent the parent of the current node
      * @return the root node of tree
      */
-    private static Node parseNewick(String str, Node parent, ArrayList<Integer> nodeIds, int count) {
+    private Node parseNewick(String str, Node parent, ArrayList<Integer> nodeIds, int count) {
         Node node = null;
         str = str.replace("\t","");
-        int start_index = str.indexOf('('); // start parenthesis
-        int end_index = str.lastIndexOf(')'); // end parenthesis
-        if (start_index == -1 && end_index == -1) { // we are at leaf (no parentheses)
-            int split_index = str.indexOf(':'); // check if a distance is specified
-            if (split_index == -1) {// no distance
-                node = new Node(str);
-                node.setParent(parent);
-            } else { // there's a distance
-                String label = str.substring(0, split_index).trim();
-                node = new Node(label);
-                try {
-
-
-                    double dist = Double.parseDouble(str.substring(split_index + 1, str.length()));
-
-                    if (dist == 0.0) {
-                        dist = 0.00001;
-                        System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
-                    }
-                    node.setDistance(dist);
-                    node.setParent(parent);
-                }
-                catch (NumberFormatException ex) {
-                    throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
-//                    System.exit(1);
-                }
-
-            }
-        } else if (start_index >= 0 && end_index >= 0) { // balanced parentheses
-            //end_index = str.length() - end_index - 1; // correct index to refer from start instead of end of string
-            String embed = str.substring(start_index + 1, end_index);
-            String tail = str.substring(end_index + 1, str.length());
-            int split_index = tail.indexOf(':'); // check if a distance is specified
-            if (split_index == -1) { // no distance
-                if(!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty()) {
-                    String name = tail.substring(split_index + 1, tail.length()).replace(";", "");
-                    node = new Node("N" + count + "_" + name);
-                    //node = new Node("N" + count + "_" + tail.substring(0, tail.length() - 1)); // MB-Fix: replaced this line with the two above to fix cropped name endings
-                } else
-                    node = new Node("N" + count);
-                node.setParent(parent);
-            } else { // there's a distance
-                if(tail.substring(0, split_index) != null && !tail.substring(0, split_index).isEmpty())
-                    node = new Node("N" + count + "_" + tail.substring(0, split_index));
-                else
-                    node = new Node("N" + count);
-                try {
-
-
-                    double dist = Double.parseDouble(tail.substring(split_index + 1, tail.length()).replace(";", ""));
-                    if (dist == 0.0) {
-                        dist = 0.00001;
-                        System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
-                    }
-                    node.setDistance(dist);
-                    node.setParent(parent);
-                }
-                catch (NumberFormatException ex) {
-                    throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - "  + str.substring(split_index + 1, str.length()));
-//                    System.exit(1);
-                }
-            }
-            nodeIds.add(count);
-            // find where the commas are, and create children of node
-            int comma = getComma(embed);
-            while (comma != -1) {
-                String process_me = embed.substring(0, comma);
-                //GOING TO HAVE TO PASS PARENT NODE WITH RECURSION TO RECORD IT
-                // get unique ID to pass through
-                while (nodeIds.contains(count))
-                    count++;
-                node.addChild(parseNewick(process_me, node, nodeIds, count)); //pass the current node down as the parent
-                if (comma + 1 > embed.length())
-                    break;
-                embed = embed.substring(comma + 1);
-                comma = getComma(embed);
-            }
+        int startIdx = str.indexOf('('); // start parenthesis
+        int endIdx = str.lastIndexOf(')'); // end parenthesis
+        if (startIdx == -1 && endIdx == -1) { // we are at leaf (no parentheses)
+            node = parseLeafNewick(str, parent);
+        } else if (startIdx >= 0 && endIdx >= 0) { // balanced parentheses
+            String embed = str.substring(startIdx + 1, endIdx);
+            String tail = str.substring(endIdx + 1, str.length());
+            node = parseInternalNewick(embed, tail, parent, nodeIds, count);
+        }
+        if (!nodeList.contains(node)) {
+            nodeList.add(node);
         }
         return node;
-    }
-
-    /**
-     * Factory method to construct tree from text string on Newick format.
-     * @param newick text string specifying a tree
-     * @return the tree
-     */
-    public static PhyloTree parseNewick(String newick) {
-        Node root = parseNewick(newick, null); //null parent for root
-        PhyloTree t = new PhyloTree(root);
-        return t;
     }
 
     /**
@@ -267,19 +274,18 @@ public class PhyloTree {
      * @param filename name of file
      * @return instance of tree
      */
-    public static PhyloTree loadNewick(String filename) throws IOException {
+    public PhyloTree loadNewick(String filename) throws IOException {
         BufferedReader reader = new BufferedReader(new FileReader(filename));
         StringBuilder sb = new StringBuilder();
         String line = null;
-        int cnt = 1;
         while ((line = reader.readLine()) != null)
             sb.append(line.trim());
-        String newick = sb.toString();
-        Node root = parseNewick(newick, null); //null parent for root
-        PhyloTree t = new PhyloTree(root);
+
+        root = parseNewick(sb.toString(), null); //null parent for root
         reader.close();
-        return t;
+        return this;
     }
+
 
     /**
      * Perform parsimony calcs on this tree.
@@ -349,14 +355,19 @@ public class PhyloTree {
         private List<Double> modelProb = new ArrayList<>(); // Every node has a single parent (bar root) so it can carry
         // the value for the edge
         private Node parent;
+
         /**
          * Construct node from label/label.
          * @param label label/label
          */
-        public Node(Object label) {
+        public Node(String label, Node parent, Double dist) {
             this.label = label;
             this.children = new ArrayList<>();
+            this.parent = parent;
+            this.dist= dist;
+            this.values = new ArrayList<>();
         }
+
 
         public Object getLabel() {
             return label;
@@ -777,13 +788,14 @@ public class PhyloTree {
 
     public static void main(String[] args) {
         //null parent for root
-        Node root = parseNewick("((A:0.6,((B:3.3,(C:1.0,D:2.5)cd:1.8)bcd:5,((E:3.9,F:4.5)ef:2.5,G:0.3)efg:7)X:3.2)Y:0.5,H:1.1)I:0.2", null);
+        PhyloTree phyloTree = new PhyloTree(null);
+        Node root = phyloTree.parseNewick("((A:0.6,((B:3.3,(C:1.0,D:2.5)cd:1.8)bcd:5,((E:3.9,F:4.5)ef:2.5,G:0.3)efg:7)X:3.2)Y:0.5,H:1.1)I:0.2", null);
         System.out.println(root);
         //null parent for root
-        root = parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)", null);
+        root = phyloTree.parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)", null);
         System.out.println(root);
         try {
-            PhyloTree edge1 = PhyloTree.loadNewick("/Users/mikael/simhome/ASR/edge1.nwk");
+            PhyloTree edge1 = phyloTree.loadNewick("/Users/mikael/simhome/ASR/edge1.nwk");
             System.out.println(edge1);
             Alignment aln = new Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/gap1.aln", Enumerable.aacid));
             edge1.setAlignment(aln);
