@@ -312,19 +312,19 @@ public class PhyloTree {
         Object[] unique = values.toArray();
         Node root = this.getRoot();
         HashSet<Object> uniqueHs = new HashSet<>();
-        System.out.println("\n========== Options ==============");
+        System.out.println("\n========== Options NEW ==============");
         for (Object u: unique) {
             uniqueHs.add(u);
             System.out.print(u + "    ");
 
         }
-        root.calculateParsimony(map, uniqueHs);
-        System.out.println("\nScore: " + root.score + "   Values: ");
+        root.calculateForwardParsimony(map, uniqueHs);
+        root.calculateBackwardParsimony(null);
+        System.out.print("\nScore: " + root.score + "   Values: ");
         for (Object val: root.values) {
             System.out.print(val + "    ");
         }
-        System.out.println("");
-
+        System.out.print("\n\n");
         //root.forwardParsimony(map, unique);
         //root.backwardParsimony(unique);
     }
@@ -341,18 +341,19 @@ public class PhyloTree {
         reset_values(this.getRoot());
         Node root = this.getRoot();
         HashSet<Object> uniqueHs = new HashSet<>();
-        System.out.println("\n========== Options ==============");
+        System.out.println("\n========== Options NEW ==============");
         for (Object u: unique) {
             uniqueHs.add(u);
             System.out.print(u + "    ");
 
         }
-        root.calculateParsimony(map, uniqueHs);
+        root.calculateForwardParsimony(map, uniqueHs);
+        root.calculateBackwardParsimony(null);
         System.out.print("\nScore: " + root.score + "   Values: ");
         for (Object val: root.values) {
             System.out.print(val + "    ");
         }
-        System.out.println("");
+        System.out.print("\n\n");
 //        root.forwardParsimony(map, unique);
 //        root.backwardParsimony(unique);
     }
@@ -369,6 +370,7 @@ public class PhyloTree {
         for (int i = 0; i < names.length; i ++)
             map.put(names[i], symbols[i]);
         setContentByParsimonyOld(map);
+
     }
 
     /**
@@ -382,9 +384,28 @@ public class PhyloTree {
         Set<Object> values = new HashSet<>(map.values());
         Object[] unique = values.toArray();
         Node root = this.getRoot();
-
         root.forwardParsimony(map, unique);
         root.backwardParsimony(unique);
+
+        System.out.println("\n========== Options OLD ==============");
+        for (Object u: unique) {
+            System.out.print(u + "    ");
+
+        }
+        double bestScore = Double.POSITIVE_INFINITY;
+        for (double s: root.getScoresOld()){
+            if (s < bestScore) {
+                bestScore = s;
+            }
+        }
+        System.out.print("\nScore: " + bestScore + "   Values: ");
+        for (int i=0; i < root.values.size(); i ++) {
+            if (bestScore == root.scores[i]) {
+                System.out.print(root.values.get(i) + "    ");
+            }
+        }
+        System.out.print("\n\n");
+
     }
 
     /**
@@ -400,6 +421,26 @@ public class PhyloTree {
         Node root = this.getRoot();
         root.forwardParsimony(map, unique);
         root.backwardParsimony(unique);
+
+        System.out.println("\n========== Options OLD ==============");
+        for (Object u: unique) {
+            System.out.print(u + "    ");
+
+        }
+        double bestScore = Double.POSITIVE_INFINITY;
+        for (double s: root.getScoresOld()){
+            if (s < bestScore) {
+                bestScore = s;
+            }
+        }
+        System.out.print("\nScore: " + bestScore + "   Values: ");
+        for (int i=0; i < root.getValues().size(); i ++) {
+            if (bestScore == root.getScoresOld()[i]) {
+                System.out.print(root.getValues().get(i) + "    ");
+            }
+        }
+        System.out.print("\n\n");
+
     }
 
     private void reset_values(Node node) {
@@ -748,7 +789,7 @@ public class PhyloTree {
             return true;
         }
 
-        private List<Object> calculateParsimony (Map<String, Object> assign, HashSet<Object> unique) {
+        private List<Object> calculateForwardParsimony (Map<String, Object> assign, HashSet<Object> unique) {
             // Check if this node is a leaf
             if (assignedLeafParsimony(assign, unique) == true) {
                 return this.values;
@@ -760,7 +801,7 @@ public class PhyloTree {
             childrensValues.clear();
             for (Node child: children) {
                 child.values = new ArrayList<>();
-                child.calculateParsimony(assign, unique);
+                child.calculateForwardParsimony(assign, unique);
             }
             /*  Now each child has been assigned we need to perform a more complex traversal to
                 determine the most parsimonious route. If the children of this node were undecided,
@@ -777,6 +818,32 @@ public class PhyloTree {
             // Update the score
 
             return this.values;
+        }
+
+        private void calculateBackwardParsimony (List<Object> parentValues) {
+            boolean parentInfluence = false;
+            List<Object> valsToRemove = new ArrayList<>();
+            if (parentValues != null) {
+                // Want to see if your parents values will effect the current node's decision
+                for (Object value: this.getValues()) {
+                    if (parentValues.contains(value)) {
+                        // Means at least one of the values was supported by the parent thus that
+                        // is the most parsimonious.
+                        parentInfluence = true;
+                    } else {
+                        valsToRemove.add(value);
+                    }
+                }
+                if (parentInfluence) {
+                    this.values.removeAll(valsToRemove);
+                }
+            }
+            // release the memory
+            valsToRemove = null;
+            for (Node child: this.getChildren()) {
+                // Pass down the current values
+                child.calculateBackwardParsimony(this.getValues());
+            }
         }
 
         /**
@@ -805,17 +872,17 @@ public class PhyloTree {
                 if (this.children == null) { // leaf node, no children, ouch... problem
                     throw new RuntimeException("Leaf " + this + " has not been assigned a value");
                 } else { // recurse into children nodes...
-                    System.out.println("\n===========" + this.getLabel() + "============");
+                    // System.out.println("\n===========" + this.getLabel() + "============");
                     // determine scores contributed by each child (cscores) BEFORE substitution penalties
                     double[][] cscores = new double[children.size()][];
                     for (int c = 0; c < children.size(); c ++) {
                         Node child = children.get(c);
                         cscores[c] = child.forwardParsimony(assign, unique); // one score from child c for each symbol
-                        System.out.print(child.getLabel() + "\n");
-                        for (double cs: cscores[c]) {
-                            System.out.print(cs + "    ");
-                        }
-                        System.out.print("\n\n");
+//                        System.out.print(child.getLabel() + "\n");
+//                        for (double cs: cscores[c]) {
+//                            System.out.print(cs + "    ");
+//                        }
+//                        System.out.print("\n\n");
                     }
                     // traceback array needs to hold all child symbol indices that contribute to (indexed) parent symbol score via (indexed) child
                     this.traceback = new int[unique.length][children.size()][];

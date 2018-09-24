@@ -5,6 +5,7 @@ import dat.Enumerable;
 import dat.PhyloTree;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -19,8 +20,7 @@ public class ParsimonyTests {
     static EnumSeq.Alignment[] alns;
 
 
-    PhyloTree treeOld= new PhyloTree().parseNewick("((((x01,x02)X01_02,x03)X01_03,(x04,((x05,x06)X05_06,(x07,x08)X07_08)X05_08)X04_08)X01_08,(x09,(x10,x11)X10_11)X09_11)X01_11;");
-    PhyloTree treeNew = new PhyloTree().parseNewick("((((x01,x02)X01_02,x03)X01_03,(x04,((x05,x06)X05_06,(x07,x08)X07_08)X05_08)X04_08)X01_08,(x09,(x10,x11)X10_11)X09_11)X01_11;");
+    PhyloTree tree = new PhyloTree().parseNewick("((((x01,x02)X01_02,x03)X01_03,(x04,((x05,x06)X05_06,(x07,x08)X07_08)X05_08)X04_08)X01_08,(x09,(x10,x11)X10_11)X09_11)X01_11;");
 
     @BeforeAll
     public static void setUp() throws Exception {
@@ -175,12 +175,24 @@ public class ParsimonyTests {
                 bestScore = sc[p];
             }
         }
-        for (int p = 0; p < sc.length; p ++) {
+        List<Object> vals = nOld.getValues();
+        for (int p = 0; p < vals.size(); p ++) {
             if (sc[p] == bestScore) {
-                oldBestVals.add(nOld.getValues().get(p));
+                Object o = vals.get(p).toString();
+                oldBestVals.add(o);
             }
         }
         return oldBestVals;
+    }
+
+    public ArrayList<Object> getNVals(PhyloTree.Node nNew) {
+        List<Object> nVals =  nNew.getValues();
+        ArrayList<Object> nValNew = new ArrayList<>();
+        for (Object n: nVals) {
+            Object r = n.toString();
+            nValNew.add(r);
+        }
+        return nValNew;
     }
 
     @Test
@@ -193,101 +205,109 @@ public class ParsimonyTests {
         Object[] init1 = new Object[] {s[0],s[0],s[2],s[3],s[1],s[1],s[1],s[1],s[4],s[5],s[6]};
         Object[] init2 = new Object[] {s[0],s[0],s[2],s[3],s[1],s[1],s[1],s[1],s[4],s[1],s[0]};
         Object[] init3 = new Object[] {s[0],s[0],s[2],s[3],s[1],s[1],s[1],s[1],s[4],s[1],s[5]};
-        treeOld.setContentByParsimonyOld(names, init1);
-        PhyloTree.Node nOld = treeOld.find("N2_X01_03");
-        treeNew.setContentByParsimony(names, init1);
-        PhyloTree.Node nNew = treeNew.find("N2_X01_03");
+        tree.setContentByParsimonyOld(names, init1);
+        PhyloTree.Node nOld = tree.find("N2_X01_03");
+
         /**
          * Here we want to compare the old and the new top values. Since in the old algorithm it
          * kept all possibilities however, in the new algorithm, we want to just keep the best values.
          */
-        ArrayList<Object> oldBestVals = null;
-        List<Object> newBestVals;
+        HashMap<Integer, ArrayList<Object>> oldBestMap = new HashMap<>();
+        HashMap<Integer, List<Object>> newBestMap = new HashMap<>();
+
         if (nOld != null) {
             for (int i = 0; i < s.length; i ++)
                 assertEquals(nOld.getValues().contains(s[i]), true);
         }
-        oldBestVals = testParsimony2Helper(nOld);
-        newBestVals = nNew.getValues();
+        oldBestMap.put(0, testParsimony2Helper(nOld));
 
-        for (Object val: oldBestVals) {
-            assertEquals(newBestVals.contains(val), true);
-        }
-
-        nOld = treeOld.find("N4_X04_08");
-        nNew = treeNew.find("N4_X04_08");
+        nOld = tree.find("N4_X04_08");
         if (nOld != null) {
             for (int i = 0; i < s.length; i ++)
                 assertEquals(nOld.getValues().contains(s[i]), true);
         }
-        oldBestVals = testParsimony2Helper(nOld);
-        newBestVals = nNew.getValues();
-        for (Object val: oldBestVals) {
-            assertEquals(newBestVals.contains(val), true);
-        }
-//        System.out.println(tree1.printValues());
-        treeOld.setContentByParsimonyOld(names, init2);
-        nOld = treeOld.find("N2_X01_03");
-        nNew = treeNew.find("N2_X01_03");
+        oldBestMap.put(1, testParsimony2Helper(nOld));
+
+        tree.setContentByParsimonyOld(names, init2);
+        nOld = tree.find("N2_X01_03");
         if (nOld != null) {
             assertEquals(nOld.getValues().contains(s[0]), true);
             assertEquals(nOld.getValues().contains(s[1]), true);
             assertEquals(nOld.getValues().contains(s[2]), true);
             assertEquals(nOld.getValues().contains(s[3]), false);
         }
-        oldBestVals = testParsimony2Helper(nOld);
-        newBestVals = nNew.getValues();
-        for (Object val: oldBestVals) {
-            assertEquals(newBestVals.contains(val), true);
-        }
+        oldBestMap.put(2, testParsimony2Helper(nOld));
 
-        nOld = treeOld.find("N4_X04_08");
-        nNew = treeNew.find("N4_X04_08");
+        nOld = tree.find("N4_X04_08");
         if (nOld != null) {
             assertEquals(nOld.getValues().contains(s[0]), true);
             assertEquals(nOld.getValues().contains(s[1]), true);
             assertEquals(nOld.getValues().contains(s[2]), false);
             assertEquals(nOld.getValues().contains(s[3]), true);
         }
-        oldBestVals = testParsimony2Helper(nOld);
-        newBestVals = nNew.getValues();
-        for (Object val: oldBestVals) {
-            assertEquals(newBestVals.contains(val), true);
-        }
+        oldBestMap.put(3, testParsimony2Helper(nOld));
 
-
-//        System.out.println(tree1.printValues());
-        treeOld.setContentByParsimonyOld(names, init3);
-        nOld = treeOld.find("N2_X01_03");
-        nNew = treeNew.find("N2_X01_03");
+        tree.setContentByParsimonyOld(names, init3);
+        nOld = tree.find("N2_X01_03");
         if (nOld != null) {
             assertEquals(nOld.getValues().contains(s[0]), true);
             assertEquals(nOld.getValues().contains(s[1]), true);
             assertEquals(nOld.getValues().contains(s[2]), true);
         }
+        oldBestMap.put(1, testParsimony2Helper(nOld));
 
-        oldBestVals = testParsimony2Helper(nOld);
-        newBestVals = nNew.getValues();
-        for (Object val: oldBestVals) {
-            assertEquals(newBestVals.contains(val), true);
-        }
-
-
-        nOld = treeOld.find("N4_X04_08");
-        nNew = treeNew.find("N4_X04_08");
+        nOld = tree.find("N4_X04_08");
         if (nOld != null) {
             assertEquals(nOld.getValues().contains(s[0]), false);
             assertEquals(nOld.getValues().contains(s[1]), true);
             assertEquals(nOld.getValues().contains(s[2]), false);
             assertEquals(nOld.getValues().contains(s[3]), false);
         }
+        // Perform the same with the new parsimony method
+        tree.setContentByParsimony(names, init1);
 
-        oldBestVals = testParsimony2Helper(nOld);
-        newBestVals = nNew.getValues();
-        for (Object val: oldBestVals) {
-            assertEquals(newBestVals.contains(val), true);
+        PhyloTree.Node nNew = tree.find("N2_X01_03");
+
+        newBestMap.put(0, getNVals(nNew));
+
+        nNew = tree.find("N4_X04_08");
+        newBestMap.put(1, getNVals(nNew));
+
+        tree.setContentByParsimony(names, init2);
+
+        nNew = tree.find("N2_X01_03");
+        newBestMap.put(2, getNVals(nNew));
+
+        nNew = tree.find("N4_X04_08");
+        newBestMap.put(3, getNVals(nNew));
+
+        tree.setContentByParsimony(names, init3);
+
+        nNew = tree.find("N2_X01_03");
+        newBestMap.put(4, getNVals(nNew));
+
+        nNew = tree.find("N4_X04_08");
+        newBestMap.put(5, getNVals(nNew));
+
+        /**
+         * Test the best values for the old and new methods agree
+         */
+        for (Integer test: oldBestMap.keySet()) {
+            System.out.println("============ OLD =============");
+            for (Object val: oldBestMap.get(test)) {
+                System.out.print(val + "    ");
+            }
+            System.out.println("\n============ NEW =============");
+            for (Object val: newBestMap.get(test)) {
+                System.out.print(val + "    ");
+            }
+            System.out.println("\n");
+//            for (Object val: oldBestMap.get(test)) {
+//                List<Object> vals = newBestMap.get(test);
+//                System.out.println();
+//                assertEquals(vals.contains(val), true);
+//            }
         }
-//        System.out.println(tree1.printValues());
     }
 
 }

@@ -169,7 +169,7 @@ public class ASRPOG {
 		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
 
-	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa) throws InterruptedException {
+	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa) throws IOException, InterruptedException {
 
 		extantSequences = new ArrayList<>(sequences);
 
@@ -189,19 +189,7 @@ public class ASRPOG {
 			pogAlignment = new POGraph(msa);
 
 		// perform inference
-		if (jointInference) {
-			marginalDistributions = null;
-			queryBNJoint();
-		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
-			queryBNMarginal(marginalNode);
-		} else {
-			if (marginalNode == null)
-				System.out.println("No node was specified for the marginal inference: inferring the root node");
-			else
-				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
-			marginalNode = phyloTree.getRoot().getLabel().toString();
-			queryBNMarginal(phyloTree.getRoot().getLabel().toString());
-		}
+		performInference(jointInference);
 	}
 
 
@@ -281,7 +269,15 @@ public class ASRPOG {
 		JSONObject infJSON = new JSONObject();
 
 		// add ancestral inferences
+		JSONArray allInferences = getAllInferencesAsArray();
+		infJSON.put("inferences", allInferences);
+
+		return infJSON;
+	}
+
+	public JSONArray getAllInferencesAsArray() {
 		JSONArray allInferences = new JSONArray();
+
 		for (String ancestor : ancestralInferences.keySet()) {
 			JSONObject ancestorsInferences = new JSONObject();
 			JSONArray inferences = new JSONArray();
@@ -299,9 +295,7 @@ public class ASRPOG {
 			ancestorsInferences.put("inferences", inferences);
 			allInferences.put(ancestorsInferences);
 		}
-		infJSON.put("inferences", allInferences);
-
-		return infJSON;
+		return allInferences;
 	}
 
 	public void importInferencesFromJSON(JSONObject inferences) {
@@ -346,24 +340,7 @@ public class ASRPOG {
 		asrJSON.put("extants", extants);
 
 		// add ancestral inferences
-		JSONArray allInferences = new JSONArray();
-		for (String ancestor : ancestralInferences.keySet()) {
-			JSONObject ancestorsInferences = new JSONObject();
-			JSONArray inferences = new JSONArray();
-			for (Inference i : ancestralInferences.get(ancestor)) {
-				JSONObject infDetails = new JSONObject();
-				infDetails.put("id", i.pogId);
-				infDetails.put("base", i.base + "");
-				JSONArray transitions = new JSONArray();
-				for (Integer transition : i.transitions)
-					transitions.put(transition);
-				infDetails.put("transitions", transitions);
-				inferences.put(infDetails);
-			}
-			ancestorsInferences.put("label", ancestor);
-			ancestorsInferences.put("inferences", inferences);
-			allInferences.put(ancestorsInferences);
-		}
+		JSONArray allInferences = getAllInferencesAsArray();
 		asrJSON.put("inferences", allInferences);
 
 		asrJSON.put("model", model);
@@ -586,21 +563,7 @@ public class ASRPOG {
 			else
 				writer.write(aacid[i] + "\t");
 		// Each row is a graph node ID and character distribution
-		for (int k = 0; k < ancestor.getNumNodes(); k++) {
-			writer.write(Integer.toString(ancestor.getNodeIDs().get(k)) + "\t");
-			ancestor.setCurrent(ancestor.getNodeIDs().get(k));
-			Map<Character, Double> distribution = ancestor.getCharacterDistribution();
-			for (int a = 0; a < aacid.length; a++) {
-				if (!distribution.containsKey(aacid[a]))
-					writer.write("NA");
-				else
-					writer.write(Double.toString(distribution.get(aacid[a])));
-				if (a == aacid.length - 1)
-					writer.write("\n");
-				else
-					writer.write("\t");
-			}
-		}
+		writeMSA(writer, aacid);
 		writer.close();
 	}
 
@@ -620,6 +583,11 @@ public class ASRPOG {
 			else
 				writer.write(aacid[i] + "\t");
 		// Each row is a graph node ID and character distribution
+		writeMSA(writer, aacid);
+		writer.close();
+	}
+
+	private void writeMSA(Writer writer, Object[] aacid) throws IOException{
 		for (int k = 0; k < pogAlignment.getNumNodes(); k++) {
 			writer.write(Integer.toString(pogAlignment.getNodeIDs().get(k)) + "\t");
 			pogAlignment.setCurrent(pogAlignment.getNodeIDs().get(k));
@@ -635,7 +603,6 @@ public class ASRPOG {
 					writer.write("\t");
 			}
 		}
-		writer.close();
 	}
 
 	/**
@@ -762,6 +729,29 @@ public class ASRPOG {
 		pog = null;
 
 		// perform inference
+		performInference(jointInference);
+	}
+
+
+
+	/**
+	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 *
+	 * @param treeFile       filepath to the phylogenetic tree (expected extension .nwk)
+	 * @param sequenceFile   filepath to the sequences (expected extension .fa, .fasta or .aln)
+	 * @param msa            POG dot string or filepath to the partial order alignment graph (expected extension .dot)
+	 * @param jointInference flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 */
+	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws RuntimeException, IOException, InterruptedException {
+		loadData(treeFile, sequenceFile);
+
+		pogAlignment = msa;
+
+		// perform inference
+		performInference(jointInference);
+	}
+
+	private void performInference(boolean jointInference) throws RuntimeException, IOException, InterruptedException {
 		if (jointInference) {
 			marginalDistributions = null;
 			queryBNJoint();
@@ -778,33 +768,72 @@ public class ASRPOG {
 	}
 
 	/**
-	 * Construct phylogenetic tree structure, load partial order alignment graph, and infer ancestral sequences based on inference type
+	 * Generates the ancestor by applying the inference changes stored in the ancestralInferences log.
 	 *
-	 * @param treeFile       filepath to the phylogenetic tree (expected extension .nwk)
-	 * @param sequenceFile   filepath to the sequences (expected extension .fa, .fasta or .aln)
-	 * @param msa            POG dot string or filepath to the partial order alignment graph (expected extension .dot)
-	 * @param jointInference flag for indicating joint inference (true: 'joint' or false: 'marginal')
+	 * @param label Ancestral sequence label
+	 * @return POGStructure of ancestor
 	 */
-	private void performASR(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws RuntimeException, IOException, InterruptedException {
-		loadData(treeFile, sequenceFile);
+//	public POGraph getAncestor(String label) {
+//		POGraph ancestor = new POGraph(pogAlignment);
+//		if (label.equalsIgnoreCase("root"))
+//			label = (String) phyloTree.getRoot().getLabel();
+//		List<Inference> inferences = ancestralInferences.get(label);
+//		for (Inference inferredBase : inferences)
+//			if (ancestor.setCurrent(inferredBase.pogId)) {
+//				// set inferred base, or remove node if inferred to be removed
+//				if (!inferredBase.pogId.equals(ancestor.getFinalNodeID()) && !inferredBase.pogId.equals(pogAlignment.getInitialNodeID()))
+//					if (inferredBase.base == '-')
+//						// remove node from ancestor
+//						ancestor.removeNode();
+//					else
+//						ancestor.setBase(inferredBase.base);
+//				// if node is still there, check the parsimonious transitions. Because we are doing both backwards and forwards parsimony,
+//				// get the intersection of the previous/next nodes and all inferred transitions of the current node
+//				if (ancestor.getCurrentId().equals(ancestor.getFinalNodeID()) && !inferredBase.pogId.equals(ancestor.getFinalNodeID()) || (!ancestor.getCurrentId().equals(ancestor.getFinalNodeID()) && !ancestor.getCurrentId().equals(inferredBase.pogId)))
+//					continue;
+//
+//
+//				// find union of next/previous transitions and remove transitions that are not inferred
+//				// 'next':
+//				ArrayList<Integer> keepNext = new ArrayList<>();
+//				for (Integer nextId : ancestor.getNextIDs()) {
+//					// Identify if edge is reciprocated by backwards parsimony (if so, flag)
+//					Inference next = null;
+//					for (Inference i : inferences)
+//						if ((i.pogId.equals(ancestor.getFinalNodeID()) && (nextId.equals(ancestor.getFinalNodeID()))) || i.pogId.equals(nextId)) {
+//							next = i;
+//							break;
+//						}
+//					if (inferredBase.transitions.contains(nextId) && next != null && next.transitions.contains(inferredBase.pogId))
+//						ancestor.setReciprocated(nextId);
+//					if (next != null && next.transitions.contains(inferredBase.pogId))
+//						keepNext.add(next.pogId);
+//				}
+//
+//				// take the union of the inferred transitions (i.e. use all provided transitions from maximum parsimony)
+//				for (Integer nextId : ancestor.getNextIDs())
+//					if (inferredBase.transitions.contains(nextId) && !keepNext.contains(nextId))
+//						keepNext.add(nextId);
+//				// check previous transitions of future nodes to see if there has been a parsimonious edge to this node
+//				// if so, add to keep
+//				for (Integer nextId : ancestor.getNextIDs())
+//					if (!keepNext.contains(nextId) && !nextId.equals(pogAlignment.getFinalNodeID()))
+//						ancestor.removeNextTransition(nextId);
+//			}
+//
+//		// if marginal, update each node with character distribution
+//		if (marginalNode != null)
+//			for (Integer nodeId : ancestor.getNodeIDs()) {
+//				double[] dist = marginalDistributions[nodeId].get();
+//				HashMap<Character, Double> distribution = new HashMap<>();
+//				for (int ind = 0; ind < dist.length; ind++)
+//					distribution.put((char) marginalDistributions[nodeId].getDomain().get(ind), dist[ind]);
+//				ancestor.setCurrent(nodeId);
+//				ancestor.setCharacterDistribution(distribution);
+//			}
+//		return ancestor;
+//	}
 
-		pogAlignment = msa;
-
-		// perform inference
-		if (jointInference) {
-			marginalDistributions = null;
-			queryBNJoint();
-		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
-			queryBNMarginal(marginalNode);
-		} else {
-			if (marginalNode == null)
-				System.out.println("No node was specified for the marginal inference: inferring the root node");
-			else
-				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
-			marginalNode = phyloTree.getRoot().getLabel().toString();
-			queryBNMarginal(phyloTree.getRoot().getLabel().toString());
-		}
-	}
 
 	/**
 	 * Generates the ancestor by applying the inference changes stored in the ancestralInferences log.
