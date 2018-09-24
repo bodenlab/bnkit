@@ -357,6 +357,51 @@ public class PhyloTree {
 //        root.backwardParsimony(unique);
     }
 
+
+    /**
+     * Perform parsimony calcs on this tree.
+     * Uses a simple 0/1 substitution penalty based on equivalence or not of states
+     * @param names the names of the leaves
+     * @param symbols the symbols/states/values assigned to the leaves (same order as names)
+     */
+    public void setContentByParsimonyOld(String[] names, Object[] symbols) {
+        Map<String, Object> map = new HashMap<>();
+        for (int i = 0; i < names.length; i ++)
+            map.put(names[i], symbols[i]);
+        setContentByParsimonyOld(map);
+    }
+
+    /**
+     * Perform parsimony calcs on this tree.
+     * Uses a simple 0/1 substitution penalty based on equivalence or not of states
+     * @param map contains key/value pairs for leaf names and states
+     */
+    public void setContentByParsimonyOld(Map<String, Object> map) {
+        // reset node values (otherwise stores previous uses)
+        reset_values(this.getRoot());
+        Set<Object> values = new HashSet<>(map.values());
+        Object[] unique = values.toArray();
+        Node root = this.getRoot();
+
+        root.forwardParsimony(map, unique);
+        root.backwardParsimony(unique);
+    }
+
+    /**
+     * Perform parsimony calcs on this tree.
+     * Uses a simple 0/1 substitution penalty based on equivalence or not of states
+     * @param map contains key/value pairs for leaf names and states
+     * @param unique array with the unique states in order of preference
+     * (which decides what states that are preferred when multiple states contribute to optimal solution)
+     */
+    public void setContentByParsimonyOld(Map<String, Object> map, Object[] unique) {
+        // reset node values (otherwise stores previous uses)
+        reset_values(this.getRoot());
+        Node root = this.getRoot();
+        root.forwardParsimony(map, unique);
+        root.backwardParsimony(unique);
+    }
+
     private void reset_values(Node node) {
         if (node.getChildren().isEmpty())
             return;
@@ -417,7 +462,7 @@ public class PhyloTree {
             return values.get(index);
         }
 
-        public double[] getScores() {
+        public double[] getScoresOld() {
             return scores;
         }
 
@@ -808,13 +853,17 @@ public class PhyloTree {
             }
         }
 
-        public double getParsimonyScore() {
+        public int getParsimonyScore() {
+            if (score < values.size() - 1) {
+                score = values.size() - 1;
+            }
             return score; //getParsimonyScore(null);
         }
-        private double getParsimonyScore(Object parent_state) {
-            if (this.values.size() == 0) {
-                return 0;
-            }
+
+        public double getParsimonyScoreOld() {
+            return getParsimonyScoreOld(null);
+        }
+        private double getParsimonyScoreOld(Object parent_state) {
             Object my_state = this.values.get(0);
             if (my_state == null)
                 return 0;
@@ -822,7 +871,7 @@ public class PhyloTree {
             if (parent_state != null)
                 score = (parent_state == my_state ? 0 : 1);
             for (Node child : children) {
-                score += child.getParsimonyScore(my_state);
+                score += child.getParsimonyScoreOld(my_state);
             }
             return score;
         }
