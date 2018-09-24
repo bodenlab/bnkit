@@ -56,17 +56,31 @@ public class ASRTests {
     public void performSmallASR() throws IOException, InterruptedException {
         System.out.println("======================= Perform Huge ASR " +
                 "=========================\n");
-        String alnfilepath = "src/test/resources/tawfik.aln";
-        String nwkfilepath = "src/test/resources/tawfik.nwk";
+        String alnfilepath = "src/test/resources/Edge_parsimony_example_with_non_bi_directional_transition_10.aln";
+        String nwkfilepath = "src/test/resources/Edge_parsimony_example_10.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
         String gappySeq = asr.getGraph("root").getConsensusGappySequence();
-        String expectedGappyConsensus = "GYVMTVLG-PLPINEMGVTLMHEHILLDASGKWVPPCCCSDRHLAEMPVKMENLGELSLNPLMSRDNCQLFDVDVAIDELTKYRALGGETVVDPTNIGIGRDPKALARIARLT-GLNIIMGTGLYLEPSHPEWVKIS-----------SVEQLTERLIYDLGGAEEKPEVLAGLIGEIGISS-RFTPDEEKSLRAAGRASAATGVPIEVHLPGWERLGHRVLDILE-QEGADLRHTVLCHMNPSFADKRYQRELAQRGAFLEYDMIGMSYYYADES------AQSPSDEENARAIRELIDDGYIQQILLSQDVFLKTM----------LTRYGGHGYGYILKHFVPRLRRHGVSGEQLETLMIGNPQRVFGG-----";
+        String expectedGappyConsensus = "MGG---D";
         assertEquals(gappySeq, expectedGappyConsensus);
         System.out.println("     Testing the expected gappy consensus " +
                 "sequence \n");
         System.out.println("Expected: " + expectedGappyConsensus);
         System.out.println("Received: " + gappySeq);
         System.out.println("\n****    PASSED\n");
+
+//        System.out.println("======================= Perform Huge ASR " +
+//                "=========================\n");
+//        String alnfilepath = "src/test/resources/tawfik.aln";
+//        String nwkfilepath = "src/test/resources/tawfik.nwk";
+//        ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
+//        String gappySeq = asr.getGraph("root").getConsensusGappySequence();
+//        String expectedGappyConsensus = "GYVMTVLG-PLPINEMGVTLMHEHILLDASGKWVPPCCCSDRHLAEMPVKMENLGELSLNPLMSRDNCQLFDVDVAIDELTKYRALGGETVVDPTNIGIGRDPKALARIARLT-GLNIIMGTGLYLEPSHPEWVKIS-----------SVEQLTERLIYDLGGAEEKPEVLAGLIGEIGISS-RFTPDEEKSLRAAGRASAATGVPIEVHLPGWERLGHRVLDILE-QEGADLRHTVLCHMNPSFADKRYQRELAQRGAFLEYDMIGMSYYYADES------AQSPSDEENARAIRELIDDGYIQQILLSQDVFLKTM----------LTRYGGHGYGYILKHFVPRLRRHGVSGEQLETLMIGNPQRVFGG-----";
+//        assertEquals(gappySeq, expectedGappyConsensus);
+//        System.out.println("     Testing the expected gappy consensus " +
+//                "sequence \n");
+//        System.out.println("Expected: " + expectedGappyConsensus);
+//        System.out.println("Received: " + gappySeq);
+//        System.out.println("\n****    PASSED\n");
     }
 
     @Test
