@@ -166,7 +166,7 @@ public class ParsimonyTests {
 //    }
 //
 
-    public ArrayList<Object> testParsimony2Helper(PhyloTree.Node nOld) {
+    public List<Object> testParsimony2Helper(PhyloTree.Node nOld) {
         ArrayList<Object> oldBestVals = new ArrayList<>();
         double bestScore = Double.POSITIVE_INFINITY;
         double[] sc = nOld.getScoresOld();
@@ -175,14 +175,13 @@ public class ParsimonyTests {
                 bestScore = sc[p];
             }
         }
-        List<Object> vals = nOld.getValues();
-        for (int p = 0; p < vals.size(); p ++) {
-            if (sc[p] == bestScore) {
-                Object o = vals.get(p).toString();
-                oldBestVals.add(o);
-            }
+        List<Object> nVals =  nOld.getValues();
+        ArrayList<Object> nValNew = new ArrayList<>();
+        for (Object n: nVals) {
+            Object r = n.toString();
+            nValNew.add(r);
         }
-        return oldBestVals;
+        return nVals;
     }
 
     public ArrayList<Object> getNVals(PhyloTree.Node nNew) {
@@ -207,12 +206,18 @@ public class ParsimonyTests {
         Object[] init3 = new Object[] {s[0],s[0],s[2],s[3],s[1],s[1],s[1],s[1],s[4],s[1],s[5]};
         tree.setContentByParsimonyOld(names, init1);
         PhyloTree.Node nOld = tree.find("N2_X01_03");
-
+        HashMap<Integer, String> nodeMap = new HashMap<>();
+        nodeMap.put(0, "N2_X01_03");
+        nodeMap.put(1, "N4_X04_08");
+        nodeMap.put(2, "N2_X01_03");
+        nodeMap.put(3, "N4_X04_08");
+        nodeMap.put(2, "N2_X01_04");
+        nodeMap.put(3, "N4_X04_05");
         /**
          * Here we want to compare the old and the new top values. Since in the old algorithm it
          * kept all possibilities however, in the new algorithm, we want to just keep the best values.
          */
-        HashMap<Integer, ArrayList<Object>> oldBestMap = new HashMap<>();
+        HashMap<Integer, List<Object>> oldBestMap = new HashMap<>();
         HashMap<Integer, List<Object>> newBestMap = new HashMap<>();
 
         if (nOld != null) {
@@ -293,20 +298,16 @@ public class ParsimonyTests {
          * Test the best values for the old and new methods agree
          */
         for (Integer test: oldBestMap.keySet()) {
-            System.out.println("============ OLD =============");
+            System.out.println("============ " + test + " " + nodeMap.get(test) + " =============");
+            System.out.println("OLD:");
             for (Object val: oldBestMap.get(test)) {
                 System.out.print(val + "    ");
             }
-            System.out.println("\n============ NEW =============");
+            System.out.println("\nNEW:");
             for (Object val: newBestMap.get(test)) {
                 System.out.print(val + "    ");
             }
             System.out.println("\n");
-//            for (Object val: oldBestMap.get(test)) {
-//                List<Object> vals = newBestMap.get(test);
-//                System.out.println();
-//                assertEquals(vals.contains(val), true);
-//            }
         }
     }
 
