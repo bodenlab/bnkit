@@ -870,6 +870,7 @@ public class ASRPOG {
 				ancestor.setCurrent(nodeId);
 				ancestor.setCharacterDistribution(distribution);
 			}
+		System.out.println("Got ancestor: " + label);
 		return ancestor;
 	}
 
@@ -1083,7 +1084,6 @@ public class ASRPOG {
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using joint inference.
 	 */
 	private void queryBNJoint() throws InterruptedException {
-
 //		long startTime = System.nanoTime();
 
 		// infer base/gap of each aligned node

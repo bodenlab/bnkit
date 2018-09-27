@@ -1,14 +1,11 @@
 package reconstruction;
 
-import dat.EnumSeq;
-import dat.Enumerable;
-import dat.POGraph;
-
+import api.PartialOrderGraph;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Map;
-import java.util.List;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -45,25 +42,27 @@ public class RunASRPOG {
 	 */
 	public static void main(String[] args) throws IOException, InterruptedException {
 
-		if (args.length > 1) {
+		if (args.length > -1) {
 			ASRPOG asr = null;
 
 			String inference = "joint";
 			String marginalNode = null;
 			String outputPath = "";
-			String sequencePath = "";
-			String treePath = "";
+			String sequencePath = "/Users/ariane/Documents/boden/apps/bnkit/bnkit/src/test/resources/up_select_core2.aln";
+			String treePath = "/Users/ariane/Documents/boden/apps/bnkit/bnkit/src/test/resources/core2_rooted.nwk";
 			String poagRepresentation = "";
 			String alignmentType = "";
 			String perturbNode = "";
 			String model = null;
-			int numThreads = 1;
+
+			System.out.println("RUNNING");
+			int numThreads = 5;
 			int indelLength = 0;
-			if (!args[0].contains("-"))
-				if (!args[0].contains(".nwk"))
-					poagRepresentation = args[0];
-				else
-					treePath = args[0];
+//			if (!args[0].contains("-"))
+//				if (!args[0].contains(".nwk"))
+//					poagRepresentation = args[0];
+//				else
+//					treePath = args[0];
 			boolean dotFile = false;
 			boolean msaFile = false;
 			boolean performAlignment = false;
@@ -132,6 +131,10 @@ public class RunASRPOG {
 			else
 				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), performAlignment, model, numThreads);
 
+			PartialOrderGraph root = asr.getGraph("root");
+			String gappySeq = root.getConsensusGappySequence();
+			System.out.println(gappySeq);
+			System.out.println("DONE 	:) ");
 			if (!outputPath.isEmpty()) {
 //				outputPath += "/";
 				if (dotFile)
