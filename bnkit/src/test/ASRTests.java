@@ -24,8 +24,8 @@ public class ASRTests {
                 "order graph ====================\n");
 
         //Getting the runtime reference from system
-        String alnfilepath = "src/test/resources/small.aln";
-        String nwkfilepath = "src/test/resources/small.nwk";
+        String alnfilepath = "src/test/resources/tawfik.aln";
+        String nwkfilepath = "src/test/resources/tawfik.nwk";
 //        "M-D-SINFLKKSVK-MKESRLQ";
 //        "-KD-SINFLKKSVKQMKESR--"
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
@@ -79,8 +79,8 @@ public class ASRTests {
     public void performSmallASR() throws IOException, InterruptedException {
         System.out.println("======================= Perform Huge ASR " +
                 "=========================\n");
-        String alnfilepath = "src/test/resources/Edge_parsimony_example_with_non_bi_directional_transition_10.aln";
-        String nwkfilepath = "src/test/resources/Edge_parsimony_example_10.nwk";
+        String alnfilepath = "src/test/resources/10.aln";
+        String nwkfilepath = "src/test/resources/10.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
         String gappySeq = asr.getGraph("root").getConsensusGappySequence();
         String expectedGappyConsensus = "MGG---D";

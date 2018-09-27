@@ -708,7 +708,7 @@ public class PhyloTree {
                 // If we got here the child has been set so we want to add the choice to the list
                 // of possibilities.
                 if (child.values.size() < 1) {
-//                    System.out.println("Child: " + child.getLabel());
+                    System.out.println("Child: " + child.getLabel());
                 }
                 for (Object v: child.values) {
                     if (value2numChildren.get(v) == null) {
@@ -740,6 +740,7 @@ public class PhyloTree {
                     score += tmp[1];
                     countChanges ++;
                 } else {
+                    // setValue(value);
                     // Add one onto the score as we know we need to have a change here or
                     // some-point down the line.
                     score += 1;
@@ -765,6 +766,7 @@ public class PhyloTree {
             }
             // Now we want to check each child has had it's values assigned.
             for (Node child: children) {
+                child.values = new ArrayList<>();
                 child.calculateForwardParsimony(assign, unique);
             }
             /*  Now each child has been assigned we need to perform a more complex traversal to
