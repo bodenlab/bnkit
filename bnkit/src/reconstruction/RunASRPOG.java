@@ -1,6 +1,5 @@
 package reconstruction;
 
-import api.PartialOrderGraph;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,8 +47,8 @@ public class RunASRPOG {
 			String inference = "joint";
 			String marginalNode = null;
 			String outputPath = "";
-			String sequencePath = "/Users/ariane/Documents/boden/apps/bnkit/bnkit/src/test/resources/up_select_core2.aln";
-			String treePath = "/Users/ariane/Documents/boden/apps/bnkit/bnkit/src/test/resources/core2_rooted.nwk";
+			String sequencePath = "";
+			String treePath = "";
 			String poagRepresentation = "";
 			String alignmentType = "";
 			String perturbNode = "";
@@ -58,11 +57,11 @@ public class RunASRPOG {
 			System.out.println("RUNNING");
 			int numThreads = 5;
 			int indelLength = 0;
-//			if (!args[0].contains("-"))
-//				if (!args[0].contains(".nwk"))
-//					poagRepresentation = args[0];
-//				else
-//					treePath = args[0];
+			if (!args[0].contains("-"))
+				if (!args[0].contains(".nwk"))
+					poagRepresentation = args[0];
+				else
+					treePath = args[0];
 			boolean dotFile = false;
 			boolean msaFile = false;
 			boolean performAlignment = false;
@@ -131,10 +130,6 @@ public class RunASRPOG {
 			else
 				asr = new ASRPOG(poagRepresentation, treePath, inference.equalsIgnoreCase("joint"), performAlignment, model, numThreads);
 
-			PartialOrderGraph root = asr.getGraph("root");
-			String gappySeq = root.getConsensusGappySequence();
-			System.out.println(gappySeq);
-			System.out.println("DONE 	:) ");
 			if (!outputPath.isEmpty()) {
 //				outputPath += "/";
 				if (dotFile)

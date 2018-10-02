@@ -883,15 +883,7 @@ public class POGraph {
 		}
 		int positionDiff = java.lang.Math.abs(to.getID() - from.getID());
 		positionDiff = (positionDiff != 0) ? positionDiff : 1;
-//        System.out.println("BaseFrom: " + from.getBase() + " BaseTo: " + to
-//                .getBase() +
-//                " Value:" +
-//                multiplier *	(this
-//                        .sequences.size
-//                                () - edge
-//                        .getSequences().size
-//                                () + 1) *
-//                        positionDiff );
+
 		return multiplier * (this.sequences.size() - edge.getSequences().size
 				() + 1) *
 				positionDiff;
