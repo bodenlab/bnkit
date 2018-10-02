@@ -67,6 +67,16 @@ public class ASRPOG {
 	private boolean performMSA = false;                                    // Flag to track whether the input sequences required alignment or not
 
 	/**
+	 * Static variables that define the positions of various elements in JSON inference object
+	 */
+	public static final int LABEL = 0;
+	public static final int INFERENCES = 1;
+	// Second level variables in the inference object
+	private static final int ID = 0;
+	public static final int TRANSITIONS = 2;
+	public static final int BASE = 1;
+
+	/**
 	 * Infer ancestral sequences given an alignment file (fasta or aln).
 	 *
 	 * @param alignmentFile  filepath to the sequence alignment (expected extension .fa, .fasta or .aln)
@@ -281,34 +291,107 @@ public class ASRPOG {
 		JSONObject infJSON = new JSONObject();
 
 		// add ancestral inferences
-		JSONArray allInferences = new JSONArray();
-		for (String ancestor : ancestralInferences.keySet()) {
-			JSONObject ancestorsInferences = new JSONObject();
-			JSONArray inferences = new JSONArray();
-			for (Inference i : ancestralInferences.get(ancestor)) {
-				JSONObject infDetails = new JSONObject();
-				infDetails.put("id", i.pogId);
-				infDetails.put("base", i.base + "");
-				JSONArray transitions = new JSONArray();
-				for (Integer transition : i.transitions)
-					transitions.put(transition);
-				infDetails.put("transitions", transitions);
-				inferences.put(infDetails);
-			}
-			ancestorsInferences.put("label", ancestor);
-			ancestorsInferences.put("inferences", inferences);
-			allInferences.put(ancestorsInferences);
-		}
+		JSONArray allInferences = toJSON();
 		infJSON.put("inferences", allInferences);
 
 		return infJSON;
 	}
 
+	/**
+	 * Helper function that converts the inferences to a JSON object.
+	 * We want to store a meta component to minimise the space consumption.
+	 * @return
+	 */
+	private JSONArray toJSON() {
+		JSONArray allInferences = new JSONArray();
+		JSONObject meta = new JSONObject();
+		allInferences.put(meta);
+		// We want to keep track of where everything is. Also want to have a way to make sure that we
+		// can determine whether this is the old type or the new type (i.e. which inference are we
+		// looking at - the reduced size method or the expanded mode).
+		meta.put("type", "meta");
+		meta.put("id", new int[]{INFERENCES, ID});
+		meta.put("transitions", new int[]{INFERENCES, TRANSITIONS});
+		meta.put("base", new int[]{INFERENCES, BASE});
+		meta.put("label", LABEL);
+		meta.put("inferences", INFERENCES);
+		for (String ancestor : ancestralInferences.keySet()) {
+			JSONArray ancestorsInferences = new JSONArray();
+			JSONArray inferences = new JSONArray();
+			for (Inference i : ancestralInferences.get(ancestor)) {
+				JSONArray infDetails = new JSONArray();
+				infDetails.put(i.pogId);
+				infDetails.put(i.base);
+				JSONArray transitions = new JSONArray();
+				for (Integer transition : i.transitions)
+					transitions.put(transition);
+				infDetails.put(transitions);
+				inferences.put(infDetails);
+			}
+			ancestorsInferences.put(ancestor);
+			ancestorsInferences.put(inferences);
+			allInferences.put(ancestorsInferences);
+		}
+		return allInferences;
+	}
+
+	/**
+	 * Here we want to determine whether the inferences are of the new type of encoding or
+	 * of an older type.
+	 * @param inferences
+	 */
 	public void importInferencesFromJSON(JSONObject inferences) {
+		// The new type is classified by having a meta object in the inferences array stored in the 0th
+		// position
+		JSONArray allInfArray = inferences.getJSONArray("inferences");
+		JSONObject meta = (JSONObject) allInfArray.get(0);
+		try {
+			// ToDo: Clean this up - throws an exception if this doesn't exist and we know it is the old method
+			Object dataType = meta.get("type");
+			// Now we know this is a meta data object otherwise this is an inference and is the old style
+			importInferencesFromJSONNew(allInfArray, meta);
+		} catch (Exception e) {
+			  importInferencesFromJSONOld(allInfArray);
+		}
+	}
+
+	/**
+	 * Here we import the inference which is represented as using only ints. The meta data contains
+	 * the index's where the data is stored. Note we don't use this as it is already available to us
+	 * here globally but was included incase others want to re-use the inference code.
+	 * @param allInfArray
+	 * @param meta
+	 */
+	public void importInferencesFromJSONNew(JSONArray allInfArray, JSONObject meta) {
+		ancestralInferences = new HashMap<>();
+		ancestralSeqLabels = new ArrayList<>();
+		for (int i = 1; i < allInfArray.length(); i++) {
+			JSONArray anc = allInfArray.getJSONArray(i);
+			List<Inference> infs = new ArrayList<>();
+			JSONArray ancInfArray = anc.getJSONArray(INFERENCES);
+			for (Object inf : ancInfArray) {
+				JSONArray infJSON = (JSONArray) inf;
+				List<Integer> transitions = new ArrayList<>();
+				JSONArray jTransitions = infJSON.getJSONArray(TRANSITIONS);
+				for (int j = 0; j < jTransitions.length(); j++)
+					transitions.add(jTransitions.getInt(j));
+
+				Character base = (char)infJSON.getInt(BASE);
+				infs.add(new Inference(infJSON.getInt(ID), base, transitions));
+			}
+			ancestralInferences.put(anc.getString(LABEL), infs);
+			ancestralSeqLabels.add(anc.getString(LABEL));
+		}
+	}
+
+	/**
+	 * This is the old method, it is kept so we can still re-load previously saved inferences.
+	 * @param allInfArray
+	 */
+	public void importInferencesFromJSONOld(JSONArray allInfArray) {
 		ancestralInferences = new HashMap<>();
 		ancestralSeqLabels = new ArrayList<>();
 
-		JSONArray allInfArray = inferences.getJSONArray("inferences");
 		for (Object ancestor : allInfArray) {
 			JSONObject anc = (JSONObject) ancestor;
 			List<Inference> infs = new ArrayList<>();
@@ -346,24 +429,7 @@ public class ASRPOG {
 		asrJSON.put("extants", extants);
 
 		// add ancestral inferences
-		JSONArray allInferences = new JSONArray();
-		for (String ancestor : ancestralInferences.keySet()) {
-			JSONObject ancestorsInferences = new JSONObject();
-			JSONArray inferences = new JSONArray();
-			for (Inference i : ancestralInferences.get(ancestor)) {
-				JSONObject infDetails = new JSONObject();
-				infDetails.put("id", i.pogId);
-				infDetails.put("base", i.base + "");
-				JSONArray transitions = new JSONArray();
-				for (Integer transition : i.transitions)
-					transitions.put(transition);
-				infDetails.put("transitions", transitions);
-				inferences.put(infDetails);
-			}
-			ancestorsInferences.put("label", ancestor);
-			ancestorsInferences.put("inferences", inferences);
-			allInferences.put(ancestorsInferences);
-		}
+		JSONArray allInferences = toJSON();
 		asrJSON.put("inferences", allInferences);
 
 		asrJSON.put("model", model);
