@@ -1,8 +1,6 @@
 package dat;
 
 import alignment.utilities.MutableInt;
-import com.sun.deploy.util.OrderedHashSet;
-import com.sun.javafx.geom.Edge;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
@@ -94,6 +92,39 @@ public class POGraph {
 	}
 
 	/**
+	 * Store the cost of a particular transition.
+	 * @param transitionCost
+	 */
+	public void setTransitionCost(HashMap<Integer, Integer> transitionCost) {
+		current.transitionCost = transitionCost;
+	}
+
+	/**
+	 * Ass the cost of a particular transition.
+	 * @param edge
+	 * @param cost
+	 */
+	public void addTransitionCost(Integer edge, Integer cost) {
+		current.transitionCost.put(edge, cost);
+	}
+
+	/**
+	 * Remove the cost of a particular transition.
+	 * @param edge
+	 */
+	public void removeTransitionCost(Integer edge) {
+		current.transitionCost.remove(edge);
+	}
+
+	/**
+	 * Gets the cost of a particular transition.
+	 * @param transitionId
+	 */
+	public Integer getTransitionCost(Integer transitionId) {
+		return current.transitionCost.get(transitionId);
+	}
+
+	/**
 	 * Add sequence to the graph with characters in the order specified in nodeIds.
 	 *
 	 * @param id		Sequence ID
@@ -166,7 +197,7 @@ public class POGraph {
 		HashMap<Integer, Double> edgeWeights = new HashMap<>();
 		for (Edge next : current.getNextTransitions())
 			//if (next.getNext() != finalNode)
-				edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
+			edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
 		return edgeWeights;
 	}
 
@@ -669,17 +700,17 @@ public class POGraph {
 	 */
 	private void loadSequencesWithGraphStructure(String structure, String seqPath) throws FileNotFoundException, IOException{
 		List<EnumSeq.Gappy<Enumerable>> seqs = new ArrayList<>();
-			BufferedReader seqfile = new BufferedReader(new FileReader(seqPath));
-			String line = null;
-			line = seqfile.readLine();
-			if (line.startsWith("CLUSTAL")) {
-				seqs = EnumSeq.Gappy.loadClustal(seqPath, Enumerable.aacid_ext);
-			} else if (line.startsWith(">")) {
-				seqs = EnumSeq.Gappy.loadFasta(seqPath, Enumerable.aacid_ext, '-');
-			} else {
-				throw new RuntimeException("Incorrect sequence or alignment format (requires FASTA or Clustal format .aln, .fa or .fasta)");
-			}
-			seqfile.close();
+		BufferedReader seqfile = new BufferedReader(new FileReader(seqPath));
+		String line = null;
+		line = seqfile.readLine();
+		if (line.startsWith("CLUSTAL")) {
+			seqs = EnumSeq.Gappy.loadClustal(seqPath, Enumerable.aacid_ext);
+		} else if (line.startsWith(">")) {
+			seqs = EnumSeq.Gappy.loadFasta(seqPath, Enumerable.aacid_ext, '-');
+		} else {
+			throw new RuntimeException("Incorrect sequence or alignment format (requires FASTA or Clustal format .aln, .fa or .fasta)");
+		}
+		seqfile.close();
 
 		for (Integer seqId = 0; seqId < seqs.size(); seqId++)
 			sequences.put(seqId, seqs.get(seqId).getName());
@@ -689,8 +720,7 @@ public class POGraph {
 			for (Integer seqId = 0; seqId < seqs.size(); seqId++)
 				// check that all sequences have the same length (i.e. check that they are aligned)
 				if (seqs.get(seqId).toString().length() != seqLen)
-					throw new RuntimeException("Error: The alignment file is not correctly aligned.\n" + seqs.get(seqId).getName() +
-							" is a different length to " + seqs.get(0).getName());
+					throw new RuntimeException("Aligned sequences must have the same length.");
 			// load graph from aligned sequences
 			current = loadPOGraph(seqs);
 		} else
@@ -834,11 +864,183 @@ public class POGraph {
 	}
 
 	/**
+	 * Method of adding in heuristics to the AStar search algorithm.
+	 * The aim is to get the path that has the most sequences in agreement.
+	 * However we also want the longest sequence (as this will contain the
+	 * fewest gaps).
+	 *
+	 * To do this we use the edge.getSequences().size() and multiply it by a
+	 * factor that penalises long gappy regions i.e. (1 + (1/gap_size))
+	 *
+	 * ToDo: optimise the heuristic function.
+	 *
+	 * @return
+	 */
+	private Integer heuristicCostEstimate(Edge edge, Node from, Node to, boolean isBidirectional) {
+		int multiplier = 1;
+		if (!isBidirectional) {
+			multiplier = 1000;
+		}
+		int positionDiff = java.lang.Math.abs(to.getID() - from.getID());
+		positionDiff = (positionDiff != 0) ? positionDiff : 1;
+
+		return multiplier * (this.sequences.size() - edge.getSequences().size
+				() + 1) *
+				positionDiff;
+	}
+
+
+	/**
+	 * Reconstructs the consensus sequence based on the A* search. We need to
+	 * reverse the path and add in the gaps.
+	 *
+	 * @param cameFrom
+	 * @param current
+	 * @param gappy
+	 * @return
+	 */
+	private String reconstructPath(HashMap<Node, Path> cameFrom, Node
+			current, boolean gappy) {
+		Stack<Character> sequence = new Stack<>();
+		String sequenceString = "";
+		while (cameFrom.keySet().contains(current)) {
+			Path prevPath = cameFrom.get(current);
+			Node prevNode = prevPath.getNode();
+			// Set the edge to have a true consensus flag
+			prevPath.getEdge().setConsensus(true);
+			// If we have a character we want to add it
+			if (current.getBase() != null) {
+				sequence.push(current.getBase());
+			}
+			// If we have a gappy sequence we need to add in the gaps
+			if (gappy == true) {
+				int cameFromPosition = current.getID();
+				int nextPosition = prevNode.getID();
+				int numGaps = -1 * ((nextPosition - cameFromPosition) + 1);
+				if (numGaps > 0) {
+					for (int g = 0; g < numGaps; g++) {
+						sequence.push('-');
+					}
+				}
+			}
+			cameFrom.remove(current);
+			current = prevNode;
+		}
+		// Reverse and create a string
+		while (!sequence.empty()) {
+			sequenceString += sequence.pop();
+		}
+		return sequenceString;
+	}
+
+
+	/**
+	 * Gets the consensus sequences using an A star search algorithm.
+	 *
+	 * @param gappy
+	 * @return
+	 */
+	public String getSupportedSequence(boolean gappy) {
+		// Intanciate the comparator class
+		Comparator<Node> comparator = new NodeComparator();
+		// Already visited nodes
+		ArrayList<Node> closedSet = new ArrayList<>();
+		// Unvisted nodes keep track of the best options
+		PriorityQueue<Node> openSet = new PriorityQueue<>(10, comparator);
+		// Add the initial node to the open set
+		openSet.add(initialNode);
+		// Storing the previous node
+		HashMap<Node, Path> cameFrom = new HashMap<>();
+		// Map with heuristics
+		HashMap<Node, Integer> cost = new HashMap<>();
+		// Add the initial node cost
+		cost.put(initialNode, 0);
+		while (!openSet.isEmpty()) {
+			current = openSet.poll();
+			if (current.equals(finalNode)) {
+				// Reconstruct the path
+				return reconstructPath(cameFrom, current, gappy);
+			}
+			// Otherwise add this to the closedSet
+			closedSet.add(current);
+			for (int n = 0; n < current.getNextTransitions().size(); n++) {
+				Edge next = current.getNextTransitions().get(n);
+				Node neighbor = next.getNext();
+				int thisCost = heuristicCostEstimate(next, current, neighbor, current.getNextTransitions().get(n).reciprocated);
+				if (closedSet.contains(neighbor)) {
+					continue; // ignore as it has already been visited
+				}
+				// Otherwise we set the cost to this node
+				int tentativeCost = cost.get(current) + thisCost;
+
+				// Check if we have discovered a new node
+				if (!openSet.contains(neighbor)) {
+					// Assign the cost to the node
+					neighbor.setCost(tentativeCost);
+					openSet.add(neighbor);
+				} else if (tentativeCost >= cost.get(neighbor)) {
+					continue; // This isn't a better path
+				}
+				// If we have made it here this is the best path so let's
+				cameFrom.put(neighbor, new Path(current, next));
+				cost.put(neighbor, tentativeCost);
+			}
+		}
+		return null;
+	}
+
+
+	/**
+	 * Comparator class for ensuring the nodes with the largest cost are
+	 * kept at the front of the queue.
+	 *
+	 * Here, we want to maximise the cost as we are trying to get either:
+	 * 		a. the longest sequence, or
+	 * 		b. the path which the greatest number of sequences agree on.
+	 */
+	public class NodeComparator implements Comparator<Node>
+	{
+		@Override
+		public int compare(Node x, Node y)
+		{
+			if (x.getCost() < y.getCost())
+			{
+				return -1;
+			}
+			if (x.getCost() > y.getCost())
+			{
+				return 1;
+			}
+			return 0;
+		}
+	}
+
+	/**
+	 * Helper class to store the path. Keeps track of the edge and the node
+	 * that lead to a particular path. We need to keep track of the edge to
+	 * be able to set it as 'consensus' and the node to be able to get the
+	 * character.
+	 */
+	public class Path {
+		private Node node;
+		private Edge edge;
+
+		public Path(Node node, Edge edge) {
+			this.edge = edge;
+			this.node = node;
+		}
+
+		public Node getNode() { return this.node; }
+
+		public Edge getEdge() { return this.edge; }
+	}
+
+	/**
 	 * Traverses the graph structure to construct the most supported sequence of characters.
 	 *
 	 * @return	most supported sequence of base characters
 	 */
-	public String getSupportedSequence(boolean gappy) {
+	public String getSupportedSequenceOld(boolean gappy) {
 
 		String sequence = "";
 		Node current = initialNode;
@@ -847,11 +1049,12 @@ public class POGraph {
 			// find next edge as first reciprocated edge in the ordered extant list, if no reciprocated, then
 			// default to the first edge (extant support)
 			Edge next = null;
-			for (int n = 0; n < current.getNextTransitions().size(); n++)
+			for (int n = 0; n < current.getNextTransitions().size(); n++) {
 				if (current.getNextTransitions().get(n).reciprocated) {
 					next = current.getNextTransitions().get(n);
 					break;
 				}
+			}
 			next = (next == null) ? current.getNextTransitions().get(0) : next;
 			next.setConsensus(true);
 			if (gappy) {
@@ -1277,15 +1480,8 @@ public class POGraph {
 			for (int baseInd = 0; baseInd < bases.length; baseInd++)
 				if (bases[baseInd] != '-') {
 					//filteredBases.add(bases[baseInd]);
-					try {
-						nodes.get(baseInd).addSequence(seqId, bases[baseInd]);
-						seqNodeMap.get(seqId).add(nodes.get(baseInd));
-					}
-					catch (NullPointerException e) {
-
-
-					}
-
+					nodes.get(baseInd).addSequence(seqId, bases[baseInd]);
+					seqNodeMap.get(seqId).add(nodes.get(baseInd));
 				}
 			//Character[] chars = new Character[filteredBases.size()];
 			//filteredBases.toArray(chars);
@@ -1452,7 +1648,7 @@ public class POGraph {
 	 * @return			List of nodes to traverse
 	 */
 	private List<Node> findShortestPathToNode(Node start, Node end, Node ignore) {
-    		Queue<ArrayList<Node>> paths = new ArrayDeque<>();
+		Queue<ArrayList<Node>> paths = new ArrayDeque<>();
 
 		// create adjacency map of nodes, where adjacency is defined as nodes that are a 'next' node of the previous
 		// considered node (or parent node)
@@ -1526,6 +1722,8 @@ public class POGraph {
 		private HashMap<Integer, Character> seqChars;			// map of sequence Ids and their base character
 		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
 		private boolean consensus = false; 						// flag to indicate if belongs to the consensus path
+		private int cost = 10000;								// cost to  reach this node from the start
+		private Map<Integer, Integer> transitionCost; // Keeps track of the cost of a particular transition
 
 		/**
 		 * Constructor
@@ -1534,6 +1732,16 @@ public class POGraph {
 			this.prevTransitions = new ArrayList<>();
 			this.nextTransitions = new ArrayList<>();
 			this.seqChars = new HashMap<>();
+			this.transitionCost = new HashMap<>();
+		}
+
+		/**
+		 * Gets the maximum parsimony score of transitioning from one node to another.
+		 * @param nodeId
+		 * @return
+		 */
+		public Integer getTransitionCost(Integer nodeId) {
+			return transitionCost.get(nodeId);
 		}
 
 		/**
@@ -1544,6 +1752,22 @@ public class POGraph {
 		public Node(Integer ID) {
 			this();
 			this.ID = ID;
+		}
+
+		/**
+		 * Sets the cost based on a heuristic.
+		 * @param cost
+		 */
+		public void setCost(int cost) {
+			this.cost = cost;
+		}
+
+		/**
+		 * Gets the cost to this node.
+		 * @return
+		 */
+		public int getCost() {
+			return this.cost;
 		}
 
 		/**
@@ -1606,7 +1830,7 @@ public class POGraph {
 				}
 			// edge doesn't already exist, create new transition
 			if (nextT == null)
-			 	nextT = new Edge(next);
+				nextT = new Edge(next);
 			if (seq != null)
 				nextT.addSequence(seq);
 			// find index to put next edge

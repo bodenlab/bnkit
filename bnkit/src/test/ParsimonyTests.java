@@ -1,15 +1,11 @@
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.PhyloTree;
-
 import java.io.IOException;
-import java.util.List;
-
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.Test;
 
 
 /**
@@ -20,14 +16,15 @@ public class ParsimonyTests {
     static PhyloTree[] trees;
     static EnumSeq.Alignment[] alns;
 
-    static PhyloTree tree1 = PhyloTree.parseNewick("((((x01,x02)X01_02,x03)X01_03,(x04,((x05,x06)X05_06,(x07,x08)X07_08)X05_08)X04_08)X01_08,(x09,(x10,x11)X10_11)X09_11)X01_11;");
+
+    PhyloTree tree1 = new PhyloTree().parseNewick("((((x01,x02)X01_02,x03)X01_03,(x04,((x05,x06)X05_06,(x07,x08)X07_08)X05_08)X04_08)X01_08,(x09,(x10,x11)X10_11)X09_11)X01_11;");
 
     @BeforeAll
     public static void setUp() throws Exception {
         try {
             trees = new PhyloTree[] { // MB: also successfully tried a 150-seq tree with alignment (not in test/resources)
-                    PhyloTree.loadNewick("src/test/resources/large.nwk"),
-                    PhyloTree.loadNewick("src/test/resources/default.nwk"),
+                    new PhyloTree().loadNewick("src/test/resources/large.nwk"),
+                    new PhyloTree().loadNewick("src/test/resources/default.nwk"),
 //                    PhyloTree.loadNewick("src/test/resources/edge1.nwk"),
             };
             alns = new EnumSeq.Alignment[] {

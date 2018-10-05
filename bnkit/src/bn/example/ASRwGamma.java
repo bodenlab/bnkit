@@ -46,7 +46,7 @@ public class ASRwGamma {
     static String file_tree = "/Users/mikael/simhome/ASR/CYP2/CYP2F.nwk";
     static String file_aln = "/Users/mikael/simhome/ASR/CYP2/CYP2F.aln";
     
-    static PhyloTree tree;
+    static PhyloTree tree = new PhyloTree();
     static List<EnumSeq.Gappy<Enumerable>> seqs;
     static EnumSeq.Alignment<Enumerable> aln;
 
@@ -72,7 +72,7 @@ public class ASRwGamma {
                 //System.out.println("Alpha = " + alphas[a]);
 
                 
-            tree = PhyloTree.loadNewick(file_tree);
+            tree = tree.loadNewick(file_tree);
             Node[] nodes = tree.toNodesBreadthFirst();
             List<String> indexForNodes = new ArrayList<>(); // Newick string for subtree
             Map<String, String> mapForNodes = new HashMap<>(); // Shortname --> Newick string for subtree

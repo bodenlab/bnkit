@@ -1,14 +1,10 @@
 package reconstruction;
 
-import dat.EnumSeq;
-import dat.Enumerable;
-import dat.POGraph;
-
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Map;
-import java.util.List;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -45,7 +41,7 @@ public class RunASRPOG {
 	 */
 	public static void main(String[] args) throws IOException, InterruptedException {
 
-		if (args.length > 1) {
+		if (args.length > -1) {
 			ASRPOG asr = null;
 
 			String inference = "joint";
@@ -57,7 +53,9 @@ public class RunASRPOG {
 			String alignmentType = "";
 			String perturbNode = "";
 			String model = null;
-			int numThreads = 1;
+
+			System.out.println("RUNNING");
+			int numThreads = 5;
 			int indelLength = 0;
 			if (!args[0].contains("-"))
 				if (!args[0].contains(".nwk"))
