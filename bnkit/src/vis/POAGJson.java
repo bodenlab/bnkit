@@ -6,12 +6,12 @@
 package vis;
 
 import api.PartialOrderGraph;
-import json.JSONArray;
-import json.JSONObject;
-
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
+import json.JSONArray;
+import json.JSONObject;
 
 /**
  *
@@ -20,43 +20,28 @@ import java.util.Set;
 public class POAGJson {
 
     PartialOrderGraph poag;
-    HashMap<Integer, Node> nodes;
-    HashMap<Integer, Integer> xcoords;
     JSONObject jsonMap;
-    PathGen pathGen;
+    Integer[] nodeIds;
 
     public POAGJson(PartialOrderGraph poag) {
         this.poag = poag;
         poag.getConsensusSequence(); // populate consensus flags
-        pathGen = new PathGen(poag);
-        this.nodes = pathGen.nodes;
-        // add start and end nodes
-        Node initialNode = new Node(poag.getInitialNodeID(), -1, 0, null, poag.getOutEdgeWeights(poag.getInitialNodeID()), poag.getSeqChars(-1));
-        Node finalNode = new Node(poag.getFinalNodeID(), poag.getFinalNodeID(), 0, null, poag.getOutEdgeWeights(poag.getFinalNodeID()), poag.getSeqChars(poag.getFinalNodeID()));
-        this.nodes.put(initialNode.getID(), initialNode);
-        this.nodes.put(finalNode.getID(), finalNode);
+        nodeIds = poag.getNodeIDs();
         jsonMap = new JSONObject();
-        xcoords = new HashMap<>();
     }
 
     /**
-     * For the POAG's where the state hasn't been decided we pass the label in a
-     * format so that a pie chart can easily be rendered on the JavaScript side
-     *
-     * @param map
+     * Helper function to round to 2 decimal places for the vis.
+     * @param value
+     * @param places
      * @return
      */
-    private JSONObject seq2JSON(Map<Character, Double> map) {
-        JSONObject chars = new JSONObject();
-        JSONArray bars = new JSONArray();
-        for (Map.Entry<Character, Double> list : map.entrySet()) {
-            JSONObject bar = new JSONObject();
-            bar.put("label", list.getKey().toString());
-            bar.put("value", list.getValue());
-            bars.put(bar);
-        }
-        chars.put("chars", bars);
-        return chars;
+    public static double round(double value, int places) {
+        if (places < 0) throw new IllegalArgumentException();
+
+        BigDecimal bd = new BigDecimal(value);
+        bd = bd.setScale(places, RoundingMode.HALF_UP);
+        return bd.doubleValue();
     }
 
     /**
@@ -65,98 +50,140 @@ public class POAGJson {
      * @param map
      * @return
      */
-    private JSONObject map2JSON(Map<Character, Double> map) {
-        JSONObject graph = new JSONObject();
-        JSONArray bars = new JSONArray();
+    private JSONArray map2JSON(Map<Character, Double> map) {
+        JSONArray arr = new JSONArray();
         for (Map.Entry<Character, Double> list : map.entrySet()) {
-            JSONObject bar = new JSONObject();
-            bar.put("x_label", list.getKey().toString());
-            bar.put("value", (list.getValue() * 100));
-            bars.put(bar);
+            JSONArray arrEntry = new JSONArray();
+            if (round(list.getValue(), 2) != 0) {
+                arrEntry.put(Defines.G_LABEL, list.getKey());
+                arrEntry.put(Defines.G_VALUE, round(list.getValue(), 2));
+                System.out.println(round(list.getValue(), 2));
+                arr.put(arrEntry);
+            }
         }
-        graph.put("bars", bars);
-        return graph;
+        return arr;
     }
 
+    /**
+     * Returns a JSON representation of the histogram,
+     *
+     * @param map
+     * @return
+     */
+    private JSONArray seq2JSON(Map<Character, Double> map) {
+        JSONArray arr = new JSONArray();
+        return arr.put(Defines.G_CHAR, map2JSON(map));
+    }
+
+    /**
+     * Gets the outgoing edges of a node.
+     * @param nodeId
+     * @return
+     */
+    private Map<Integer, Double> getOutEdges (int nodeId) {
+        return poag.getOutEdgeWeights(nodeId);
+    }
+
+    /**
+     * Gets the graph for a specific Node Id.
+     * @param nodeId
+     * @return
+     */
+    private Map<Character, Double> getGraph (int nodeId) {
+        return poag.getCharacterDistribution(nodeId);
+    }
+
+    /**
+     * Makes a distribution of the sequence characters so that we can easily
+     * display it in a pie chart when the amino acid hasn't been chosen yet.
+     * @param nodeId
+     * @return
+     */
+    private Map<Character, Double> getSeq (int nodeId, Map<Character, Double> graph) {
+        Map<Character, Double> seqChars = new HashMap<>();
+        if (poag.getSeqChars(nodeId) == null) {
+            return seqChars;
+        }
+        int numSeqs = poag.getSeqChars(nodeId).size();
+        for (Character base : graph.keySet()) {
+            if (graph.get(base) > 0.01) {
+                seqChars.put(base, graph.get(base) * numSeqs);
+            }
+        }
+        return seqChars;
+        }
+
+
+    /**
+     * Converts a node object to a JSON array representation.
+     * @param nodeId
+     * @return
+     */
+    private JSONArray nodeToJsonArray (Integer nodeId) {
+        JSONArray jsonNode = new JSONArray();
+        Map<Character, Double> graph = getGraph(nodeId);
+        JSONArray seq = seq2JSON(getSeq(nodeId, graph));
+        jsonNode.put(Defines.G_ID, nodeId);
+        jsonNode.put(Defines.G_LABEL, nodeId.equals(poag.getFinalNodeID()) ? "final" : nodeId.equals(poag.getInitialNodeID()) ? "initial" : poag.getLabel(nodeId));
+        jsonNode.put(Defines.G_X, nodeId);
+        jsonNode.put(Defines.G_GRAPH, graph == null ? null : map2JSON(graph));
+        jsonNode.put(Defines.G_SEQ, seq);
+        jsonNode.put(Defines.G_MUTANTS, seq);
+        jsonNode.put(Defines.G_CONSENSUS, poag.getConsensusMembership(nodeId));
+        return jsonNode;
+    }
+
+
+    /**
+     * Converts an Edge to a JSON array
+     * @param nodeFromId
+     * @param nodeToId
+     * @param weight
+     * @return
+     */
+    private JSONArray edgeToJsonArray (int nodeFromId, int nodeToId, double weight) {
+        JSONArray jsonEdge = new JSONArray();
+        try {
+            jsonEdge.put(Defines.E_FROM, nodeFromId);
+            jsonEdge.put(Defines.E_TO, nodeToId);
+            jsonEdge.put(Defines.E_WEIGHT, (int) (100 * weight));
+            jsonEdge.put(Defines.E_CONSENSUS, poag.getConsensusMembership(nodeFromId)
+                    && nodeToId == poag.getNextConsensusID(nodeFromId));
+            Integer[] reciprocatedIds = poag.getReciprocatedNextIDs(nodeFromId);
+            boolean reciprocated = false;
+            for (int r = 0; r < reciprocatedIds.length; r++) {
+                if (reciprocatedIds[r] == nodeToId) {
+                    reciprocated = true;
+                    break;
+                }
+            }
+            jsonEdge.put(Defines.E_RECIPROCATED, reciprocated);
+            jsonEdge.put(Defines.E_SINGLE, weight * poag.getNumberSequences() <= 1.5);
+        } catch (Exception e) {
+            System.err.println("Error with reaction: " + nodeFromId + e.getMessage());
+        }
+        return jsonEdge;
+    }
+
+
+    /**
+     * Converts an array of Nodes to a JSON Object.
+     * @return
+     */
     public JSONObject toJSON() {
         JSONArray nodesJSON = new JSONArray();
-        int x;
-        int y;
-        int max_depth = 0;
-        JSONObject reactions = new JSONObject();
-        Node n;
-        Set<Integer> ns = nodes.keySet();
-
-        // get list of consensus IDs so that we can set a node as being part of the consensus or not
-       // ArrayList<Integer> consensusIds = new ArrayList<>();
-       // for (int c = 0; c < poag.getConsensusNodeIds().length; c++)
-       //     consensusIds.add(poag.getConsensusNodeIds()[c]);
-
-        for (Integer i : ns) {
-            JSONObject thisNode = new JSONObject();
-            n = nodes.get(i);
-            x = n.getX();
-            y = n.getY();
-            Integer id = n.getID();
-            String nid = "node-" + id;
-            // Extra things for the multi view poag
-            thisNode.put("class", ""); // Some sort of class
-            thisNode.put("id", id);
-            thisNode.put("lane", y);
-
-            // Ones needed for tthe actual poag
-            thisNode.put("label", n.getID().equals(poag.getFinalNodeID()) ? "final" : id.equals(poag.getInitialNodeID()) ? "initial" : poag.getLabel(id));
-            thisNode.put("x", x);
-            thisNode.put("y", y);
-            thisNode.put("graph", n.getGraph() == null? null : map2JSON(n.getGraph()));
-            thisNode.put("seq", seq2JSON(n.getSeq()));
-            thisNode.put("mutants", seq2JSON(n.getSeq()));
-            thisNode.put("consensus", poag.getConsensusMembership(id));
-            nodesJSON.put(thisNode);
-            //Check if it is the max depth
-            if (y > max_depth)
-                max_depth = y;
-            // Need to get the out egdes into JSON reaction object
-            Map<Integer, Double> outedges = n.getOutedges();
-            for (Map.Entry<Integer, Double> outNodes : outedges.entrySet()) {
-                try {
-                    JSONObject thisReaction = new JSONObject();
-                    Integer n2id = outNodes.getKey();
-                    Node tempNode = nodes.get(n2id);
-                    String rid = "edges_" + id + ":" + n2id;
-                    int x2 = tempNode.getX();
-                    int y2 = tempNode.getY();
-                    int weight = (int) (100 * outNodes.getValue());
-                    thisReaction.put("from", id);
-                    thisReaction.put("to", n2id);
-                    thisReaction.put("x1", x);
-                    thisReaction.put("x2", x2);
-                    thisReaction.put("y1", y);
-                    thisReaction.put("y2", y2);
-                    thisReaction.put("weight", weight);
-                    thisReaction.put("consensus", poag.getConsensusMembership(id) && n2id.equals(poag.getNextConsensusID(id)));
-                    Integer[] reciprocatedIds = poag.getReciprocatedNextIDs(id);
-                    boolean reciprocated = false;
-                    for (int r = 0; r < reciprocatedIds.length; r++)
-                        if (reciprocatedIds[r].equals(n2id)) {
-                            reciprocated = true;
-                            break;
-                        }
-                    thisReaction.put("reciprocated", reciprocated);
-                    thisReaction.put("single", outNodes.getValue()*poag.getNumberSequences() <= 1.5);
-                    reactions.put(rid, thisReaction);
-                } catch (Exception e) {
-                    System.err.println("Error with reaction: " + nid + e.getMessage());
-                }
-
+        JSONArray edgesJSON = new JSONArray();
+        for (Integer nodeId : nodeIds) {
+            nodesJSON.put(nodeToJsonArray(nodeId));
+            Map<Integer, Double> outEdges = getOutEdges(nodeId);
+            for (Map.Entry<Integer, Double> outEdge : outEdges.entrySet()) {
+                edgesJSON.put(edgeToJsonArray(nodeId, outEdge.getKey(), outEdge.getValue()));
             }
-            // Want to add each of the edge weights to the reaction nodes
         }
-        JSONObject metadata = new JSONObject();
         jsonMap.put("nodes", nodesJSON);
-        jsonMap.put("edges", reactions);
-        jsonMap.put("max_depth", max_depth);
+        jsonMap.put("edges", edgesJSON);
         return jsonMap;
     }
+
 
 }

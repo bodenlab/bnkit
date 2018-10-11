@@ -940,7 +940,7 @@ public class POGraph {
 	 * @param gappy
 	 * @return
 	 */
-	public String getSupportedSequence(boolean gappy) {
+	public String getSupportedSequenceNew(boolean gappy) {
 		// Intanciate the comparator class
 		Comparator<Node> comparator = new NodeComparator();
 		// Already visited nodes
@@ -1040,7 +1040,7 @@ public class POGraph {
 	 *
 	 * @return	most supported sequence of base characters
 	 */
-	public String getSupportedSequenceOld(boolean gappy) {
+	public String getSupportedSequence(boolean gappy) {
 
 		String sequence = "";
 		Node current = initialNode;
