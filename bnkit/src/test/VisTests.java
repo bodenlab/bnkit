@@ -49,8 +49,7 @@ public class VisTests {
     }
 
     @Test
-    @DisplayName("New Inference Storing method")
-    public void getJSONInferences() throws IOException, InterruptedException {
+    @DisplayName("New Inference Storing method")   public void getJSONInferences() throws IOException, InterruptedException {
         String alnfilepath = "src/test/resources/small.aln";
         String treefilepath = "src/test/resources/small.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, treefilepath, false, false, null, 1);

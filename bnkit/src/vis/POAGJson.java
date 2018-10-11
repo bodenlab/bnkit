@@ -164,6 +164,20 @@ public class POAGJson {
         return jsonEdge;
     }
 
+    /**
+     * Helper that adds a node and all the outgoing edges to JSON arrays.
+     * @param nodesJSON
+     * @param edgesJSON
+     * @param nodeId
+     */
+    private void toJSON (JSONArray nodesJSON, JSONArray edgesJSON, int nodeId) {
+        nodesJSON.put(nodeToJsonArray(nodeId));
+        Map<Integer, Double> outEdges = getOutEdges(nodeId);
+        for (Map.Entry<Integer, Double> outEdge : outEdges.entrySet()) {
+            edgesJSON.put(edgeToJsonArray(nodeId, outEdge.getKey(), outEdge.getValue()));
+        }
+    }
+
 
     /**
      * Converts an array of Nodes to a JSON Object.
@@ -172,13 +186,15 @@ public class POAGJson {
     public JSONObject toJSON() {
         JSONArray nodesJSON = new JSONArray();
         JSONArray edgesJSON = new JSONArray();
+        // Add the initial node
+        toJSON(nodesJSON, edgesJSON, poag.getInitialNodeID());
+        // Add all other nodes
         for (Integer nodeId : nodeIds) {
-            nodesJSON.put(nodeToJsonArray(nodeId));
-            Map<Integer, Double> outEdges = getOutEdges(nodeId);
-            for (Map.Entry<Integer, Double> outEdge : outEdges.entrySet()) {
-                edgesJSON.put(edgeToJsonArray(nodeId, outEdge.getKey(), outEdge.getValue()));
-            }
+            toJSON(nodesJSON, edgesJSON, nodeId);
         }
+        // Also want to add the final node
+        toJSON(nodesJSON, edgesJSON, poag.getFinalNodeID());
+
         jsonMap.put("nodes", nodesJSON);
         jsonMap.put("edges", edgesJSON);
         return jsonMap;
