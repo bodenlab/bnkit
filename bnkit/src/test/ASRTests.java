@@ -57,18 +57,17 @@ public class ASRTests {
     public void performSmallASR() throws IOException, InterruptedException {
         System.out.println("======================= Perform Huge ASR " +
                 "=========================\n");
-        String alnfilepath = "src/test/resources/10.aln";
-        String nwkfilepath = "src/test/resources/10.nwk";
+        String alnfilepath = "src/test/resources/tawfik.aln";
+        String nwkfilepath = "src/test/resources/tawfik.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, nwkfilepath, true, false, null, 1);
         String gappySeq = asr.getGraph("root").getConsensusGappySequence();
-        System.out.println(gappySeq);
-//        String expectedGappyConsensus = "GYVMTVLG-PLPINEMGVTLMHEHILLDASGKWVPPCCCSDRHLAEMPVKMENLGELSLNPLMSRDNCQLFDVDVAIDELTKYRALGGETVVDPTNIGIGRDPKALARIARLT-GLNIIMGTGLYLEPSHPEWVKIS-----------SVEQLTERLIYDLGGAEEKPEVLAGLIGEIGISS-RFTPDEEKSLRAAGRASAATGVPIEVHLPGWERLGHRVLDILE-QEGADLRHTVLCHMNPSFADKRYQRELAQRGAFLEYDMIGMSYYYADES------AQSPSDEENARAIRELIDDGYIQQILLSQDVFLKTM----------LTRYGGHGYGYILKHFVPRLRRHGVSGEQLETLMIGNPQRVFGG-----";
-//        assertEquals(gappySeq, expectedGappyConsensus);
-//        System.out.println("     Testing the expected gappy consensus " +
-//                "sequence \n");
-//        System.out.println("Expected: " + expectedGappyConsensus);
-//        System.out.println("Received: " + gappySeq);
-//        System.out.println("\n****    PASSED\n");
+        String expectedGappyConsensus = "GYVMTVLG-PLPINEMGVTLMHEHILLDASGKWVPPCCCSDRHLAEMPVKMENLGELSLNPLMSRDNCQLFDVDVAIDELTKYRALGGETVVDPTNIGIGRDPKALARIARLT-GLNIIMGTGLYLEPSHPEWVKIS-----------SVEQLTERLIYDLGGAEEKPEVLAGLIGEIGISS-RFTPDEEKSLRAAGRASAATGVPIEVHLPGWERLGHRVLDILE-QEGADLRHTVLCHMNPSFADKRYQRELAQRGAFLEYDMIGMSYYYADES------AQSPSDEENARAIRELIDDGYIQQILLSQDVFLKTM----------LTRYGGHGYGYILKHFVPRLRRHGVSGEQLETLMIGNPQRVFGG-----";
+        assertEquals(gappySeq, expectedGappyConsensus);
+        System.out.println("     Testing the expected gappy consensus " +
+                "sequence \n");
+        System.out.println("Expected: " + expectedGappyConsensus);
+        System.out.println("Received: " + gappySeq);
+        System.out.println("\n****    PASSED\n");
     }
 
     @Test
