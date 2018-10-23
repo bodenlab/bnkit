@@ -49,6 +49,9 @@ public class VisTests {
 
     @Test
     @DisplayName("New Inference Storing method")   public void getJSONInferences() throws IOException, InterruptedException {
+        /**
+         * ToDo: work out why this test fails despite being exactly the same on visual inspection
+         */
         String alnfilepath = "src/test/resources/small.aln";
         String treefilepath = "src/test/resources/small.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, treefilepath, false, false, null, 1);
