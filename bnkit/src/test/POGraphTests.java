@@ -27,7 +27,7 @@ public class POGraphTests {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println("Consensus sequence: " + apiGraph.getConsensusSequence());
-        assertEquals("PMAR", apiGraph.getConsensusSequence());
+        assertEquals("PNAR", apiGraph.getConsensusSequence());
     }
 
     @Test
@@ -36,7 +36,7 @@ public class POGraphTests {
         String filepath = "src/test/resources/testPOGraphSmall.dot";
         POGraph graph = new POGraph(filepath);
         System.out.println("Consensus sequence: " + graph.getSupportedSequence(false));
-        assertEquals("PMAR", graph.getSupportedSequence(false));
+        assertEquals("PNAR", graph.getSupportedSequence(false));
         POAGJson jsongraph = new POAGJson(new PartialOrderGraph(graph));
         System.out.println(jsongraph.toJSON().toString());
         Map<Integer, List<Integer>> lists = graph.getSequenceNodeMapping();
