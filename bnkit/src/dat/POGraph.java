@@ -876,17 +876,20 @@ public class POGraph {
 	 *
 	 * @return
 	 */
-	private Integer heuristicCostEstimate(Edge edge, Node from, Node to, boolean isBidirectional) {
+	private long heuristicCostEstimate(Edge edge, Node from, Node to, boolean isBidirectional) {
 		int multiplier = 1;
 		if (!isBidirectional) {
 			multiplier = 1000;
 		}
 		int positionDiff = java.lang.Math.abs(to.getID() - from.getID());
-		positionDiff = (positionDiff != 0) ? positionDiff : 1;
+		positionDiff = (positionDiff > 0) ? positionDiff : 1;
 
-		return multiplier * (this.sequences.size() - edge.getSequences().size
-				() + 1) *
-				positionDiff;
+		long val =  multiplier * (this.sequences.size() - edge.getSequences().size() + 1) *positionDiff;
+		if (val < 0) {
+			val = Long.MAX_VALUE;
+		}
+		return val;
+
 	}
 
 
@@ -952,9 +955,9 @@ public class POGraph {
 		// Storing the previous node
 		HashMap<Node, Path> cameFrom = new HashMap<>();
 		// Map with heuristics
-		HashMap<Node, Integer> cost = new HashMap<>();
+		HashMap<Node, Long> cost = new HashMap<>();
 		// Add the initial node cost
-		cost.put(initialNode, 0);
+		cost.put(initialNode, new Long(0));
 		while (!openSet.isEmpty()) {
 			current = openSet.poll();
 			if (current.equals(finalNode)) {
@@ -966,12 +969,12 @@ public class POGraph {
 			for (int n = 0; n < current.getNextTransitions().size(); n++) {
 				Edge next = current.getNextTransitions().get(n);
 				Node neighbor = next.getNext();
-				int thisCost = heuristicCostEstimate(next, current, neighbor, current.getNextTransitions().get(n).reciprocated);
+				long thisCost = heuristicCostEstimate(next, current, neighbor, current.getNextTransitions().get(n).reciprocated);
 				if (closedSet.contains(neighbor)) {
 					continue; // ignore as it has already been visited
 				}
 				// Otherwise we set the cost to this node
-				int tentativeCost = cost.get(current) + thisCost;
+				long tentativeCost = cost.get(current) + thisCost;
 
 				// Check if we have discovered a new node
 				if (!openSet.contains(neighbor)) {
@@ -1722,7 +1725,7 @@ public class POGraph {
 		private HashMap<Integer, Character> seqChars;			// map of sequence Ids and their base character
 		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
 		private boolean consensus = false; 						// flag to indicate if belongs to the consensus path
-		private int cost = 10000;								// cost to  reach this node from the start
+		private long cost = 10000;								// cost to  reach this node from the start
 		private Map<Integer, Integer> transitionCost; // Keeps track of the cost of a particular transition
 
 		/**
@@ -1734,6 +1737,24 @@ public class POGraph {
 			this.seqChars = new HashMap<>();
 			this.transitionCost = new HashMap<>();
 		}
+
+		/**
+		 * Constructor for when we're recreating the objects from JSON objs.
+		 *
+		 * @param id
+		 * @param base
+		 * @param consensus
+		 */
+		public Node(int id, char base, boolean consensus) {
+			this.consensus = consensus;
+			this.ID = id;
+			this.base = base;
+			this.prevTransitions = new ArrayList<>();
+			this.nextTransitions = new ArrayList<>();
+			this.seqChars = new HashMap<>();
+			this.transitionCost = new HashMap<>();
+		}
+
 
 		/**
 		 * Gets the maximum parsimony score of transitioning from one node to another.
@@ -1758,7 +1779,7 @@ public class POGraph {
 		 * Sets the cost based on a heuristic.
 		 * @param cost
 		 */
-		public void setCost(int cost) {
+		public void setCost(long cost) {
 			this.cost = cost;
 		}
 
@@ -1766,7 +1787,7 @@ public class POGraph {
 		 * Gets the cost to this node.
 		 * @return
 		 */
-		public int getCost() {
+		public long getCost() {
 			return this.cost;
 		}
 
@@ -2082,23 +2103,38 @@ public class POGraph {
 		private boolean reciprocated = false;
 		private List<Integer> sequences;
 
-		private Edge() {
+		// Used once we already have the sequences and we no longer retain this info, instead converting
+		// it to a weight.
+		private double weight = 0.0;
+
+		public Edge() {
 			this.sequences = new ArrayList<>();
 		}
 
-		private Edge(Node nextNode) {
+		public Edge(Node nextNode) {
 			this();
 			this.next = nextNode;
 		}
 
-		private void setConsensus(boolean flag) { this.consensus = flag; }
+		/**
+		 * Initialiser for when we already have the edge saved.
+		 * @param nextNode
+		 * @param weight
+		 * @param reciprocated
+		 */
+		public Edge(Node nextNode, double weight, boolean reciprocated) {
+			this.next = nextNode;
+			this.weight = weight;
+			this.reciprocated = reciprocated;
+		}
 
-		private boolean getConsensus() { return this.consensus; }
+		public void setConsensus(boolean flag) { this.consensus = flag; }
 
-		private void setReciprocated(boolean flag) { this.reciprocated = flag; }
+		public boolean getConsensus() { return this.consensus; }
 
-		private boolean getReciprocated() { return this.reciprocated; }
+		public void setReciprocated(boolean flag) { this.reciprocated = flag; }
 
+		public boolean getReciprocated() { return this.reciprocated; }
 
 		private void addSequence(int seqId) {
 			this.sequences.add(seqId);
@@ -2112,11 +2148,11 @@ public class POGraph {
 			return this.sequences;
 		}
 
-		private Node getNext() {
+		public Node getNext() {
 			return this.next;
 		}
 
-		private void setNext(Node nextNode) {
+		public void setNext(Node nextNode) {
 			this.next = nextNode;
 		}
 	}

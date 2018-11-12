@@ -1,6 +1,4 @@
 package reconstruction;
-
-
 import alignment.MSA;
 import api.PartialOrderGraph;
 import bn.alg.CGTable;
@@ -65,6 +63,11 @@ public class ASRPOG {
 	private String model = "JTT";                                        // Evolutionary model to use for character inference
 	private int threads = 1;                                            // Number of threads to use for performing the reconstruction
 	private boolean performMSA = false;                                    // Flag to track whether the input sequences required alignment or not
+
+	/**
+	 * ToDo: remove this! It was only for testing
+	 */
+	private String logFileName;
 
 	/**
 	 * Static variables that define the positions of various elements in JSON inference object
@@ -163,6 +166,27 @@ public class ASRPOG {
 		setupASRPOG(model, marginalNode, threads);
 	}
 
+	/**
+	 * This method enables us to directly import the inferences from the database.
+	 *
+	 * @param model
+	 * @param threads
+	 * @param inferences
+	 * @param sequences
+	 * @param tree
+	 */
+	public ASRPOG(String model, int threads, Map<String, List<Inference>> inferences, List<EnumSeq.Gappy<Enumerable>> sequences, String tree) {
+		setupASRPOG(model, null, threads);
+		extantSequences = new ArrayList<>(sequences);
+		this.ancestralInferences = inferences;
+		this.ancestralSeqLabels = new ArrayList<>();
+		for (String ancestralLabel: ancestralInferences.keySet()) {
+			this.ancestralSeqLabels.add(ancestralLabel);
+		}
+		phyloTree = phyloTree.parseNewick(tree);
+		pogAlignment = new POGraph(sequences);
+	}
+
 	public ASRPOG(String model, int threads, JSONObject inferences, List<EnumSeq.Gappy<Enumerable>> sequences, String tree) {
 		setupASRPOG(model, null, threads);
 		extantSequences = new ArrayList<>(sequences);
@@ -178,6 +202,53 @@ public class ASRPOG {
 	public void runReconstruction(POGraph msa, String treeFile, String sequenceFile, boolean jointInference) throws IOException, InterruptedException {
 		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
+
+
+	/**
+	 * Temporary method to be able to log to a particular file name.
+	 *
+	 * @param treeNewick
+	 * @param sequences
+	 * @param jointInference
+	 * @param msa
+	 * @param logFileName
+	 * @throws InterruptedException
+	 */
+	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa, String logFileName) throws InterruptedException {
+		this.logFileName = logFileName;
+		extantSequences = new ArrayList<>(sequences);
+
+		// create phylogenetic tree structure
+		phyloTree = phyloTree.parseNewick(treeNewick);
+
+		// Check if there are duplicate extant node names in the phylogenetic tree
+		// Duplicate extant node names not allowed - will influence reconstruction outcomes
+		// Check if there are duplicate sequence names in the extant sequences
+		// Duplicate sequence names not allowed - will influence reconstruction outcomes
+		// Check if the provided extant sequences match up to the provided tree
+		checkData();
+
+		if (msa == null)
+			pogAlignment = new POGraph(extantSequences);
+		else
+			pogAlignment = new POGraph(msa);
+
+		// perform inference
+		if (jointInference) {
+			marginalDistributions = null;
+			queryBNJoint();
+		} else if (marginalNode != null && phyloTree.find(marginalNode) != null) {
+			queryBNMarginal(marginalNode);
+		} else {
+			if (marginalNode == null)
+				System.out.println("No node was specified for the marginal inference: inferring the root node");
+			else
+				throw new RuntimeException("Incorrect internal node label provided for marginal reconstruction: " + marginalNode + " tree: " + phyloTree.toString());
+			marginalNode = phyloTree.getRoot().getLabel().toString();
+			queryBNMarginal(phyloTree.getRoot().getLabel().toString());
+		}
+	}
+
 
 	public void runReconstruction(String treeNewick, List<EnumSeq.Gappy<Enumerable>> sequences, boolean jointInference, POGraph msa) throws InterruptedException {
 
@@ -334,6 +405,7 @@ public class ASRPOG {
 		}
 		return allInferences;
 	}
+
 
 	/**
 	 * Here we want to determine whether the inferences are of the new type of encoding or
@@ -743,9 +815,9 @@ public class ASRPOG {
 	public Map<String, String> getAncestralDict() {
 		Map<String, String> ancestralDict = new HashMap<>();
 		for (String label : this.ancestralSeqLabels) {
-			List<ASRPOG.Inference> inferences = this.ancestralInferences.get(label);
+			List<Inference> inferences = this.ancestralInferences.get(label);
 			String inferenceString = "";
-			for (ASRPOG.Inference inference : inferences) {
+			for (Inference inference : inferences) {
 				inferenceString += inference.base;
 			}
 
@@ -936,7 +1008,6 @@ public class ASRPOG {
 				ancestor.setCurrent(nodeId);
 				ancestor.setCharacterDistribution(distribution);
 			}
-		System.out.println("Got ancestor: " + label);
 		return ancestor;
 	}
 
@@ -1147,17 +1218,128 @@ public class ASRPOG {
 	// 0: 30 secs; 1: 29 secs; 2: 22 secs; 3: 21 secs; 4: 20 secs; 5: 19 secs; 6: 19 secs; 7: 19 secs; 8: 20 secs
 
 	/**
+	 * Helper function that prints the memory usage to a file
+	 */
+	private long[] printStats(FileWriter fr, int nodeId, double time, long prevTotal, long prevFree) {
+		Runtime rt = Runtime.getRuntime();
+		long total = rt.totalMemory();
+		long free = rt.freeMemory();
+		long used = total - free;
+		if (prevTotal != 0) {
+			try {
+				fr.write(nodeId + ",bnjoint," + time +
+						"," + total +
+						"," + used +
+						"," + free + "\n");
+				System.out.println(nodeId + " saved");
+			} catch (Exception e) {
+				System.out.println(nodeId + "," + time +
+						"," + total +
+						"," + used +
+						"," + free + "\n");
+			}
+		}
+		long[] vals = {total, free};
+		return vals;
+	}
+
+
+//
+//	public void queryBNJointNew() {
+//		List<Integer> nodeIDs = getNodeIdsToInfer();
+//		Queue<Integer> nodeQueue = new PriorityQueue<>();
+//		for (Integer nodeId : nodeIDs) {
+//			nodeQueue.add(nodeId);
+//		}
+//		while (!nodeQueue.isEmpty()) {
+//			Integer nodeId = nodeQueue.poll();
+//			Variable.Assignment[] results = queryBNJointNode(nodeId);
+//		}
+//		nodeIDs.add(pogAlignment.getFinalNodeID()); // add dummy final node for identifying backwards transition
+//		for (Integer nodeId : nodeIDs) {
+//			makeInference(nodeId, result);
+//		}
+//	}
+//
+//	public List<Integer> getNodeIdsToInfer() {
+//		List<Integer> nodeIDs = new ArrayList<>();
+//		nodeIDs.add(pogAlignment.getInitialNodeID());
+//		nodeIDs.addAll(pogAlignment.getNodeIDs());
+//		rates = new Double[nodeIDs.get(nodeIDs.size() - 1) + 1]; //Rate matrix
+//		return nodeIDs;
+//	}
+//
+//	/**
+//	 * Updated method that takes an open connection to a database.
+//	 * This allows us to be able to save inferences as they are created.
+//	 * This also means that we won't have to store all inferences as a single object
+//	 * or reload all of them at once.
+//	 *
+//	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using joint inference.
+//	 */
+//	public Variable.Assignment[] queryBNJointNode(int nodeId) {
+//		pogAlignment.setCurrent(nodeId);
+//		// perform character inference if not the dummy initial node or dummy final node
+//		if (nodeId != pogAlignment.getInitialNodeID()) {
+//			VarElim ve = new VarElim();
+//			PhyloBNet charNet = createCharacterNetwork();
+//			rates[nodeId] = charNet.getRate();
+//			ve.instantiate(charNet.getBN());
+//			return getJointAssignment(ve);
+//		}
+//		return null;
+//	}
+//
+//	public void makeInference(Integer nodeId, Variable.Assignment[] charAssignments) {
+//			pogAlignment.setCurrent(nodeId);
+//			Map<String, Integer[]> phyloTransition = getPhyloTransitions();
+//			// for each node in the phylogenetic tree, if character is inferred at position, set inferred base,
+//			// otherwise gap is inferred, remove from alignment and set transitions of previous nodes to the
+//			// inferred transition
+//			for (String phyloNode : ancestralSeqLabels) {
+//				Character base = '-';
+//				// check for inferred base character
+//				for (Variable.Assignment varassign : charAssignments) {
+//					if (phyloNode.equals(varassign.var.getName())) {
+//						base = (char) varassign.val;
+//						break;
+//					}
+//				}
+//				// store inferred transitions
+//				List<Integer> transitionIds = new ArrayList<>();
+//				Integer[] transitions = phyloTransition.get(phyloNode);
+//				for (int i = 0; i < transitions.length; i++)
+//					transitionIds.add(transitions[i]);
+//
+//				if (!ancestralInferences.containsKey(phyloNode))
+//					ancestralInferences.put(phyloNode, new ArrayList<>());
+//				ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
+//			}
+//	}
+
+
+	/**
 	 * Infer gap/base character of each partial order alignment graph structure at each internal node of the phylogenetic tree using joint inference.
 	 */
 	private void queryBNJoint() throws InterruptedException {
-//		long startTime = System.nanoTime();
-
+		long startTime = System.nanoTime();
 		// infer base/gap of each aligned node
 		List<Integer> nodeIDs = new ArrayList<>();
 		nodeIDs.add(pogAlignment.getInitialNodeID());
 		nodeIDs.addAll(pogAlignment.getNodeIDs());
 		rates = new Double[nodeIDs.get(nodeIDs.size() - 1) + 1]; //Rate matrix
 
+		FileWriter fr = null;
+
+		if (this.logFileName != null) {
+			File file = new File("/var/www/GRASP/data/stats_" + logFileName + ".csv");
+			try {
+				fr = new FileWriter(file);
+				fr.write("nodeId,test,time,total_mem,used_mem,free_mem\n");
+			} catch (Exception e) {
+				System.out.println("Couldn't open file...");
+			}
+		}
 		// First, create a queue with which all nodes will be inferred (by NodeID)
 		Queue<Integer> nodeQueue = new PriorityQueue<>();
 		for (Integer nodeId : nodeIDs)
@@ -1170,7 +1352,7 @@ public class ASRPOG {
 
 		// Here's where all results will end up
 		Map<Integer, Variable.Assignment[]> result = new HashMap<>(nodeIDs.size());
-
+		long[] vals = {0, 0};
 		// Populate the coordinator with jobs, and run them successively;
 		// results are kept for later (associated with IDs) but the actual internals of the inference are not
 		while (!nodeQueue.isEmpty()) {
@@ -1193,6 +1375,10 @@ public class ASRPOG {
 				Map<Integer, Variable.Assignment[]> rets = batch.run();
 				result.putAll(rets);
 			}
+			if (fr != null) {
+				vals = printStats(fr, nodeId, (System.nanoTime() - startTime) / 1000000000.0, vals[0],
+						vals[1]);
+			}
 		}
 		// last time through all nodes; this time serially, extracting results
 		nodeIDs.add(pogAlignment.getFinalNodeID()); // add dummy final node for identifying backwards transitions
@@ -1206,6 +1392,7 @@ public class ASRPOG {
 			// for each node in the phylogenetic tree, if character is inferred at position, set inferred base,
 			// otherwise gap is inferred, remove from alignment and set transitions of previous nodes to the
 			// inferred transition
+
 			for (String phyloNode : ancestralSeqLabels) {
 				Character base = '-';
 				// check for inferred base character
@@ -1226,8 +1413,14 @@ public class ASRPOG {
 				ancestralInferences.get(phyloNode).add(new Inference(pogAlignment.getCurrentId(), base, transitionIds));
 			}
 		}
-//		long elapsedTimeNs = System.nanoTime() - startTime;
-//		System.out.printf("Elapsed time in secs: %5.3f\n", elapsedTimeNs/1000000000.0);
+		long elapsedTimeNs = System.nanoTime() - startTime;
+		//System.out.println("END,"  + elapsedTimeNs/1000000000.0);
+		try {
+			fr.write("END," + elapsedTimeNs / 1000000000.0 + "\n");
+			fr.close();
+		} catch (Exception e) {
+			System.out.println("Coun't write.");
+		}
 	}
 
 	// MB's laptop on 2U1 data (145 seqs) queryBNMarginal "N0" for different number of threads:
@@ -1482,27 +1675,4 @@ public class ASRPOG {
 //
 //
 //	}
-
-
-	/**
-	 * Helper class to store changes to an ancestral graph node
-	 *
-	 * Information:
-	 * 		- POG structure index
-	 * 		- Inferred base character: base character that is inferred or '-' to represent a gap (i.e. that the node needs to be deleted when updating the structure)
-	 */
-	public class Inference {
-		Integer pogId;
-		char base;
-		List<Integer> transitions;
-
-		public Inference(Integer id, char ch, List<Integer> tr){
-			pogId = id;
-			base = ch;
-			transitions = tr;
-		}
-		public String toString(){
-			return pogId + "->" + base;
-		}
-	}
 }
