@@ -22,12 +22,31 @@ public class POAGJson {
     PartialOrderGraph poag;
     JSONObject jsonMap;
     Integer[] nodeIds;
+    String consensusSeq;
+
+    public POAGJson(PartialOrderGraph poag, Boolean gappy) {
+        this.poag = poag;
+        consensusSeq = poag.getConsensusSequence(gappy); // populate consensus flags
+        nodeIds = poag.getNodeIDs();
+        jsonMap = new JSONObject();
+    }
 
     public POAGJson(PartialOrderGraph poag) {
         this.poag = poag;
-        poag.getConsensusSequence(); // populate consensus flags
+        consensusSeq = poag.getConsensusSequence(); // populate consensus flags
         nodeIds = poag.getNodeIDs();
         jsonMap = new JSONObject();
+    }
+
+
+    /**
+     * Gets the consensus sequence for a reconstruction.
+     * This allows us to only call this once.
+     * Note may be removed.
+     * @return
+     */
+    public String getConsensusSeq() {
+        return this.consensusSeq;
     }
 
     /**
@@ -199,6 +218,5 @@ public class POAGJson {
         jsonMap.put("edges", edgesJSON);
         return jsonMap;
     }
-
 
 }

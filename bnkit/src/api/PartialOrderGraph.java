@@ -41,6 +41,16 @@ public class PartialOrderGraph {
 
     /**
      * Get the sequence with the most edge support through the graph. Support is based on maximizing immediate edge
+     * weights.
+     *
+     * @return      most supported sequence based on edge weights
+     */
+    public String getConsensusSequence(boolean gappy) {
+        return graph.getSupportedSequence(gappy);
+    }
+
+    /**
+     * Get the sequence with the most edge support through the graph. Support is based on maximizing immediate edge
      * weights. Represents 'gaps' (i.e. jumps in the partial order graph)
      *
      * @return      most supported gappy sequence based on edge weights

@@ -10,6 +10,8 @@ import json.JSONObject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import reconstruction.ASRPOG;
+import reconstruction.Consensus;
+import reconstruction.Inference;
 import vis.POAGJson;
 
 /**
@@ -48,7 +50,37 @@ public class ASRTests {
         System.out.println("Received: " + expectedSupportedSeq);
         System.out.println("\n****    PASSED\n");
 
+        System.out.println("     Testing we are able to re-generate the consensus from the inference ROOT: \n");
         POAGJson json = new POAGJson(root);
+
+        /* We want to check that we get the same result reading back in the JSON object */
+        JSONObject jsonObject = json.toJSON();
+        Consensus c = new Consensus(jsonObject);
+        String regeneratedConsensus = c.getSupportedSequence(true);
+
+        assertEquals(expectedGappyConsensus, regeneratedConsensus);
+
+
+        assertEquals(expectedGappyConsensus, regeneratedConsensus);
+        System.out.println("Expected: " + expectedGappyConsensus);
+        System.out.println("Received: " + regeneratedConsensus);
+        System.out.println("\n****    PASSED\n");
+
+        PartialOrderGraph n22 = asr.getGraph("N22_68");
+        json = new POAGJson(n22);
+
+        System.out.println("     Testing we are able to re-generate the consensus from the inference N22_68: \n");
+
+        /* We want to check that we get the same result reading back in the JSON object */
+        jsonObject = json.toJSON();
+        c = new Consensus(jsonObject);
+        regeneratedConsensus = c.getSupportedSequence(true);
+        assertEquals(supportedSeq, regeneratedConsensus);
+        System.out.println("Expected: " + expectedSupportedSeq);
+        System.out.println("Received: " + regeneratedConsensus);
+        System.out.println("\n****    PASSED\n");
+        assertEquals(expectedSupportedSeq, regeneratedConsensus);
+
     }
 
 
@@ -93,8 +125,8 @@ public class ASRTests {
         for (String a : test.getAncestralInferences().keySet()) {
             System.out.println(a + "--------");
             for (int i = 0; i < test.getAncestralInferences().get(a).size(); i++) {
-                ASRPOG.Inference it = test.getAncestralInferences().get(a).get(i);
-                ASRPOG.Inference im = asr.getAncestralInferences().get(a).get(i);
+                Inference it = test.getAncestralInferences().get(a).get(i);
+                Inference im = asr.getAncestralInferences().get(a).get(i);
                 if (!it.toString().equalsIgnoreCase(im.toString())) {
                     System.out.println(it.toString());
                     System.out.println(im.toString());

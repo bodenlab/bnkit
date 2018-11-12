@@ -74,7 +74,7 @@ class BranchIsolation {
 
                 Character maxMSACharacter = Collections.max(distribution.entrySet(), Map.Entry.comparingByValue()).getKey();
 
-                Map<String, List<ASRPOG.Inference>> ancestralInferences = asr.getAncestralInferences();
+                Map<String, List<Inference>> ancestralInferences = asr.getAncestralInferences();
                 Character maxDistribCharacter = ancestralInferences.get(node).get(k).base;
                 Character rootDistribCharacter = ancestralInferences.get("N0").get(k).base;
 
