@@ -96,7 +96,11 @@ public class Consensus {
         int positionDiff = java.lang.Math.abs(to.getId() - from.getId());
         positionDiff = (positionDiff > 0) ? positionDiff : 1;
 
-        double val =  multiplier * (edge.getWeight()) * positionDiff;
+        // Edge weight is out of 100
+        double val =  multiplier * ((100 - edge.getWeight() + 1) * positionDiff);
+        if (val < 0) {
+            val = Double.MAX_VALUE;
+        }
         return Math.abs(val);
 
     }
@@ -124,7 +128,7 @@ public class Consensus {
                 sequence.push(current.getBase());
             }
             // If we have a gappy sequence we need to add in the gaps
-            if (gappy == true) {
+            if (gappy) {
                 int cameFromPosition = current.getId();
                 int nextPosition = prevNode.getId();
                 int numGaps = -1 * ((nextPosition - cameFromPosition) + 1);

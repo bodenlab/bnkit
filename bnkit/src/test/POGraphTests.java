@@ -1,19 +1,17 @@
-
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import api.PartialOrderGraph;
 import dat.POGraph;
-import json.JSONObject;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import vis.POAGJson;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import json.JSONObject;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import reconstruction.Consensus;
+import vis.POAGJson;
 
 /**
  * Functions to test the partial order graph implementation (api and code).
@@ -28,6 +26,14 @@ public class POGraphTests {
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println("Consensus sequence: " + apiGraph.getConsensusSequence());
         assertEquals("PNAR", apiGraph.getConsensusSequence());
+        POAGJson json = new POAGJson(apiGraph);
+
+        /* We want to check that we get the same result reading back in the JSON object */
+        JSONObject jsonObject = json.toJSON();
+        Consensus c = new Consensus(jsonObject);
+        String regeneratedConsensus = c.getSupportedSequence(false);
+        assertEquals("PNAR", regeneratedConsensus);
+
     }
 
     @Test
