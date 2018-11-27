@@ -911,6 +911,8 @@ public class POGraph {
 			Node prevNode = prevPath.getNode();
 			// Set the edge to have a true consensus flag
 			prevPath.getEdge().setConsensus(true);
+			// Set to be the consensus path
+			prevNode.setConsensus(true);
 			// If we have a character we want to add it
 			if (current.getBase() != null) {
 				sequence.push(current.getBase());
