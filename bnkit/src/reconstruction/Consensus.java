@@ -127,6 +127,8 @@ public class Consensus {
             if (current.getBase() != null && current != initialNode && current != finalNode) {
                 sequence.push(current.getBase());
             }
+            // Set to be the consensus path
+            current.setConsensus(true);
             // If we have a gappy sequence we need to add in the gaps
             if (gappy) {
                 int cameFromPosition = current.getId();
@@ -281,6 +283,7 @@ public class Consensus {
         private int id;
         private ArrayList<Edge> outEdges;
         private double cost = Double.MAX_VALUE;
+        private boolean consensus = false;
 
         public Node(char base, int id) {
             this.base = base;
@@ -302,6 +305,11 @@ public class Consensus {
             this.outEdges.add(edge);
         }
 
+        public void setConsensus(boolean consensus) { this.consensus = consensus;}
+
+        public boolean getConsensus() {
+            return consensus;
+        }
 
         public Character getBase() { return this.base; }
 

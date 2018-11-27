@@ -147,7 +147,7 @@ public class POAGJson {
         jsonNode.put(Defines.G_GRAPH, graph == null ? null : map2JSON(graph, 100));
         jsonNode.put(Defines.G_SEQ, seq);
         jsonNode.put(Defines.G_MUTANTS, seq);
-        jsonNode.put(Defines.G_CONSENSUS, poag.getConsensusMembership(nodeId));
+        jsonNode.put(Defines.G_CONSENSUS, poag.getConsensusMembership(nodeId) ? Defines.TRUE : Defines.FALSE);
         return jsonNode;
     }
 
