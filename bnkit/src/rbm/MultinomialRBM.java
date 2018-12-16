@@ -96,11 +96,6 @@ public class MultinomialRBM extends AbstractRBM {
     }
 
 
-    public double logistic(double x) {
-        double y = 1.0 / (1.0 + Math.exp(-x));
-        return y;
-    }
-
     public double softmax_denom(double[] x) {
         double denom = 0;
         for (int i = 0; i < x.length; i ++)
@@ -116,10 +111,6 @@ public class MultinomialRBM extends AbstractRBM {
         return d;
     }
 
-    public double softmax(double[] x, int j) {
-        return Math.exp(x[j]) / softmax_denom(x);
-    }
-
     public void setVisible(Object[] input) {
         for (int i = 0; i < v.length; i ++) {
             if (input[i] != null)
@@ -128,8 +119,7 @@ public class MultinomialRBM extends AbstractRBM {
     }
 
     @Override
-    public Object[] encode(Object[] input) {
-        Object[] hinst = new Object[this.h.length];
+    public Object[] encode(Object[] input, Object[] hinst) {
         for (int j = 0; j < h.length; j ++) {
             double net = 0.0;
             for (int i = 0; i < v.length; i ++) {
@@ -146,9 +136,8 @@ public class MultinomialRBM extends AbstractRBM {
     }
 
     @Override
-    public Object[] decode(Object[] hidden) {
+    public Object[] decode(Object[] hidden, Object[] vinst) {
         int K = getK(); // degree of each visible variable
-        Object[] vinst = new Object[this.v.length];
         for (int i = 0; i < v.length; i ++) {
             double[] net = new double[getK()];
             for (int k = 0; k < K; k ++) {

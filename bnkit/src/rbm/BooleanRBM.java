@@ -212,18 +212,6 @@ public class BooleanRBM extends AbstractRBM {
         writer.close();
     }
 
-    public double logistic(double x) {
-        double y = 1.0 / (1.0 + Math.exp(-x));
-        return y;
-    }
-
-    public double softmax(double[] x, int j) {
-        double denom = 0;
-        for (int i = 0; i < x.length; i ++)
-            denom += Math.exp(x[i]);
-        return Math.exp(x[j]) / denom;
-    }
-
     public void setVisible(Object[] input) {
         for (int i = 0; i < v.length; i ++) {
             if (input[i] != null)
@@ -231,36 +219,48 @@ public class BooleanRBM extends AbstractRBM {
         }
     }
 
+    /**
+     * Calculate a hidden state vector from a given visible/input state vector;
+     * note that this function updates the (internal) probabilities of the hidden state.
+     * @param input input state (array)
+     * @param hinst hidden state (array); over-written as a result of calling this function
+     * @return hidden state (array)
+     */
     @Override
-    public Object[] encode(Object[] input) {
-        Object[] hinst = new Object[this.h.length];
+    public Object[] encode(Object[] input, Object[] hinst) {
         for (int j = 0; j < h.length; j ++) {
-            double net = 0.0;
+            double net = b[j];
             for (int i = 0; i < v.length; i ++) {
                 if (input[i] != null && lnk[j][i]) {
                     if ((Boolean)input[i])
                         net += w[j][i];
                 }
             }
-            double p = logistic(net + b[j]);
+            double p = logistic(net);
             Ph[j].set(new double[] {p, 1.0 - p}) ;
             hinst[j] = Ph[j].sample();
         }
         return hinst;
     }
 
+    /**
+     * Calculate the visible state from the hidden;
+     * note that this function updates the (internal) probabilities of the visible state.
+     * @param hidden hidden state (array)
+     * @param vinst visible state array; over-written when called to enable the calling function to re-use memory
+     * @return visible state (array)
+     */
     @Override
-    public Object[] decode(Object[] hidden) {
-        Object[] vinst = new Object[this.v.length];
+    public Object[] decode(Object[] hidden, Object[] vinst) {
         for (int i = 0; i < v.length; i ++) {
-            double net = 0.0;
+            double net = a[i];
             for (int j = 0; j < h.length; j ++) {
                 if (hidden[j] != null && lnk[j][i]) {
                     if ((Boolean)hidden[j])
                         net +=  w[j][i];
                 }
             }
-            double p = logistic(net + a[i]);
+            double p = logistic(net);
             Pv[i].set(new double[] {p, 1.0 - p}) ;
             vinst[i] = Pv[i].sample();
         }
@@ -269,7 +269,7 @@ public class BooleanRBM extends AbstractRBM {
 
     @Override
     public Double[][] getCDGradient(Object[][] minibatch, int niter) {
-        Double[][] sum = new Double[getNHidden() + 1][getNVisible() + 1]; // plus one to include biases
+        Double[][] sum = new Double[getNHidden() + 1][getNVisible() + 1]; // plus one to include bias weights
         int[][] cnt = new int[getNHidden() + 1][getNVisible() + 1];
         err = 0;
         // TODO: multi-thread the following iteration
@@ -281,14 +281,16 @@ public class BooleanRBM extends AbstractRBM {
             for (int i = 0; i < getNVisible(); i ++) {
                 if (minibatch[p][i] != null) {
                     for (int j = 0; j < getNHidden(); j ++) {
-                        if (i == 0) { // do this only for one round
+                        if (i == 0) { // do this only for one round (bias)
                             cnt[j][getNVisible()] ++;
                             sum[j][getNVisible()] = 0.0;
                             pos[j][getNVisible()] = Ph[j].get(0);
                         }
-                        cnt[j][i] ++;
+                        if (lnk[j][i]) {
+                            cnt[j][i] ++;
+                            pos[j][i] = ((Boolean)input0[i]) ? 1 /*true*/ * Ph[j].get(0) : 0.0;
+                        }
                         sum[j][i] = 0.0;
-                        pos[j][i] = ((Boolean)input0[i]) ? 1 /*true*/ * Ph[j].get(0) : 0.0;
                     }
                     cnt[getNHidden()][i] ++;
                     sum[getNHidden()][i] = 0.0;
@@ -311,8 +313,10 @@ public class BooleanRBM extends AbstractRBM {
                             double neg = Ph[j].get(0);
                             sum[j][getNVisible()] += pos[j][getNVisible()] - neg;
                         }
-                        double neg = Pv[i].get(0) * Ph[j].get(0);
-                        sum[j][i] += pos[j][i] - neg;
+                        if (lnk[j][i]) {
+                            double neg = Pv[i].get(0) * Ph[j].get(0);
+                            sum[j][i] += pos[j][i] - neg;
+                        }
                     }
                     double neg = Pv[i].get(0);
                     sum[getNHidden()][i] += pos[getNHidden()][i] - neg;

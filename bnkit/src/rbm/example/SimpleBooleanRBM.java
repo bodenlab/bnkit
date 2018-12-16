@@ -34,12 +34,12 @@ public class SimpleBooleanRBM {
     
     public static void main(String[] args) {
 
-        //BooleanRBM rbm = new BooleanRBM(28 * 28,20);
+        BooleanRBM rbm = new BooleanRBM(28 * 28,20);
         try {
-            BooleanRBM rbm = new BooleanRBM("/Users/mikael/simhome/rbm/after.tsv");
+        //    BooleanRBM rbm = new BooleanRBM("/Users/mikael/simhome/rbm/after.tsv");
 
             EnumVariable[] vars = rbm.getVisibleVars();
-            Object[][] data = DataBuf.load("/Users/mikael/simhome/rbm/btrn.txt", vars, false);
+            Object[][] data = DataBuf.load("/Users/mikael/simhome/rbm/btrn0.txt", vars, false);
             CD<BooleanRBM> trn = new CD<>(rbm, 1);
             rbm.save("/Users/mikael/simhome/rbm/before.tsv");
             trn.train(data);
