@@ -139,6 +139,35 @@ public abstract class AbstractRBM {
         return indices;
     }
 
+    public void setLinked(boolean state) {
+        for (int j = 0; j < h.length; j ++) {
+            for (int i = 0; i < v.length; i ++)
+                this.lnk[j][i] = state;
+        }
+    }
+
+    public void setLinked(int[] visidx, int[] hididx, boolean state) {
+        for (int j = 0; j < hididx.length; j ++) {
+            for (int i = 0; i < visidx.length; i ++) {
+                this.lnk[hididx[j]][visidx[i]] = state;
+            }
+        }
+    }
+
+    public void setLinked(int from_visidx, int to_visidx, int hididx, boolean state) {
+        for (int i = from_visidx; i < to_visidx; i ++) {
+            this.lnk[hididx][i] = state;
+        }
+    }
+
+    public void setLinkedWindow(int viswidth, boolean state) {
+        int stepsize = (getNVisible() - viswidth) / (getNHidden() - 1);
+        for (int j = 0; j < getNHidden(); j ++) {
+            int start = j * stepsize;
+            setLinked(start, start + viswidth, j, state);
+        }
+    }
+
     /**
      * Designate the links from the specified input variables as "in use".
      * @param inputvars
