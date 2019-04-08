@@ -24,6 +24,18 @@ public class AlnReader {
     BufferedReader reader;
 
     /**
+     * Construct a reader for Clustal files for the GRASP server where we used BR's.
+     *
+     * @param filename the name of the file
+     * @param alpha the alphabet that the alignment uses
+     */
+    public AlnReader(BufferedReader br, Enumerable alpha) {
+        reader = br;
+        this.alpha = alpha;
+        file = null;
+    }
+
+    /**
      * Construct a reader for Clustal files.
      *
      * @param filename the name of the file

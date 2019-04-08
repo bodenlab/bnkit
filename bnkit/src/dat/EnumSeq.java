@@ -19,7 +19,9 @@ package dat;
 
 import dat.file.AlnReader;
 import dat.file.FastaReader;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,7 +30,7 @@ import java.util.List;
  * @author mikael
  * @param <E>
  */
-public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
+public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
 
     String name;
     String info;
@@ -72,8 +74,9 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
         }
         return sb.toString();
     }
-    
-    public static <T extends Enumerable> List<EnumSeq<T>> loadFasta(String filename, T elementType) throws IOException {
+
+
+    public static <T extends dat.Enumerable> List<EnumSeq<T>> loadFasta(String filename, T elementType) throws IOException {
         List<EnumSeq<T>> seqs = new ArrayList<>();
         FastaReader r = new FastaReader(filename, elementType);
         EnumSeq[] rseqs = r.load();
@@ -87,10 +90,10 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
         return seqs;
     }
     
-    public static EnumSeq<Enumerable> aacid_seq = new EnumSeq<>(Enumerable.aacid);
-    public static EnumSeq<Enumerable> nacid_seq = new EnumSeq<>(Enumerable.nacid);
+    public static EnumSeq<dat.Enumerable> aacid_seq = new EnumSeq<>(dat.Enumerable.aacid);
+    public static EnumSeq<dat.Enumerable> nacid_seq = new EnumSeq<>(dat.Enumerable.nacid);
 
-    public static class Gappy<E extends Enumerable> extends EnumSeq<E> {
+    public static class Gappy<E extends dat.Enumerable> extends EnumSeq<E> {
 
         public Gappy(E elementType) {
             super(elementType);
@@ -112,7 +115,31 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
             return true;
         }
 
-        public static <T extends Enumerable> List<EnumSeq.Gappy<T>> loadClustal(String filename, T elementType) throws IOException {
+        /**
+         * New version of the below, takes a buffered reader in, this was to avoid saving files on
+         * the GRASP server unnecessarily.
+         *
+         * @param br
+         * @param elementType
+         * @param <T>
+         * @return
+         * @throws IOException
+         */
+        public static <T extends dat.Enumerable> List<EnumSeq.Gappy<T>> loadClustal(BufferedReader br, T elementType) throws IOException {
+            List<EnumSeq.Gappy<T>> seqs = new ArrayList<>();
+            AlnReader r = new AlnReader(br, elementType);
+            EnumSeq.Gappy[] rseqs = r.load();
+            for (EnumSeq.Gappy<T> rseq : rseqs) {
+                try {
+                    seqs.add((EnumSeq.Gappy<T>) rseq);
+                } catch (ClassCastException e) {
+                }
+            }
+            r.close();
+            return seqs;
+        }
+
+        public static <T extends dat.Enumerable> List<EnumSeq.Gappy<T>> loadClustal(String filename, T elementType) throws IOException {
             List<EnumSeq.Gappy<T>> seqs = new ArrayList<>();
             AlnReader r = new AlnReader(filename, elementType);
             EnumSeq.Gappy[] rseqs = r.load();
@@ -126,7 +153,35 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
             return seqs;
         }
 
-        public static <T extends Enumerable> List<EnumSeq.Gappy<T>> loadFasta(String filename, T elementType, Character gap) throws IOException {
+        /**
+         * Apparently untested?
+         *
+         * This is the one used in GRASP atm (08042019) i (ariane) have just repourposed it to use
+         * for the buffered reader.
+         *
+         * @param br buffered reader
+         * @param elementType
+         * @param gap
+         * @param <T>
+         * @return
+         * @throws IOException
+         */
+        public static <T extends dat.Enumerable> List<EnumSeq.Gappy<T>> loadFasta(BufferedReader br, T elementType, Character gap) throws IOException {
+            //FIXME - untested
+            List<EnumSeq.Gappy<T>> seqs = new ArrayList<>();
+            FastaReader r = new FastaReader(br, elementType, gap);
+            EnumSeq.Gappy[] rseqs = r.loadGappy();
+            for (EnumSeq.Gappy rseq : rseqs) {
+                try {
+                    seqs.add((EnumSeq.Gappy<T>) rseq);
+                } catch (ClassCastException e) {
+                }
+            }
+            r.close();
+            return seqs;
+        }
+
+        public static <T extends dat.Enumerable> List<EnumSeq.Gappy<T>> loadFasta(String filename, T elementType, Character gap) throws IOException {
             //FIXME - untested
             List<EnumSeq.Gappy<T>> seqs = new ArrayList<>();
             FastaReader r = new FastaReader(filename, elementType, gap);
@@ -143,10 +198,10 @@ public class EnumSeq<E extends Enumerable> extends SeqDomain<E> {
         
     }
 
-    public static Gappy<Enumerable> aacid_gapseq = new Gappy<>(Enumerable.aacid);
-    public static Gappy<Enumerable> nacid_gapseq = new Gappy<>(Enumerable.nacid);
+    public static Gappy<dat.Enumerable> aacid_gapseq = new Gappy<>(dat.Enumerable.aacid);
+    public static Gappy<dat.Enumerable> nacid_gapseq = new Gappy<>(dat.Enumerable.nacid);
 
-    public static class Alignment<E extends Enumerable> {
+    public static class Alignment<E extends dat.Enumerable> {
         
         private final List<EnumSeq.Gappy<E>> seqs;
         private final int width;
