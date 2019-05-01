@@ -91,6 +91,63 @@ public class FastaReader {
     }
 
     /**
+     * Takes an already open file i.e. a buffered reader and does the same as above.
+     *
+     * This constructor makes an educated guess on what the alphabet is; it checks in order
+     * DNA, DNA with N, RNA, RNA with N, Amino Acid and the resorts to create its own.
+     * It will recognise a (separate) gap character ('-' by default), and not include it as part of the alphabet.
+     * @param br the buffered reader
+     * @throws IOException if the file can not be found
+     */
+    public FastaReader(BufferedReader br) throws IOException {
+        this(br, '-');
+    }
+
+    /**
+     * Opens a file on the FASTA format.
+     * This constructor makes an educated guess on what the alphabet is; it checks in order
+     * DNA, DNA with N, RNA, RNA with N, Amino Acid and the resorts to create its own.
+     * It will recognise a (separate) gap character ('-' by default), and not include it as part of the alphabet.
+     * @param reader the buffered reader
+     * @param gapSymbol the gap character
+     * @throws IOException if the file can not be found
+     */
+    public FastaReader(BufferedReader reader, Character gapSymbol) throws IOException {
+        this.gapSymbol = gapSymbol;
+        try {
+            String line = reader.readLine();
+            Set<Object> charset = new HashSet<>();
+            while (line != null) {
+                String myline = line.trim();
+                if (!myline.startsWith(">"))
+                    for (Character ch : myline.toCharArray())
+                        charset.add(ch);
+                line = reader.readLine();
+            }
+            reader.close();
+            for (Enumerable alpha : checkAlphabetsInOrder) {
+                boolean valid = true;
+                for (Object ch : charset) {
+                    if (ch != gapSymbol && !Enumerable.aacid.isValid(ch)) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid) { // we are happy with this alphabet
+                    this.alphabet = alpha;
+                    break;
+                }
+            }
+            if (this.alphabet == null)
+                this.alphabet = new Enumerable(charset.toArray());
+            sequences=new ArrayList<>();
+        } catch (FileNotFoundException e) {
+            reader=null;
+            throw new IOException(e.getMessage());
+        }
+    }
+
+    /**
      * Opens a file on the FASTA format.
      * This constructor makes an educated guess on what the alphabet is; it checks in order
      * DNA, DNA with N, RNA, RNA with N, Amino Acid and the resorts to create its own.
@@ -138,6 +195,21 @@ public class FastaReader {
             throw new IOException(e.getMessage());
         }
     }
+
+    /**
+     * Assigns the buffered reader for use in GRASP.
+     *
+     * @param br the open file already buffered.
+     * @param alpha the symbol alphabet to use
+     * @throws IOException if the file can not be found
+     */
+    public FastaReader(BufferedReader br, Enumerable alpha, Character gapSymbol) throws IOException {
+        sequences=new ArrayList<>();
+        alphabet=alpha;
+        this.gapSymbol = gapSymbol;
+        reader = br;
+    }
+
 
     /**
      * Opens a file on the FASTA format.
