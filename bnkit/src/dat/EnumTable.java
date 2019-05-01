@@ -70,7 +70,31 @@ public class EnumTable<E> implements Iterable<Integer> {
             this.period[parent] = prod;
         }
     }
-    
+
+    public static int getSize(EnumVariable... useParents) {
+        return getSize(EnumVariable.toList(useParents));
+    }
+    public static int getSize(Collection<EnumVariable> useParents) {
+        int nParents = useParents.size();
+        EnumVariable[] pararr = new EnumVariable[nParents];
+        int[] step = new int[nParents];
+        int[] period = new int[nParents];
+        int[] domsize = new int[nParents];
+        int prod = 1;
+        int i = 0;
+        for (EnumVariable var : useParents) {
+            pararr[i ++] = var;
+        }
+        for (i = 0; i < nParents; i++) {
+            int parent = nParents - i - 1;
+            domsize[parent] = pararr[parent].size();
+            step[parent] = prod;
+            prod *= domsize[parent];
+            period[parent] = prod;
+        }
+        return period[0];
+    }
+
     public EnumTable retrofit(List<EnumVariable> useParents) {
         if (this.nParents != useParents.size())
             throw new RuntimeException("Invalid retrofitting");
@@ -354,9 +378,18 @@ public class EnumTable<E> implements Iterable<Integer> {
             return getIndices();
         }
         List<Integer> indices = new ArrayList<>();
-        for (Map.Entry<Integer, E> entry : map.entrySet()) {
-            if (isMatch(key, entry.getKey())) {
-                indices.add(entry.getKey());
+        int tot = getNTheoreticalIndices(key);
+        if (tot < (map.size() / 100)) {
+            int[] tidxs = getTheoreticalIndices(key);
+            for (int tidx : tidxs) {
+                if (map.containsKey(tidx))
+                    indices.add(tidx);
+            }
+        } else {
+            for (Map.Entry<Integer, E> entry : map.entrySet()) {
+                if (isMatch(key, entry.getKey())) {
+                    indices.add(entry.getKey());
+                }
             }
         }
         int[] ret = new int[indices.size()];
@@ -364,6 +397,16 @@ public class EnumTable<E> implements Iterable<Integer> {
             ret[i] = indices.get(i);
         }
         return ret;
+    }
+
+    public int getNTheoreticalIndices(Object[] key) {
+        int tot = 1;
+        for (int i = 0; i < key.length; i++) {
+            if (key[i] == null) {
+                tot *= domsize[i];
+            }
+        }
+        return tot;
     }
 
     /**

@@ -50,9 +50,9 @@ public class TSVFile {
                     }
                 }
             }
-            for (int i = 1; i < objects.length; i++) { // start at 1, skip header
-                int index = i - 1;
-                rows.add(index, objects[i]);
+            int index = 0;
+            for (int i = (useHeader ? 1 : 0); i < objects.length; i++) { // start at 1 and skip header conditionally
+                rows.add(index ++, objects[i]);
             }
         }
     }
@@ -124,6 +124,20 @@ public class TSVFile {
         if (col == null)
             return -1;
         return col;
+    }
+
+    public String getHeader(int col) {
+        for (Map.Entry<String, Integer> entry : headers.entrySet())
+            if (entry.getValue().intValue() == col)
+                return entry.getKey();
+        return null;
+    }
+
+    public String[] getHeaders() {
+        String[] s = new String[headers.size()];
+        for (Map.Entry<String, Integer> entry : headers.entrySet())
+            s[entry.getValue().intValue()] = entry.getKey();
+        return s;
     }
 
     public Object getValue(Object[] row, String colname) {

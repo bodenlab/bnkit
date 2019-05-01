@@ -570,8 +570,9 @@ public class GDT implements BNode, Serializable {
             int nrows = table.getSize();
             for (int i = 0; i < nrows; i++) {
                 if (!table.hasValue(i))
-                    table.setValue(i, new GaussianDistrib(rand.nextGaussian(), rand.nextDouble()));
+                    table.setValue(i, new GaussianDistrib(rand.nextGaussian()*10+10, rand.nextDouble()*5));
             }
+            table.display();
         }
     }
 
