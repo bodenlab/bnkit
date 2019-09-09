@@ -27,6 +27,7 @@ public class POGraph {
 	private Node initialNode = null;					// initial node (null node), points to the first actual nodes as 'next' nodes
 	private Node finalNode = null; 						// final node (null node), 'previous' pointers point to the final actual nodes
 	private Map<Integer, String> sequences;				// map of sequence ID and sequence label
+	private Map<Integer, Map<Integer, Map<Integer, Integer>>> edgeCounts;
 
 	/**
 	 * Constructor to initialise empty graph.
@@ -37,6 +38,7 @@ public class POGraph {
 		finalNode = new Node();
 		nodes = new HashMap<>();
 		current = null;
+		edgeCounts = new HashMap<>();
 	}
 
 	/**
@@ -1497,6 +1499,8 @@ public class POGraph {
 		for (Integer seqId : seqNodeMap.keySet())
 			for (int nodeInd = 0; nodeInd + 1 < seqNodeMap.get(seqId).size(); nodeInd++) {
 				seqNodeMap.get(seqId).get(nodeInd).addNextNode(seqNodeMap.get(seqId).get(nodeInd + 1), seqId);
+				addEdgeToSeq(seqNodeMap.get(seqId).get(nodeInd).ID, seqNodeMap.get(seqId).get(nodeInd + 1).ID, seqId );
+
 				seqNodeMap.get(seqId).get(nodeInd + 1).addPrevNode(seqNodeMap.get(seqId).get(nodeInd), seqId);
 			}
 
@@ -1527,6 +1531,11 @@ public class POGraph {
 			seqNodeMap.get(seqId).get(0).addPrevNode(initialNode, seqId);
 			finalNode.addPrevNode(seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).size()-1), seqId);
 			seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).size()-1).addNextNode(finalNode, seqId);
+
+			addEdgeToSeq(initialNode.ID, seqNodeMap.get(seqId).get(0).ID, seqId );
+			addEdgeToSeq(seqNodeMap.get(seqId).get(seqNodeMap.get(seqId).size()-1).ID, finalNode.ID, seqId );
+
+
 		}
 
 		return initialNode.getNextNodes().get(0);
@@ -1642,6 +1651,24 @@ public class POGraph {
 			stack.add(nodeID);
 			stack.addAll(successors);
 		}
+	}
+
+	
+	private void addEdgeToSeq(Integer start, Integer end, Integer seqID){
+		HashMap<Integer, Integer> edgeCount = new HashMap<>();
+		edgeCount.put(end, 1);
+
+		if (this.edgeCounts.get(seqID) != null){
+
+			this.edgeCounts.get(seqID).put(start, edgeCount);
+
+		}
+		else {
+			this.edgeCounts.put(seqID, new HashMap(){{put(start, edgeCount);}});
+
+		}
+
+
 	}
 
 	/**
