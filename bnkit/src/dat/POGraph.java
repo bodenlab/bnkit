@@ -94,6 +94,14 @@ public class POGraph {
 	}
 
 	/**
+	 * Allows grasp to access the POG egde counts.
+	 * @return
+	 */
+	public Map<Integer, Map<Integer, Map<Integer, Integer>>> getEdgeCounts() {
+		return edgeCounts;
+	}
+
+	/**
 	 * Store the cost of a particular transition.
 	 * @param transitionCost
 	 */

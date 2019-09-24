@@ -203,6 +203,14 @@ public class ASRPOG {
 		performASR(msa, treeFile, sequenceFile, jointInference);
 	}
 
+	/**
+	 * Allows GRASP to access the POG alignment classes.
+	 * @return
+	 */
+	public POGraph getPogAlignment() {
+		return this.pogAlignment;
+	}
+
 
 	/**
 	 * Temporary method to be able to log to a particular file name.
