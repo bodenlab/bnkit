@@ -119,7 +119,7 @@ public class TreeNodeObject {
         // Check if this is a leaf
         if (isExtent()) {
             // We need to assign the edge counts associated with this sequecne.
-            int id = seqIdMap.get(this.label);
+            int id = seqIdMap.get(this.originalLabel);
             this.edgeCounts = (HashMap)edgeCounts.get(id);
             this.leafLabels.add(this.label);
             this.numSeqsUnderNode = 1;
