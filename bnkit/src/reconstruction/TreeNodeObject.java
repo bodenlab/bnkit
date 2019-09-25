@@ -56,7 +56,7 @@ public class TreeNodeObject {
     private int id;
     private boolean inIntersection = false;
     private boolean isRoot = false;
-    private HashMap<Integer, HashMap<Integer, Integer>> edgeCounts;		//private  Map<start ID, Map<end ID, count>>
+    private HashMap<Integer, HashMap<Integer, Integer>> edgeCounts;     //private  Map<start ID, Map<end ID, count>>
     private int msaId; // Used to keep track of the ID of this sequence in the MSA.
 
     public TreeNodeObject(String label, TreeNodeObject parent, Double distance, int id, boolean extent) {
@@ -122,6 +122,7 @@ public class TreeNodeObject {
             int id = seqIdMap.get(this.label);
             this.edgeCounts = (HashMap)edgeCounts.get(id);
             this.leafLabels.add(this.label);
+            this.numSeqsUnderNode = 1;
             return true;
         }
         this.edgeCounts = new HashMap<>();
@@ -158,7 +159,7 @@ public class TreeNodeObject {
                         if (this.edgeCounts.get(start).get(end) == null) {
                             this.edgeCounts.get(start).put(end, countList.get(start).get(end));
                         } else {
-                            int endCount = this.edgeCounts.get(start).get(end) + 1;
+                            int endCount = this.edgeCounts.get(start).get(end) + countList.get(start).get(end);
                             this.edgeCounts.get(start).put(end, endCount);
                         }
                     }
