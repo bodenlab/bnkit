@@ -350,8 +350,15 @@ public class ConsensusObject {
 //            return Double.MAX_VALUE;
 //        }
         // This has a 0 cost
-        Double weight;
-        weight = edgeCounts.get(from.getId()).get(to.getId())/(double)(this.numberSeqsUnderNode);
+        Double weight = 0.0;
+        try {
+            weight = edgeCounts.get(from.getId()).get(to.getId())/(double)(this.numberSeqsUnderNode);
+
+        } catch (Exception e) {
+            // This mean this edge doesn't exist, so we can't go down here (for this - lets return the max value)
+            // ToDo: Do we just want to add a penalty? Saying no seqs go down here... another option.
+            return Double.MAX_VALUE;
+        }
 
         //
         if (!isBidirectional) {
@@ -366,11 +373,6 @@ public class ConsensusObject {
         }
 
         val =  multiplier * val * positionDiff;
-        if (val <= 0) {
-            System.out.println("RUNNING: " + from.getId() + "->" + to.getId() + "VAL <= 0 AFTER MULTIPLY: " + val);
-            val = numberSeqsUnderNode;
-        }
-
         // We add 1 on here since just incase we have a 0 cost (i.e. all the sequences travel here,
         // we still want to assign this a cost of "moving".
         return Math.abs(val) + 1;
@@ -401,7 +403,7 @@ public class ConsensusObject {
             // Set the edge to have a true consensus flag
             prevPath.getEdge().setConsensus(true);
             // If we have a character we want to add it
-            if (current.getBase() != null) { //&& current != initialNode && current != finalNode) {
+            if (current.getBase() != null && current != finalNode) {
                 sequence.push(current.getBase());
             }
             // Set to be the consensus path
@@ -420,6 +422,8 @@ public class ConsensusObject {
             cameFrom.remove(current);
             current = prevNode;
         }
+
+        // ToDo: Totally remove - the below was used for finiding the best final and initial notdes
 
 //        for (int i = 0; i < bestInitialNode.getId(); i ++) {
 //            sequenceString += '-';
