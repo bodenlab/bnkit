@@ -23,7 +23,7 @@ public class ConsensusObject {
     // We keep them as they are used on the front end for signifying the start and end terminals.
     Node initialNode;
     Node finalNode;
-    int numberNodes;
+    int numberPositionsInSequence;
 
     // Map with heuristics
     HashMap<Integer, Double> cost = new HashMap<>();
@@ -41,9 +41,14 @@ public class ConsensusObject {
     Node bestInitialNode;
     Node bestFinalNode;
 
+    boolean updateEdgeCounts; // Used to toggel whether or not we want to update the cost of the edges based on the
+    // edge count map that is passed in.
+
     public ConsensusObject(HashMap<Integer, HashMap<Integer, Integer>> edgeCounts, int numberSeqsUnderNode) {
         this.numberSeqsUnderNode = numberSeqsUnderNode;
         this.edgeCounts = edgeCounts;
+        // For now let's just automatically set to update the edge counts cost
+        this.updateEdgeCounts = true;
         cost = new HashMap<>();
     }
 
@@ -59,6 +64,14 @@ public class ConsensusObject {
         return bestCount;
     }
 
+
+    /**
+     *
+     * @param updateEdgeCost
+     */
+    public void setUpdateEdgeCounts(boolean updateEdgeCost) {
+        this.updateEdgeCounts = updateEdgeCost;
+    }
 
     /**
      * Build the mapping of the edges.
@@ -251,10 +264,17 @@ public class ConsensusObject {
             JSONArray edgeJson = (JSONArray) jsonEdges.get(e);
             int fromId = edgeJson.getInt(Defines.E_FROM);
             int toId = edgeJson.getInt(Defines.E_TO);
-
+            double weight = edgeJson.getDouble(Defines.E_WEIGHT);
+            if (updateEdgeCounts) {
+                try {
+                    weight = edgeCounts.get(fromId).get(toId);
+                } catch (Exception excep) {
+                    // Skip this edge as this is not possible, we want to remove it.
+                    continue;
+                }
+            }
 
             boolean reciprocated = edgeJson.getInt(Defines.E_RECIPROCATED) == Defines.TRUE;
-            double weight = edgeJson.getDouble(Defines.E_WEIGHT);
             Edge edge = new Edge(fromId, toId, weight, reciprocated, edgeJson, e);
             edges.add(edge);
             // Add the edge to the node map
@@ -284,15 +304,8 @@ public class ConsensusObject {
         this.initialNode = nodeMap.get(initialId);
         this.finalNode = nodeMap.get(endId);
         // Calculate the best initial and final IDs
-        // ToDo: Either remove or keep...
-//        initialId = getBestId(possibleInitialIds, 'M');
-//        endId = getBestId(possibleFinalIds, null);
-//        // Set these so we're able to get the edges that are from these
-//        this.bestInitialNode = nodeMap.get(initialId);
-//        this.bestFinalNode = nodeMap.get(endId);
-
-        // Set the numberof nodes to be the end ID
-        numberNodes = nodeMap.size();
+        // Set the number of nodes to be the end ID
+        numberPositionsInSequence = nodeMap.size();
     }
 
 
@@ -322,18 +335,18 @@ public class ConsensusObject {
      * We want the smallest cost esitmate to get from the start to the end.
      *
      * We have penalities for things such as a non-bidirectional edge.
-     *      1. weight penality = numSeqsUnderNode
+     *      1. weight penality = numberPositionsInSequence * 2
      * We also have the number of sequences that have taken an edge, we convert this into a % by
      * dividing by the number of sequences under this node
      *      2. 1 - edge weight (we do 1 - since we want the largest possible amount)
      * Method of adding in heuristics to the AStar search algorithm.
      * The aim is to get the path that has the most sequences in agreement.
      * However we also want the longest sequence (as this will contain the
-     * fewest gaps).
+     * fewest gaps). Hence we multiply by the position change.
      *
-     * To do this we use the edge.getSequences().size() and multiply it by a
-     * factor that penalises long gappy regions i.e. (1 + (1/gap_size))
      *
+     * numberPositionsInSequence * 2 is the maximum value we could get for a bidirectional
+     * path - hence we use this as the cost.
      * ToDo: optimise the heuristic function.
      *
      * @return
@@ -344,14 +357,11 @@ public class ConsensusObject {
         int positionDiff = java.lang.Math.abs(to.getId() - from.getId());
         positionDiff = (positionDiff > 0) ? positionDiff : 1;
 
-        // ToDo potentially uncomment if we want to have predefined start and end again.
-        if (to.getId() == finalNode.getId() || from.getId() == initialNode.getId()) {
-            System.out.println("PASSED FINAL NODE OR TRYING FROM WRONG INITIAL NODE: " + from.getId() + "->" + to.getId());
-            return Double.MAX_VALUE;
-        }
         // This has a 0 cost
         Double weight = 0.0;
         try {
+            // Note we don't use edge.getWeight here, as sometimes the person won't have
+            // wanted to override this.
             weight = edgeCounts.get(from.getId()).get(to.getId())/(double)(this.numberSeqsUnderNode);
 
         } catch (Exception e) {
@@ -360,22 +370,24 @@ public class ConsensusObject {
             return Double.MAX_VALUE;
         }
 
-        //
-        if (!isBidirectional) {
-            multiplier = numberSeqsUnderNode;
+        // Endure we don't add our multiplier to start and end nodes
+        if (!isBidirectional && to.getId() != finalNode.getId() && from.getId() != initialNode.getId()) {
+            multiplier = 2 * numberPositionsInSequence;
         }
 
         double val = 1 - weight;
         if (val < 0) {
             // That is very strange and we need to return an error
-            System.out.println("RUNNING: " + from.getId() + "->" + to.getId() + "VAL < 0: " + val);
-            val = numberSeqsUnderNode;
+            System.out.println("ERROR: RUNNING: " + from.getId() + "->" + to.getId() + "VAL < 0: " + val);
+            val = numberPositionsInSequence * 2;
         }
 
-        val =  ((multiplier * val) + 1) * positionDiff;
         // We add 1 on here since just incase we have a 0 cost (i.e. all the sequences travel here,
-        // we still want to assign this a cost of "moving".
-        return Math.abs(val);
+        // we still want to assign this a cost of "moving". and ensure this is multiplied by the
+        // number of poistions we travel as this is additive.
+        val =  ((multiplier * val) + 1) * positionDiff;
+
+        return val;
     }
 
 
@@ -393,8 +405,6 @@ public class ConsensusObject {
         // Add the initial Base that we decided on during the pre-processing stage
         String sequenceString = "";
         // Set the initial and final edges
-//        initialAndFinalEdges.get(bestInitialNode.getId()).setConsensus(true);
-//        initialAndFinalEdges.get(bestFinalNode.getId()).setConsensus(true);
 
         while (cameFrom.keySet().contains(current)) {
             Path prevPath = cameFrom.get(current);
@@ -423,25 +433,10 @@ public class ConsensusObject {
             current = prevNode;
         }
 
-        // ToDo: Totally remove - the below was used for finiding the best final and initial notdes
-
-//        for (int i = 0; i < bestInitialNode.getId(); i ++) {
-//            sequenceString += '-';
-//        }
-//
-//        sequenceString += bestInitialNode.getBase();
         // Reverse and create a string
         while (!sequence.empty()) {
             sequenceString += sequence.pop();
         }
-//        // Finally we need to check if we are missing any of the end gaps
-//        if (bestFinalNode.getId() < finalNode.getId()) {
-//            int diff = finalNode.getId() - bestFinalNode.getId() - 1;
-//            while (diff > 0) {
-//                sequenceString += '-';
-//                diff --;
-//            }
-//        }
         return sequenceString;
     }
 
