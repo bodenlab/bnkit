@@ -365,10 +365,8 @@ public class ConsensusObject {
             weight = edgeCounts.get(from.getId()).get(to.getId())/(double)(this.numberSeqsUnderNode);
 
         } catch (Exception e) {
-            // This mean this edge doesn't exist, so we can't go down here (for this - lets return the max value)
-            // ToDo: Do we just want to add a penalty? Saying no seqs go down here... another option.
-            System.out.println("ERROR: RUNNING: " + from.getId() + "->" + to.getId());
-            return Double.MAX_VALUE;
+            System.out.println("ERROR NO WEIGHT: RUNNING: " + from.getId() + "->" + to.getId());
+            multiplier = 2 * numberPositionsInSequence;
         }
 
         // Endure we don't add our multiplier to start and end nodes
