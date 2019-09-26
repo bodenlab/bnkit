@@ -270,7 +270,7 @@ public class ConsensusObject {
                     weight = (edgeCounts.get(fromId).get(toId)/(double)numberSeqsUnderNode)*100;
                 } catch (Exception excep) {
                     // Skip this edge as this is not possible, we want to remove it.
-                    continue;
+                    weight = 0.0;
                 }
             }
 
