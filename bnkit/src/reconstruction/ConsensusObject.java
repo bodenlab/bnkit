@@ -345,10 +345,10 @@ public class ConsensusObject {
         positionDiff = (positionDiff > 0) ? positionDiff : 1;
 
         // ToDo potentially uncomment if we want to have predefined start and end again.
-//        if (to.getId() == finalNode.getId() || from.getId() == initialNode.getId()) {
-//            System.out.println("PASSED FINAL NODE OR TRYING FROM WRONG INITIAL NODE: " + from.getId() + "->" + to.getId());
-//            return Double.MAX_VALUE;
-//        }
+        if (to.getId() == finalNode.getId() || from.getId() == initialNode.getId()) {
+            System.out.println("PASSED FINAL NODE OR TRYING FROM WRONG INITIAL NODE: " + from.getId() + "->" + to.getId());
+            return Double.MAX_VALUE;
+        }
         // This has a 0 cost
         Double weight = 0.0;
         try {
@@ -372,10 +372,10 @@ public class ConsensusObject {
             val = numberSeqsUnderNode;
         }
 
-        val =  multiplier * val * positionDiff;
+        val =  ((multiplier * val) + 1) * positionDiff;
         // We add 1 on here since just incase we have a 0 cost (i.e. all the sequences travel here,
         // we still want to assign this a cost of "moving".
-        return Math.abs(val) + 1;
+        return Math.abs(val);
     }
 
 
