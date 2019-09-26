@@ -367,6 +367,7 @@ public class ConsensusObject {
         } catch (Exception e) {
             // This mean this edge doesn't exist, so we can't go down here (for this - lets return the max value)
             // ToDo: Do we just want to add a penalty? Saying no seqs go down here... another option.
+            System.out.println("ERROR: RUNNING: " + from.getId() + "->" + to.getId());
             return Double.MAX_VALUE;
         }
 
