@@ -267,10 +267,10 @@ public class ConsensusObject {
             double weight = edgeJson.getDouble(Defines.E_WEIGHT);
             if (updateEdgeCounts) {
                 try {
-                    weight = (edgeCounts.get(fromId).get(toId)/(double)numberSeqsUnderNode)*100;
+                    weight = (edgeCounts.get(fromId).get(toId)/(double)numberSeqsUnderNode) * 100;
                 } catch (Exception excep) {
                     // Skip this edge as this is not possible, we want to remove it.
-                    weight = 0.0;
+                    continue;
                 }
             }
 
@@ -365,7 +365,9 @@ public class ConsensusObject {
             weight = edgeCounts.get(from.getId()).get(to.getId())/(double)(this.numberSeqsUnderNode);
 
         } catch (Exception e) {
-            System.out.println("ERROR NO WEIGHT: RUNNING: " + from.getId() + "->" + to.getId());
+            // This mean this edge doesn't exist, so we can't go down here (for this - lets return the max value)
+            // ToDo: Do we just want to add a penalty? Saying no seqs go down here... another option.
+            System.out.println("NO WEIGHTS " + from.getId() + "->" + to.getId());
             multiplier = 2 * numberPositionsInSequence;
         }
 
