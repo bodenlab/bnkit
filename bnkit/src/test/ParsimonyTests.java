@@ -23,13 +23,13 @@ public class ParsimonyTests {
     public static void setUp() throws Exception {
         try {
             trees = new PhyloTree[] { // MB: also successfully tried a 150-seq tree with alignment (not in test/resources)
-                    new PhyloTree().loadNewick("src/test/resources/large.nwk"),
-                    new PhyloTree().loadNewick("src/test/resources/default.nwk"),
+                    new PhyloTree().loadNewick("bnkit/src/test/resources/large.nwk"),
+                    new PhyloTree().loadNewick("bnkit/src/test/resources/default.nwk"),
 //                    PhyloTree.loadNewick("src/test/resources/edge1.nwk"),
             };
             alns = new EnumSeq.Alignment[] {
-                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("src/test/resources/large.aln", Enumerable.aacid)),
-                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("src/test/resources/default.aln", Enumerable.aacid)),
+                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("bnkit/src/test/resources/large.aln", Enumerable.aacid)),
+                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("bnkit/src/test/resources/default.aln", Enumerable.aacid)),
 //                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("src/test/resources/edge2.aln", Enumerable.aacid)),
             };
             for (int i = 0; i < trees.length; i ++)

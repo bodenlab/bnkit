@@ -19,7 +19,7 @@ public class VisTests {
     @Test
     @DisplayName("Generate JSON graph")
     public void getJSONGraphTest() throws IOException {
-        String alnfilepath = "src/test/resources/small.aln";
+        String alnfilepath = "bnkit/src/test/resources/small.aln";
         PartialOrderGraph graph = new PartialOrderGraph(new POGraph(alnfilepath));
         POAGJson json = new POAGJson(graph);
         JSONObject jsonObject = json.toJSON();
@@ -35,8 +35,8 @@ public class VisTests {
     @Test
     @DisplayName("Generate JSON graph for ASR output")
     public void getJSONASRTest() throws IOException, InterruptedException {
-        String alnfilepath = "src/test/resources/small.aln";
-        String treefilepath = "src/test/resources/small.nwk";
+        String alnfilepath = "bnkit/src/test/resources/small.aln";
+        String treefilepath = "bnkit/src/test/resources/small.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, treefilepath, false, false, null, 1);
         PartialOrderGraph msa = asr.getPartialOrderGraph();
         PartialOrderGraph graph = asr.getGraph("root");
@@ -54,8 +54,8 @@ public class VisTests {
         /**
          * ToDo: work out why this test fails despite being exactly the same on visual inspection
          */
-        String alnfilepath = "src/test/resources/small.aln";
-        String treefilepath = "src/test/resources/small.nwk";
+        String alnfilepath = "bnkit/src/test/resources/small.aln";
+        String treefilepath = "bnkit/src/test/resources/small.nwk";
         ASRPOG asr = new ASRPOG(alnfilepath, treefilepath, false, false, null, 1);
         PartialOrderGraph msa = asr.getPartialOrderGraph();
         PartialOrderGraph graph = asr.getGraph("root");

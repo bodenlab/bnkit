@@ -22,7 +22,7 @@ public class POGraphTests {
     @Test
     @DisplayName("Small Partial Order Graph test")
     public void smallPartialOrderGraph() throws IOException {
-        String filepath = "src/test/resources/testPOGraphSmall.dot";
+        String filepath = "bnkit/src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println("Consensus sequence: " + apiGraph.getConsensusSequence());
         assertEquals("PNAR", apiGraph.getConsensusSequence());
@@ -39,7 +39,7 @@ public class POGraphTests {
     @Test
     @DisplayName("Small PO Graph test")
     public void smallPOGraph() throws IOException {
-        String filepath = "src/test/resources/testPOGraphSmall.dot";
+        String filepath = "bnkit/src/test/resources/testPOGraphSmall.dot";
         POGraph graph = new POGraph(filepath);
         System.out.println("Consensus sequence: " + graph.getSupportedSequence(false));
         assertEquals("PNAR", graph.getSupportedSequence(false));
@@ -60,7 +60,7 @@ public class POGraphTests {
     @Test
     @DisplayName("MSA PO Graph test")
     public void MSAPOGraph() throws IOException {
-        String filepath = "src/test/resources/testPOGraphMSAMed.dot";
+        String filepath = "bnkit/src/test/resources/testPOGraphMSAMed.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         for (Integer id : apiGraph.getNodeIDs())
             System.out.println(apiGraph.getLabel(id));
@@ -69,7 +69,7 @@ public class POGraphTests {
     @Test
     @DisplayName("Load Graph test")
     public void LoadPOGraph() throws IOException {
-        String filepath = "src/test/resources/testPOGraphMSAFourLevels.dot";
+        String filepath = "bnkit/src/test/resources/testPOGraphMSAFourLevels.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         System.out.println(apiGraph.toString());
     }
@@ -77,7 +77,7 @@ public class POGraphTests {
     @Test
     @DisplayName("Small PO Graph test edge weights")
     public void smallPOGraphEdgeWeights() throws IOException {
-        String filepath = "src/test/resources/testPOGraphSmall.dot";
+        String filepath = "bnkit/src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         for (Integer nodeId : apiGraph.getNodeIDs()) {
             System.out.println(Integer.toString(nodeId) + ":" + apiGraph.getLabel(nodeId));
@@ -91,7 +91,7 @@ public class POGraphTests {
     @Test
     @DisplayName("Sort small PO Graph")
     public void smallPOGraphSort() throws IOException {
-        String filepath = "src/test/resources/testPOGraphSmall.dot";
+        String filepath = "bnkit/src/test/resources/testPOGraphSmall.dot";
         PartialOrderGraph apiGraph = new PartialOrderGraph(filepath);
         Integer[] ids = apiGraph.sort();
         for (Integer id : ids)
@@ -102,9 +102,9 @@ public class POGraphTests {
     @Test
     @DisplayName("Convert PO Graph to API PartialOrderGraph")
     public void graphToAPITest() throws IOException {
-        String filepath = "src/test/resources/small.aln";
+        String filepath = "bnkit/src/test/resources/small.aln";
         POGraph graph = new POGraph(filepath);
-        graph.saveSequences("src/text/resources/small_graph.aln", "clustal");
+        graph.saveSequences("bnkit/src/text/resources/small_graph.aln", "clustal");
         PartialOrderGraph apiGraph = new PartialOrderGraph(graph);
         System.out.println(graph.toString());
         System.out.println(apiGraph.toString());
@@ -114,7 +114,7 @@ public class POGraphTests {
     @Test
     @DisplayName("Convert PO Graph to JSON")
     public void graphToJSONTest() throws IOException {
-        String filepath = "src/test/resources/testPOGraphMSAEightLevels.dot";
+        String filepath = "bnkit/src/test/resources/testPOGraphMSAEightLevels.dot";
         PartialOrderGraph graph = new PartialOrderGraph(filepath);
         POAGJson json = new POAGJson(graph);
         JSONObject obj = json.toJSON();
