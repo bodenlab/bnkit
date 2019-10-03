@@ -1423,11 +1423,13 @@ public class ASRPOG {
 		}
 		long elapsedTimeNs = System.nanoTime() - startTime;
 		//System.out.println("END,"  + elapsedTimeNs/1000000000.0);
-		try {
-			fr.write("END," + elapsedTimeNs / 1000000000.0 + "\n");
-			fr.close();
-		} catch (Exception e) {
-			System.out.println("Coun't write.");
+		if (fr != null) {
+			try {
+				fr.write("END," + elapsedTimeNs / 1000000000.0 + "\n");
+				fr.close();
+			} catch (Exception e) {
+				System.out.println("Couldn't write.");
+			}
 		}
 	}
 
