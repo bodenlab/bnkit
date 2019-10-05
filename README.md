@@ -13,7 +13,7 @@ It is a complete re-write of an earlier (in-house) version the Boden lab has bee
 To generate documentation use javadoc. There are a few examples in the code and a very
 brief tutorial in the "bn" package documentation.
 
-As part of work funded by the Australian Research Council, the inference engine in bnkit has been bundled with code for phylogenetic analysis. In particular, the "reconstruction" package interfaces with services for ancestral sequence reconstruction (ASR). GRASP (bodenlab/ASR) implements a web server for ASR.
+As part of work funded by the Australian Research Council, the inference engine in bnkit has been bundled with code for phylogenetic analysis. In particular, the "reconstruction" package interfaces with services for ancestral sequence reconstruction (ASR). GRASP (https://github.com/bodenlab/ASR) implements a web server for ASR.
 
 # Wiki #
 https://github.com/bodenlab/bnkit/wiki
