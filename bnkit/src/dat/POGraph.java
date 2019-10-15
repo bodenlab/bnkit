@@ -1,9 +1,13 @@
 package dat;
 
 import alignment.utilities.MutableInt;
+import bn.Distrib;
+import bn.prob.EnumDistrib;
 import dat.file.AlnWriter;
 import dat.file.DotWriter;
 import dat.file.FastaWriter;
+import reconstruction.Inference;
+import reconstruction.POGEdgeMap;
 
 import java.io.*;
 import java.util.*;
@@ -18,7 +22,7 @@ import java.util.*;
  * 		- list of starting nodes
  * 		- mapping between sequence ID and sequence label
  *
- * @author Gabe, Marnie
+ * @author Gabe, Marnie, some amendments by Mikael
  *
  */
 public class POGraph {
@@ -27,7 +31,9 @@ public class POGraph {
 	private Node initialNode = null;					// initial node (null node), points to the first actual nodes as 'next' nodes
 	private Node finalNode = null; 						// final node (null node), 'previous' pointers point to the final actual nodes
 	private Map<Integer, String> sequences;				// map of sequence ID and sequence label
-	private Map<Integer, Map<Integer, Map<Integer, Integer>>> edgeCounts;
+	private Map<Integer, Map<Integer, Map<Integer, Integer>>>  edgeCountsMSA; 	// edge counts for MSA POG
+	private Map<Integer, Map<Integer, Integer>>  edgeCountsNode; 	// edge counts for node
+	private int numSeqsUnderNode; 								// number of sequences under this node
 
 	/**
 	 * Constructor to initialise empty graph.
@@ -38,7 +44,8 @@ public class POGraph {
 		finalNode = new Node();
 		nodes = new HashMap<>();
 		current = null;
-		edgeCounts = new HashMap<>();
+		edgeCountsMSA = new HashMap<>();
+		edgeCountsNode = new HashMap<>();
 	}
 
 	/**
@@ -93,19 +100,100 @@ public class POGraph {
 		this.current = initialNode.getNextNodes().get(0);
 	}
 
+
 	/**
-	 * Allows grasp to access the POG egde counts.
+	 * Constructor to initialise partial order graph from inferred characters and jumps in POG.
+	 * FIXME: make a new sub-class of POGraph for AncestorPOGraph with this as the only constructor?
+	 */
+	public POGraph(List<Inference> inferred, Map<Integer, String> sequences, Map<Integer, Map<Integer, Integer>> edgeCountsForNode, int numSeqsUnderNode) {
+		this.sequences = sequences;
+		this.edgeCountsNode = edgeCountsForNode;
+		this.numSeqsUnderNode = numSeqsUnderNode;
+		initialNode = new Node(-1);
+		finalNode = new Node(inferred.size() - 2);
+		nodes = new HashMap<>();
+		current = null;
+
+		POGEdgeMap pem = new POGEdgeMap();
+		for (Inference inf : inferred) {
+			int idx1 = inf.pogId;
+			Node n1 = null;
+			if (idx1 == initialNode.ID)
+				n1 = initialNode;
+			else if (idx1 == finalNode.ID)
+				n1 = finalNode;
+			else {
+				if (inf.base != '-') {
+					n1 = new Node(idx1);
+					n1.setBase(inf.base);
+					nodes.put(idx1, n1);
+				}
+			}
+			if (inf.base != '-') {
+				for (int idx2 : inf.transitions) {
+					if (idx1 < idx2)
+						pem.add(idx1, idx2);
+					else
+						pem.add(idx2, idx1);
+				}
+			}
+		}
+		Set<POGEdgeMap.POGEdge> deleted = new HashSet<>();
+		for (POGEdgeMap.POGEdge pe : pem.getEdges()) {
+			int[] idxs = pe.getIndices();
+			this.setCurrent(idxs[0]);
+			Node n1 = current;
+			if (n1 == null) { // index is referring to a deleted position
+				deleted.add(pe);
+				continue;
+			}
+			Node n2 = null;
+			if (idxs[1] == finalNode.ID)
+				n2 = finalNode;
+			else {
+				n2 = nodes.get(idxs[1]);
+				if (n2 == null) { // index is referring to a deleted position
+					deleted.add(pe);
+					continue;
+				}
+			}
+			// FIXME: look into populating edges with the edge counts
+			Edge e1 = new Edge(n2);
+			e1.addSequence(0); // temp fix so POGraph.toString can be used
+			n1.nextTransitions.add(e1);
+			Edge e2 = new Edge(n1);
+			e2.addSequence(0); // temp fix so POGraph.toString can be used
+			n2.prevTransitions.add(e2);
+			boolean recip = pem.isReciprocated(pe);
+			e1.setReciprocated(recip);
+			e2.setReciprocated(recip);
+		}
+		for (POGEdgeMap.POGEdge pe : deleted)
+			pem.remove(pe);
+		// after the removal of POGEdge:s above, the map should be correct
+	}
+
+	/**
+	 * Allows grasp to access the POG edge counts.
 	 * @return
 	 */
 	public Map<Integer, Map<Integer, Map<Integer, Integer>>> getEdgeCounts() {
-		return edgeCounts;
+		return edgeCountsMSA;
+	}
+
+	public Map<Integer, Map<Integer, Integer>> getEdgeCountsNode() {
+		return edgeCountsNode;
+	}
+
+	public int getNumSeqsUnderNode() {
+		return numSeqsUnderNode;
 	}
 
 	/**
 	 * Store the cost of a particular transition.
 	 * @param transitionCost
 	 */
-	public void setTransitionCost(HashMap<Integer, Integer> transitionCost) {
+	public void setTransitionCost(Map<Integer, Integer> transitionCost) {
 		current.transitionCost = transitionCost;
 	}
 
@@ -188,6 +276,10 @@ public class POGraph {
 		return (current != null);
 	}
 
+	public Node getNode(int index) {
+		return nodes.get(index);
+	}
+
 	/**
 	 * Reset the node pointer to the initial (null) node.
 	 *
@@ -204,7 +296,7 @@ public class POGraph {
 	 * @return	mapping between next node ID and the edge weight to the next node
 	 */
 	public Map<Integer, Double> getNextEdgeWeights(){
-		HashMap<Integer, Double> edgeWeights = new HashMap<>();
+		Map<Integer, Double> edgeWeights = new HashMap<>();
 		for (Edge next : current.getNextTransitions())
 			//if (next.getNext() != finalNode)
 			edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
@@ -217,7 +309,7 @@ public class POGraph {
 	 * @return	mapping between next node ID and the edge weight to the next node
 	 */
 	public Map<Integer, Double> getPreviousEdgeWeights(){
-		HashMap<Integer, Double> edgeWeights = new HashMap<>();
+		Map<Integer, Double> edgeWeights = new HashMap<>();
 		for (Edge next : current.getPreviousTransitions())
 			//if (next.getNext() != finalNode)
 			edgeWeights.put(next.getNext().getID(), 1.0 * next.getSequences().size() / sequences.size());
@@ -668,9 +760,14 @@ public class POGraph {
 	 * Set the probability distribution of the current node.
 	 *
 	 * @param dist	Character probability distribution {(Character, Double)}
+	 * @deprecated use setDistrib instead
 	 */
-	public void setCharacterDistribution(HashMap<Character, Double> dist) {
+	public void setCharacterDistribution(Map<Character, Double> dist) {
 		current.setCharacterDistribution(dist);
+	}
+
+	public void setDistrib(EnumDistrib d) {
+		current.setDistrib(d);
 	}
 
 	/**
@@ -682,6 +779,18 @@ public class POGraph {
 		return current.getDistribution();
 	}
 
+	public Distrib getDistrib() {
+		Node n = current;
+		if (n == null)
+			return null;
+		return n.getDistrib();
+	}
+	public Distrib getDistrib(int index) {
+		Node n = getNode(index);
+		if (n == null)
+			return null;
+		return n.getDistrib();
+	}
 	/**
 	 * Get the out path of sequences from the node.
 	 *
@@ -784,7 +893,7 @@ public class POGraph {
 	 */
 	public ArrayList<Integer> getOrderedNext() {
 		Integer[] ids = new Integer[current.getNextTransitions().size()];
-		HashMap<Integer, Integer> weights = new HashMap<>();
+		Map<Integer, Integer> weights = new HashMap<>();
 		int i = 0;
 		for (Edge edge : current.getNextTransitions()) {
 			ids[i++] = edge.getNext().getID();
@@ -802,7 +911,7 @@ public class POGraph {
 	 */
 	public ArrayList<Integer> getOrderedPrev() {
 		Integer[] ids = new Integer[current.getPreviousTransitions().size()];
-		HashMap<Integer, Integer> weights = new HashMap<>();
+		Map<Integer, Integer> weights = new HashMap<>();
 		int i = 0;
 		for (Edge edge : current.getPreviousTransitions()) {
 			ids[i++] = edge.getNext().getID();
@@ -873,81 +982,6 @@ public class POGraph {
 			findDist(nextNode, distance);
 	}
 
-	/**
-	 * Method of adding in heuristics to the AStar search algorithm.
-	 * The aim is to get the path that has the most sequences in agreement.
-	 * However we also want the longest sequence (as this will contain the
-	 * fewest gaps).
-	 *
-	 * To do this we use the edge.getSequences().size() and multiply it by a
-	 * factor that penalises long gappy regions i.e. (1 + (1/gap_size))
-	 *
-	 * ToDo: optimise the heuristic function.
-	 *
-	 * @return
-	 */
-	private long heuristicCostEstimate(Edge edge, Node from, Node to, boolean isBidirectional) {
-		int multiplier = 1;
-		if (!isBidirectional) {
-			multiplier = 1000;
-		}
-		int positionDiff = java.lang.Math.abs(to.getID() - from.getID());
-		positionDiff = (positionDiff > 0) ? positionDiff : 1;
-
-		long val =  multiplier * (this.sequences.size() - edge.getSequences().size() + 1) *positionDiff;
-		if (val < 0) {
-			val = Long.MAX_VALUE;
-		}
-		return val;
-
-	}
-
-
-	/**
-	 * Reconstructs the consensus sequence based on the A* search. We need to
-	 * reverse the path and add in the gaps.
-	 *
-	 * @param cameFrom
-	 * @param current
-	 * @param gappy
-	 * @return
-	 */
-	private String reconstructPath(HashMap<Node, Path> cameFrom, Node
-			current, boolean gappy) {
-		Stack<Character> sequence = new Stack<>();
-		String sequenceString = "";
-		while (cameFrom.keySet().contains(current)) {
-			Path prevPath = cameFrom.get(current);
-			Node prevNode = prevPath.getNode();
-			// Set the edge to have a true consensus flag
-			prevPath.getEdge().setConsensus(true);
-			// Set to be the consensus path
-			prevNode.setConsensus(true);
-			// If we have a character we want to add it
-			if (current.getBase() != null) {
-				sequence.push(current.getBase());
-			}
-			// If we have a gappy sequence we need to add in the gaps
-			if (gappy == true) {
-				int cameFromPosition = current.getID();
-				int nextPosition = prevNode.getID();
-				int numGaps = -1 * ((nextPosition - cameFromPosition) + 1);
-				if (numGaps > 0) {
-					for (int g = 0; g < numGaps; g++) {
-						sequence.push('-');
-					}
-				}
-			}
-			cameFrom.remove(current);
-			current = prevNode;
-		}
-		// Reverse and create a string
-		while (!sequence.empty()) {
-			sequenceString += sequence.pop();
-		}
-		return sequenceString;
-	}
-
 
 	/**
 	 * Gets the consensus sequences using an A star search algorithm.
@@ -956,51 +990,7 @@ public class POGraph {
 	 * @return
 	 */
 	public String getSupportedSequence(boolean gappy) {
-		// Intanciate the comparator class
-		Comparator<Node> comparator = new NodeComparator();
-		// Already visited nodes
-		ArrayList<Node> closedSet = new ArrayList<>();
-		// Unvisted nodes keep track of the best options
-		PriorityQueue<Node> openSet = new PriorityQueue<>(10, comparator);
-		// Add the initial node to the open set
-		openSet.add(initialNode);
-		// Storing the previous node
-		HashMap<Node, Path> cameFrom = new HashMap<>();
-		// Map with heuristics
-		HashMap<Node, Long> cost = new HashMap<>();
-		// Add the initial node cost
-		cost.put(initialNode, new Long(0));
-		while (!openSet.isEmpty()) {
-			current = openSet.poll();
-			if (current.equals(finalNode)) {
-				// Reconstruct the path
-				return reconstructPath(cameFrom, current, gappy);
-			}
-			// Otherwise add this to the closedSet
-			closedSet.add(current);
-			for (int n = 0; n < current.getNextTransitions().size(); n++) {
-				Edge next = current.getNextTransitions().get(n);
-				Node neighbor = next.getNext();
-				long thisCost = heuristicCostEstimate(next, current, neighbor, current.getNextTransitions().get(n).reciprocated);
-				if (closedSet.contains(neighbor)) {
-					continue; // ignore as it has already been visited
-				}
-				// Otherwise we set the cost to this node
-				long tentativeCost = cost.get(current) + thisCost;
-
-				// Check if we have discovered a new node
-				if (!openSet.contains(neighbor)) {
-					// Assign the cost to the node
-					neighbor.setCost(tentativeCost);
-					openSet.add(neighbor);
-				} else if (tentativeCost >= cost.get(neighbor)) {
-					continue; // This isn't a better path
-				}
-				// If we have made it here this is the best path so let's
-				cameFrom.put(neighbor, new Path(current, next));
-				cost.put(neighbor, tentativeCost);
-			}
-		}
+		// FIXME: used currently for N0, needs to be updated to new consensus as in GraspCmd
 		return null;
 	}
 
@@ -1137,10 +1127,10 @@ public class POGraph {
 				if (node == finalNode)
 					continue;
 				// format node character distribution, if available
-				HashMap<Character, Double> dist = node.getDistribution();
+				EnumDistrib dist = node.getDistrib();
 				String distStr = "\"";
 				if (dist != null)
-					for (Character base : dist.keySet())
+					for (Object base : dist.getDomain().getValues())
 						distStr += base + ":" + String.format("%.0e", dist.get(base)) + " ";
 				distStr = distStr.trim() + "\"";
 
@@ -1375,13 +1365,15 @@ public class POGraph {
 							} else if (el.contains("distribution")) {
 								// load node character distribution, expects "char:prob char:prob ... "
 								elements = el.split("[\" ]+");
-								HashMap<Character, Double> dist = new HashMap<>();
+								Map<Object, Double> dist = new HashMap<>();
 								for (String cp : elements)
 									if (cp.contains(":")) {
 										String[] els = cp.split("[:]+");
 										dist.put(els[0].toCharArray()[0], Double.parseDouble(els[1]));
 									}
-								node.setCharacterDistribution(dist);
+								EnumDistrib d = new EnumDistrib(dist);
+								//node.setCharacterDistribution(dist);
+								node.setDistrib(d);
 							} else if (el.contains("sequences")) {
 								el = el.replace("\"", "");
 								String seqs = el.split("sequences=")[1];
@@ -1480,7 +1472,7 @@ public class POGraph {
 		initialNode = new Node(-1);
 		finalNode = new Node(seqs.get(0).toString().length());
 		nodes = new HashMap<>();
-		HashMap<Integer, List<Node>> seqNodeMap = new HashMap<>();
+		Map<Integer, List<Node>> seqNodeMap = new HashMap<>();
 
 		int numNodes = seqs.get(0).toString().toCharArray().length;
 		for (int nodeId = 0; nodeId < numNodes; nodeId++)
@@ -1663,16 +1655,16 @@ public class POGraph {
 
 	
 	private void addEdgeToSeq(Integer start, Integer end, Integer seqID){
-		HashMap<Integer, Integer> edgeCount = new HashMap<>();
+		Map<Integer, Integer> edgeCount = new HashMap<>();
 		edgeCount.put(end, 1);
 
-		if (this.edgeCounts.get(seqID) != null){
+		if (this.edgeCountsMSA.get(seqID) != null){
 
-			this.edgeCounts.get(seqID).put(start, edgeCount);
+			this.edgeCountsMSA.get(seqID).put(start, edgeCount);
 
 		}
 		else {
-			this.edgeCounts.put(seqID, new HashMap(){{put(start, edgeCount);}});
+			this.edgeCountsMSA.put(seqID, new HashMap(){{put(start, edgeCount);}});
 
 		}
 
@@ -1692,7 +1684,7 @@ public class POGraph {
 
 		// create adjacency map of nodes, where adjacency is defined as nodes that are a 'next' node of the previous
 		// considered node (or parent node)
-		HashMap<Node, List<Node>> adjacency = new HashMap<>();
+		Map<Node, List<Node>> adjacency = new HashMap<>();
 		ArrayList<Node> allNodes = new ArrayList<>();
 		allNodes.add(initialNode);
 		allNodes.addAll(nodes.values());
@@ -1759,8 +1751,9 @@ public class POGraph {
 		private List<Edge> nextTransitions;						// transitions to next nodes
 		private List<Edge> prevTransitions;						// transitions to previous nodes
 		private List<Node> alignedTo = null;					// list of nodes that are aligned with this node
-		private HashMap<Integer, Character> seqChars;			// map of sequence Ids and their base character
-		private HashMap<Character, Double> distribution = null;	// probability distribution of inferred character
+		private Map<Integer, Character> seqChars;				// map of sequence Ids and their base character
+		private Map<Character, Double> distribution = null;		// probability distribution of inferred character (deprecated, use distrib instead)
+		private EnumDistrib distrib = null;						// probability distribution of character state
 		private boolean consensus = false; 						// flag to indicate if belongs to the consensus path
 		private long cost = 10000;								// cost to  reach this node from the start
 		private Map<Integer, Integer> transitionCost; // Keeps track of the cost of a particular transition
@@ -1953,17 +1946,23 @@ public class POGraph {
 		 * Set the probability distribution of characters in this node.
 		 *
 		 * @param dist	distribution {(Character, probability)}
+		 * @deprecated use setDistrib instead
 		 */
-		public void setCharacterDistribution(HashMap<Character, Double> dist) {
+		public void setCharacterDistribution(Map<Character, Double> dist) {
 			this.distribution = new HashMap<>(dist);
+		}
+
+		public void setDistrib(EnumDistrib d) {
+			this.distrib = d;
 		}
 
 		/**
 		 * Get the distribution of characters in this node.
 		 *
 		 * @return distribution {(Character, probability)}
+		 * @deprecated use getDistrib instead
 		 */
-		public HashMap<Character, Double> getDistribution() {
+		public Map<Character, Double> getDistribution() {
 			if (distribution != null)
 				return distribution;
 			distribution = new HashMap<>();
@@ -1975,6 +1974,10 @@ public class POGraph {
 			for (Character b : distribution.keySet())
 				distribution.put(b, distribution.get(b) / seqChars.size());
 			return this.distribution;
+		}
+
+		public EnumDistrib getDistrib() {
+			return distrib;
 		}
 
 		/**

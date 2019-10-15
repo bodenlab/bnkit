@@ -9,6 +9,7 @@ package reconstruction;
 /**
  *
  * @author Alex
+ * @deprecated
  */
 public class runASR {
     

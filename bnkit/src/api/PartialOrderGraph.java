@@ -1,6 +1,11 @@
 package api;
 
+import bn.prob.EnumDistrib;
+import dat.EnumSeq;
+import dat.Enumerable;
 import dat.POGraph;
+import reconstruction.ConsensusObject;
+import vis.POAGJson;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -11,10 +16,13 @@ import java.util.Map;
  * Partial order graph data structure.
  *
  * Created by marnie on 28/3/17.
+ * Patched by mikael 10/10/2019
+ * FIXME: clean out a lot of deprecated functions relating to the old definition of consensus/most supported sequence.
  */
 public class PartialOrderGraph {
 
     private POGraph graph = null;
+    private ConsensusObject consensus = null;
 
     /**
      * Constructors.
@@ -29,11 +37,70 @@ public class PartialOrderGraph {
         graph = new POGraph(dotStructure);
     }
 
+    public EnumSeq getMostSupported(boolean GAPPY) {
+        if (consensus == null) {
+            consensus = new ConsensusObject(graph.getEdgeCountsNode(), graph.getNumSeqsUnderNode());
+            // Here we could use the POAGJson object itself rather than the actual JSON object
+            consensus.setJsonObject(new POAGJson(this, GAPPY).toJSON());
+            consensus.getSupportedIndices();
+        }
+        char[] supportedSeq = consensus.getSupportedSequence(GAPPY).toCharArray();
+        Character[] arr = new Character[supportedSeq.length];
+        for (int j = 0; j < arr.length; j ++)
+            arr[j] = supportedSeq[j];
+        EnumSeq ancseq = GAPPY ? new EnumSeq.Gappy(Enumerable.aacid_ext) : new EnumSeq(Enumerable.aacid_ext);
+        ancseq.set(arr);
+        return ancseq;
+    }
+
+    public EnumDistrib[] getDistribMostSupported(boolean GAPPY) {
+        if (consensus == null) {
+            consensus = new ConsensusObject(graph.getEdgeCountsNode(), graph.getNumSeqsUnderNode());
+            // Here we could use the POAGJson object itself rather than the actual JSON object
+            consensus.setJsonObject(new POAGJson(this, GAPPY).toJSON());
+            consensus.getSupportedIndices();
+        }
+        int[] idxs = consensus.getSupportedIndices();
+        EnumDistrib[] ret = new EnumDistrib[GAPPY ? getFinalNodeID() : idxs.length];
+        int j = 0; // index for walking through the nodes in the POG
+        for (int i = 0; i < ret.length; i ++) {
+            int pogidx = idxs[j];
+            if (GAPPY) {
+                if (i == pogidx) {
+                    ret[i] = graph.getNode(pogidx).getDistrib();
+                    j++;
+                } else
+                    ret[i] = null;
+            } else {
+                ret[i] = graph.getNode(pogidx).getDistrib();
+                j++;
+            }
+        }
+        return ret;
+    }
+
+    public int[] getIndicesMostSupported(boolean GAPPY) {
+        if (consensus == null) {
+            consensus = new ConsensusObject(graph.getEdgeCountsNode(), graph.getNumSeqsUnderNode());
+            // Here we could use the POAGJson object itself rather than the actual JSON object
+            consensus.setJsonObject(new POAGJson(this, GAPPY).toJSON());
+            consensus.getSupportedIndices();
+        }
+        int[] idxs = consensus.getSupportedIndices();
+        if (!GAPPY)
+            return idxs;
+        int[] ret = new int[getFinalNodeID()];
+        for (int i = 0; i < ret.length; i ++)
+            ret[i] = i;
+        return ret;
+    }
+
     /**
      * Get the sequence with the most edge support through the graph. Support is based on maximizing immediate edge
      * weights.
      *
      * @return      most supported sequence based on edge weights
+     * @deprecated
      */
     public String getConsensusSequence() {
         return graph.getSupportedSequence(false);
@@ -44,6 +111,7 @@ public class PartialOrderGraph {
      * weights.
      *
      * @return      most supported sequence based on edge weights
+     * @deprecated
      */
     public String getConsensusSequence(boolean gappy) {
         return graph.getSupportedSequence(gappy);
@@ -54,6 +122,7 @@ public class PartialOrderGraph {
      * weights. Represents 'gaps' (i.e. jumps in the partial order graph)
      *
      * @return      most supported gappy sequence based on edge weights
+     * @deprecated
      */
     public String getConsensusGappySequence() {
         return graph.getSupportedSequence(true);
@@ -65,6 +134,7 @@ public class PartialOrderGraph {
      *
      * @param id    Node ID
      * @return      Flag indicating consensus membership of the node with the provided ID
+     * @deprecated
      */
     public Boolean getConsensusMembership(Integer id) {
         if (!graph.setCurrent(id))
@@ -77,6 +147,7 @@ public class PartialOrderGraph {
      *
      * @param id    ID of the current node
      * @return      ID of the next node in the consensus path.
+     * @deprecated
      */
     public Integer getNextConsensusID(Integer id) {
         if (!graph.setCurrent(id))

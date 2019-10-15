@@ -138,6 +138,7 @@ public class RunASRPOG {
 					asr.saveMSAGraph(outputPath);
 				//asr.saveSupportedAncestors(outputPath);
 				//asr.saveGraph(outputPath);
+				// FIXME: next call not saving right distribs
 				asr.saveDistrib(outputPath  + marginalNode);
 				if (inference.equalsIgnoreCase("joint"))
 					asr.save(outputPath, true, "fasta");

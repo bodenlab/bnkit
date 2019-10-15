@@ -15,9 +15,9 @@ public class ConsensusObject {
      *      1. Parsing the JSON object
      *      2. Developing the consensus from this
      */
-    HashMap<Integer,  Node> nodeMap;
+    Map<Integer,  Node> nodeMap;
     ArrayList< Edge> edges;
-
+    int[] consensusByIndex = null; // the indices that make up the most supported/consensus sequence
 
     // These are the nodes that are dummy start and end nodes in the original version.
     // We keep them as they are used on the front end for signifying the start and end terminals.
@@ -26,16 +26,16 @@ public class ConsensusObject {
     int numberPositionsInSequence;
 
     // Map with heuristics
-    HashMap<Integer, Double> cost = new HashMap<>();
-    HashMap<Integer, HashMap<Integer, Integer>> edgeCounts;
+    Map<Integer, Double> cost;
+    Map<Integer, Map<Integer, Integer>> edgeCounts;
     int[] countArray;
 
     int numberSeqsUnderNode;
     ArrayList<Integer> possibleInitialIds;
     ArrayList<Integer> possibleFinalIds;
 
-    HashMap<Integer, Edge> initialAndFinalEdges;
-    HashMap<Integer, Node> initialAndFinalNodeMap;
+    Map<Integer, Edge> initialAndFinalEdges;
+    Map<Integer, Node> initialAndFinalNodeMap;
 
     // These are our best (or optimal) initial nodes. We use these to determine the consensus seq.
     Node bestInitialNode;
@@ -44,7 +44,7 @@ public class ConsensusObject {
     boolean updateEdgeCounts; // Used to toggel whether or not we want to update the cost of the edges based on the
     // edge count map that is passed in.
 
-    public ConsensusObject(HashMap<Integer, HashMap<Integer, Integer>> edgeCounts, int numberSeqsUnderNode) {
+    public ConsensusObject(Map<Integer, Map<Integer, Integer>> edgeCounts, int numberSeqsUnderNode) {
         this.numberSeqsUnderNode = numberSeqsUnderNode;
         this.edgeCounts = edgeCounts;
         // For now let's just automatically set to update the edge counts cost
@@ -333,10 +333,10 @@ public class ConsensusObject {
 
     /**
      *
-     * We want the smallest cost esitmate to get from the start to the end.
+     * We want the smallest cost estimate to get from the start to the end.
      *
-     * We have penalities for things such as a non-bidirectional edge.
-     *      1. weight penality = numberPositionsInSequence * 2
+     * We have penalties for things such as a non-bidirectional edge.
+     *      1. weight penalty = numberPositionsInSequence * 2
      * We also have the number of sequences that have taken an edge, we convert this into a % by
      * dividing by the number of sequences under this node
      *      2. 1 - edge weight (we do 1 - since we want the largest possible amount)
@@ -401,8 +401,9 @@ public class ConsensusObject {
      * @param current
      * @param gappy
      * @return
+     * @deprecated just kept until function of replacement is verified
      */
-    private String reconstructPath(HashMap< Node,  Path> cameFrom,  Node current, boolean gappy) {
+    private String reconstructPathLegacy(Map< Node,  Path> cameFrom,  Node current, boolean gappy) {
         Stack<Character> sequence = new Stack<>();
         // Add the initial Base that we decided on during the pre-processing stage
         String sequenceString = "";
@@ -442,6 +443,42 @@ public class ConsensusObject {
         return sequenceString;
     }
 
+    /**
+     * Reconstructs the consensus sequence based on the A* search. We need to
+     * reverse the path and add in the gaps.
+     *
+     * @param cameFrom
+     * @param current
+     * @return
+     */
+    public int[] updateSupportedPath(Map< Node,  Path> cameFrom, Node current) {
+        Stack<Integer> sequence = new Stack<>();
+        while (cameFrom.keySet().contains(current)) {
+            Path prevPath = cameFrom.get(current);
+            prevPath.getEdge().setConsensus(true);
+            Node prevNode = prevPath.getNode();
+            // Set the edge to have a true consensus flag
+            prevPath.getEdge().setConsensus(true);
+            // If we have a character we want to add it
+            if (current.getBase() != null && current != finalNode)
+                sequence.push(current.getId());
+            // Set to be the consensus path
+            current.setConsensus(true);
+            cameFrom.remove(current);
+            current = prevNode;
+        }
+
+        // Reverse and create a string
+        int[] ret = new int[sequence.size()];
+        int i = 0;
+        while (!sequence.empty()) {
+            ret[i]= sequence.pop();
+            i ++;
+        }
+        if (consensusByIndex == null)
+            consensusByIndex = ret;
+        return ret;
+    }
 
     public Node getLowestCostNode(ArrayList<Node> openSet) {
         double minCost = Double.MAX_VALUE;
@@ -476,19 +513,19 @@ public class ConsensusObject {
         return best;
     }
 
-
     /**
-     * Gets the consensus sequences using an A star search algorithm.
-     *
-     * @param gappy
+     * Get the consensus sequence using an A star search algorithm.
+     * Determines the indices that form part of the most supported sequence.
+     * The logic here comes from (Ariane's old) getSupportedSequence, and an array
+     * is stored internal to this class to save compute time...
      * @return
      */
-    public String getSupportedSequence(boolean gappy) {
-        // Intanciate the comparator class
+    public int[] getSupportedIndices() {
+        // Instantiate the comparator class
         Comparator< Node> comparator = new NodeComparator();
         // Already visited nodes
         ArrayList< Node> closedSet = new ArrayList<>();
-        // Unvisted nodes keep track of the best options
+        // Unvisited nodes keep track of the best options
         // ToDo Work out why priority queue isn't working
         //PriorityQueue< Node> openSet = new PriorityQueue<>(1000, comparator);
         ArrayList<Node> openSet = new ArrayList<>();
@@ -499,9 +536,8 @@ public class ConsensusObject {
         //if (i == this.initialNode.getId()) {
         cost.put(initialNode.getId(), 0.0);
 
-
         // Storing the previous node
-        HashMap< Node,  Path> cameFrom = new HashMap<>();
+        Map< Node,  Path> cameFrom = new HashMap<>();
 
         boolean printout = false;
         while (!openSet.isEmpty()) {
@@ -512,7 +548,8 @@ public class ConsensusObject {
             }
             if (current.equals(finalNode)) {
                 // Reconstruct the path
-                return reconstructPath(cameFrom, current, gappy);
+                int[] idxs = updateSupportedPath(cameFrom, current);
+                return idxs;
             }
             // Otherwise add this to the closedSet
             closedSet.add(current);
@@ -564,6 +601,114 @@ public class ConsensusObject {
         }
         return null;
     }
+
+    /**
+     * Gets the consensus sequences using an A star search algorithm.
+     *
+     * @param gappy
+     * @return
+     */
+    public String getSupportedSequence(boolean gappy) {
+        if (consensusByIndex == null)
+            consensusByIndex = getSupportedIndices();
+        int[] idxs = consensusByIndex;
+        StringBuilder sb = new StringBuilder();
+        int sidx = 0; // index in sequence
+        for (int i = 0; i < idxs.length; i ++) {
+            int pidx = idxs[i]; // index in POG
+            if (gappy) {
+                for (; sidx < pidx; sidx ++)
+                    sb.append('-');
+            }
+            sb.append(nodeMap.get(pidx).getBase());
+            sidx ++;
+        }
+        if (gappy) {
+            for (; sidx < this.finalNode.getId(); sidx ++)
+                sb.append('-');
+        }
+        return sb.toString();
+    }
+
+//        // Instantiate the comparator class
+//        Comparator< Node> comparator = new NodeComparator();
+//        // Already visited nodes
+//        ArrayList< Node> closedSet = new ArrayList<>();
+//        // Unvisited nodes keep track of the best options
+//        // ToDo Work out why priority queue isn't working
+//        //PriorityQueue< Node> openSet = new PriorityQueue<>(1000, comparator);
+//        ArrayList<Node> openSet = new ArrayList<>();
+//        // Add the initial node to the open set
+//        //for (Integer i: possibleInitialIds) {
+//        //   Node n = nodeMap.get(i);
+//        openSet.add(initialNode);
+//        //if (i == this.initialNode.getId()) {
+//        cost.put(initialNode.getId(), 0.0);
+//
+//        // Storing the previous node
+//        Map< Node,  Path> cameFrom = new HashMap<>();
+//
+//        boolean printout = false;
+//        while (!openSet.isEmpty()) {
+//            Node current = getLowestCostNode(openSet); //openSet.poll();
+//            if (current == null) {
+//                current = openSet.get(0);
+//                openSet.remove(current);
+//            }
+//            if (current.equals(finalNode)) {
+//                // Reconstruct the path
+//                return reconstructPath(cameFrom, current, gappy);
+//            }
+//            // Otherwise add this to the closedSet
+//            closedSet.add(current);
+//
+//            if (printout) {
+//                System.out.println("Looking at edges from: " + current.getId());
+//            }
+//            for (int n = 0; n < current.getOutEdges().size(); n++) {
+//                Edge next = current.getOutEdges().get(n);
+//                Node neighbor = nodeMap.get(next.getToId());
+//                double thisCost = heuristicCostEstimate(next, current, neighbor, current.getOutEdges().get(n).reciprocated);
+//                if (closedSet.contains(neighbor)) {
+//                    // Check if this path is better and update the path to get to the neighbour
+//                    if (cost.get(neighbor.getId()) > thisCost) {
+//                        //cameFrom.put(neighbor, new Path(current, next));
+//                        cost.put(neighbor.getId(), thisCost);
+//                    }
+//                    continue; // ignore as it has already been visited
+//                }
+//                // Otherwise we set the cost to this node
+//                double tentativeCost = cost.get(current.getId()) + thisCost;
+//
+//                // Check if we have discovered a new node
+//                if (!openSet.contains(neighbor)) {
+//                    // Assign the cost to the node
+//                    neighbor.setCost(tentativeCost);
+//                    cost.put(neighbor.getId(), tentativeCost);
+//                    openSet.add(neighbor);
+//                } else if (tentativeCost > cost.get(neighbor.getId())) {
+//                    if (printout) {
+//                        System.out.println("WORSE : " + current.getBase() + "-" + neighbor.getBase() + ": " + neighbor.getId() + " , " + neighbor.getBase() + ":" + thisCost + ", " + tentativeCost + " vs." + neighbor.getCost());
+//                    }
+//                    continue; // This isn't a better path
+//                }
+//                cost.put(neighbor.getId(), tentativeCost);
+//                neighbor.setCost(tentativeCost);
+//
+//                if (printout) {
+//                    System.out.println("BETTER : " + current.getBase() + "-" + neighbor.getBase() + ": " + neighbor.getId() + " , " + neighbor.getBase() + ":" + thisCost + ", " + tentativeCost + " vs." + cost.get(neighbor.getId()));
+//                }
+//                // Check if we already have this in the camefrom path, if so remove
+//                // ToDo: Check if overriding is causing issues?
+//                if (cameFrom.get(neighbor) != null) {
+//                    //System.out.println("ALREADY HAD PATH, BEING OVERRIDDEN, " + cameFrom.get(neighbor).edge.fromId + "->" + cameFrom.get(neighbor).edge.toId + ", " + cameFrom.get(neighbor).node.base + " to " + current.base + " path:" + next.fromId + " ->" + next.toId);
+//                }
+//                // If we have made it here this is the best path so let's
+//                cameFrom.put(neighbor, new Path(current, next));
+//            }
+//        }
+//        return null;
+//    }
 
 
     /**
@@ -706,7 +851,6 @@ public class ConsensusObject {
         }
 
         public Character getBase() { return this.base; }
-
 
         public int getId()  { return this.id; }
     }

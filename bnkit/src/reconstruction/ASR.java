@@ -30,6 +30,7 @@ import json.JSONObject;
 /**
  * @author Mikael Boden
  * @author Alex Essebier
+ * @deprecated
  */
 public class ASR {
     

@@ -24,7 +24,7 @@ public class TreeNodeObject {
 
     // The below is just for the Taxanomic information retrieval
     private int[] taxanomicCounts;
-    HashMap<Integer, HashMap<String, Integer>> taxonomicMap;
+    Map<Integer, Map<String, Integer>> taxonomicMap;
     /* TaxonomicMap keeps track of the list of different items for each taxonomic rank, the length
      * of each of these hashmaps then makes up the taxonomic count. */
     // End
@@ -56,7 +56,7 @@ public class TreeNodeObject {
     private int id;
     private boolean inIntersection = false;
     private boolean isRoot = false;
-    private HashMap<Integer, HashMap<Integer, Integer>> edgeCounts;     //private  Map<start ID, Map<end ID, count>>
+    private Map<Integer, Map<Integer, Integer>> edgeCounts;     //private  Map<start ID, Map<end ID, count>>
     private int msaId; // Used to keep track of the ID of this sequence in the MSA.
 
     public TreeNodeObject(String label, TreeNodeObject parent, Double distance, int id, boolean extent) {
@@ -114,13 +114,13 @@ public class TreeNodeObject {
      * Build the edge counts up dynamically as we iterate through the tree.
      * @return
      */
-    public boolean buildEdgeCountMap(Map<Integer, Map<Integer, Map<Integer, Integer>>> edgeCounts, HashMap<String, Integer> seqIdMap) {
+    public boolean buildEdgeCountMap(Map<Integer, Map<Integer, Map<Integer, Integer>>> edgeCounts, Map<String, Integer> seqIdMap) {
 
         // Check if this is a leaf
-        if (isExtent()) {
+        if (isExtant()) {
             // We need to assign the edge counts associated with this sequecne.
             int id = seqIdMap.get(this.originalLabel);
-            this.edgeCounts = (HashMap)edgeCounts.get(id);
+            this.edgeCounts = edgeCounts.get(id);
             this.leafLabels.add(this.label);
             this.numSeqsUnderNode = 1;
             return true;
@@ -133,7 +133,7 @@ public class TreeNodeObject {
 
         for (TreeNodeObject tno: getChildren()) {
 
-            HashMap<Integer, HashMap<Integer, Integer>> countList = tno.getEdgeCounts();
+            Map<Integer, Map<Integer, Integer>> countList = tno.getEdgeCounts();
 
             // If we don't have this child we want to build up the edge count first. Keep
             // recursing until we reach the leaf nodes.
@@ -173,12 +173,12 @@ public class TreeNodeObject {
     }
 
     /**
-     * Return teh edge counts for a given node.
+     * Return the edge counts for a given node.
      * Note we have no way of building it up without the original edge counts so we need to
      * rely on this.
      * @return
      */
-    public HashMap<Integer, HashMap<Integer, Integer>> getEdgeCounts() {
+    public Map<Integer, Map<Integer, Integer>> getEdgeCounts() {
         return edgeCounts;
     }
 
@@ -256,7 +256,7 @@ public class TreeNodeObject {
      */
     public boolean buildIntersectionLabelMapping(ArrayList<TreeNodeObject> extentIntersection) {
         // Check if this is a leaf
-        if (isExtent()) {
+        if (isExtant()) {
             for (TreeNodeObject tno: extentIntersection) {
                 if (tno.getLabel().equals(this.getLabel())) {
                     inIntersection = true;
@@ -495,7 +495,7 @@ public class TreeNodeObject {
      */
     public void getLeaves(TreeNodeObject node) {
         for (TreeNodeObject child: node.getChildren()) {
-            if (child.isExtent()) {
+            if (child.isExtant()) {
                 leaves.add(child);
             } else {
                 getLeaves(child);
@@ -510,7 +510,7 @@ public class TreeNodeObject {
      */
     public void getLeafLabels(TreeNodeObject node) {
         for (TreeNodeObject child: node.getChildren()) {
-            if (child.isExtent()) {
+            if (child.isExtant()) {
                 leafLabels.add(child.getLabel());
                 rawLeafLabels.add(child.getOriginalLabel());
             } else {
@@ -540,7 +540,7 @@ public class TreeNodeObject {
      *
      * @return
      */
-    public boolean isExtent() {
+    public boolean isExtant() {
         return this.children.size() == 0;
     }
 
