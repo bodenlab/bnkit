@@ -1173,6 +1173,7 @@ public class ASRPOG {
 
 		// create phylogenetic tree structure
 		phyloTree = phyloTree.loadNewick(treeFile);
+		phyloTree.removeInternalLabels();
 		System.out.println("Phylogenetic tree loaded");
 
 		// Check if there are duplicate extant node names in the phylogenetic tree

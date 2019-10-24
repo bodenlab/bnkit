@@ -50,8 +50,8 @@ public class GraspCmd {
                 "\t\"-savetree\" re-saves the tree on Newick with ancestor names\n" +
                 "\tThe output file is written on the specified format.");
         out.println("Notes: \n" +
-                "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1)." +
-                "\tEvolutionary models include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman");
+                "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
+                "\tEvolutionary models include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman.");
         System.exit(error);
     }
 
