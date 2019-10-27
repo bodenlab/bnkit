@@ -147,10 +147,6 @@ public class TreeObject {
     public TreeNodeObject getNodeByOriginalLabel(String label) {
         for (TreeNodeObject node: nodeList) {
             if (node.getOriginalLabel().equals(label)) {
-                if (label.equals("N4_98")) {
-                    int i = 0;
-
-                }
                 return node;
             }
         }
@@ -252,7 +248,7 @@ public class TreeObject {
                 double dist = Double.parseDouble(str.substring(splitIdx + 1, str.length()));
                 if (dist == 0.0) {
                     dist = 0.00001;
-                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                    System.err.println("Distance 0.0 parsed in tree file (child=" + label + "): Representing distance as " + Double.toString(dist));
                 }
                 node = new TreeNodeObject(label, parent, dist, nextId,  true);
                 nextId ++;
@@ -305,7 +301,7 @@ public class TreeObject {
                 double dist = Double.parseDouble(tail.substring(splitIdx + 1, tail.length()).replace(";", ""));
                 if (dist == 0.0) {
                     dist = 0.00001;
-                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                    System.err.println("Distance 0.0 parsed in tree file (child=" + label + "): Representing distance as " + Double.toString(dist));
                 }
                 node = new TreeNodeObject(label, parent, dist, count, false);
                 if (root == null) {

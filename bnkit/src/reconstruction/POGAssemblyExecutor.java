@@ -86,7 +86,11 @@ public class POGAssemblyExecutor {
         }
         @Override
         public PartialOrderGraph call() {
-            PartialOrderGraph pog = new PartialOrderGraph(asr.getAncestor(ancestor));
+            POGraph a = asr.getAncestor(ancestor);
+            if (a == null) {
+                throw new RuntimeException("Assembly job failed for ancestor \"" + ancestor + "\"");
+            }
+            PartialOrderGraph pog = new PartialOrderGraph(a);
             pog.getMostSupported(true);
             return pog;
         }

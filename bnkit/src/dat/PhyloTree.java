@@ -184,7 +184,7 @@ public class PhyloTree {
                 double dist = Double.parseDouble(str.substring(splitIdx + 1, str.length()));
                 if (dist == 0.0) {
                     dist = 0.00001;
-                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                    //System.err.println("Distance 0.0 parsed in tree file (child=" + label + "): Representing distance as " + Double.toString(dist));
                 }
                 node = new Node(label, parent, dist);
                 if (root == null) {
@@ -202,7 +202,7 @@ public class PhyloTree {
      * Helper function to parse an internal node (i.e. the template for an ancestor) in the
      * Newick file.
      *
-     * @param embed   Part of Newick String containing the ancestoral node
+     * @param embed   Part of Newick String containing the ancestral node
      * @param tail    End of the String
      * @param parent  Parent of the Node
      * @param nodeIds List of traversed NodeIds
@@ -230,7 +230,7 @@ public class PhyloTree {
                 double dist = Double.parseDouble(tail.substring(splitIdx + 1, tail.length()).replace(";", ""));
                 if (dist == 0.0) {
                     dist = 0.00001;
-                    System.err.println("Distance value: 0.0 parsed in tree file. Representing distance as " + Double.toString(dist));
+                    //System.err.println("Distance 0.0 parsed in tree file (child=" + label + "): Representing distance as " + Double.toString(dist));
                 }
                 node = new Node(label, parent, dist);
                 if (root == null) {

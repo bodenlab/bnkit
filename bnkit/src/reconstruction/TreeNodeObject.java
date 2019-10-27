@@ -79,6 +79,28 @@ public class TreeNodeObject {
     }
 
     /**
+     * String representation of the node and its children (recursively) that uses the Newick format.
+     *
+     * @return string representation
+     */
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        String dstr = null;
+        int nchildren = children.size();
+        int cnt = 0;
+        for (TreeNodeObject child : children) {
+            sb.append(child.toString());
+            if (++cnt < nchildren)
+                sb.append(",");
+        }
+        if (nchildren < 1)
+            return label;
+        else
+            return "(" + sb.toString().substring(0, Math.min(sb.toString().length(), 10)) + "...)" + label ;
+    }
+
+
+    /**
      * The MSA id is used to reference the sequence ID in the MSA, used when contructing the edge
      * map and we want to map this onto the reference tree.
      *

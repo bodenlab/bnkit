@@ -15,6 +15,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Command line version of GRASP.
@@ -22,6 +23,9 @@ import java.util.*;
  * @author ariane
  */
 public class GraspCmd {
+
+    public static String VERSION = "1027.2019";
+    public static boolean VERBOSE = false;
 
     public static void usage() {
         usage(0, null);
@@ -40,7 +44,7 @@ public class GraspCmd {
                 "\t{-gap}\n" +
                 "\t{-savetree <tree-file>}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DISTRIB>}\n" +
-                "\t{-help}");
+                "\t{-verbose}{-help}");
         out.println("where \n" +
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
@@ -48,10 +52,12 @@ public class GraspCmd {
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick with ancestor names\n" +
-                "\tThe output file is written on the specified format.");
+                "\tThe output file is written on the specified format.\n" +
+                "\t-verbose will print out information about steps undertaken, and the time it took to finish.");
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
-                "\tEvolutionary models include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman.");
+                "\tEvolutionary models include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman.\n" +
+                "\t~ This is version " + VERSION + " ~");
         System.exit(error);
     }
 
@@ -73,6 +79,8 @@ public class GraspCmd {
         String MARG_NODE = null;
         String SAVE_TREE = null;
 
+        long START_TIME, ELAPSED_TIME;
+
         for (int a = 0; a < args.length; a ++) {
             if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
@@ -86,6 +94,8 @@ public class GraspCmd {
                     INF_JOINT = true;
                 } else if (arg.equalsIgnoreCase("gap")) {
                     GAPPY = true;
+                } else if (arg.equalsIgnoreCase("verbose")) {
+                    VERBOSE = true;
                 } else if (arg.equalsIgnoreCase("savetree") && args.length > a + 1) {
                     SAVE_TREE = args[++a];
                 } else if (arg.equalsIgnoreCase("marg") && args.length > a + 1) {
@@ -128,8 +138,10 @@ public class GraspCmd {
 
         if (ALIGNMENT != null && NEWICK != null && OUTPUT != null) {
             try {
+                START_TIME = System.currentTimeMillis();
                 // Load alignment, tree and run inference with specified settings across given number of threads
-                System.out.println("Loading alignment, tree and starting inference (" + NTHREADS + " threads)");
+                if (VERBOSE) System.out.println("Loading alignment (" + ALIGNMENT + "), tree (" + NEWICK + ") and starting inference (" + NTHREADS + " threads)");
+                ASRPOG.VERBOSE = VERBOSE;
                 ASRPOG asr = null;
                 if (INF_JOINT)
                     asr = new ASRPOG(ALIGNMENT, NEWICK, INF_JOINT, false, MODELS[MODEL_IDX], NTHREADS);
@@ -139,9 +151,9 @@ public class GraspCmd {
                 } else {
                     usage(7, "Marginal inference requires the specification of a valid branch-ID");
                 }
-                System.out.println("Inference done; now assembling ancestor POGs");
+                if (VERBOSE) System.out.println("Inference done; now assembling ancestor POGs");
                 asr.performAssembly(NTHREADS);
-                System.out.println("Assembling ancestor POGs done; now extracting most supported ancestor sequences (" + NTHREADS + " threads)");
+                if (VERBOSE) System.out.println("Assembling ancestor POGs done; now extracting most supported ancestor sequences (" + NTHREADS + " threads)");
                 EnumSeq[] ancseqs = new EnumSeq[asr.getAncestralSeqLabels().size()];
                 EnumDistrib[] ancdist = null;
                 int[] ancidxs = null;
@@ -201,7 +213,12 @@ public class GraspCmd {
                 if (SAVE_TREE != null)
                     asr.saveTree(SAVE_TREE);
 
-                System.out.println("Done.");
+                ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
+                if (VERBOSE) {
+                    System.out.println(String.format("Done in %d min, %d sec", TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME),
+                            TimeUnit.MILLISECONDS.toSeconds(ELAPSED_TIME) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME))));
+                }
+
             } catch (IOException e) {
                 usage(2, "Failed to read or write files: " + e.getMessage());
             } catch (InterruptedException e) {
