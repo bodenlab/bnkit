@@ -153,7 +153,7 @@ public class GraspCmd {
                 }
                 if (VERBOSE) System.out.println("Inference done; now assembling ancestor POGs");
                 asr.performAssembly(NTHREADS);
-                if (VERBOSE) System.out.println("Assembling ancestor POGs done; now extracting most supported ancestor sequences (" + NTHREADS + " threads)");
+                if (VERBOSE) System.out.println("Assembling ancestor POGs done; now extracting preferred ancestor sequences (" + NTHREADS + " threads)");
                 EnumSeq[] ancseqs = new EnumSeq[asr.getAncestralSeqLabels().size()];
                 EnumDistrib[] ancdist = null;
                 int[] ancidxs = null;
