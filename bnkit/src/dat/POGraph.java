@@ -129,7 +129,7 @@ public class POGraph {
 					nodes.put(idx1, n1);
 				}
 			}
-			if (inf.base != '-') {
+			if (inf.base != '-' || n1 == initialNode || n1 == finalNode) {
 				for (int idx2 : inf.transitions) {
 					if (idx1 < idx2)
 						pem.add(idx1, idx2);

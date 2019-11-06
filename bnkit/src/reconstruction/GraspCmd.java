@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GraspCmd {
 
-    public static String VERSION = "1027.2019";
+    public static String VERSION = "1106.2019";
     public static boolean VERBOSE = false;
 
     public static void usage() {

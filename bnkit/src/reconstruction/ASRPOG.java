@@ -1345,7 +1345,8 @@ public class ASRPOG {
 			}
 		}
 		// last time through all nodes; this time serially, extracting results
-		System.out.println("Character inference done, now inferring parsimonious POG edges");
+		if (VERBOSE)
+			System.out.println("Character inference done, now inferring parsimonious POG edges");
 		nodeIDs.add(pogAlignment.getFinalNodeID()); // add dummy final node for identifying backwards transitions
 		for (Integer nodeId : nodeIDs) {
 			pogAlignment.setCurrent(nodeId);
