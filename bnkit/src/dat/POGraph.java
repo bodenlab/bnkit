@@ -1966,13 +1966,17 @@ public class POGraph {
 			if (distribution != null)
 				return distribution;
 			distribution = new HashMap<>();
+			EnumDistrib d = this.getDistrib();
 			for (Character b : seqChars.values())
+				distribution.put(b, d.get(b));
+  		/*
 				if (distribution.containsKey(b))
 					distribution.put(b, distribution.get(b) + 1.0);
 				else
 					distribution.put(b, 1.0);
 			for (Character b : distribution.keySet())
 				distribution.put(b, distribution.get(b) / seqChars.size());
+		 */
 			return this.distribution;
 		}
 
