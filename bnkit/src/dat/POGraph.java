@@ -1950,10 +1950,22 @@ public class POGraph {
 		 */
 		public void setCharacterDistribution(Map<Character, Double> dist) {
 			this.distribution = new HashMap<>(dist);
+			if (this.distrib == null)
+                this.distrib = new EnumDistrib(Enumerable.aacid);
+            for (Character ch : dist.keySet())
+                if (this.distrib.isValid(ch))
+                    this.distrib.set(ch, dist.get(ch));
 		}
 
 		public void setDistrib(EnumDistrib d) {
 			this.distrib = d;
+			// below is a FIX to work with GRASP GUI
+            if (this.distribution == null) {
+                this.distribution = new HashMap<>();
+                for (Object ch : this.distrib.getDomain().getValues()) {
+                    this.distribution.put((Character)ch, this.distrib.get(ch));
+                }
+            }
 		}
 
 		/**
@@ -1966,17 +1978,19 @@ public class POGraph {
 			if (distribution != null)
 				return distribution;
 			distribution = new HashMap<>();
-			EnumDistrib d = this.getDistrib();
 			for (Character b : seqChars.values())
-				distribution.put(b, d.get(b));
-  		/*
 				if (distribution.containsKey(b))
 					distribution.put(b, distribution.get(b) + 1.0);
 				else
 					distribution.put(b, 1.0);
 			for (Character b : distribution.keySet())
 				distribution.put(b, distribution.get(b) / seqChars.size());
-		 */
+			if (distrib == null) {
+			    distrib = new EnumDistrib(Enumerable.aacid);
+			    for (Object ch : distrib.getDomain().getValues())
+			        if (distribution.containsValue(ch))
+			            distrib.set(ch, distribution.get(ch));
+            }
 			return this.distribution;
 		}
 

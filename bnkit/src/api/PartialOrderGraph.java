@@ -246,7 +246,7 @@ public class PartialOrderGraph {
      * @return      Map between next node ID and edge weight
      */
     public Map<Integer, Double> getOutEdgeWeights(Integer id) {
-        if (!graph.setCurrent(id))
+        if (!graph.setCurrent(id)) 
             return null;
         return new HashMap<>(graph.getNextEdgeWeights());
     }
