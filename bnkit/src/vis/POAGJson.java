@@ -123,13 +123,15 @@ public class POAGJson {
             return seqChars;
         }
         int numSeqs = poag.getSeqChars(nodeId).size();
+        if (numSeqs == 0) // MB: Fix to deal with misappropriation of this field in ancestor nodes
+            numSeqs = 100;
         for (Character base : graph.keySet()) {
             if (graph.get(base) > 0.01) {
                 seqChars.put(base, graph.get(base) * numSeqs);
             }
         }
         return seqChars;
-        }
+    }
 
 
     /**

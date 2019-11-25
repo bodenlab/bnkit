@@ -1970,13 +1970,16 @@ public class POGraph {
 
 		/**
 		 * Get the distribution of characters in this node.
+         * Actually, it SETs the distribution from seqChars if it has not be set before...
 		 *
 		 * @return distribution {(Character, probability)}
 		 * @deprecated use getDistrib instead
 		 */
 		public Map<Character, Double> getDistribution() {
+		    // MB: I think the first if-clause is when the distribution has been set from a marginal recon, or if the code below has been executed previously
 			if (distribution != null)
 				return distribution;
+			// MB: I think the below code is ONLY executed if this is an extant node
 			distribution = new HashMap<>();
 			for (Character b : seqChars.values())
 				if (distribution.containsKey(b))
