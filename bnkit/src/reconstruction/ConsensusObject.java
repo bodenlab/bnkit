@@ -372,10 +372,12 @@ public class ConsensusObject {
             multiplier = 2 * numberPositionsInSequence;
         }
 
-        // Endure we don't add our multiplier to start and end nodes
+        // Ensure we don't add our multiplier to start and end nodes
         if (!isBidirectional && to.getId() != finalNode.getId() && from.getId() != initialNode.getId()) {
             multiplier = 2 * numberPositionsInSequence;
         }
+        if (isBidirectional) // give bi-directional edges a tiny advantage, regardless
+            multiplier *= 1.001;
 
         double val = 1 - weight;
         if (val < 0) {

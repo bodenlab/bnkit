@@ -133,7 +133,7 @@ public class POGraph {
 				for (int idx2 : inf.transitions) {
 					if (idx1 < idx2)
 						pem.add(idx1, idx2);
-					else
+					else if (idx1 > idx2)
 						pem.add(idx2, idx1);
 				}
 			}

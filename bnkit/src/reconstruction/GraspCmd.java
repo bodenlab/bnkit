@@ -5,15 +5,14 @@ import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.POGraph;
+import dat.PhyloTree;
 import dat.file.AlnWriter;
 import dat.file.FastaWriter;
 import dat.file.TSVFile;
 import vis.POAGJson;
 
 import javax.swing.*;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -24,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GraspCmd {
 
-    public static String VERSION = "1121.2019";
+    public static String VERSION = "1203.2019";
     public static boolean VERBOSE = false;
 
     public static void usage() {
@@ -43,7 +42,7 @@ public class GraspCmd {
                 "\t{-joint (default) | -marg <branchpoint-id>} \n" +
                 "\t{-gap}\n" +
                 "\t{-savetree <tree-file>}\n" +
-                "\t{-format <FASTA(default)|CLUSTAL|DISTRIB>}\n" +
+                "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT>}\n" +
                 "\t{-verbose}{-help}");
         out.println("where \n" +
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
@@ -51,7 +50,7 @@ public class GraspCmd {
                 "\toutput-file will be populated by inferred ancestor or ancestors\n" +
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (joint inference only, default for CLUSTAL format)\n" +
-                "\t\"-savetree\" re-saves the tree on Newick with ancestor names\n" +
+                "\t\"-savetree\" re-saves the tree on Newick format with ancestor names included\n" +
                 "\tThe output file is written on the specified format.\n" +
                 "\t-verbose will print out information about steps undertaken, and the time it took to finish.");
         out.println("Notes: \n" +
@@ -71,7 +70,7 @@ public class GraspCmd {
         int MODEL_IDX = 0; // default model is that above indexed 0
 
         boolean GAPPY = false;
-        String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL"};
+        String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL", "DOT"};
         int FORMAT_IDX = 0;
 
         int NTHREADS = 1;
@@ -159,14 +158,19 @@ public class GraspCmd {
                 EnumDistrib[] ancdist = null;
                 int[] ancidxs = null;
                 int i = 0;
+                PartialOrderGraph[] pogs = new PartialOrderGraph[asr.getAncestralSeqLabels().size()];
                 for (String anclabel : asr.getAncestralSeqLabels()) { // iterate through all ancestors
                     PartialOrderGraph ancestor = asr.getGraph(anclabel);
-                    ancseqs[i] = ancestor.getMostSupported(GAPPY);
-                    if (anclabel.equals(MARG_NODE)) {
-                        ancdist = ancestor.getDistribMostSupported(GAPPY);
-                        ancidxs = ancestor.getIndicesMostSupported(GAPPY);
+                    if (FORMAT_IDX == 3)
+                        pogs[i] = ancestor;
+                    else {
+                        ancseqs[i] = ancestor.getMostSupported(GAPPY);
+                        if (anclabel.equals(MARG_NODE)) {
+                            ancdist = ancestor.getDistribMostSupported(GAPPY);
+                            ancidxs = ancestor.getIndicesMostSupported(GAPPY);
+                        }
+                        ancseqs[i].setName(anclabel);
                     }
-                    ancseqs[i].setName(anclabel);
                     i ++;
                 }
                 switch (FORMAT_IDX) {
@@ -174,6 +178,18 @@ public class GraspCmd {
                         FastaWriter fw = new FastaWriter(OUTPUT);
                         fw.save(ancseqs);
                         fw.close();
+                        break;
+                    case 3: // DOT
+                        try {
+                            FileWriter w = new FileWriter(OUTPUT);
+                            for (int ii = 0; ii < pogs.length; ii++) {
+                                w.write(pogs[ii].toString() + "\n");
+                            }
+                            w.close();
+                        } catch (IOException e) {
+                            usage(9, e.getMessage());
+                        }
+
                         break;
                     case 1: // DISTRIB
                         if (ancdist != null) {
@@ -225,13 +241,24 @@ public class GraspCmd {
             } catch (InterruptedException e) {
                 usage(6, "Process interrupted: " + e.getMessage());
             }
-        } else {
-            if (ALIGNMENT == null)
+
+        } else if (OUTPUT == null && NEWICK != null && SAVE_TREE != null) {
+            PhyloTree ptree = new PhyloTree();
+            try {
+                ptree.loadNewick(NEWICK);
+                Writer writer = new PrintWriter(SAVE_TREE, "UTF-8");
+                String newick = ptree.getRoot().toString();
+                writer.write(newick);
+                writer.write(";\n");
+                writer.close();
+            } catch (IOException e) {
+                usage(9, "Phylogenetic tree file error: " + e.getMessage());
+            }
+        } else if (ALIGNMENT == null)
                 usage(3, "Need to specify alignment (Clustal or FASTA file)");
-            if (NEWICK == null)
+        else if (NEWICK == null)
                 usage(4, "Need to specify phylogenetic tree (Newick file)");
-            if (OUTPUT == null)
+        else if (OUTPUT == null)
                 usage(5, "Need to specify output file");
-        }
     }
 }
