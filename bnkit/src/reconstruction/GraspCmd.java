@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GraspCmd {
 
-    public static String VERSION = "1203.2019";
+    public static String VERSION = "0309.2020";
     public static boolean VERBOSE = false;
 
     public static void usage() {
