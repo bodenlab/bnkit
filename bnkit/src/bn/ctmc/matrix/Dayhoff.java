@@ -28,6 +28,7 @@ public class Dayhoff extends SubstModel {
     // Dayhoff, M. O., R. V. Eck, and C. M. Park. 1972. A model of evolutionary change in proteins. Pp. 89–99 in M. O. Dayhoff, ed., Atlas of Protein Sequence and Structure Vol. 5. National Biomedical Research Foundation, Washington, D.C.
     // The matrix below uses the improvements of 
     // Kosiol, C., and Goldman, N. 2005. Different versions of the Dayhoff rate matrix. Molecular Biology and Evolution 22:193-199.
+    // https://www.ebi.ac.uk/goldman-srv/dayhoff/
     
     public static Character[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
     
