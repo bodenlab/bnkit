@@ -11,6 +11,7 @@ class IdxGraphTest {
 
     IdxGraph g1 = null;
     IdxGraph g2 = null;
+    IdxGraph g3 = null;
 
     @Test
     void addNode() {
@@ -36,17 +37,39 @@ class IdxGraphTest {
         }
     }
 
+    private class MyNode implements Node {
+        final String label;
+        public MyNode(String label) {
+            this.label = label;
+        }
+        public String toString() { return label; }
+    }
+
+    private class MyEdge implements Edge {
+        final String label;
+        public MyEdge(String label) {
+            this.label = label;
+        }
+        public String toString() { return label; }
+    }
+
     void createGraphs() {
         for (int i = 0; i < g1.size(); i++) {
             g1.addNode(i);
             g2.addNode(i);
+            g3.addNode(i, new MyNode("Node[" + i + "]"));
         }
+        for (int i = 0; i < g1.size() - 1; i += 2)
+            g3.addEdge(-1, i, new MyEdge("Start:" + i));
         for (int from = 0; from < g1.size(); from += 2) {
             for (int to = 1; to < g1.size(); to += 2) {
                 g1.addEdge(from, to); // un-directed
                 g2.addEdge(from, to); // directed
+                g3.addEdge(from, to, new MyEdge(from + ":" + to));
             }
         }
+        for (int i = 1; i < g1.size(); i += 3)
+            g3.addEdge(g1.size() - i, g3.size(), new MyEdge(g1.size() - i + ":End"));
     }
 
     @Test
@@ -152,5 +175,6 @@ class IdxGraphTest {
     void setUp() {
         g1 = new IdxGraph(10, true, false);
         g2 = new IdxGraph(100, false, false);
+        g3 = new IdxGraph(200, false, true);
     }
 }

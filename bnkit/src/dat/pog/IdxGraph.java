@@ -62,6 +62,14 @@ public class IdxGraph {
     }
 
     /**
+     * Check if the graph is directed
+     * @return true if directed, false if undirected
+     */
+    public boolean isDirected() {
+        return !undirected;
+    }
+
+    /**
      * Check if index is a valid index for a node; does not include virtual termination nodes and
      * does not indicate if the index is indeed occupied by a node
      * @param idx index
@@ -129,6 +137,18 @@ public class IdxGraph {
     }
 
     /**
+     * Retrieve the node instance for a specified index
+     * @param idx index of node
+     * @return the node instance
+     */
+    public Node getNode(int idx) {
+        if (isIndex(idx))
+            return nodes[idx];
+        else
+            throw new InvalidIndexRuntimeException("Index outside bounds: " + idx);
+    }
+
+    /**
      * Modify the graph by adding a node at a specified index.
      * Note: does not connect the node.
      * @param nid node index, which must be valid, i.e. between 0 and N - 1, where N is the size of the possible/valid node-set
@@ -150,7 +170,7 @@ public class IdxGraph {
             if (!undirected)
                 this.edgesBackward[nid] = new BitSet(size());
         } else {
-            throw new IndexOutOfBoundsException("Index outside bounds: " + nid);
+            throw new InvalidIndexRuntimeException("Index outside bounds: " + nid);
         }
     }
 
@@ -166,7 +186,26 @@ public class IdxGraph {
             if (!undirected)
                 this.edgesBackward[nid] = null;
         } else {
-            throw new IndexOutOfBoundsException("Index outside bounds: " + nid);
+            throw new InvalidIndexRuntimeException("Index outside bounds: " + nid);
+        }
+    }
+
+    /**
+     * Retrieve the edge instance for a pair of node indices
+     * @param from source node index
+     * @param to target node index
+     * @return edge instance if exists, else null
+     * @throws InvalidIndexRuntimeException if either node index is invalid
+     */
+    public Edge getEdge(int from, int to) {
+        if (isNode(from) && isNode(to)) {
+            return this.edges.get(getEdgeIndex(from, to));
+        } else if (from == -1 && isNode(to) && isTerminated()) {
+            return this.edges.get(getEdgeIndex(from, to));
+        } else if (isNode(from) && to == this.size() && isTerminated()) {
+            return this.edges.get(getEdgeIndex(from, to));
+        } else {
+            throw new InvalidIndexRuntimeException("Cannot retrieve edge between non-existent node/s: " + from + " or " + to);
         }
     }
 
@@ -186,6 +225,7 @@ public class IdxGraph {
      * @param from the source node index of the edge, -1 for a terminal start edge
      * @param to the destination node index of the edge, N for a terminal end edge, where N is the number of possible/valid nodes
      * @param edge the instance of the edge (optional)
+     * @throws InvalidIndexRuntimeException if either node index is invalid
      */
     public synchronized void addEdge(int from, int to, Edge edge) {
         if (isNode(from) && isNode(to)) {
@@ -204,7 +244,7 @@ public class IdxGraph {
             this.endNodes.set(from);
             this.edges.put(getEdgeIndex(from, to), edge);
         } else {
-            throw new RuntimeException("Cannot add edge between non-existent node/s: " + from + " or " + to);
+            throw new InvalidIndexRuntimeException("Cannot add edge \"" + edge.toString() + "\" between non-existent node/s: " + from + " or " + to);
         }
     }
 
@@ -213,6 +253,7 @@ public class IdxGraph {
      * If the graph is terminated, an edge can be added from a virtual start, or to a virtual end node.
      * @param from the source node index of the edge, -1 for a terminal start edge
      * @param to the destination node index of the edge, N for a terminal end edge, where N is the number of possible/valid nodes
+     * @throws InvalidIndexRuntimeException if either node index is invalid
      */
     public synchronized void removeEdge(int from, int to) {
         if (isNode(from) && isNode(to)) {
@@ -229,7 +270,7 @@ public class IdxGraph {
             this.endNodes.set(from, false);
             this.edges.remove(getEdgeIndex(from, to));
         } else {
-            throw new RuntimeException("Cannot remove edge between non-existent node/s: " + from + " or " + to);
+            throw new InvalidIndexRuntimeException("Cannot remove edge between non-existent node/s: " + from + " or " + to);
         }
     }
 
@@ -269,12 +310,20 @@ public class IdxGraph {
                 indices[count ++] = i;
             return indices;
         } else {
-            throw new RuntimeException("Cannot retrieve edges from non-existent/invalid node: " + idx);
+            throw new InvalidIndexRuntimeException("Cannot retrieve edges from non-existent/invalid node: " + idx);
         }
     }
 
 }
 
+/**
+ *
+ */
+class InvalidIndexRuntimeException extends RuntimeException {
+    public InvalidIndexRuntimeException(String errmsg) {
+        super(errmsg);
+    }
+}
 /**
  * Default, place-holder implementation of a node
  */
