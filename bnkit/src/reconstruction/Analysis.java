@@ -17,6 +17,7 @@ import java.util.*;
 
 /**
  * Created by aesseb on 10/6/2015.
+ * @deprecated
  */
 public class Analysis {
 

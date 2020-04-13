@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GraspCmd {
 
-    public static String VERSION = "1203.2019";
+    public static String VERSION = "0309.2020";
     public static boolean VERBOSE = false;
 
     public static void usage() {
@@ -37,7 +37,7 @@ public class GraspCmd {
             out.println(msg + " (Error " + error + ")");
         out.println("Usage: GraspCmd \n" +
                 "\t[-aln <alignment-file> -nwk <tree-file> -out <output-file>]\n" +
-                "\t{-model <JTT(default)|Dayhoff|LG|WAG>}\n" +
+                "\t{-model <JTT(default)|Dayhoff|LG|WAG|Yang>}\n" +
                 "\t{-thr <n-threads>}\n" +
                 "\t{-joint (default) | -marg <branchpoint-id>} \n" +
                 "\t{-gap}\n" +
@@ -55,7 +55,8 @@ public class GraspCmd {
                 "\t-verbose will print out information about steps undertaken, and the time it took to finish.");
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
-                "\tEvolutionary models include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman.\n" +
+                "\tEvolutionary models include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman; \n" +
+                "\tthe only DNA model is that of Yang (general reversible process model).\n" +
                 "\t~ This is version " + VERSION + " ~");
         System.exit(error);
     }
@@ -66,7 +67,7 @@ public class GraspCmd {
         String NEWICK = null;
         String OUTPUT = null;
 
-        String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG"};
+        String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang"};
         int MODEL_IDX = 0; // default model is that above indexed 0
 
         boolean GAPPY = false;

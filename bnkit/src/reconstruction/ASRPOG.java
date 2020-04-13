@@ -6,10 +6,7 @@ import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.PhyloBNet;
 import bn.ctmc.SubstNode;
-import bn.ctmc.matrix.Dayhoff;
-import bn.ctmc.matrix.JTT;
-import bn.ctmc.matrix.LG;
-import bn.ctmc.matrix.WAG;
+import bn.ctmc.matrix.*;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.EnumVariable;
@@ -1180,9 +1177,11 @@ public class ASRPOG {
 	 * @return Bayesian network for node position in pogAlignment
 	 */
 	private PhyloBNet createCharacterNetwork() {
-		// create a Bayesian network with the phylogenetic tree structure and the substitution model for amino acids
+		// create a Bayesian network with the phylogenetic tree structure and the substitution model for nucleic acids or amino acids
 		PhyloBNet phyloBN;
-		if (this.model.equalsIgnoreCase("Dayhoff"))
+		if (this.model.equalsIgnoreCase("Yang")) // DNA
+			phyloBN = PhyloBNet.create(phyloTree, new Yang());
+		else if (this.model.equalsIgnoreCase("Dayhoff")) // protein
 			phyloBN = PhyloBNet.create(phyloTree, new Dayhoff());
 		else if (this.model.equalsIgnoreCase("LG"))
 			phyloBN = PhyloBNet.create(phyloTree, new LG());

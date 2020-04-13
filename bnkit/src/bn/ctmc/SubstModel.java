@@ -31,51 +31,51 @@ import bn.math.Matrix.Exp;
  */
 public abstract class SubstModel {
     
-    final double[][] R;
-    final double[] F;
-    final Exp Rexp;
+    final double[][] R; // This is the IRM, sometimes referred to as Q
+    final double[] F;   // This is the frequencies of the character states
+    final Exp Rexp;     // exp(IRM)
     final Enumerable alpha;
     private EnumTable<EnumDistrib> table = null;
 
     /**
      * Create time reversible evolutionary model.
      * @param F stationary base frequencies
-     * @param Q Q matrix (general reversible model)
+     * @param S Symmetric, un-scaled version of Q matrix Q_ij = s_ij*pi_j as defined by PAML
      * @param alphabet the values that substitutable variables can take, listed strictly in the order of the array and matrix
      */
-    public SubstModel(double[] F, double[][] Q, Enumerable alphabet) {
-        this(F, Q, alphabet, true);
+    public SubstModel(double[] F, double[][] S, Enumerable alphabet) {
+        this(F, S, alphabet, true);
     }
     
     /**
      * Create evolutionary model.
      * @param F stationary base frequencies
-     * @param Q Q matrix (general reversible model)
+     * @param IRM Instantaneous rate matrix
      * @param alphabet the values that substitutable variables can take, listed strictly in the order of the array and matrix
-     * @param time_reversible set to true if model is time reversible (Qij == Qji)
+     * @param symmetric set to true if the IRM is unscaled and symmetric (Sij == Sji) as per PAML format, or
+     *                  false if the IRM is the "Q" matrix as often provided in papers
      */
-    public SubstModel(double[] F, double[][] Q, Enumerable alphabet, boolean time_reversible) {
-        if (Q.length != F.length)
-            throw new IllegalArgumentException("Invalid size of either Q or F");
+    public SubstModel(double[] F, double[][] IRM, Enumerable alphabet, boolean symmetric) {
+        if (IRM.length != F.length)
+            throw new IllegalArgumentException("Invalid size of either IRM or F");
         if (alphabet.size() != F.length)
             throw new IllegalArgumentException("Invalid size of alphabet");
         this.F = F;
-        R = new double[Q.length][Q.length];
-        for (int i = 0; i < Q.length; i ++)  {
-            if (Q[i].length != F.length)
-                throw new IllegalArgumentException("Q must be a square matrix");
-            if (time_reversible) {
-                for (int j = i + 1; j < Q[i].length; j ++) {
-                    double q = Q[i][j];
-                    R[i][j] = q*F[j];
-                    R[j][i] = q*F[i];
+        R = new double[IRM.length][IRM.length];
+        for (int i = 0; i < IRM.length; i ++)  {
+            if (IRM[i].length != F.length)
+                throw new IllegalArgumentException("IRM must be a square matrix");
+            if (symmetric) {
+                for (int j = i + 1; j < IRM[i].length; j ++) {
+                    double s = IRM[i][j];
+                    R[i][j] = s*F[j];
+                    R[j][i] = s*F[i];
                 }
-            } else { // time is *not* reversible
-                for (int j = 0; j < Q[i].length; j ++) {
+            } else { // the supplied IRM is Q, hence no conversion necessary
+                for (int j = 0; j < IRM[i].length; j ++) {
                     if (i == j)
                         continue;
-                    double q = Q[i][j];
-                    R[i][j] = q*F[j]; // FIXME: check so that it is not F[i]
+                    R[i][j] = IRM[i][j];
                 }
             }
         }
@@ -85,16 +85,32 @@ public abstract class SubstModel {
         Rexp = new Exp(R);
     }
 
+    /**
+     * Get the name of the evolutionary model
+     * @return the name as a text string
+     */
     public abstract String getName();
-    
+
+    /**
+     * The the frequencies of the character states
+     * @return a priori probability of each character
+     */
     public double[] getF() {
         return F;
     }
-    
+
+    /**
+     * Get the IRM a.k.a. "Q"
+     * @return the IRM
+     */
     public double[][] getR() {
         return R;
     }
-        
+
+    /**
+     * Get the domain that defines the character states.
+     * @return the domain
+     */
     public Enumerable getDomain() {
         return alpha;
     }
@@ -217,7 +233,8 @@ public abstract class SubstModel {
     }
     
     public static void main(String[] argv) {
-        SubstModel sm_gap = new gap();
+        SubstModel sm_gap = new Gap();
+        SubstModel sm_yang = new Yang();
         SubstModel sm_wag = new WAG();
         SubstModel sm_lg = new LG();
         SubstModel sm_jtt = new JTT();
@@ -225,17 +242,23 @@ public abstract class SubstModel {
 
         System.out.println("R (Gap)");
         bn.math.Matrix.print(sm_gap.getR());
+        System.out.println("R (Yang)");
+        bn.math.Matrix.print(sm_yang.getR());
 
         System.out.println("R (Dayhoff)");
         bn.math.Matrix.print(sm_dh.getR());
         System.out.println("R (WAG)");
         bn.math.Matrix.print(sm_wag.getR());
-        System.out.println("\nR (LG)");
+        System.out.println("R (LG)");
         bn.math.Matrix.print(sm_lg.getR());
 
         double time = .1;
         System.out.println("\n\nTransition probabilities of R (Gap) @ time = " + time);
         double[][] prob = sm_gap.getProbs(time);
+        bn.math.Matrix.print(prob);
+
+        System.out.println("\n\nTransition probabilities of R (Yang) @ time = " + time);
+        prob = sm_yang.getProbs(time);
         bn.math.Matrix.print(prob);
 
         System.out.println("\n\nTransition probabilities of R (WAG) @ time = " + time);

@@ -6,7 +6,7 @@ import dat.Enumerable;
 /**
  * Created by aesseb on 11-Dec-15.
  */
-public class gap extends SubstModel {
+public class Gap extends SubstModel {
 
     public static Character[] S = {'G', 'C'};
 
@@ -19,7 +19,7 @@ public class gap extends SubstModel {
             {-0.54, 0.54},
             {0.54, -0.54}};
 
-    public gap() {
+    public Gap() {
         super (F, Q, new Enumerable(S), false);
     }
 

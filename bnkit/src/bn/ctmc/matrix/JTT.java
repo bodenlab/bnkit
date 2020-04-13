@@ -29,6 +29,7 @@ public class JTT extends SubstModel {
     // Jones, D. T., W. R. Taylor, and J. M. Thornton. 1992. The rapid generation of mutation data matrices from protein sequences. CABIOS 8:275–282.
     // The matrix below uses the improvements of 
     // Kosiol, C., and Goldman, N. 2005. Different versions of the Dayhoff rate matrix. Molecular Biology and Evolution 22:193-199.
+    // https://www.ebi.ac.uk/goldman-srv/dayhoff/
 
     public static Character[] S = {'A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V'};
 

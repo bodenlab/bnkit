@@ -21,6 +21,7 @@ import bn.BNet;
 import bn.BNode;
 import bn.Predef;
 import dat.EnumVariable;
+import dat.Enumerable;
 import dat.PhyloTree;
 import dat.PhyloTree.Node;
 import dat.Variable;
@@ -86,8 +87,7 @@ public class PhyloBNet {
         PhyloBNet pbn = new PhyloBNet(model);
         pbn.rate = rate;
         Node root = tree.getRoot();
-        EnumVariable rvar = Predef.AminoAcid(root.getLabel().toString());
-//        EnumVariable rvar = Predef.AminoAcid(root.toString());
+        EnumVariable rvar = new EnumVariable(model.getDomain(), root.getLabel().toString());
         pbn.bnroot = new SubstNode(rvar, model);
         pbn.addBNode(pbn.bnroot);
         pbn.createNodesForSubtree(root, rvar);
@@ -202,8 +202,7 @@ public class PhyloBNet {
 
         } else {
             for (Node child : children) {
-                EnumVariable cvar = Predef.AminoAcid(child.getLabel().toString());
-//                EnumVariable cvar = Predef.AminoAcid(child.toString());
+                EnumVariable cvar = new EnumVariable(model.getDomain(), child.getLabel().toString());
                 SubstNode cnode = new SubstNode(cvar, evar, model, child.getDistance() * this.rate);
                 this.addBNode(cnode);
                 createNodesForSubtree(child, cvar);

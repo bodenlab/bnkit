@@ -11,7 +11,7 @@ import bn.alg.*;
 import bn.ctmc.PhyloBNet;
 import bn.ctmc.SubstNode;
 import bn.ctmc.matrix.JTT;
-import bn.ctmc.matrix.gap;
+import bn.ctmc.matrix.Gap;
 import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
 import dat.EnumSeq;
@@ -217,12 +217,12 @@ public class ASR {
             PhyloBNet pbnGap;
             if (use_sampled_rate) {
                 pbn = PhyloBNet.create(tree, new JTT(), sampled_rate);
-                pbnGap = PhyloBNet.createGap(tree, new gap(), sampled_rate);
+                pbnGap = PhyloBNet.createGap(tree, new Gap(), sampled_rate);
             } else {
                 //creates BNet beginning with root then recursively
                 //traversing subtrees
                 pbn = PhyloBNet.create(tree, new JTT());
-                pbnGap = PhyloBNet.createGap(tree, new gap());
+                pbnGap = PhyloBNet.createGap(tree, new Gap());
             }
             pbnets[col] = pbn;
 
