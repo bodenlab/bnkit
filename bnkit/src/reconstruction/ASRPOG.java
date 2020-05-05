@@ -1131,7 +1131,7 @@ public class ASRPOG {
 		Set<String> eNodes = new HashSet<>();
 		for (PhyloTree.Node en : extNodes)
 			if (!eNodes.add(en.getLabel().toString()))
-				throw new RuntimeException("Error: Extant node names must be unique.\nDuplicate names are - " + en.getLabel().toString());
+				throw new RuntimeException("Error: Extant node names must be unique.\nDuplicate names are - " + en.getLabel().toString() + "\n");
 
 
 		// Check if there are duplicate sequence names in the extant sequences
@@ -1139,7 +1139,7 @@ public class ASRPOG {
 		Set<String> seqNames = new HashSet<>();
 		for (EnumSeq seq : extantSequences)
 			if (!seqNames.add(seq.getName()))
-				throw new RuntimeException("Error: Sequence names must be unique.\nDuplicate names are - " + seq.getName());
+				throw new RuntimeException("Error: Sequence names must be unique.\nDuplicate names are - " + seq.getName() + "\n");
 
 		// Check if the provided extant sequences match up to the provided tree
 		if (!eNodes.equals(seqNames)) {
@@ -1147,13 +1147,14 @@ public class ASRPOG {
 			String seqLabels = "";
 			for (String seqLabel : seqNames)
 				if (!eNodes.contains(seqLabel))
-					seqLabels += " " + seqLabel;
+					seqLabels += " " + seqLabel + "\r\n";
 			String eLabels = "";
 			for (String eLabel : eNodes)
 				if (!seqNames.contains(eLabel))
-					eLabels += " " + eLabel;
-			throw new RuntimeException("Error: The sequence names in the provided alignment must all have a match" +
-					" in the provided tree.\nUnique labels in the alignment: " + seqLabels + ": unique labels in the tree: " + eLabels);
+					eLabels += " " + eLabel + "\r\n";
+			throw new RuntimeException("Error: The sequence names in the provided alignment are different to the names " +
+                    "in the provided tree. \r\n Look closely at the following two lists and fix your alignment or tree file " +
+                    "so that they are identical. \r\n Note that some alignment or tree generation programs may alter your identifiers. \r\n \r\nUnique labels in the alignment: " + seqLabels + " \r\n \r\n Unique labels in the tree: \r\n " + eLabels);
 		}
 	}
 
