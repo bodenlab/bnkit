@@ -1154,7 +1154,7 @@ public class ASRPOG {
 					eLabels += " " + eLabel + "\r\n";
 			throw new RuntimeException("Error: The sequence names in the provided alignment are different to the names " +
                     "in the provided tree. \r\n Look closely at the following two lists and fix your alignment or tree file " +
-                    "so that they are identical. \r\n Note that some alignment or tree generation programs may alter your identifiers. \r\n \r\nUnique labels in the alignment: " + seqLabels + " \r\n \r\n Unique labels in the tree: \r\n " + eLabels);
+                    "so that they are identical. \r\n Note that some alignment or tree generation programs may alter your identifiers. \r\n \r\nUnique labels in the alignment: \r\n " + seqLabels + " \r\n \r\n Unique labels in the tree: \r\n " + eLabels);
 		}
 	}
 
