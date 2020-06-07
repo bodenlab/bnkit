@@ -55,7 +55,11 @@ public class SeqDomain<E extends Domain> implements Domain {
     public Object[] get() {
         return arr;
     }
-    
+
+    public Object get(int idx) {
+        return arr[idx];
+    }
+
     public int length() {
         if (arr != null)
             return arr.length;

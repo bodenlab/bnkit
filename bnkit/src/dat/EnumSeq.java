@@ -205,7 +205,8 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
         
         private final List<EnumSeq.Gappy<E>> seqs;
         private final int width;
-        
+        private E domain = null;
+
         /**
          * Create an alignment structure out of aligned, gappy sequences.
          * @param aseqs 
@@ -214,10 +215,13 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
             this.seqs = aseqs;
             int w = -1;
             for (EnumSeq.Gappy<E> seq : aseqs) {
-                if (w < 0)
+                if (w < 0) {
                     w = seq.length();
-                else if (w != seq.length())
+                    domain = seq.elementType;
+                } else if (w != seq.length())
                     throw new RuntimeException("Invalid alignment with sequences of different lengths.");
+                else if (domain != seq.elementType)
+                    throw new RuntimeException("Invalid alignment with sequences of different types.");
             }
             width = w;
         }
@@ -225,7 +229,11 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
         public EnumSeq.Gappy<E> getEnumSeq(int index) {
             return seqs.get(index);
         }
-        
+
+        public E getDomain() {
+            return domain;
+        }
+
         /**
          * Get the width of alignment--the number of columns.
          * @return number of columns
@@ -283,6 +291,21 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
                 return syms;
             }
             return null;
+        }
+
+        /**
+         * Determine the number of sequences that have content in this column
+         * @param col column
+         * @return count of sequences
+         */
+        public int getOccupancy(int col) {
+            if (col >= 0 && col < this.width) {
+                int count = 0;
+                for (EnumSeq<E> seq : seqs)
+                    count += seq.get(col) == null ? 0 : 1;
+                return count;
+            }
+            return 0;
         }
     }
     

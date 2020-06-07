@@ -29,6 +29,7 @@ import java.util.*;
  * Functionality includes labeling and traversing nodes; reading and writing to Newick format;
  * Programmers should note that almost all functionality is implemented through recursion.
  * @author mikael
+ *
  */
 public class PhyloTree {
 
@@ -45,6 +46,13 @@ public class PhyloTree {
 
     public PhyloTree() {
 
+    }
+
+    public static PhyloTree load(String filename, String format) throws IOException {
+        if (format.equalsIgnoreCase("newick") || format.equalsIgnoreCase("nwk"))
+            return new PhyloTree().loadNewick(filename);
+        else
+            throw new RuntimeException("Unknown format: " + format);
     }
 
     /**
