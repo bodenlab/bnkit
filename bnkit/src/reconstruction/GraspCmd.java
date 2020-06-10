@@ -165,6 +165,9 @@ public class GraspCmd {
                     if (FORMAT_IDX == 3)
                         pogs[i] = ancestor;
                     else {
+                        if (anclabel.equals("N141") || anclabel.equals("N142")) {
+                            System.out.println(anclabel);
+                        }
                         ancseqs[i] = ancestor.getMostSupported(GAPPY);
                         if (anclabel.equals(MARG_NODE)) {
                             ancdist = ancestor.getDistribMostSupported(GAPPY);

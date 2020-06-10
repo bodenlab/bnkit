@@ -2,7 +2,7 @@ package dat.pog;
 
 import dat.EnumSeq;
 import dat.Enumerable;
-import dat.PhyloTree;
+import dat.phylo.Tree;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -13,7 +13,7 @@ import java.util.Map;
  */
 public class POGTree {
 
-    private PhyloTree tree;
+    private Tree tree;
     private Map<String, POGraph<Enumerable>> extants;
     private Enumerable domain;
 
@@ -23,7 +23,7 @@ public class POGTree {
      * @param aln
      * @param tree
      */
-    public POGTree(dat.EnumSeq.Alignment<Enumerable> aln, dat.PhyloTree tree) {
+    public POGTree(dat.EnumSeq.Alignment<Enumerable> aln, Tree tree) {
         this.tree = tree;
         this.extants = new HashMap<>();
         this.domain = aln.getDomain();
@@ -63,7 +63,7 @@ public class POGTree {
      * @param extants
      * @param tree
      */
-    public POGTree(Map<String, POGraph<Enumerable>> extants, dat.PhyloTree tree) {
+    public POGTree(Map<String, POGraph<Enumerable>> extants, Tree tree) {
         this.tree = tree;
 
     }
@@ -74,11 +74,11 @@ public class POGTree {
      * @param index
      * @return
      */
-    PhyloTree getTree(int index) {
+    Tree getTree(int index) {
         throw new RuntimeException("Not implemented");
     }
 
-    PhyloTree getTree() {
+    Tree getTree() {
         return tree;
     }
 
@@ -86,7 +86,7 @@ public class POGTree {
     public static void main(String[] args) {
         try {
             EnumSeq.Alignment aln = new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/dp16_poag5.aln", Enumerable.aacid));
-            PhyloTree tree = PhyloTree.load("/Users/mikael/simhome/ASR/dp16_poag5.nwk", "newick");
+            Tree tree = Tree.load("/Users/mikael/simhome/ASR/dp16_poag5.nwk", "newick");
             POGTree pogt = new POGTree(aln, tree);
             for (Object name : pogt.extants.keySet()) {
                 POGraph pog = (POGraph)pogt.extants.get(name);

@@ -15,44 +15,49 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package dat;
+package dat.phylo;
 
+import dat.EnumSeq;
 import dat.EnumSeq.Alignment;
+import dat.Enumerable;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
 
 /**
- * Class to represent a phylogenetic tree.
- * Rooted, bifurcating tree for representing phylogenetic relationships.
- * Functionality includes labeling and traversing nodes; reading and writing to Newick format;
+ * Class to represent a phylogenetic tree, refactored from old PhyloTree (now deprecated).
+ * Rooted, multifurcating tree for representing phylogenetic relationships.
+ * Functionality includes labeling and traversing branchpoints; reading and writing to Newick format;
  * Programmers should note that almost all functionality is implemented through recursion.
  * @author mikael
- * @deprecated
  */
-public class PhyloTree {
+public class Tree {
 
-    private Node root = null; // the root of the tree
-    private ArrayList<Node> nodeList = new ArrayList<>();
+    private BranchPoint root = null; // the root of the tree, all descendants linked by pointer in BranchPoint class
+    private ArrayList<BranchPoint> branchPointList = new ArrayList<>(); // kept to assist in searching for node by content
 
     /**
-     * Private constructor for tree from a root with all nodes connected off that.
+     * Constructor for tree from a root with all nodes connected off that.
      * Use factory methods to construct trees.
      */
-    private PhyloTree(ArrayList<Node> nodeList) {
-        this.nodeList = nodeList;
+    public Tree(BranchPoint root) {
+        this.root = root;
+        this.branchPointList.add(root);
+        for (BranchPoint bp : root.getDescendants()) {
+            if (!branchPointList.contains(bp))
+                branchPointList.add(bp);
+            else
+                throw new TreeRuntimeException("Branch points form cycle");
+        }
     }
 
-    public PhyloTree() {
-
-    }
-
-    public static PhyloTree load(String filename, String format) throws IOException {
+    public static Tree load(String filename, String format) throws IOException {
         if (format.equalsIgnoreCase("newick") || format.equalsIgnoreCase("nwk"))
-            return new PhyloTree().loadNewick(filename);
+            return Tree.loadNewick(filename);
         else
-            throw new RuntimeException("Unknown format: " + format);
+            throw new IOException("Unknown format: " + format);
     }
 
     /**
@@ -75,30 +80,11 @@ public class PhyloTree {
     }
 
     /**
-     * Convert nodes to an array, breadth-first
-     *
-     * @return
-     */
-    public Node[] toNodesBreadthFirst() {
-        Node[] arr = new Node[nodeList.size()];
-        nodeList.toArray(arr);
-        return arr;
-    }
-
-    public String[] toStringsBreadthFirst() {
-        Node[] nodes = toNodesBreadthFirst();
-        String[] arr = new String[nodes.length];
-        for (int i = 0; i < nodes.length; i++)
-            arr[i] = nodes[i].label.toString();
-        return arr;
-    }
-
-    /**
      * Get root node of tree.
      *
      * @return the root of the tree
      */
-    public Node getRoot() {
+    public BranchPoint getRoot() {
         return root;
     }
 
@@ -108,7 +94,7 @@ public class PhyloTree {
      * @param content label or label
      * @return matching node, or null if not found
      */
-    public Node find(Object content) {
+    public BranchPoint find(Object content) {
         return root.find(content);
     }
 
@@ -122,195 +108,15 @@ public class PhyloTree {
      *
      * @param aln sequence alignment
      */
-    public void setAlignment(EnumSeq.Alignment aln) {
+    public void setAlignment(Alignment aln) {
         int nseqs = aln.getHeight();
         for (int i = 0; i < nseqs; i++) {
             EnumSeq seq = aln.getEnumSeq(i);
-            Node node = find(seq.getName());
-            if (node != null) {
-                node.setSequence(seq);
+            BranchPoint branchPoint = find(seq.getName());
+            if (branchPoint != null) {
+                branchPoint.setSequence(seq);
             }
         }
-    }
-
-    /**
-     * Find index of first comma at the current level (non-embedded commas are ignored) or end of string.
-     *
-     * @param str a Newick string
-     * @return index of the first comma or end-of-string
-     */
-    private static int getComma(String str) {
-        if (str.length() == 0)
-            return -1;
-        int mylevel = 0;
-        char[] chararr = str.toCharArray();
-        for (int i = 0; i < chararr.length; i++) {
-            if (chararr[i] == '(') mylevel += 1;
-            else if (chararr[i] == ')') mylevel -= 1;
-            else if (chararr[i] == ',' && mylevel == 0) return i;
-        }
-        return str.length();
-    }
-
-    /**
-     * Utility method to parse an embedded string on the Newick format.
-     *
-     * @param parent the parent of the current node
-     * @return the root node of tree
-     */
-    private Node parseNewick(String newickStr, Node parent) {
-        root = parseNewick(newickStr, parent, new ArrayList<>(), 0);
-        return root;
-    }
-
-    /**
-     * Utility method to parse an embedded string on the Newick format.
-     *
-     * @return the tree
-     */
-    public PhyloTree parseNewick(String newickStr) {
-        root = parseNewick(newickStr, null, new ArrayList<>(), 0);
-        return this;
-    }
-
-    /**
-     * Helper function to parse a leaf (extent sequence) in a Newick file.
-     *
-     * @param str    The Newick String
-     * @param parent Parent Node
-     * @return
-     */
-    private Node parseLeafNewick(String str, Node parent) {
-        Node node;
-        String label;
-        int splitIdx = str.indexOf(':'); // check if a distance is specified
-        if (splitIdx == -1) {// no distance
-            return new Node(str, parent, null);
-        } else { // there's a distance
-            label = str.substring(0, splitIdx).trim();
-            try {
-                double dist = Double.parseDouble(str.substring(splitIdx + 1, str.length()));
-                if (dist == 0.0) {
-                    dist = 0.00001;
-                    //System.err.println("Distance 0.0 parsed in tree file (child=" + label + "): Representing distance as " + Double.toString(dist));
-                }
-                node = new Node(label, parent, dist);
-                if (root == null) {
-                    root = node;
-                }
-                return node;
-            } catch (NumberFormatException ex) {
-                throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - " + str.substring(splitIdx + 1, str.length()));
-            }
-        }
-    }
-
-
-    /**
-     * Helper function to parse an internal node (i.e. the template for an ancestor) in the
-     * Newick file.
-     *
-     * @param embed   Part of Newick String containing the ancestral node
-     * @param tail    End of the String
-     * @param parent  Parent of the Node
-     * @param nodeIds List of traversed NodeIds
-     * @param count   Number of nodeIds visited
-     * @return
-     */
-    private Node parseInternalNewick(String embed, String tail, Node parent, ArrayList<Integer> nodeIds, int count) {
-        String label;
-        Node node;
-        int splitIdx = tail.indexOf(':'); // check if a distance is specified
-        if (splitIdx == -1) { // no distance
-            if (!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty()) {
-                label = tail.substring(splitIdx + 1, tail.length()).replace(";", "");
-                node = new Node("N" + count + "_" + label, parent, null);
-            } else {
-                node = new Node("N" + count, parent, null);
-            }
-        } else { // there's a distance
-            if (tail.substring(0, splitIdx) != null && !tail.substring(0, splitIdx).isEmpty()) {
-                label = "N" + count + "_" + tail.substring(0, splitIdx);
-            } else {
-                label = "N" + count;
-            }
-            try {
-                double dist = Double.parseDouble(tail.substring(splitIdx + 1, tail.length()).replace(";", ""));
-                if (dist == 0.0) {
-                    dist = 0.00001;
-                    //System.err.println("Distance 0.0 parsed in tree file (child=" + label + "): Representing distance as " + Double.toString(dist));
-                }
-                node = new Node(label, parent, dist);
-                if (root == null) {
-                    root = node;
-                }
-            } catch (NumberFormatException ex) {
-                throw new RuntimeException("Error: A distance value in your Newick file couldn't be parsed as a number  \n \nThe value was - " + tail.substring(splitIdx + 1, tail.length()).replace(";", ""));
-            }
-        }
-        nodeIds.add(count);
-        // find where the commas are, and create children of node
-        int comma = getComma(embed);
-        String toProcess;
-        while (comma != -1) {
-            toProcess = embed.substring(0, comma);
-            //GOING TO HAVE TO PASS PARENT NODE WITH RECURSION TO RECORD IT
-            // get unique ID to pass through
-            while (nodeIds.contains(count)) {
-                count++;
-            }
-            node.addChild(parseNewick(toProcess, node, nodeIds, count));
-            if (comma + 1 > embed.length()) {
-                break;
-            }
-            embed = embed.substring(comma + 1);
-            comma = getComma(embed);
-        }
-        return node;
-    }
-
-    /**
-     * Utility method for recursively parse an embedded string on the Newick format.
-     * MB-Fix: fixed a bug that meant that labels were missing the last character.
-     * (Only last node or any node if distance is not given.)
-     *
-     * @param parent the parent of the current node
-     * @return the root node of tree
-     */
-    private Node parseNewick(String str, Node parent, ArrayList<Integer> nodeIds, int count) {
-        Node node = null;
-        str = str.replace("\t", "");
-        int startIdx = str.indexOf('('); // start parenthesis
-        int endIdx = str.lastIndexOf(')'); // end parenthesis
-        if (startIdx == -1 && endIdx == -1) { // we are at leaf (no parentheses)
-            node = parseLeafNewick(str, parent);
-        } else if (startIdx >= 0 && endIdx >= 0) { // balanced parentheses
-            String embed = str.substring(startIdx + 1, endIdx);
-            String tail = str.substring(endIdx + 1, str.length());
-            node = parseInternalNewick(embed, tail, parent, nodeIds, count);
-        }
-        if (!nodeList.contains(node)) {
-            nodeList.add(node);
-        }
-        return node;
-    }
-
-    /**
-     * Factory method to create a tree instance from a Newick formatted file.
-     *
-     * @param filename name of file
-     * @return instance of tree
-     */
-    public PhyloTree loadNewick(String filename) throws IOException {
-        BufferedReader reader = new BufferedReader(new FileReader(filename));
-        StringBuilder sb = new StringBuilder();
-        String line = null;
-        while ((line = reader.readLine()) != null)
-            sb.append(line.trim());
-
-        root = parseNewick(sb.toString(), null); //null parent for root
-        reader.close();
-        return this;
     }
 
 
@@ -339,7 +145,7 @@ public class PhyloTree {
         reset_values(this.getRoot());
         Set<Object> values = new HashSet<>(map.values());
         Object[] unique = values.toArray();
-        Node root = this.getRoot();
+        BranchPoint root = this.getRoot();
         root.forwardParsimony(map, unique);
         root.backwardParsimony(unique);
     }
@@ -355,23 +161,192 @@ public class PhyloTree {
     public void setContentByParsimony(Map<String, Object> map, Object[] unique) {
         // reset node values (otherwise stores previous uses)
         reset_values(this.getRoot());
-        Node root = this.getRoot();
+        BranchPoint root = this.getRoot();
         root.forwardParsimony(map, unique);
         root.backwardParsimony(unique);
     }
 
-    private void reset_values(Node node) {
-        if (node.getChildren().isEmpty())
+    private void reset_values(BranchPoint branchPoint) {
+        if (branchPoint.getChildren().isEmpty())
             return;
-        node.setValue(null);
-        for (Node child : node.getChildren())
+        branchPoint.setValue(null);
+        for (BranchPoint child : branchPoint.getChildren())
             reset_values(child);
+    }
+
+    /**
+     * Find index of first comma at the current level (non-embedded commas are ignored) or end of string.
+     * @param str a Newick string, e.g. "(((A:0.3,B:0.4):0.1,C:0.4):0.2,D:0.5);"
+     * @return index of the first comma or end-of-string
+     */
+    static int getComma(String str) {
+        if (str.length() == 0)
+            return -1;
+        int mylevel = 0;
+        char[] chararr = str.toCharArray();
+        for (int i = 0; i < chararr.length; i++) {
+            if (chararr[i] == '(') mylevel += 1;
+            else if (chararr[i] == ')') mylevel -= 1;
+            else if (chararr[i] == ',' && mylevel == 0) return i;
+        }
+        return str.length();
+    }
+
+    /**
+     * Helper function to parse a leaf in a Newick file.
+     *
+     * @param str    The Newick String
+     * @param parent Parent Node
+     * @return
+     */
+    private static BranchPoint parseLeafNewick(String str, BranchPoint parent) {
+        String label;
+        int splitIdx = str.indexOf(':'); // check if a distance is specified
+        if (splitIdx == -1) { // no distance
+            return new BranchPoint(str, parent, null);
+        } else { // there's a distance
+            label = str.substring(0, splitIdx).trim();
+            try {
+                double dist = Double.parseDouble(str.substring(splitIdx + 1));
+                if (dist == 0.0) {
+                    dist = 0.00001;
+                }
+                return new BranchPoint(label, parent, dist);
+            } catch (NumberFormatException ex) {
+                throw new RuntimeException("A distance value couldn't be parsed as a number. The value is \"" + str.substring(splitIdx + 1)+ "\" about here: " + str);
+            }
+        }
+    }
+
+    /**
+     * Helper function to parse an internal node (i.e. the template for an ancestor) in the
+     * Newick file.
+     *
+     * @param embed   Part of Newick String containing the ancestral node
+     * @param tail    End of the String
+     * @param parent  Parent of the Node
+     * @param nodeIds List of traversed NodeIds
+     * @param count   Number of nodeIds visited
+     * @return
+     */
+    private static BranchPoint parseInternalNewick(String embed, String tail, BranchPoint parent, ArrayList<Integer> nodeIds, int count) {
+        String label;
+        BranchPoint branchPoint;
+        int splitIdx = tail.indexOf(':'); // check if a distance is specified
+        if (splitIdx == -1) { // no distance
+            if (!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty()) {
+                label = tail.substring(splitIdx + 1).replace(";", "");
+                branchPoint = new BranchPoint("N" + count + "_" + label, parent, null);
+            } else {
+                branchPoint = new BranchPoint("N" + count, parent, null);
+            }
+        } else { // there's a distance
+            if (tail.substring(0, splitIdx) != null && !tail.substring(0, splitIdx).isEmpty()) {
+                label = "N" + count + "_" + tail.substring(0, splitIdx);
+            } else {
+                label = "N" + count;
+            }
+            try {
+                double dist = Double.parseDouble(tail.substring(splitIdx + 1).replace(";", ""));
+                if (dist == 0.0) {
+                    dist = 0.00001;
+                }
+                branchPoint = new BranchPoint(label, parent, dist);
+            } catch (NumberFormatException ex) {
+                throw new RuntimeException("A distance value couldn't be parsed as a number. The value is \"" + tail.substring(splitIdx + 1).replace(";", "") + "\" about here: " + tail);
+            }
+        }
+        nodeIds.add(count);
+        // find where the commas are, and create children of node
+        int comma = getComma(embed);
+        String toProcess;
+        while (comma != -1) {
+            toProcess = embed.substring(0, comma);
+            //GOING TO HAVE TO PASS PARENT NODE WITH RECURSION TO RECORD IT
+            // get unique ID to pass through
+            while (nodeIds.contains(count)) {
+                count++;
+            }
+            branchPoint.addChild(parseNewick(toProcess, branchPoint, nodeIds, count));
+            if (comma + 1 > embed.length()) {
+                break;
+            }
+            embed = embed.substring(comma + 1);
+            comma = getComma(embed);
+        }
+        return branchPoint;
+    }
+
+    /**
+     * Utility method for recursively parse an embedded string on the Newick format.
+     * MB-Fix: fixed a bug that meant that labels were missing the last character.
+     * (Only last node or any node if distance is not given.)
+     *
+     * @param parent the parent of the current node
+     * @return the root node of tree
+     */
+    private static BranchPoint parseNewick(String str, BranchPoint parent, ArrayList<Integer> nodeIds, int count) {
+        BranchPoint branchPoint = null;
+        // str = str.replace("\t", "");
+        int startIdx = str.indexOf('('); // start parenthesis
+        int endIdx = str.lastIndexOf(')'); // end parenthesis
+        if (startIdx == -1 && endIdx == -1) { // we are at leaf (no parentheses)
+            branchPoint = Tree.parseLeafNewick(str, parent);
+        } else if (startIdx >= 0 && endIdx >= startIdx) { // balanced parentheses
+            String embed = str.substring(startIdx + 1, endIdx);
+            String tail = str.substring(endIdx + 1);
+            branchPoint = parseInternalNewick(embed, tail, parent, nodeIds, count);
+        } else {
+            if (startIdx >=0)
+                throw new RuntimeException("Missing \")\" in Newick string, before here: " + str.substring(startIdx));
+            else
+                throw new RuntimeException("Missing \"(\" in Newick string, matching this: " + str.substring(0, endIdx));
+        }
+        return branchPoint;
+    }
+
+    /**
+     * Utility method to parse an embedded string on the Newick format, and attach to a given parent.
+     * @param parent the parent of the current node (can be null if no parent)
+     * @return the root node of sub-tree
+     */
+    static BranchPoint parseNewick(String newickStr, BranchPoint parent) {
+        BranchPoint subroot = Tree.parseNewick(newickStr, parent, new ArrayList<>(), 0);
+        if (parent != null)
+            parent.addChild(subroot);
+        return subroot;
+    }
+
+    /**
+     * Factory method to parse an embedded string on the Newick format and make a tree out of it.
+     * @return the tree
+     */
+    public static Tree parseNewick(String newickStr) {
+        BranchPoint root = Tree.parseNewick(newickStr, null);
+        return new Tree(root);
+    }
+
+    /**
+     * Factory method to create a tree instance from a Newick formatted file.
+     *
+     * @param filename name of file
+     * @return instance of tree
+     */
+    public static Tree loadNewick(String filename) throws IOException {
+        BufferedReader reader = new BufferedReader(new FileReader(filename));
+        StringBuilder sb = new StringBuilder();
+        String line = null;
+        while ((line = reader.readLine()) != null)
+            sb.append(line.trim());
+        BranchPoint root = Tree.parseNewick(sb.toString(), null); //null parent for root
+        reader.close();
+        return new Tree(root);
     }
 
     public static void main(String[] args) {
 
         try {
-            PhyloTree mytree = new PhyloTree().loadNewick("/Users/mikael/cloudstor/DHAD_Jan2019/dhad_clustal_08012019/r_7500_9112_dhad_01012018.nwk");
+            Tree mytree = Tree.loadNewick("/Users/mikael/cloudstor/DHAD_Jan2019/dhad_clustal_08012019/r_7500_9112_dhad_01012018.nwk");
             mytree.removeInternalLabels();
             System.out.println(mytree.toString());
         } catch (IOException e) {
@@ -379,14 +354,12 @@ public class PhyloTree {
             System.exit(1);
         }
         //null parent for root
-        PhyloTree phyloTree = new PhyloTree();
-        Node root = phyloTree.parseNewick("((A:0.6,((B:3.3,(C:1.0,D:2.5)cd:1.8)bcd:5,((E:3.9,F:4.5)ef:2.5,G:0.3)efg:7)X:3.2)Y:0.5,H:1.1)I:0.2", null);
-        System.out.println(root);
+        Tree phyloTree = new Tree(Tree.parseNewick("((A:0.6,((B:3.3,(C:1.0,D:2.5)cd:1.8)bcd:5,((E:3.9,F:4.5)ef:2.5,G:0.3)efg:7)X:3.2)Y:0.5,H:1.1)I:0.2", null));
+        System.out.println(phyloTree.root);
         //null parent for root
-        root = phyloTree.parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)", null);
-        System.out.println(root);
+        System.out.println(Tree.parseNewick("(((E:3.9,F:4.5,A,B,C)ef:2.5,G:0.3)efg:7,x,z,q,w,e,r,t)", null));
         try {
-            PhyloTree edge1 = phyloTree.loadNewick("/Users/mikael/simhome/ASR/edge1.nwk");
+            Tree edge1 = Tree.loadNewick("/Users/mikael/simhome/ASR/edge1.nwk");
             System.out.println(edge1);
             Alignment aln = new Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/gap1.aln", Enumerable.aacid));
             edge1.setAlignment(aln);
@@ -398,36 +371,62 @@ public class PhyloTree {
     }
 
     /**
-     * Class for nodes that make up tree.
+     * Class for branch points that make up tree.
      * Note recursive definition. Supports any branching factor.
      */
-    public static class Node {
-        final private List<Node> children;  // the children of this node
-        private Object label;               // arbitrary label of node
-        // MB-Fix: now a list of values, previously just a single "value"
-        private List<Object> values = null; // values of node
+    public static class BranchPoint {
+        private List<BranchPoint> children = new ArrayList<>(); // the children of this branch point
+        private Object label = null;               // arbitrary label of branch point
+        private List<Object> values = new ArrayList<>();        // values at branch point
         private EnumSeq sequence = null;    // sequence
         private double[] scores = null;     // the optimal score for each parent value
-        // MB-Fix: added third index, to allow multiple child symbols to contribute to the same parent score
-        private int[][][] traceback = null; // [parent value][child branch] = [value in child that gives optimal value, next value in same child ...]
+        private int[][][] traceback = null; // [parent value][child branch][best child value/s],
+        // e.g. [2][1][0] means when parent is assigned 2nd value, child indexed 1, is (optimally) assigned 0th value
         private Double dist = null;         // optional distance (from this node to its parent)
-        private List<Double> modelProb = new ArrayList<>(); // Every node has a single parent (bar root) so it can carry
-        // the value for the edge
-        private Node parent;
+        private BranchPoint parent = null;         // link to parent
+
+        /**
+         * Construct a branch point
+         */
+        public BranchPoint() {
+        }
 
         /**
          * Construct node from label/label.
-         *
          * @param label label/label
          */
-        public Node(String label, Node parent, Double dist) {
+        public BranchPoint(String label) {
             this.label = label;
-            this.children = new ArrayList<>();
-            this.parent = parent;
-            this.dist = dist;
-            this.values = new ArrayList<>();
         }
 
+        /**
+         * Construct node from label/label, and parent at distance.
+         * @param label label/label
+         * @param parent parent node
+         * @param dist distance to parent from this node
+         */
+        public BranchPoint(String label, BranchPoint parent, Double dist) {
+            this.label = label;
+            this.parent = parent;
+            this.dist = dist;
+        }
+
+        /**
+         * Construct a branch point for a parent based on existing children
+         * @param label
+         * @param children
+         */
+        public BranchPoint(String label, BranchPoint... children) {
+            this.label = label;
+            for (BranchPoint child : children)
+                this.children.add(child);
+        }
+
+        public boolean isLeaf() {
+            if (children == null)
+                return true;
+            return children.isEmpty();
+        }
 
         public Object getLabel() {
             return label;
@@ -437,12 +436,34 @@ public class PhyloTree {
             this.label = label;
         }
 
-        // MB-Fix: re-directs to a new function, defaults to return the first symbol if multiple available
+        public void setParent(BranchPoint parent) {
+            this.parent = parent;
+        }
+
+        public BranchPoint getParent() {
+            return parent;
+        }
+
+        public void setSequence(EnumSeq seq) {
+            this.sequence = seq;
+        }
+
+        public EnumSeq getSequence() {
+            return sequence;
+        }
+
+        /**
+         * Return a single value (the first) associated with this branch point
+         * @return the (first) value of the branch point
+         */
         public Object getValue() {
             return getValue(0);
         }
 
-        // MB-Fix: new function signature, using index to retrieve specific value
+        /**
+         * Return a single value (by index) associated with this branch point
+         * @return the nominated value of the branch point
+         */
         public Object getValue(int index) {
             if (this.values == null)
                 return null;
@@ -451,17 +472,29 @@ public class PhyloTree {
             return values.get(index);
         }
 
+        /**
+         * Return the scores associated with each parent value (index by parent value)
+         * @return array of scores
+         */
         public double[] getScores() {
             return scores;
         }
 
-        // MB-Fix: new function, returns all values; should be run after parsimony
+        /**
+         * Return the values associated with this branch point, which will contain all values which are deemed optimal
+         * @return
+         */
         public List<Object> getValues() {
             return values;
         }
 
-        // MB-Fix: same signature, handles multiple calls to save each internally.
-        // Note it no longer returns value, instead it returns true if new value was set, false, if value was already set (used to optimise traversal below)
+        /**
+         * Set value of branch point.
+         * handles multiple calls to save each internally.
+         * it returns true if new value was set, false, if value was already set (used to optimise traversal in parsimony below)
+         * @param value
+         * @return
+         */
         public boolean setValue(Object value) {
             if (value == null) {
                 this.values = null;
@@ -475,58 +508,8 @@ public class PhyloTree {
             return true;
         }
 
-        public List<Double> getModelProb() {
-            return modelProb;
-        }
-
-        public Double getModelProb(int c) {
-            return modelProb.get(c);
-        }
-
-        /**
-         * When adding modelProb values you must iterate over the alignment in order so each value is added in
-         * the position corresponding to the column it represents
-         *
-         * @param probability
-         */
-        public void addModelProb(Double probability) {
-            this.modelProb.add(probability);
-        }
-
-        /**
-         * Can only be used after the initial assignment of all modelProb values (using addLikelihood()) otherwise the list will be unpopulated
-         * and you will get an indexOutOfBoundsException
-         *
-         * @param modelProb
-         * @param column
-         */
-        public void setModelProb(Double modelProb, int column) {
-            try {
-                this.modelProb.set(column, modelProb);
-            } catch (IndexOutOfBoundsException iob) {
-                System.out.println("Model probability list must be initialised using addModelProb() prior to setting specific columns");
-            }
-        }
-
-        public void setParent(Node parent) {
-            this.parent = parent;
-        }
-
-        public Node getParent() {
-            return parent;
-        }
-
-        public void setSequence(EnumSeq seq) {
-            this.sequence = seq;
-        }
-
-        public EnumSeq getSequence() {
-            return sequence;
-        }
-
         /**
          * String representation of the node and its children (recursively) that uses the Newick format.
-         *
          * @return string representation
          */
         public String toString() {
@@ -534,7 +517,7 @@ public class PhyloTree {
             String dstr = null;
             int nchildren = children.size();
             int cnt = 0;
-            for (Node child : children) {
+            for (BranchPoint child : children) {
                 sb.append(child.toString());
                 if (++cnt < nchildren)
                     sb.append(",");
@@ -563,7 +546,7 @@ public class PhyloTree {
             String dstr = null;
             int nchildren = children.size();
             int cnt = 0;
-            for (Node child : children) {
+            for (BranchPoint child : children) {
                 sb.append(child.printValue());
                 if (++cnt < nchildren)
                     sb.append(",");
@@ -581,7 +564,7 @@ public class PhyloTree {
          *
          * @param child
          */
-        public void addChild(Node child) {
+        public void addChild(BranchPoint child) {
             children.add(child);
         }
 
@@ -591,7 +574,7 @@ public class PhyloTree {
          *
          * @param child
          */
-        public void removeChild(Node child) {
+        public void removeChild(BranchPoint child) {
             children.remove(child);
         }
 
@@ -601,8 +584,23 @@ public class PhyloTree {
          *
          * @return
          */
-        public Collection<Node> getChildren() {
+        public Collection<BranchPoint> getChildren() {
             return children;
+        }
+
+        /**
+         * Retrieve and return all direct and indirect descendants of this branch point (excluding itself)
+         * @return
+         */
+        public Collection<BranchPoint> getDescendants() {
+            if (this.isLeaf())
+                return Collections.EMPTY_SET;
+            Collection<BranchPoint> below = new HashSet<>();
+            for (BranchPoint child : getChildren()) {
+                below.add(child);
+                below.addAll(child.getDescendants());
+            }
+            return below;
         }
 
         /**
@@ -612,14 +610,14 @@ public class PhyloTree {
          * @param label
          * @return the node that contains the specified label, or null if not found
          */
-        public Node find(Object label) {
+        public BranchPoint find(Object label) {
             if (this.label.equals(label))
                 return this;
             else {
-                for (Node child : children) {
-                    Node node = child.find(label);
-                    if (node != null)
-                        return node;
+                for (BranchPoint child : children) {
+                    BranchPoint branchPoint = child.find(label);
+                    if (branchPoint != null)
+                        return branchPoint;
                 }
                 return null;
             }
@@ -628,7 +626,7 @@ public class PhyloTree {
         private void removeInternalLabels() {
             if (children.size() > 0) {
                 this.setLabel("");
-                for (Node child : children) {
+                for (BranchPoint child : children) {
                     child.removeInternalLabels();
                 }
             }
@@ -685,7 +683,7 @@ public class PhyloTree {
                     // determine scores contributed by each child (cscores) BEFORE substitution penalties
                     double[][] cscores = new double[children.size()][];
                     for (int c = 0; c < children.size(); c++) {
-                        Node child = children.get(c);
+                        BranchPoint child = children.get(c);
                         cscores[c] = child.forwardParsimony(assign, unique); // one score from child c for each symbol
                     }
                     // traceback array needs to hold all child symbol indices that contribute to (indexed) parent symbol score via (indexed) child
@@ -735,7 +733,7 @@ public class PhyloTree {
             double score = 0;
             if (parent_state != null)
                 score = (parent_state == my_state ? 0 : 1);
-            for (Node child : children) {
+            for (BranchPoint child : children) {
                 score += child.getParsimonyScore(my_state);
             }
             return score;
@@ -828,7 +826,7 @@ public class PhyloTree {
                     if (setValue(unique[parent_index])) { // will check so that the state is assigned only once... setValue returns false if already set
                         if (this.children != null) {      // recurse into children nodes...
                             for (int c = 0; c < children.size(); c++) {
-                                Node child = children.get(c);
+                                BranchPoint child = children.get(c);
                                 // Go through each optimal child state
                                 for (int child_index : range(traceback[parent_index][c].length, SET_RANDOM_PARSIMONY)) {
                                     int best_index_in_child = traceback[parent_index][c][child_index]; // index of optimal child state
@@ -879,7 +877,7 @@ public class PhyloTree {
                         // For each child: choose the first optimal state, or go through each. Ordered randomly, or dictated by traceback/parent.
                         for (int child_state_index : range(traceback[value_index][c].length, SET_RANDOM_PARSIMONY)) {
                             int best_index_in_child = traceback[value_index][c][child_state_index];
-                            Node child = children.get(c);
+                            BranchPoint child = children.get(c);
                             child.backwardParsimony(best_index_in_child, unique);
                             if (SET_ONE_TARGET_PARSIMONY)
                                 break;
@@ -889,4 +887,13 @@ public class PhyloTree {
             }
         }
     }
+
+    public class TreeRuntimeException extends RuntimeException {
+
+        public TreeRuntimeException(String errmsg) {
+            super(errmsg);
+        }
+    }
+
 }
+

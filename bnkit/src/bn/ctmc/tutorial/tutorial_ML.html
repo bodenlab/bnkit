@@ -13,7 +13,7 @@
     with their evolutionary relationships described by a <i>phylogenetic tree</i> \(T^*\) and an <i>evolutionary model</i>.
     Each extant sequence is a series of observed character states, arranged so that <i>homologous</i> sections are distinguished.
     The input to a reconstruction tool typically takes the form of a multiple sequence alignment which highlights homology,
-    and a phylogenetic tree, with one leaf node for each sequence.
+    and a phylogenetic tree, with one leaf branchPoint for each sequence.
     There is an assortment of evolutionary models, but this is usually a less emphasized, secondary consideration.
 </p>
 <p>
@@ -28,25 +28,25 @@
     <ol type="1">
     <li>
         for each position \(v \in V\) which has observable character state contributed by one or more extant sequences, a <i>character trace tree</i> \(T_v\) is a constructed from
-        pruning the original phylogenetic tree \(T^*\); this tree will contain only nodes (extant and ancestral) for which a character state should be inferred,
+        pruning the original phylogenetic tree \(T^*\); this tree will contain only branchPoints (extant and ancestral) for which a character state should be inferred,
         i.e. where only substitution events need to be considered; deletions terminate the tree and the root of the tree is an insertion.
     </li>
     <li>
-        the position-specific character trace trees need to be linked to maintain the relationships between ancestral nodes so that ancestral sequences can be assembled following inference.
+        the position-specific character trace trees need to be linked to maintain the relationships between ancestral branchPoints so that ancestral sequences can be assembled following inference.
     </li>
     </ol>
     Neither step above is trivial but handled in GRASP by a form of maximum parsimony and via the use of partial order graphs, respectively.
 </p>
 <H2>Inference of character state</H2>
 <p>
-    The upshot of the first step above is that each leaf node in character trace trees is <i>always</i> assigned a character state that originate from a shared ancestor.
+    The upshot of the first step above is that each leaf branchPoint in character trace trees is <i>always</i> assigned a character state that originate from a shared ancestor.
     We assume that inference of ancestral character states can proceed for each position \(v\) independently; hence, we only need to consider
-    substitution events between the nodes in \(T_v\), over the time durations attached to each node-to-node branch.
+    substitution events between the branchPoints in \(T_v\), over the time durations attached to each branchPoint-to-branchPoint branch.
 </p>
 <p>
-    Each character trace tree \(T_v\) is a <i>probabilistic graphical model</i> that specifies a set of nodes and directed edges between them. Nodes have a one-to-one relationship with <i>random variables</i>. A sub-set of random variables \(X_1, X_2, ..., X_{|S_v|}\) represent the character state
+    Each character trace tree \(T_v\) is a <i>probabilistic graphical model</i> that specifies a set of branchPoints and directed edges between them. Nodes have a one-to-one relationship with <i>random variables</i>. A sub-set of random variables \(X_1, X_2, ..., X_{|S_v|}\) represent the character state
     of all sequences \(S_v \subseteq S\) that have an observable state for position \(v\), and another sub-set \(Y_1, Y_2, ..., Y_{|S_v|-1}\) represent the states in ancestral sequences; \(Y_{|S_v|-1}\) is a special case in that it represents the root of the tree.
-    For both observable and ancestral variables the index uniquely corresponds to a leaf node or a parent node in \(T_v\), respectively.
+    For both observable and ancestral variables the index uniquely corresponds to a leaf branchPoint or a parent branchPoint in \(T_v\), respectively.
 </p>
 <p>
     To complete the definition of the probabilistic graphical model based on \(T_v\), we define a function that identifies the edges of the graph. \(pa_v\) returns the parent variable of the variable in its argument.
@@ -54,7 +54,7 @@
     Additionally, we define a function \(ti_v\) that for any variable in its argument returns the time of evolution associated with the branch between it and its parent in \(T_v\).
 </p>
 <p>
-    With the exception of the root, all nodes in the probabilistic graphical model is a conditional probability
+    With the exception of the root, all branchPoints in the probabilistic graphical model is a conditional probability
     \(
         P(X_i|pa_v(X_i),ti_v(X_i))
     \) or
@@ -84,7 +84,7 @@
 </p>
 <p>
     GRASP's implementation uses <i>variable elimination</i>, which decomposes the inference into an efficient series of products given the hierarchical topology of the tree; it determines the ancestral state across all
-    non-observed variables with the highest <i>joint probability</i>. From the above, GRASP is also capable of inferring the <i>marginal probability distribution</i> at a given node \(k \in \{1, 2, ..., |S_v|-1\}\) by summing
+    non-observed variables with the highest <i>joint probability</i>. From the above, GRASP is also capable of inferring the <i>marginal probability distribution</i> at a given branchPoint \(k \in \{1, 2, ..., |S_v|-1\}\) by summing
     out all other non-observed variables.
 </p>
 <p>
@@ -183,11 +183,11 @@ V & 0.20 & 0.01 & 0.00 & 0.00 & 0.03 & 0.01 & 0.02 & 0.00 & 0.00 & 0.66 & 0.17 &
 <p><img src="GRASP_MSA.png" alt="MSA" width="1000"></p>
 <p>
     We can determine a character trace tree for each index based on the original phylogenetic tree.
-    This involves determining which of the nodes that is the root node and which nodes that terminate the tree.
+    This involves determining which of the branchPoints that is the root branchPoint and which branchPoints that terminate the tree.
     As indicated earlier, this is a separate optimisation problem that GRASP performs using a variant of maximum parsimony. We do not discuss it here.
     Below we show the resulting character trace tree for index 17.
     This is identical to the original phylogenetic tree because there should be a character state at the ultimate ancestor and there are no deletion events that would remove that position in any of the extant sequences.
-    Note that we have not yet assigned character states to the ancestral nodes--that is the problem we are going to look at next.
+    Note that we have not yet assigned character states to the ancestral branchPoints--that is the problem we are going to look at next.
 </p>
 <p><img src="tutorial4_pos17.nwk.png" alt="Tree" width="400"></p>
 <p>
@@ -263,11 +263,11 @@ V & 0.20 & 0.01 & 0.00 & 0.00 & 0.03 & 0.01 & 0.02 & 0.00 & 0.00 & 0.66 & 0.17 &
     <tt>bn.ctmc.SubstNode</tt>.
 </p>
 
-<H2>Partial order graphs with character states at ancestral nodes</H2>
+<H2>Partial order graphs with character states at ancestral branchPoints</H2>
 
 <p>
-    Once inference has been done for each character trace tree, assigning a character state to each ancestral node,
-    GRASP pieces all of them together to form the following POAGs for the ancestral nodes \(N0, N1\) and \(N2\), respectively.
+    Once inference has been done for each character trace tree, assigning a character state to each ancestral branchPoint,
+    GRASP pieces all of them together to form the following POAGs for the ancestral branchPoints \(N0, N1\) and \(N2\), respectively.
     In the process (record keeping on the grand scale) it is possible to distinguish between edges of a couple of different types, highlighted in the colour below.
     Dark grey means that bi-directional edge parsimony (described elsewhere) has deemed the edge to be fully optimal.
     The user can select a single, consensus path through the POAG, which is displayed with a thicker outline.
