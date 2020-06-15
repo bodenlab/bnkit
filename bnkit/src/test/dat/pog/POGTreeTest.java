@@ -17,7 +17,7 @@ class POGTreeTest {
     @BeforeAll
     static void setPogt1() {
         try {
-            aln = new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("src/test/resources/default.aln", Enumerable.aacid));
+            aln = new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("bnkit/src/test/resources/default.aln", Enumerable.aacid));
             tree = Tree.load("bnkit/src/test/resources/default.nwk", "newick");
             pogt1 = new POGTree(aln, tree);
         } catch (IOException e) {
