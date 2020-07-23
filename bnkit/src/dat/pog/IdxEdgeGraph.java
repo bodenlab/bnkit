@@ -69,6 +69,9 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
             return false;
     }
 
+    public synchronized boolean addTerminalEdge(int from, E edge) {
+        return addEdge(from, maxsize(), edge);
+    }
 }
 
 /**

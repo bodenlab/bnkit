@@ -19,11 +19,11 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
         for (int i = 0; i < aln.getWidth(); i ++) {
             // before adding, make sure there is at least one sequence with content in this column
             if (aln.getOccupancy(i) > 0) {
-                EnumNode node = addNode(i);
+                EnumNode node = addNode(i); // Create the node
                 for (int j = 0; j < aln.getHeight(); j ++) {
                     EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(j);
                     Object sym = gseq.get(i);
-                    if (sym != null)
+                    if (sym != null) // when a character is present, count it
                         node.add(sym);
                 }
             }
@@ -37,6 +37,7 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
                         break;
                 SeqEdge e = this.getEdge(-1, start);
                 if (e == null) {
+                    e = new SeqEdge(domain);
                     this.addEdge(-1, start, e);
                     e.setTotal(aln.getHeight());
                 }
@@ -52,6 +53,7 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
                     to = i;
                     SeqEdge e = this.getEdge(from, to);
                     if (e == null) {
+                        e = new SeqEdge(domain);
                         this.addEdge(from, to, e);
                         e.setTotal(aln.getHeight());
                     }
@@ -63,6 +65,7 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
                 to = this.maxsize();
                 SeqEdge e = this.getEdge(from, to);
                 if (e == null) {
+                    e = new SeqEdge(domain);
                     this.addEdge(from, to, e);
                     e.setTotal(aln.getHeight());
                 }

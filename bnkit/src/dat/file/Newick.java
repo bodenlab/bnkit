@@ -1,5 +1,6 @@
 package dat.file;
 
+import dat.phylo.BranchPoint;
 import dat.phylo.Tree;
 
 import java.io.*;
@@ -44,11 +45,11 @@ public class Newick {
      * @param parent Parent Node
      * @return
      */
-    private static Tree.BranchPoint parseLeaf(String str, Tree.BranchPoint parent) {
+    private static BranchPoint parseLeaf(String str, BranchPoint parent) {
         String label;
         int splitIdx = str.indexOf(':'); // check if a distance is specified
         if (splitIdx == -1) { // no distance
-            return new Tree.BranchPoint(str, parent, null);
+            return new BranchPoint(str, parent, null);
         } else { // there's a distance
             label = str.substring(0, splitIdx).trim();
             try {
@@ -56,7 +57,7 @@ public class Newick {
                 if (dist == 0.0) {
                     dist = 0.00001;
                 }
-                return new Tree.BranchPoint(label, parent, dist);
+                return new BranchPoint(label, parent, dist);
             } catch (NumberFormatException ex) {
                 throw new RuntimeException("A distance value couldn't be parsed as a number. The value is \"" + str.substring(splitIdx + 1)+ "\" about here: " + str);
             }
@@ -74,16 +75,16 @@ public class Newick {
      * @param count   Number of nodeIds visited
      * @return
      */
-    private static Tree.BranchPoint parseInternal(String embed, String tail, Tree.BranchPoint parent, ArrayList<Integer> nodeIds, int count) {
+    private static BranchPoint parseInternal(String embed, String tail, BranchPoint parent, ArrayList<Integer> nodeIds, int count) {
         String label;
-        Tree.BranchPoint branchPoint;
+        BranchPoint branchPoint;
         int splitIdx = tail.indexOf(':'); // check if a distance is specified
         if (splitIdx == -1) { // no distance
             if (!tail.isEmpty() && tail.substring(0, tail.length() - 1) != null && !tail.substring(0, tail.length() - 1).isEmpty()) {
                 label = tail.substring(splitIdx + 1).replace(";", "");
-                branchPoint = new Tree.BranchPoint(label, parent, null);
+                branchPoint = new BranchPoint(label, parent, null);
             } else {
-                branchPoint = new Tree.BranchPoint("N" + count, parent, null);
+                branchPoint = new BranchPoint("N" + count, parent, null);
             }
         } else { // there's a distance
             if (tail.substring(0, splitIdx) != null && !tail.substring(0, splitIdx).isEmpty()) {
@@ -96,7 +97,7 @@ public class Newick {
                 if (dist == 0.0) {
                     dist = 0.00001;
                 }
-                branchPoint = new Tree.BranchPoint(label, parent, dist);
+                branchPoint = new BranchPoint(label, parent, dist);
             } catch (NumberFormatException ex) {
                 throw new RuntimeException("A distance value couldn't be parsed as a number. The value is \"" + tail.substring(splitIdx + 1).replace(";", "") + "\" about here: " + tail);
             }
@@ -131,8 +132,8 @@ public class Newick {
      * @param parent the parent of the current node
      * @return the root node of tree
      */
-    private static Tree.BranchPoint parse(String str, Tree.BranchPoint parent, ArrayList<Integer> nodeIds, int count) {
-        Tree.BranchPoint branchPoint;
+    private static BranchPoint parse(String str, BranchPoint parent, ArrayList<Integer> nodeIds, int count) {
+        BranchPoint branchPoint;
         // str = str.replace("\t", "");
         int startIdx = str.indexOf('('); // start parenthesis
         int endIdx = str.lastIndexOf(')'); // end parenthesis
@@ -156,8 +157,8 @@ public class Newick {
      * @param parent the parent of the current node (can be null if no parent)
      * @return the root node of sub-tree
      */
-    private static Tree.BranchPoint parse(String newickStr, Tree.BranchPoint parent) {
-        Tree.BranchPoint subroot = Newick.parse(newickStr, parent, new ArrayList<>(), 0);
+    private static BranchPoint parse(String newickStr, BranchPoint parent) {
+        BranchPoint subroot = Newick.parse(newickStr, parent, new ArrayList<>(), 0);
         if (parent != null)
             parent.addChild(subroot);
         return subroot;
@@ -206,10 +207,10 @@ public class Newick {
         if (startIdx2 >= 0)
             throw new RuntimeException("Non-matched block, about here: " + str.substring(ptr + startIdx2));
         sb.append(str, ptr, str.length());
-        Tree.BranchPoint root = Newick.parse(sb.toString(), null);
+        BranchPoint root = Newick.parse(sb.toString(), null);
         Integer count = 0;
-        List<Tree.BranchPoint> all = root.getSubtree();
-        for (Tree.BranchPoint bp : all) {
+        List<BranchPoint> all = root.getSubtree();
+        for (BranchPoint bp : all) {
             String preferred = matchLabel.get(bp.getLabel());
             if (preferred != null)
                 bp.setLabel(preferred);
@@ -263,12 +264,12 @@ public class Newick {
     public static int MODE_ANCESTOR = 1;
     public static int MODE_STRIPPED = 2;
 
-    public static String sprint(Tree.BranchPoint node, int MODE) {
+    public static String sprint(BranchPoint node, int MODE) {
         StringBuilder sb = new StringBuilder();
         String dstr = null;
-        List<Tree.BranchPoint> children = node.getChildren();
+        List<BranchPoint> children = node.getChildren();
         int cnt = 0;
-        for (Tree.BranchPoint child : children) {
+        for (BranchPoint child : children) {
             sb.append(sprint(child, MODE));
             if (++cnt < children.size())
                 sb.append(",");

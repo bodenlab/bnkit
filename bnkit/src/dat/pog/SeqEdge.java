@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * Edge that forms part of a given sequence
  */
-public class SeqEdge extends Edge {
+public class SeqEdge extends Edge implements WeightedEdge {
 
     private Set<EnumSeq<Enumerable>> seqs;
     private int[] counts = null;
@@ -51,10 +51,10 @@ public class SeqEdge extends Edge {
         return counts[domain.getIndex(from_sym) * domain.size() + domain.getIndex(to_sym)];
     }
 
-    public Double getWeight() {
+    public double getWeight() {
         if (seqs.size() > 0)
             return (2 * Double.valueOf(seqs.size() / (double)normalise_by));
-        else return null;
+        else return 1.0/(double)normalise_by;
     }
 
 }

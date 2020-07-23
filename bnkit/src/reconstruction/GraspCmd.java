@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GraspCmd {
 
-    public static String VERSION = "0309.2020";
+    public static String VERSION = "0723.2020";
     public static boolean VERBOSE = false;
 
     public static void usage() {
@@ -49,7 +49,7 @@ public class GraspCmd {
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
                 "\toutput-file will be populated by inferred ancestor or ancestors\n" +
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
-                "\t\"-gap\" means that the gap-character is included in the resulting output (joint inference only, default for CLUSTAL format)\n" +
+                "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with ancestor names included\n" +
                 "\tThe output file is written on the specified format.\n" +
                 "\t-verbose will print out information about steps undertaken, and the time it took to finish.");
@@ -92,7 +92,7 @@ public class GraspCmd {
                     OUTPUT = args[++a];
                 } else if (arg.equalsIgnoreCase("joint")) {
                     INF_JOINT = true;
-                } else if (arg.equalsIgnoreCase("gap") && INF_JOINT) {
+                } else if (arg.equalsIgnoreCase("gap")) {
                     GAPPY = true;
                 } else if (arg.equalsIgnoreCase("verbose")) {
                     VERBOSE = true;
@@ -100,7 +100,6 @@ public class GraspCmd {
                     SAVE_TREE = args[++a];
                 } else if (arg.equalsIgnoreCase("marg") && args.length > a + 1) {
                     INF_JOINT = false;
-                    GAPPY = false;
                     MARG_NODE = args[++a];
                 } else if (arg.equalsIgnoreCase("model") && args.length > a + 1) {
                     boolean found_model = false;
@@ -148,7 +147,7 @@ public class GraspCmd {
                     asr = new ASRPOG(ALIGNMENT, NEWICK, INF_JOINT, false, MODELS[MODEL_IDX], NTHREADS);
                 else if (MARG_NODE != null) {
                     asr = new ASRPOG(ALIGNMENT, NEWICK, MARG_NODE, false, MODELS[MODEL_IDX], NTHREADS);
-                    FORMAT_IDX = 1;
+                    // FORMAT_IDX = 1;
                 } else {
                     usage(7, "Marginal inference requires the specification of a valid branch-ID");
                 }
@@ -162,12 +161,11 @@ public class GraspCmd {
                 PartialOrderGraph[] pogs = new PartialOrderGraph[asr.getAncestralSeqLabels().size()];
                 for (String anclabel : asr.getAncestralSeqLabels()) { // iterate through all ancestors
                     PartialOrderGraph ancestor = asr.getGraph(anclabel);
-                    if (FORMAT_IDX == 3)
+                    if (FORMAT_IDX == 3) // {"FASTA", "DISTRIB", "CLUSTAL", "DOT"}
                         pogs[i] = ancestor;
                     else {
-                        if (anclabel.equals("N141") || anclabel.equals("N142")) {
-                            System.out.println(anclabel);
-                        }
+                        if (FORMAT_IDX == 1)
+                            GAPPY = false;
                         ancseqs[i] = ancestor.getMostSupported(GAPPY);
                         if (anclabel.equals(MARG_NODE)) {
                             ancdist = ancestor.getDistribMostSupported(GAPPY);

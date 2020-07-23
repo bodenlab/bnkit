@@ -1,5 +1,6 @@
 package dat.phylo;
 
+import asr.Parsimony;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Newick;
@@ -49,7 +50,7 @@ public class ParsimonyTests {
                 Map<Object, Object> assign = new HashMap<>();
                 for (int n = 0; n < alns[i].getNames().length; n ++)
                     assign.put(alns[i].getNames()[n], alns[i].getColumn(col)[n]);
-                TreeInstance.Parsimony tip = trees[i].getInstance(assign).new Parsimony();
+                Parsimony tip = new Parsimony(trees[i].getInstance(assign));
                 tip.SET_ONE_TARGET_PARSIMONY = true;
                 tip.SET_RANDOM_PARSIMONY = true;
                 double[] scores = tip.forward();
@@ -73,7 +74,7 @@ public class ParsimonyTests {
         }
     }
 
-    private int getBPIndex(Tree t, Tree.BranchPoint bp) {
+    private int getBPIndex(Tree t, BranchPoint bp) {
         int idx = -1;
         for (int i = 0; i < t.getSize(); i++) {
             if (bp == t.getBranchPoint(i)) {
@@ -93,12 +94,12 @@ public class ParsimonyTests {
         Object[] init2 = new Object[]{s[0], s[0], s[2], s[3], s[1], s[1], s[1], s[1], s[4], s[1], s[0]};
         Object[] init3 = new Object[]{s[0], s[0], s[2], s[3], s[1], s[1], s[1], s[1], s[4], s[1], s[5]};
         TreeInstance ti = tree1.getInstance(names, init1);
-        TreeInstance.Parsimony tip = ti.new Parsimony();
+        Parsimony tip = new Parsimony(ti);
         tip.SET_ONE_TARGET_PARSIMONY = false;
         tip.SET_RANDOM_PARSIMONY = false;
         tip.forward();
         tip.backward();
-        Tree.BranchPoint n = tree1.find("X01_03");
+        BranchPoint n = tree1.find("X01_03");
         int bpidx = getBPIndex(tree1, n);
         if (bpidx >= 0 && n != null) {
             for (int i = 0; i < s.length; i++)
@@ -110,11 +111,11 @@ public class ParsimonyTests {
             for (int i = 0; i < s.length; i++)
                 assertEquals(tip.getOptimal(bpidx).contains(s[i]), true);
         }
-        System.out.println("init1: " + tip);
         TreeInstance.LABEL_INCLUDES_INDEX = true;
+        System.out.println("init1: " + tip);
         try { Newick.parse(tip.toString()).save("bnkit/src/test/resources/init1.nwk", "nwk"); } catch (IOException e) {}
         ti = tree1.getInstance(names, init2);
-        tip = ti.new Parsimony();
+        tip = new Parsimony(ti);
         tip.SET_ONE_TARGET_PARSIMONY = false;
         tip.SET_RANDOM_PARSIMONY = false;
         tip.forward();
@@ -138,7 +139,7 @@ public class ParsimonyTests {
         System.out.println("init2: " + tip);
         try { Newick.parse(tip.toString()).save("bnkit/src/test/resources/init2.nwk", "nwk"); } catch (IOException e) {}
         ti = tree1.getInstance(names, init3);
-        tip = ti.new Parsimony();
+        tip = new Parsimony(ti);
         tip.SET_ONE_TARGET_PARSIMONY = false;
         tip.SET_RANDOM_PARSIMONY = false;
         tip.forward();

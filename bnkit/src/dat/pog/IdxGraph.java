@@ -11,7 +11,7 @@ public class IdxGraph {
     protected final boolean directed;
     public String nodeDOT = "style=\"rounded,filled\", shape=box, fixedsize=true";
     public String edgeDOT = ""; //""style=\"bold\"";
-    protected List<Node> nodes;    // indexed by internal node ID i in {0..N}, node i does not exist if nodes[i] = null
+    protected Node[] nodes;    // indexed by internal node ID i in {0..N}, node i does not exist if nodes[i] = null
     protected int nNodes;
     protected BitSet[] edgesForward;
     protected BitSet[] edgesBackward = null;
@@ -19,8 +19,8 @@ public class IdxGraph {
     protected BitSet endNodes = null;
 
     public IdxGraph(int nNodes, boolean undirected, boolean terminated) {
-        this.nodes = new ArrayList<>(nNodes);
-        for (int i = 0; i < nNodes; i ++) this.nodes.add(null); // set all node indices to indicate "no node"
+        this.nodes = new Node[nNodes];
+        //for (int i = 0; i < nNodes; i ++) this.nodes.add(null); // set all node indices to indicate "no node"
         this.nNodes = nNodes;
         this.directed = !undirected;
         this.edgesForward = new BitSet[nNodes];
@@ -55,13 +55,13 @@ public class IdxGraph {
     public int size() {
         int cnt = 0;
         for (int i = 0; i < this.nNodes; i ++)
-            cnt += this.nodes.get(i) != null ? 1 : 0;
+            cnt += this.nodes[i] != null ? 1 : 0;
         return cnt;
     }
 
     public synchronized int getFreeIndex() {
         for (int i = 0; i < this.nNodes; i ++)
-            if (this.nodes.get(i) == null)
+            if (this.nodes[i] == null)
                 return i;
         throw new RuntimeException("There are no free indices in graph");
     }
@@ -99,7 +99,7 @@ public class IdxGraph {
      */
     public boolean isNode(int idx) {
         if (isIndex(idx))
-            return (nodes.get(idx) != null);
+            return (nodes[idx] != null);
         return false;
     }
 
@@ -160,7 +160,8 @@ public class IdxGraph {
      */
     public boolean isEndNode(int idx) {
         if (isTerminated())
-            return endNodes.get(idx);
+            if (isNode(idx))
+                return endNodes.get(idx);
         return false;
     }
 
@@ -192,7 +193,7 @@ public class IdxGraph {
      */
     public Node getNode(int idx) {
         if (isIndex(idx))
-            return nodes.get(idx);
+            return nodes[idx];
         else
             throw new InvalidIndexRuntimeException("Index outside bounds: " + idx);
     }
@@ -205,7 +206,7 @@ public class IdxGraph {
      */
     public synchronized int addNode(int nid, Node node) {
         if (isIndex(nid)) {
-            this.nodes.set(nid, node);
+            this.nodes[nid] = node;
             this.edgesForward[nid] = new BitSet(maxsize());
             if (isDirected())
                 this.edgesBackward[nid] = new BitSet(maxsize());
@@ -226,15 +227,23 @@ public class IdxGraph {
 
     /**
      * Modify the graph by removing a node at a specified index.
-     * Note: will disconnect the node (i.e. remove any exiting edge involving the node)
+     * Note: will disconnect the node (i.e. remove any existing edge involving the node)
      * @param nid node index
      */
     public synchronized void removeNode(int nid) {
         if (isIndex(nid)) {
-            this.nodes.set(nid, null);
+            for (int next : getNodeIndices(nid, true))
+                this.removeEdge(nid, next);
+            for (int prev : getNodeIndices(nid, false))
+                this.removeEdge(prev, nid);
+            this.nodes[nid] = null;
             this.edgesForward[nid] = null;
             if (isDirected())
                 this.edgesBackward[nid] = null;
+            if (isTerminated()) {
+                this.startNodes.set(nid, false);
+                this.endNodes.set(nid, false);
+            }
         } else {
             throw new InvalidIndexRuntimeException("Index outside bounds: " + nid);
         }
@@ -265,6 +274,9 @@ public class IdxGraph {
         return true;
     }
 
+    public synchronized boolean addTerminalEdge(int from) {
+        return addEdge(from, maxsize());
+    }
 
     /**
      * Modify the graph by adding an instance of an edge between two existing nodes.
@@ -274,6 +286,8 @@ public class IdxGraph {
      * @throws InvalidIndexRuntimeException if either node index is invalid
      */
     public synchronized void removeEdge(int from, int to) {
+        if (from == -1 && to == 0)
+            from = -1;
         if (isNode(from) && isNode(to)) {
             if (isDirected())
                 this.edgesBackward[to].set(from, false);
@@ -295,6 +309,7 @@ public class IdxGraph {
      * If graph is directed, then the default is to only return the edges looking forward (from the source node when added).
      * @param idx
      * @return
+     * @throws InvalidIndexRuntimeException if the index is invalid
      */
     public int[] getNodeIndices(int idx) {
         return getNodeIndices(idx, true);
@@ -302,15 +317,18 @@ public class IdxGraph {
 
     /**
      * Get indices of all nodes that can be reached in ONE step relative the given node index
-     * @param idx
+     * @param idx index to node
      * @param look_forward if true, look forward, else backward
      * @return
+     * @throws InvalidIndexRuntimeException if the index is invalid
      */
     public int[] getNodeIndices(int idx, boolean look_forward) {
         int count = 0;
         if (isNode(idx)) {
             BitSet bs = (look_forward || !isDirected()) ? edgesForward[idx] : edgesBackward[idx];
             int[] indices = new int[bs.cardinality()];
+            if (indices.length > 1)
+                count = 0;
             for (int i = bs.nextSetBit(0); i >= 0; i = bs.nextSetBit(i + 1))
                 indices[count ++] = i;
             return indices;
@@ -368,8 +386,8 @@ public class IdxGraph {
             buf.append("graph{\nnode [" + nodeDOT + "];\n");
         else
             buf.append("digraph{\nrankdir=\"LR\";\nnode [" + nodeDOT + "];\n");
-        for (int i = 0; i < nodes.size(); i ++) {
-            Node n = nodes.get(i);
+        for (int i = 0; i < nodes.length; i ++) {
+            Node n = nodes[i];
             if (n != null) {
                 buf.append(Integer.toString(i) + " [" + n.toDOT() + "];\n");
             }

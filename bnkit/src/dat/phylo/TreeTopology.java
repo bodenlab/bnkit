@@ -28,4 +28,11 @@ public interface TreeTopology {
      */
      int[] getChildren(int idx);
 
+    /**
+     * Retrieve the identifier/label of the branch point, if available
+     * @param idx the branch point index
+     * @return label if available, else null; note that branch points are not always labelled
+     */
+     Object getLabel(int idx);
+
 }

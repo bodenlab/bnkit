@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,12 +25,12 @@ class TreeTest {
     void getDescendants() {
         Tree t1 = Newick.parse(ss1);
         Tree t2 = Newick.parse(ss2);
-        Collection<Tree.BranchPoint> bps1 = t1.getRoot().getDescendants();
-        Collection<Tree.BranchPoint> bps2 = t2.getRoot().getDescendants();
+        Collection<BranchPoint> bps1 = t1.getRoot().getDescendants();
+        Collection<BranchPoint> bps2 = t2.getRoot().getDescendants();
         assertEquals(bps1.size(), bps2.size());
-        for (Tree.BranchPoint bp1 : bps1) {
+        for (BranchPoint bp1 : bps1) {
             boolean found = false;
-            for (Tree.BranchPoint bp2 : bps2) {
+            for (BranchPoint bp2 : bps2) {
                 if (bp1.getLabel().equals(bp2.getLabel())) {
                     if (bp1.isLeaf())
                         assertEquals(bp1.getDistance(), bp2.getDistance());
@@ -106,16 +109,18 @@ class TreeTest {
             t3l = Tree.load("bnkit/src/test/resources/saveme.nwk", "newick");
             assertNotNull(t3l);
             assertNotNull(t3l.find("_mysubtree is cool"));
-            Tree.BranchPoint root1 = t3l.getRoot();
+            BranchPoint root1 = t3l.getRoot();
             assertEquals(n, root1.getSubtree().size());
             t3l = Tree.load("bnkit/src/test/resources/saveme.anwk", "newick");
             assertNotNull(t3l);
             assertNull(t3l.find("_mysubtree is cool"));
-            Tree.BranchPoint root2 = t3l.getRoot();
+            BranchPoint root2 = t3l.getRoot();
             assertEquals(root1.getSubtree().size(), root2.getSubtree().size());
             t3l = Tree.load("bnkit/src/test/resources/saveme.snwk", "newick");
             assertNotNull(t3l);
             assertNull(t3l.find("_mysubtree is cool"));
+            Tree dtree = Newick.load("bnkit/src/test/resources/default.nwk");
+            dtree.save("bnkit/src/test/resources/default.anwk", "ancestor");
         } catch (IOException e) {
             assertTrue(false);
         }
@@ -125,6 +130,48 @@ class TreeTest {
     @Test
     void find() {
     }
+
+    @Test
+    void iterator() {
+        Tree t1 = Newick.parse(ss1);
+        int cnt = 0;
+        Set<Object> all = new HashSet<>();
+        for (int i : t1) {
+            BranchPoint bp = t1.getBranchPoint(i);
+            all.add(bp.getID());
+            cnt += 1;
+        }
+        assertEquals(t1.getSize(), cnt);
+        assertEquals(t1.getSize(), all.size());
+    }
+
+    @Test
+    void iterator2() {
+        try {
+            tree = Tree.load("bnkit/src/test/resources/small.nwk", "newick");
+            Iterator<Integer> iter = tree.getBreadthFirstIterator();
+            Set<Integer> all = new HashSet<>();
+            int prevdepth = 0;
+            while (iter.hasNext()) {
+                Integer idx = iter.next();
+                all.add(idx);
+                int currdepth = tree.getDepth(idx);
+                assertTrue(prevdepth <= currdepth);
+                prevdepth = currdepth;
+            }
+            int cnt = 0;
+            iter = tree.getDepthFirstIterator();
+            while (iter.hasNext()) {
+                Integer idx = iter.next();
+                assertTrue(all.contains(idx));
+                cnt += 1;
+            }
+            assertEquals(all.size(), cnt);
+        } catch (IOException e) {
+            assertTrue(false);
+        }
+    }
+
 
     static Tree tree = null;
 

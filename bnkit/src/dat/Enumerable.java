@@ -202,5 +202,6 @@ public class Enumerable implements Domain {
     public static Enumerable aacid_ext = new Enumerable(new Character[]{'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', '-'});
     public static Enumerable aacid_alt = new Enumerable(new Character[]{'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V'});
     public static Enumerable gap_character = new Enumerable(new Character[]{'G','C'});
+    public static Enumerable gap_ext = new Enumerable(new Character[]{'G','C','?'});
 
 }

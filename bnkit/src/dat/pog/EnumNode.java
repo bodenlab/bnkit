@@ -9,6 +9,7 @@ public class EnumNode extends Node {
     Enumerable domain;
     EnumDistrib distrib;
     int[] counts;
+    int tot = 0;
     boolean needs_update = true;
 
     public EnumNode(Enumerable domain) {
@@ -20,6 +21,7 @@ public class EnumNode extends Node {
     public void add(Object sym) {
         this.needs_update = true;
         counts[domain.getIndex(sym)] += 1;
+        tot += 1;
     }
 
     public EnumDistrib getDistrib() {
@@ -39,6 +41,11 @@ public class EnumNode extends Node {
     }
 
     public String getLabel() {
+        if (needs_update)
+            distrib = new EnumDistrib(domain, counts);
+        needs_update = false;
+        if (tot == 0)
+            return null;
         Object consensus = distrib.getMax();
         return consensus.toString();
     }

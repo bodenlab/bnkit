@@ -16,18 +16,20 @@ public class Edge {
      */
     public String toDOT() {
         return  ((label == null) ? "" : ("label=\"" + label + "\",")) +
-                ((getWeight() == null) ? "" : ("penwidth=" + getWeight() + ",")) +
+//                ((getWeight() == null) ? "" : ("penwidth=" + getWeight() + ",")) +
                 ((fontname == null) ? "" : ("fontname=\"" + fontname + "\",")) +
                 ((style == null) ? "" : ("style=\"" + style + "\""));
     }
 
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
     public String label = null;
-    public Double weight = null;
     public String fontname = null; // "Arial";
     public String style = null; // "bold";
-
-    public Double getWeight() {
-        return this.weight;
-    }
 
 }
