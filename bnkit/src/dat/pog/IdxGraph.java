@@ -1,8 +1,14 @@
 package dat.pog;
 
+import asr.ASRException;
+
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
@@ -404,8 +410,8 @@ public class IdxGraph {
             }
         }
         if (isTerminated()) {
-            buf.append("_start [label=\"S\",style=bold,fontcolor=red,width=0.25,fillcolor=gray,penwidth=0];\n");
-            buf.append("_end [label=\"E\",style=bold,fontcolor=red,width=0.25,fillcolor=gray,penwidth=0];\n");
+            buf.append("_start [label=\"S(" + getName() + ")\",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];\n");
+            buf.append("_end [label=\"E(" + getName() +")\",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];\n");
             buf.append("{rank=source;_start;}\n{rank=sink;_end;}\n");
         }
         buf.append("edge [" + edgeDOT + "];\n");
@@ -481,15 +487,35 @@ public class IdxGraph {
         fwriter.close();
     }
 
-    public static void saveToDOT(String filename, IdxGraph... graphs) throws IOException {
-        FileWriter fwriter=new FileWriter(filename);
-        BufferedWriter writer=new BufferedWriter(fwriter);
-        int cnt = 1;
-        for (IdxGraph g : graphs) {
-            writer.write(g.toDOT());
-            writer.newLine();
+    public static void saveToDOT(String directory, IdxGraph... graphs) throws IOException, ASRException {
+        File file = new File(directory);
+        // true if the directory was created, false otherwise
+        StringBuilder sb = new StringBuilder();
+        if (file.mkdirs()) {
+            FileWriter freadme=new FileWriter(directory + "/README.txt");
+            BufferedWriter readme=new BufferedWriter(freadme);
+            int cnt = 0;
+            for (IdxGraph g : graphs) {
+                String name = directory + "/" + Integer.toString(cnt) + ".dot";
+                sb.append(name + " ");
+                FileWriter fwriter=new FileWriter(name);
+                BufferedWriter writer=new BufferedWriter(fwriter);
+                writer.write(g.toDOT());
+                writer.newLine();
+                writer.close();
+                fwriter.close();
+                cnt += 1;
+            }
+            readme.write("Install graphviz\nRun command:\n");
+            if (cnt > 1)
+                readme.write("gvpack -u " + sb.toString() + "| dot -Tpdf -opogs.pdf");
+            else
+                readme.write("dot -Tpdf " + sb.toString() + "-opog.pdf");
+            readme.newLine();
+            readme.close();
+            freadme.close();
+        } else {
+            throw new ASRException("Directory " + directory + " already exists");
         }
-        writer.close();
-        fwriter.close();
     }
 }

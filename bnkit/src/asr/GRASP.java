@@ -177,6 +177,9 @@ public class GRASP {
                 if (MODE == Inference.MARGINAL) {
                     if (tree.getIndex(MARG_NODE) < 0)
                         usage(2, MARG_NODE + " is not a valid ancestor number");
+                } else if (MODE == Inference.JOINT) {
+                    if (FORMAT_IDX == 1)
+                        usage(2, FORMATS[FORMAT_IDX] + " is not a valid format for joint reconstruction");
                 }
                 // if we are past the above, we can assume that the data are good to process
                 START_TIME = System.currentTimeMillis();
@@ -220,6 +223,8 @@ public class GRASP {
                             IdxGraph.saveToDOT(OUTPUT, ancestors);
                         } catch (IOException e) {
                             usage(9, e.getMessage());
+                        } catch (ASRException e) {
+                            usage(10, e.getMessage());
                         }
                         break;
                     case 1: // DISTRIB

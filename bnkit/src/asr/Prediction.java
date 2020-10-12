@@ -27,6 +27,8 @@ import java.util.*;
  * 2.  Call factory methods to infer insertions and deletions (selection of algorithms is available), in which POGTree is queried and template POGs are created
  * 3a. Set evolutionary model
  * 3. Call methods to decorate ancestors with character states (joint reconstruction) and/or probability distributions (marginal reconstruction)
+ *
+ * TODO: Indexing of ancestors by ID to branch point index in phylogenetic tree and position-specific trees; currently, inefficient and wasteful
  */
 public class Prediction {
     public static boolean DEBUG = GRASP.VERBOSE;    // print out various information
@@ -35,7 +37,7 @@ public class Prediction {
     private final Map<Object, POGraph> ancestors;   // named ancestors
     private final IdxTree[] positrees;              // position-specific tree, or an edited form of the original tree for the purpose of inferring content
     private final EnumDistrib[][] distribs;         // Probability distributions of ancestor states by ancestor and position index
-    private Object[][] states = null;               // Actual values of ancestors, also indexed by ancestor and position
+    private Object[][] states = null;               // Actual values at inferred branch points, indexed by branch point index and position
 
     /**
      * Basic constructor, not intended for use as it forgoes/assumes prior prediction.
@@ -48,7 +50,7 @@ public class Prediction {
         for (Map.Entry<Object, POGraph> entry : ancestors.entrySet()) // make sure names are set
             entry.getValue().setName(entry.getKey().toString());
         this.positrees = new IdxTree[pogTree.getPositions()]; // by default there's one tree for each index in the alignment/POG
-        this.distribs = new EnumDistrib[ancestors.size()][];
+        this.distribs = new EnumDistrib[pogTree.getTree().getSize()][];
     }
 
     /**
@@ -106,13 +108,15 @@ public class Prediction {
 
     public Map<Object, POGraph> getAncestors(GRASP.Inference mode) {
         for (Map.Entry<Object, POGraph> entry : getAncestors().entrySet()) {
-            int idx = pogTree.getTree().getIndex(entry.getKey());
+            Object ancID = entry.getKey();
+            POGraph pog = entry.getValue();
+            int idx = pogTree.getTree().getIndex(ancID);
             if (mode == GRASP.Inference.JOINT) {
                 if (states != null)
-                    entry.getValue().decorateNodes(states[idx]);
+                    pog.decorateNodes(states[idx]);
             } else if (mode == GRASP.Inference.MARGINAL) {
                 if (distribs[idx] != null)
-                    entry.getValue().decorateNodes(distribs[idx]);
+                    pog.decorateNodes(distribs[idx]);
             }
         }
         return getAncestors();
@@ -142,7 +146,8 @@ public class Prediction {
      * @return
      */
     public EnumDistrib[] getMarginal(int ancestorID, SubstModel MODEL) {
-        if (distribs[ancestorID] == null) {                                     // the ancestor has not yet been inferred
+        int idx = pogTree.getTree().getIndex(ancestorID);
+        if (distribs[idx] == null) {                                     // the ancestor has not yet been inferred
             IdxTree[] trees = new IdxTree[getPositions()];                      // this is how many position-specific trees we are dealing with
             MaxLhood.Marginal[] inf = new MaxLhood.Marginal[getPositions()];    // which is also how many inferences we will carry out
             for (int pos = 0; pos < getPositions(); pos++) {                    // for each position...
@@ -151,7 +156,7 @@ public class Prediction {
                 if (ancidx >= 0)                                                //   which may not exist, i.e. part of an indel, but if it is real...
                     inf[pos] = new MaxLhood.Marginal(ancidx, trees[pos], MODEL);//     set-up the inference
             }
-            distribs[ancestorID] = new EnumDistrib[pogTree.getPositions()];
+            distribs[idx] = new EnumDistrib[pogTree.getPositions()];
             for (int pos = 0; pos < getPositions(); pos++) {                   // for each position...
                 int ancidx = trees[pos].getIndex(ancestorID);                   //   index for sought ancestor in the position-specific tree
                 if (ancidx >= 0) {                                              //   which may not exist, i.e. part of an indel, but if it is real...
@@ -161,7 +166,7 @@ public class Prediction {
                 }
             }
         }
-        return distribs[ancestorID];
+        return distribs[idx];
     }
 
     /**
@@ -170,20 +175,23 @@ public class Prediction {
      * @return the states at all ancestors that assign the greatest likelihood to the observed states at extant sequences
      */
     public Object[][] getJoint(SubstModel MODEL) {
-        this.states = new Object[ancestors.size()][getPositions()];
+        this.states = new Object[pogTree.getTree().getSize()][getPositions()];
         IdxTree[] trees = new IdxTree[getPositions()];              // this is how many position-specific trees we are dealing with
         MaxLhood.Joint[] inf = new MaxLhood.Joint[getPositions()];  // which is also how many inferences we will carry out
         for (int pos = 0; pos < inf.length; pos++) {                // for each position...
             trees[pos] = getTree(pos);                              //   this is the tree with indels imputed
             inf[pos] = new MaxLhood.Joint(trees[pos], MODEL);       //     set-up the inference
         }
-        for  (int ancID : pogTree.getTree().getAncestors()) {
+        for  (Map.Entry<Object, POGraph> entry : getAncestors().entrySet()) {
+            Object ancID = entry.getKey();
+            POGraph pog = entry.getValue();
             for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
                 int ancidx = trees[pos].getIndex(ancID);            //   index for sought ancestor in the position-specific tree
+                int bpidx = pogTree.getTree().getIndex(ancID);            //   index for sought ancestor in the position-specific tree
                 if (ancidx >= 0) {                                  //   which may not exist, i.e. part of an indel, but if it is real...
                     TreeInstance ti = pogTree.getNodeInstance(pos, trees[pos]); //     get the instances at the leaves at that position, and...
                     inf[pos].decorate(ti);                                      //     perform inference
-                    states[ancID][pos] = inf[pos].getDecoration(ancidx);        //     extract state
+                    states[bpidx][pos] = inf[pos].getDecoration(ancidx);        //     extract state
                 }
             }
         }
@@ -200,7 +208,8 @@ public class Prediction {
     public Object[] getJoint(int ancestorID, SubstModel MODEL) {
         if (states == null)   // the ancestors has not yet been inferred
             getJoint(MODEL);
-        return states[ancestorID];
+        int idx = pogTree.getTree().getIndex(ancestorID);
+        return states[idx];
     }
 
     public int[] getConsensus(int ancID) {

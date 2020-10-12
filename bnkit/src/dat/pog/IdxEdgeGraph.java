@@ -84,18 +84,23 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
     public String toDOT() {
         StringBuffer buf = new StringBuffer();
         if (!isDirected())
-            buf.append("graph{\nnode [" + nodeDOT + "];\n");
+            buf.append("graph " + getName() + " {\nnode [" + nodeDOT + "];\n");
         else
-            buf.append("digraph{\nrankdir=\"LR\";\nnode [" + nodeDOT + "];\n");
+            buf.append("digraph " + getName() + " {\nrankdir=\"LR\";\nnode [" + nodeDOT + "];\n");
         for (int i = 0; i < nodes.length; i ++) {
             Node n = nodes[i];
             if (n != null) {
-                buf.append(Integer.toString(i) + " [" + n.toDOT() + "];\n");
+                if (n.getLabel() == null) {
+                    n.setLabel(Integer.toString(i));
+                    buf.append(Integer.toString(i) + " [" + n.toDOT() + "];\n");
+                    n.setLabel(null);
+                } else
+                    buf.append(Integer.toString(i) + " [" + n.toDOT() + "];\n");
             }
         }
         if (isTerminated()) {
-            buf.append("_start [label=\"S\",style=bold,fontcolor=red,width=0.25,fillcolor=gray,penwidth=0];\n");
-            buf.append("_end [label=\"E\",style=bold,fontcolor=red,width=0.25,fillcolor=gray,penwidth=0];\n");
+            buf.append("_start [label=\"S(" + getName() + ")\",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];\n");
+            buf.append("_end [label=\"E(" + getName() +")\",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];\n");
             buf.append("{rank=source;_start;}\n{rank=sink;_end;}\n");
         }
         buf.append("edge [" + edgeDOT + "];\n");

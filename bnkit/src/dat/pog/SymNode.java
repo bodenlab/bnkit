@@ -1,6 +1,5 @@
 package dat.pog;
 
-import dat.Enumerable;
 import dat.colourschemes.Clustal;
 
 public class SymNode extends Node {

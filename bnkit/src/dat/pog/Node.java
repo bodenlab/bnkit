@@ -30,9 +30,11 @@ public class Node {
         return null;
     };
     public static String shape = null; // box, circle, doublecircle
+    public String label = null;
     public String getLabel() {
-        return null;
+        return label;
     };
+    public void setLabel(String label) { this.label = label; }
     public Boolean fixedsize = null;
     public Double width = null;
     public static String fontname = null; // "Arial";

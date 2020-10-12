@@ -1,5 +1,6 @@
 package dat.pog;
 
+import asr.ASRRuntimeException;
 import asr.Prediction;
 import bn.prob.EnumDistrib;
 
@@ -281,10 +282,14 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
     public void decorateNodes(Object[] states) {
+        if (states == null)
+            throw new ASRRuntimeException("Retrieving states for sequence that has not been inferred");
         nodes = SymNode.toArray(states);
     }
 
     public void decorateNodes(EnumDistrib[] distribs) {
+        if (distribs == null)
+            throw new ASRRuntimeException("Retrieving distributions for sequence that has not been inferred");
         nodes = EnumNode.toArray(distribs);
     }
 
