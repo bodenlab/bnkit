@@ -72,6 +72,67 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
     public synchronized boolean addTerminalEdge(int from, E edge) {
         return addEdge(from, maxsize(), edge);
     }
+
+    /**
+     * Generate a text string that describes the graph, following the DOT format.
+     * https://www.graphviz.org/pdf/dotguide.pdf
+     *
+     *   node  [style="rounded,filled,bold", shape=box, fixedsize=true, width=1.3, fontname="Arial"];
+     *   edge  [style=bold, fontname="Arial", weight=100]
+     * @return
+     */
+    public String toDOT() {
+        StringBuffer buf = new StringBuffer();
+        if (!isDirected())
+            buf.append("graph{\nnode [" + nodeDOT + "];\n");
+        else
+            buf.append("digraph{\nrankdir=\"LR\";\nnode [" + nodeDOT + "];\n");
+        for (int i = 0; i < nodes.length; i ++) {
+            Node n = nodes[i];
+            if (n != null) {
+                buf.append(Integer.toString(i) + " [" + n.toDOT() + "];\n");
+            }
+        }
+        if (isTerminated()) {
+            buf.append("_start [label=\"S\",style=bold,fontcolor=red,width=0.25,fillcolor=gray,penwidth=0];\n");
+            buf.append("_end [label=\"E\",style=bold,fontcolor=red,width=0.25,fillcolor=gray,penwidth=0];\n");
+            buf.append("{rank=source;_start;}\n{rank=sink;_end;}\n");
+        }
+        buf.append("edge [" + edgeDOT + "];\n");
+        if (isTerminated() && isDirected()) {
+            for (int i = 0; i < startNodes.length(); i++) {
+                if (startNodes.get(i)) {
+                    E edge = getEdge(-1, i);
+                    buf.append("_start -> " + i + (edge == null ? "\n" : "[" + edge.toDOT() + "]\n"));
+                }
+            }
+        }
+        for (int from = 0; from < edgesForward.length; from ++) {
+            if (isNode(from)) {
+                for (int to = isDirected() ? 0 : from; to < edgesForward[from].length(); to++) {
+                    if (edgesForward[from].get(to)) {
+                        E edge = getEdge(from, to);
+                        if (!isDirected())
+                            buf.append(from + " -- " + to + (edge == null ? "\n" : "[" + edge.toDOT() + "]\n"));
+                        else
+                            buf.append(from + " -> " + to + (edge == null ? "\n" : "[" + edge.toDOT() + "]\n"));
+                    }
+                }
+            }
+        }
+        if (isTerminated() && isDirected()) {
+            for (int i = 0; i < endNodes.length(); i++) {
+                if (endNodes.get(i)) {
+                    E edge = getEdge(i, nodes.length);
+                    buf.append(i + " -> _end" + (edge == null ? "\n" : "[" + edge.toDOT() + "]\n"));
+                }
+            }
+        }
+        buf.append("}\n");
+        return buf.toString();
+    }
+
+
 }
 
 /**

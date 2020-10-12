@@ -3,13 +3,10 @@ package dat.pog;
 import dat.Enumerable;
 import dat.colourschemes.Clustal;
 
-public class SymNode<E extends Enumerable> extends Node {
-
-    Enumerable domain;
+public class SymNode extends Node {
     Object value = null;
 
-    public SymNode(E domain, Object value) {
-        this.domain = domain;
+    public SymNode(Object value) {
         this.value = value;
     }
 
@@ -31,5 +28,13 @@ public class SymNode<E extends Enumerable> extends Node {
 
     public String getStyle() {
         return "rounded,filled";
+    }
+
+    public static Node[] toArray(Object[] values) {
+        SymNode[] arr = new SymNode[values.length];
+        for (int i = 0; i < arr.length; i ++) {
+            arr[i] = new SymNode(values[i]);
+        }
+        return arr;
     }
 }

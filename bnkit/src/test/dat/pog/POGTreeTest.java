@@ -1,7 +1,7 @@
 package dat.pog;
 
-import asr.IndelPrediction;
 import asr.Parsimony;
+import asr.Prediction;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.phylo.IdxTree;
@@ -52,7 +52,7 @@ class POGTreeTest {
 
     @Test
     void parsimonyAncestors2() {
-        IndelPrediction ap = IndelPrediction.PredictByIndelParsimony(pogt2);
+        Prediction ap = Prediction.PredictByIndelParsimony(pogt2);
         for (int idx : pogt2.getTree()) {
             if (!pogt2.getTree().isLeaf(idx)) { // ancestor
                 Object ancID = pogt2.getTree().getLabel(idx);
@@ -69,7 +69,7 @@ class POGTreeTest {
     @Test
     void parsimonyAncestors1() {
         EnumSeq.Gappy[] aln = getParsimonyGappedAlignment(pogt1);
-        IndelPrediction ap = IndelPrediction.PredictByParsimony(pogt1);
+        Prediction ap = Prediction.PredictByParsimony(pogt1);
         for (int idx : pogt1.getTree()) {
             if (pogt1.getTree().getChildren(idx).length > 0) { // ancestor
                 Object ancID = pogt1.getTree().getLabel(idx);

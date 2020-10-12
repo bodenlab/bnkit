@@ -18,7 +18,16 @@ public class EnumNode extends Node {
         counts = new int[domain.size()];
     }
 
+    public EnumNode(EnumDistrib distrib) {
+        this.distrib = distrib;
+        this.domain = distrib.getDomain();
+        this.counts = null;
+        this.needs_update = false;
+    }
+
     public void add(Object sym) {
+        if (counts == null)
+            return;
         this.needs_update = true;
         counts[domain.getIndex(sym)] += 1;
         tot += 1;
@@ -32,6 +41,8 @@ public class EnumNode extends Node {
     }
 
     public int get(Object sym) {
+        if (counts == null)
+            return 0;
         return counts[domain.getIndex(sym)];
     }
 
@@ -44,7 +55,7 @@ public class EnumNode extends Node {
         if (needs_update)
             distrib = new EnumDistrib(domain, counts);
         needs_update = false;
-        if (tot == 0)
+        if (tot == 0 && counts != null)
             return null;
         Object consensus = distrib.getMax();
         return consensus.toString();
@@ -55,4 +66,13 @@ public class EnumNode extends Node {
             return "bold,rounded,filled";
         return "rounded,filled";
     }
+
+    public static Node[] toArray(EnumDistrib[] distribs) {
+        EnumNode[] arr = new EnumNode[distribs.length];
+        for (int i = 0; i < arr.length; i ++) {
+            arr[i] = new EnumNode(distribs[i]);
+        }
+        return arr;
+    }
+
 }

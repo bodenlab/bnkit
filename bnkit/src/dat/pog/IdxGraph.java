@@ -17,6 +17,7 @@ public class IdxGraph {
     protected BitSet[] edgesBackward = null;
     protected BitSet startNodes = null;
     protected BitSet endNodes = null;
+    protected String name = null;
 
     public IdxGraph(int nNodes, boolean undirected, boolean terminated) {
         this.nodes = new Node[nNodes];
@@ -38,6 +39,16 @@ public class IdxGraph {
 
     public static IdxGraph makeUndirectedGraph(int nNodes) {
         return new IdxEdgeGraph(nNodes, true, false);
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        if (name == null)
+            return "";
+        return name;
     }
 
     /**
@@ -383,9 +394,9 @@ public class IdxGraph {
     public String toDOT() {
         StringBuffer buf = new StringBuffer();
         if (!isDirected())
-            buf.append("graph{\nnode [" + nodeDOT + "];\n");
+            buf.append("graph " + getName() + " {\nnode [" + nodeDOT + "];\n");
         else
-            buf.append("digraph{\nrankdir=\"LR\";\nnode [" + nodeDOT + "];\n");
+            buf.append("digraph " + getName() + " {\nrankdir=\"LR\";\nnode [" + nodeDOT + "];\n");
         for (int i = 0; i < nodes.length; i ++) {
             Node n = nodes[i];
             if (n != null) {
@@ -466,6 +477,18 @@ public class IdxGraph {
         FileWriter fwriter=new FileWriter(filename);
         BufferedWriter writer=new BufferedWriter(fwriter);
         writer.write(toDOT());
+        writer.close();
+        fwriter.close();
+    }
+
+    public static void saveToDOT(String filename, IdxGraph... graphs) throws IOException {
+        FileWriter fwriter=new FileWriter(filename);
+        BufferedWriter writer=new BufferedWriter(fwriter);
+        int cnt = 1;
+        for (IdxGraph g : graphs) {
+            writer.write(g.toDOT());
+            writer.newLine();
+        }
         writer.close();
         fwriter.close();
     }

@@ -7,6 +7,7 @@ import java.util.List;
 /**
  * Class for branch points that make up tree.
  * Note recursive definition. Supports any branching factor.
+ * Should be used with great care, since pointers may be used in parallel with parent-child indices in index trees.
  */
 public class BranchPoint {
     private List<BranchPoint> children = new ArrayList<>(); // the children of this branch point
@@ -16,15 +17,15 @@ public class BranchPoint {
     private BranchPoint parent = null;          // link to parent
 
     /**
-     * Construct a branch point
+     * Construct an empty or disconnected branch point
      */
     public BranchPoint() {
     }
 
     /**
-     * Construct node from label/label.
+     * Construct a disconnected branch point but with label.
      *
-     * @param label label/label
+     * @param label label
      */
     public BranchPoint(String label) {
         this.label = label;
@@ -36,6 +37,7 @@ public class BranchPoint {
      * @param label  label/label
      * @param parent parent node
      * @param dist   distance to parent from this node
+     * @// TODO: 21/9/20 if parent is specified, link it to this branch point as child or will this create issues?
      */
     public BranchPoint(String label, BranchPoint parent, Double dist) {
         this.label = label;
@@ -44,17 +46,24 @@ public class BranchPoint {
     }
 
     /**
-     * Construct a branch point for a parent based on existing children
+     * Construct a branch point for a parent based on existing children.
+     * Note that this will overwrite the parent of those existing children.
      *
      * @param label
      * @param children
      */
     public BranchPoint(String label, BranchPoint... children) {
         this.label = label;
-        for (BranchPoint child : children)
+        for (BranchPoint child : children) {
             this.children.add(child);
+            child.setParent(this);
+        }
     }
 
+    /**
+     * Check if this branch point is a leaf, i.e. has no children of its own
+     * @return
+     */
     public boolean isLeaf() {
         if (children == null)
             return true;
@@ -72,26 +81,54 @@ public class BranchPoint {
         return (isLeaf() ? label : ancestor);
     }
 
+    /**
+     * Retrieve the label of the branch point
+     * @return the label
+     */
     public Object getLabel() {
         return label;
     }
 
+    /**
+     * Set the label of the branch point
+     * @param label the label
+     */
     public void setLabel(String label) {
         this.label = label;
     }
 
+    /**
+     * Set the ancestor identifier of the branch point.
+     * Would conventionally be an integer increment (starting with 0 at root)
+     * By default the branch point has none (i.e. null) which should/could indicate a leaf.
+     * @param id
+     */
     public void setAncestor(Integer id) {
         this.ancestor = id;
     }
 
+    /**
+     * Get the ancestor identifier.
+     * Would conventionally be an integer increment (starting with 0 at root)
+     * By default the branch point has none (i.e. null) which should/could indicate a leaf.
+     * @return ancestor identifier
+     */
     public Integer getAncestor() {
         return ancestor;
     }
 
+    /**
+     * Set the parent branch point pointer of the present branch point
+     * @param parent
+     */
     public void setParent(BranchPoint parent) {
         this.parent = parent;
     }
 
+    /**
+     * Get the parent branch point of the present branch point
+     * @return
+     */
     public BranchPoint getParent() {
         return parent;
     }
@@ -148,6 +185,10 @@ public class BranchPoint {
         return children;
     }
 
+    /**
+     * Retrieve all the branch points at and below the current branch point
+     * @return a list of branch points (including the present)
+     */
     public List<BranchPoint> getSubtree() {
         if (this.isLeaf())
             return Collections.singletonList(this);
@@ -176,7 +217,7 @@ public class BranchPoint {
     }
 
     /**
-     * Find node by label/label.
+     * Find node by label.
      * Searches the tree recursively using the current node as root.
      *
      * @param label
@@ -195,6 +236,13 @@ public class BranchPoint {
         }
     }
 
+    /**
+     * Set the labels for all internal, i.e. non-leaf branch points,
+     * by the convention "N" then the number incrementing from given count for root,
+     * by depth-first search.
+     * @param count the start count, e.g. 0 for the ultimate root
+     * @return
+     */
     public int setInternalLabels(int count) {
         if (isLeaf()) {     // no need to label anything, or to increase count
             return count;
@@ -223,7 +271,7 @@ public class BranchPoint {
      */
     public double getDistance() {
         if (this.dist == null)
-            throw new RuntimeException("Node " + this + " with content " + label + " does not have a distance");
+            throw new TreeRuntimeException("Node " + this + " with content " + label + " does not have a distance");
         return this.dist;
     }
 }

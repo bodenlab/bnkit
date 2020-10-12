@@ -1,5 +1,6 @@
 package dat.phylo;
 
+import javax.swing.text.DefaultEditorKit;
 import java.util.*;
 
 /**
@@ -53,18 +54,63 @@ public class TreeInstance {
         s.toArray(this.possible);
     }
 
+    /**
+     * Create a new instance for a tree based on the values in another instance
+     * (by reference to branch point IDs). No value is copied if an ID is not matched.
+     * @param tree the tree from which an instance is created
+     * @param from the instance from which values are taken
+     * @return a new tree instance
+     */
+    public static TreeInstance copyByTree(IdxTree tree, TreeInstance from) {
+        BranchPoint[] bp_new = tree.bpoints;
+        Object[] vals_new = new Object[tree.bpoints.length];
+        IdxTree src = from.getTree();
+        BranchPoint[] bp_old = src.bpoints;
+        for (int j = 0; j < bp_old.length; j ++) {
+            Object val = from.getInstance(j);
+            if (val != null) { // instantiated, so copy if included in new tree
+                for (int i = 0; i < bp_new.length; i++) {
+                    if (bp_new[i].getID().equals(bp_old[j].getID())) {
+                        vals_new[i] = val;
+                        break; // no point in continuing to loop
+                    }
+                }
+            }
+        }
+        return new TreeInstance(tree, vals_new);
+    }
+
+    /**
+     * Retrieve the tree associated with the instance
+     * @return tree
+     */
     public IdxTree getTree() {
         return tree;
     }
 
+    /**
+     * Retrieve the value at a branch point
+     * @param index the index of the branch point in tree
+     * @return the value at the index
+     */
     public Object getInstance(int index) {
         return instance[index];
     }
 
+    /**
+     * The branch points can be assigned n defined values. This function determines the value based on the index i in 0 to n-1.
+     * @param idx4val index of value
+     * @return the value
+     */
     public Object getValueByIndex(int idx4val) {
         return possible[idx4val];
     }
 
+    /**
+     * The branch points can be assigned n defined values. This function determines the the index i in 0 to n-1 based on the value.
+     * @param val the value
+     * @return the index, or -1 if the value is invalid
+     */
     public int getIndexByValue(Object val) {
         for (int i = 0; i < possible.length; i++) {
             if (val.equals(possible[i]))
@@ -73,14 +119,27 @@ public class TreeInstance {
         return -1;
     }
 
+    /**
+     * Get how many valid values there are
+     * @return the number of distinct values
+     */
     public int getNPossibleValues() {
         return possible.length;
     }
 
+    /**
+     * Get the total number of branch points in the tree, including leaves
+     * @return the number of branch points
+     */
     public int getSize() {
         return tree.getSize();
     }
 
+    /**
+     * Get the indices for all children of the branch point
+     * @param index the branch point index
+     * @return a list of all children, which is empty if the branch point is a leaf
+     */
     public int[] getChildren(int index) {
         return tree.getChildren(index);
     }
@@ -113,6 +172,5 @@ public class TreeInstance {
         else
             return "(" + sb.toString() + ")" + istr;
     }
-
 
 }

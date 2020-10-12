@@ -28,6 +28,10 @@ public class IdxTree implements Iterable<Integer> {
         distance = (distances ? new double[bpoints.length] : null);
     }
 
+    /**
+     * Create an "index tree", based on branch points which each have pointers to children
+     * @param bpointarr
+     */
     public IdxTree(BranchPoint[] bpointarr) {
         bpoints = bpointarr;
         parent = new int[bpoints.length];
@@ -50,8 +54,8 @@ public class IdxTree implements Iterable<Integer> {
                 if (ancestor != null) { // root node, possibly internal
                     Double dist = null;
                     try {
-                        dist = ancestor.getDistance();
-                        distances[i] = dist;
+                        if (ancestor.getParent() != null)
+                            distances[i] = ancestor.getDistance();
                     } catch (RuntimeException e) {
                         distances_found = false;
                     }
@@ -79,9 +83,10 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
-     * Create a reduced tree by removing indices for nominated branch points, and
+     * Create a new IdxTree which is a reduced version of the source tree by excluding indices for nominated branch points, and
      * adjusting parent-child relations, as well as distances, which are assumed to be additive.
-     * @return tree with nominated branch point removed
+     * Note that the source branch points are not cloned, but are still referenced by the new tree
+     * @return new tree with nominated branch points excluded
      */
     public static IdxTree createPrunedTree(IdxTree source, Set<Integer> pruneMe) {
         // Create the bare-bones of the new pruned tree
@@ -125,6 +130,7 @@ public class IdxTree implements Iterable<Integer> {
 
     /**
      * Isolate a subtree rooted by a given node, and create a separate instance for it.
+     * Note that the source branch points are not cloned, but are still referenced by the new tree
      * @param source source tree
      * @param rootidx the root branch point for the new, isolated tree by reference to the source tree indices
      * @return new tree instance
@@ -168,7 +174,7 @@ public class IdxTree implements Iterable<Integer> {
      */
     public static IdxTree createDuplicatedSubtree() {
         // FIXME: implement; note that "index" map needs to map from ancestor@position to recover duplicated branch points
-        return null;
+        throw new RuntimeException("Not implemented");
     }
 
     @Override
@@ -267,6 +273,12 @@ public class IdxTree implements Iterable<Integer> {
         throw new TreeRuntimeException("Invalid branch point index: " + idx);
     }
 
+    /**
+     * Get the label of the node at the specified index. The label is either user specified (if leaf node) or
+     * an automatically generated ancestor tag (an Integer instance, incrementing from 0).
+     * @param idx
+     * @return
+     */
     public Object getLabel(int idx) {
         if (idx >= 0 && idx < getSize())
             return bpoints[idx].getID();
@@ -388,6 +400,37 @@ public class IdxTree implements Iterable<Integer> {
         return ret;
     }
 
+    public int[] getLeaves() {
+        int[] ret = new int[getNLeaves()];
+        int cnt = 0;
+        for (int idx = 0; idx < bpoints.length; idx ++)
+            if (isLeaf(idx))
+                ret[cnt ++] = idx;
+        return ret;
+    }
+
+    public int[] getAncestors() {
+        int[] ret = new int[getSize() - getNLeaves()];
+        int cnt = 0;
+        for (int idx = 0; idx < bpoints.length; idx ++)
+            if (!isLeaf(idx))
+                ret[cnt ++] = idx;
+        return ret;
+    }
+
+    /**
+     * Retrieve the index for a specified label (either user specified label or automatically assigned
+     * @param label name or ancestor ID
+     * @return index of node, or -1 if not found
+     */
+    public int getIndex(Object label) {
+        for (int i : this) {
+            if (this.getLabel(i).equals(label))
+                return i;
+        }
+        return -1;
+    }
+
     /**
      * Class to iterate through branch point indices.
      * By default a depth-first like traversal is used, but the implementation may change.
@@ -467,10 +510,4 @@ public class IdxTree implements Iterable<Integer> {
         return collect;
     }
 
-    public class TreeRuntimeException extends RuntimeException {
-
-        public TreeRuntimeException(String errmsg) {
-            super(errmsg);
-        }
-    }
 }

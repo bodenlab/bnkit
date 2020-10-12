@@ -51,6 +51,11 @@ public class Tree extends IdxTree {
         this.root = root;        // assume all branch points are OK and store them
     }
 
+    /**
+     * Create the array of branch points from a single branch point, which in turn is linked to its children
+     * @param root the ultimate branch point
+     * @return an array of all branch points
+     */
     private static BranchPoint[] straightenTree(BranchPoint root) {
         List<BranchPoint> branchPoints = root.getSubtree();
         BranchPoint[] bpoints = new BranchPoint[branchPoints.size()];
@@ -58,6 +63,13 @@ public class Tree extends IdxTree {
         return bpoints;
     }
 
+    /**
+     * Load a tree file with given name and of given format
+     * @param filename file
+     * @param format format
+     * @return instance of tree
+     * @throws IOException
+     */
     public static Tree load(String filename, String format) throws IOException {
         if (format.equalsIgnoreCase("newick") || format.equalsIgnoreCase("nwk"))
             return Newick.load(filename);
@@ -65,6 +77,12 @@ public class Tree extends IdxTree {
             throw new IOException("Unknown format: " + format);
     }
 
+    /**
+     * Save the current tree to a file with given name and of given format
+     * @param filename file
+     * @param format format
+     * @throws IOException if an error happens during the write operation
+     */
     public void save(String filename, String format) throws IOException {
         if (format.equalsIgnoreCase("newick") || format.equalsIgnoreCase("nwk"))
             Newick.save(this, filename, Newick.MODE_DEFAULT);
@@ -73,6 +91,7 @@ public class Tree extends IdxTree {
         else
             throw new IOException("Unknown format: " + format);
     }
+
     /**
      * String representation in the Newick format.
      *
@@ -93,6 +112,11 @@ public class Tree extends IdxTree {
         return root.find(content);
     }
 
+    /**
+     * Label the internal branch points
+     * by the convention "N" then the number incrementing from 0 for root,
+     * by depth-first search. Overwrites the labels at internal branch points.
+     */
     public void setInternalLabels() {
         root.setInternalLabels(0);
     }

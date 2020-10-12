@@ -30,6 +30,6 @@ public class Edge {
     }
     public String label = null;
     public String fontname = null; // "Arial";
-    public String style = null; // "bold";
+    public String style = null; // "bold", "dotted";
 
 }

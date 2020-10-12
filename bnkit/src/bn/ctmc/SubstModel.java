@@ -231,9 +231,29 @@ public abstract class SubstModel {
         }
         return prob;
     }
-    
+
+    public static SubstModel createModel(String name) {
+        if (name.equalsIgnoreCase("Gap")) {
+            return new Gap();
+        } else if (name.equalsIgnoreCase("Yang")) {
+            return new Yang();
+        } else if (name.equalsIgnoreCase("GLOOME1")) {
+            return new GLOOME1();
+        } else if (name.equalsIgnoreCase("WAG")) {
+            return new WAG();
+        } else if (name.equalsIgnoreCase("LG")) {
+            return new LG();
+        }   else if (name.equalsIgnoreCase("JTT")) {
+            return new JTT();
+        } else if (name.equalsIgnoreCase("Dayhoff")) {
+            return new Dayhoff();
+        } else
+            return null;
+    }
+
     public static void main(String[] argv) {
         SubstModel sm_gap = new Gap();
+        SubstModel sm_gloome1 = new GLOOME1();
         SubstModel sm_yang = new Yang();
         SubstModel sm_wag = new WAG();
         SubstModel sm_lg = new LG();
@@ -242,6 +262,8 @@ public abstract class SubstModel {
 
         System.out.println("R (Gap)");
         bn.math.Matrix.print(sm_gap.getR());
+        System.out.println("R (GLOOME1)");
+        bn.math.Matrix.print(sm_gloome1.getR());
         System.out.println("R (Yang)");
         bn.math.Matrix.print(sm_yang.getR());
 
@@ -255,6 +277,10 @@ public abstract class SubstModel {
         double time = .1;
         System.out.println("\n\nTransition probabilities of R (Gap) @ time = " + time);
         double[][] prob = sm_gap.getProbs(time);
+        bn.math.Matrix.print(prob);
+
+        System.out.println("\n\nTransition probabilities of R (GLOOME1) @ time = " + time);
+        prob = sm_gloome1.getProbs(time);
         bn.math.Matrix.print(prob);
 
         System.out.println("\n\nTransition probabilities of R (Yang) @ time = " + time);

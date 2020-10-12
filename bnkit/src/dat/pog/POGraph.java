@@ -1,11 +1,18 @@
 package dat.pog;
 
+import asr.Prediction;
+import bn.prob.EnumDistrib;
+
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
-public class POGraph extends IdxGraph {
+/**
+ * Definition of partial-order graph, which is essentially a directed index graph, with virtual start and end nodes.
+ * Note that edges can be, but do not have to be instantiated.
+ * {@link POGraph.StatusEdge} is defined internally.
+ */
+public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 
     /**
      * Create partial order graph, which is a directed and terminated IdxGraph with some specific properties.
@@ -15,6 +22,10 @@ public class POGraph extends IdxGraph {
         super(nNodes, false, true);
     }
 
+    /**
+     * Get string representation of instance
+     * @return
+     */
     public String toString() {
         return super.toString();
     }
@@ -30,7 +41,7 @@ public class POGraph extends IdxGraph {
     }
 
     /**
-     * Determine the indices for start nodes
+     * Determine the indices for start nodes (same as providing -1 as index in {@link POGraph#getForward(int)})
      * @return the indices for nodes that act as start nodes of the POG
      */
     public int[] getForward() {
@@ -39,17 +50,25 @@ public class POGraph extends IdxGraph {
 
     /**
      * Determine the node indices that are behind (backward direction)
-     * @param idx current node, use N for retrieving the start nodes, where N is the nu
+     * @param idx current node, use N for retrieving the start nodes, where N is the max number of positions in the POG
      * @return the indices for nodes accessible directly forward from the current node
      */
     public int[] getBackward(int idx) {
         return getNodeIndices(idx, false);
     }
 
+    /**
+     * Determine the indices for end nodes (same as providing N as index in {@link POGraph#getBackward(int)} where N is the max number of positions in the POG)
+     * @return the indices for nodes that act as end nodes of the POG
+     */
     public int[] getBackward() {
         return getBackward(this.nNodes);
     }
 
+    /**
+     * Retrieve all edges in the POG, including edges leading to start nodes, and those leading from end nodes to the terminus.
+     * @return an array of pairs of int
+     */
     public int[][] getEdges() {
         int[][] pairs = new int[getEdgeCount()][];
         int cnt = 0;
@@ -62,6 +81,10 @@ public class POGraph extends IdxGraph {
         return pairs;
     }
 
+    /**
+     * Retrieve all pairs of jump edges, i.e. edges that skip at least one position
+     * @return
+     */
     public Set<int[]> getIndels() {
         Set<int[]> ivset = new HashSet<>();
         for (int from = -1; from < nNodes; from++) {
@@ -79,6 +102,12 @@ public class POGraph extends IdxGraph {
     static public Boolean GAP_STATUS_ABSENT = false;
     static public Boolean GAP_STATUS_UNKNOWN = null;
 
+    /**
+     * Check for this POG if the query indel is present, if it is absent, or if it is permissible.
+     * @param from start index of indel
+     * @param to end index of indel
+     * @return
+     */
     public Boolean getSimpleGapCode(int from, int to) {
         if (isNode(from) || from == -1) {
             // check if this POG has a jump that matches exactly
@@ -90,8 +119,8 @@ public class POGraph extends IdxGraph {
                 if (ahead[i] < to) // the gap in this POG ends BEFORE that of the query
                     return GAP_STATUS_ABSENT;
             }
-            return GAP_STATUS_UNKNOWN; // the gap end AFTER that of the query
-        } else if (isNode(to) || to == maxsize()) { // the gap has started BEFORE "from"
+            return GAP_STATUS_UNKNOWN; // the gap ends AFTER that of the query
+        } else if (isNode(to) || to == maxsize()) { // the gap starts BEFORE "from"
             int[] before = this.getBackward(to);
             for (int i = 0; i < before.length; i++) {
                 if (before[i] > from) // the gap in this POG begins AFTER that of the query
@@ -109,6 +138,7 @@ public class POGraph extends IdxGraph {
 
     /**
      * Create a POG from an array of edge indices.
+     * This is not uncomplicated as each INDEL needs to be considered in a broader context to form a valid, start-to-end POG.
      * @param nNodes number of nodes in new POG
      * @param optional edges that CAN be TRUE
      * @param definitive edges that MUST be TRUE
@@ -238,6 +268,26 @@ public class POGraph extends IdxGraph {
         }
     }
 
+    public static POGraph createFromEdgeMap(int nPos, EdgeMap emap) {
+        POGraph pog = new POGraph(nPos);
+        for (EdgeMap.POGEdge edge : emap.getEdges()) {
+            if (edge.idx1 != -1 && !pog.isNode(edge.idx1))
+                pog.addNode(edge.idx1, new Node());
+            if (edge.idx2 != nPos && !pog.isNode(edge.idx2))
+                pog.addNode(edge.idx2, new Node());
+            pog.addEdge(edge.idx1, edge.idx2, new StatusEdge(emap.isReciprocated(edge)));
+        }
+        return pog;
+    }
+
+    public void decorateNodes(Object[] states) {
+        nodes = SymNode.toArray(states);
+    }
+
+    public void decorateNodes(EnumDistrib[] distribs) {
+        nodes = EnumNode.toArray(distribs);
+    }
+
     public static class StatusNode extends Node {
         public static int FORWARD = 0x01;
         public static int BACKWARD = 0x02;
@@ -255,6 +305,33 @@ public class POGraph extends IdxGraph {
         }
         public boolean isStatus(int status) {
             return (this.status & status) > 0;
+        }
+    }
+
+
+    public static class StatusEdge extends Edge implements WeightedEdge {
+        private double weight = 0;  // default
+        private boolean reciprocated = false;
+        public StatusEdge(boolean reciprocated) {
+            this.reciprocated = reciprocated;
+        }
+        public StatusEdge(boolean reciprocated, int weight) {
+            this.reciprocated = reciprocated;
+            this.weight = weight;
+        }
+        public void setWeight(int weight) {
+            this.weight = weight;
+        }
+        @Override
+        public double getWeight() {
+            return weight;
+        }
+        @Override
+        public String toDOT() {
+            return  ((label == null) ? "" : ("label=\"" + label + "\",")) +
+                    ("penwidth=" + (getWeight() + 1) + ",") +
+                    ((fontname == null) ? "" : ("fontname=\"" + fontname + "\",")) +
+                    (reciprocated ? "" : ("style=\"dashed\""));
         }
     }
 
