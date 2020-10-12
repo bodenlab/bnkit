@@ -32,7 +32,8 @@ public class SymNode extends Node {
     public static Node[] toArray(Object[] values) {
         SymNode[] arr = new SymNode[values.length];
         for (int i = 0; i < arr.length; i ++) {
-            arr[i] = new SymNode(values[i]);
+            if (values[i] != null)
+                arr[i] = new SymNode(values[i]);
         }
         return arr;
     }

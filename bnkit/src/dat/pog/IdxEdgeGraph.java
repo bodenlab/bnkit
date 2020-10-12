@@ -90,11 +90,11 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
         for (int i = 0; i < nodes.length; i ++) {
             Node n = nodes[i];
             if (n != null) {
-                if (n.getLabel() == null) {
-                    n.setLabel(Integer.toString(i));
-                    buf.append(Integer.toString(i) + " [" + n.toDOT() + "];\n");
-                    n.setLabel(null);
-                } else
+//                if (n.getLabel() == null) {
+//                    n.setLabel(Integer.toString(i));
+//                    buf.append(Integer.toString(i) + " [" + n.toDOT() + "];\n");
+//                    n.setLabel(null);
+//                } else
                     buf.append(Integer.toString(i) + " [" + n.toDOT() + "];\n");
             }
         }

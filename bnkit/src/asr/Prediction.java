@@ -157,12 +157,12 @@ public class Prediction {
                     inf[pos] = new MaxLhood.Marginal(ancidx, trees[pos], MODEL);//     set-up the inference
             }
             distribs[idx] = new EnumDistrib[pogTree.getPositions()];
-            for (int pos = 0; pos < getPositions(); pos++) {                   // for each position...
+            for (int pos = 0; pos < getPositions(); pos++) {                    // for each position...
                 int ancidx = trees[pos].getIndex(ancestorID);                   //   index for sought ancestor in the position-specific tree
                 if (ancidx >= 0) {                                              //   which may not exist, i.e. part of an indel, but if it is real...
                     TreeInstance ti = pogTree.getNodeInstance(pos, trees[pos]); //     get the instances at the leaves at that position, and...
                     inf[pos].decorate(ti);                                      //     perform inference
-                    distribs[ancestorID][pos] = inf[pos].getDecoration(ancidx); //     extract distribution of marginal prob
+                    distribs[idx][pos] = inf[pos].getDecoration(ancidx);        //     extract distribution of marginal prob
                 }
             }
         }
@@ -184,14 +184,13 @@ public class Prediction {
         }
         for  (Map.Entry<Object, POGraph> entry : getAncestors().entrySet()) {
             Object ancID = entry.getKey();
-            POGraph pog = entry.getValue();
             for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
+                int idx = pogTree.getTree().getIndex(ancID);        //   index for sought ancestor in the phylogenetic tree
                 int ancidx = trees[pos].getIndex(ancID);            //   index for sought ancestor in the position-specific tree
-                int bpidx = pogTree.getTree().getIndex(ancID);            //   index for sought ancestor in the position-specific tree
                 if (ancidx >= 0) {                                  //   which may not exist, i.e. part of an indel, but if it is real...
                     TreeInstance ti = pogTree.getNodeInstance(pos, trees[pos]); //     get the instances at the leaves at that position, and...
                     inf[pos].decorate(ti);                                      //     perform inference
-                    states[bpidx][pos] = inf[pos].getDecoration(ancidx);        //     extract state
+                    states[idx][pos] = inf[pos].getDecoration(ancidx);          //     extract state
                 }
             }
         }
