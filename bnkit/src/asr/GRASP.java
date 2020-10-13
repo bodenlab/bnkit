@@ -50,7 +50,7 @@ public class GRASP {
         out.println("where \n" +
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
-                "\toutput-file will be populated by inferred ancestor or ancestors\n" +
+                "\toutput-file will be populated by inferred ancestor or ancestors; directory with files if format is DOT\n" +
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with ancestor names included\n" +
@@ -229,33 +229,27 @@ public class GRASP {
                         break;
                     case 1: // DISTRIB
                         EnumDistrib[] d = indelpred.getMarginal(MARG_NODE, MODEL);
-                        for (int i = 0; i < MODEL.getDomain().size(); i ++)
-                            System.out.print(" " + MODEL.getDomain().get(i) + "   ");
-                        System.out.println();
-                        for (int pos = 0; pos < d.length; pos ++) // for each position...
-                            System.out.println(pos + "\t" + d[pos]);
-/*
-                        if (ancdist != null) {
-                            Object[][] m = new Object[ancdist.length + 1][];
-                            for (int j = 0; j < ancdist.length; j++) {
-                                if (ancdist[j] != null) {
-                                    m[j + 1] = new Object[ancdist[j].getDomain().size() + 1];
-                                    m[j + 1][0] = ancidxs[j] + 1;
+                        if (d != null) {
+                            Object[][] m = new Object[d.length + 1][];
+                            for (int j = 0; j < d.length; j++) {
+                                if (d[j] != null) {
+                                    m[j + 1] = new Object[MODEL.getDomain().size() + 1];
+                                    m[j + 1][0] = j + 1;
                                     if (m[0] == null) {
-                                        m[0] = new Object[ancdist[j].getDomain().size() + 1];
+                                        m[0] = new Object[MODEL.getDomain().size() + 1];
                                         m[0][0] = "Index";
                                     }
                                     for (int jj = 0; jj < m[j + 1].length - 1; jj++) {
-                                        m[j + 1][jj + 1] = ancdist[j].get(jj);
+                                        m[j + 1][jj + 1] = d[j].get(jj);
                                         if (m[0][jj + 1] == null)
-                                            m[0][jj + 1] = ancdist[0].getDomain().get(jj);
+                                            m[0][jj + 1] = MODEL.getDomain().get(jj);
                                     }
                                 }
                             }
-                            for (int j = 0; j < ancdist.length; j++) {
-                                if (ancdist[j] == null) {
+                            for (int j = 0; j < d.length; j++) {
+                                if (d[j] == null) {
                                     m[j + 1] = new Object[m[0].length];
-                                    m[j + 1][0] = ancidxs[j] + 1;
+                                    m[j + 1][0] = j + 1;
                                     for (int jj = 0; jj < m[j + 1].length - 1; jj++)
                                         m[j + 1][jj + 1] = null;
                                 }
@@ -263,7 +257,6 @@ public class GRASP {
                             TSVFile.saveObjects(OUTPUT, m);
                         } else
                             usage(8, "Invalid ancestor node label: " + MARG_NODE);
- */
                         break;
                     case 2: // CLUSTAL
                         AlnWriter aw = new AlnWriter(OUTPUT);
