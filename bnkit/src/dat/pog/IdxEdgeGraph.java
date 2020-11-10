@@ -42,6 +42,14 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
     }
 
     /**
+     * Retrieve a collection of all the edges with no ref to index; these include disabled edges
+     * @return all edges
+     */
+    public Collection<E> getEdges() {
+        return edges.values();
+    }
+
+    /**
      * Modify the graph by adding an instance of an edge between two existing nodes.
      * If the graph is terminated, an edge can be added from a virtual start, or to a virtual end node.
      * @param from the source node index of the edge, -1 for a terminal start edge
@@ -49,12 +57,32 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
      * @throws InvalidIndexRuntimeException if either node index is invalid
      */
     public synchronized void removeEdge(int from, int to) {
-        super.removeEdge(from , to);
-        this.edges.remove(getEdgeIndex(from, to));
+        if (isEdge(from, to)) {
+            super.removeEdge(from, to);
+            this.edges.remove(getEdgeIndex(from, to));
+        }
+    }
+
+    /**
+     * Modify the graph by disabling an edge between two existing nodes.
+     * If there is an edge, it will be stashed to be enabled at a later stage.
+     *
+     * @param from the source node index of the edge, -1 for a terminal start edge
+     * @param to the destination node index of the edge, N for a terminal end edge, where N is the number of possible/valid nodes
+     * @return true if an edge exists, and then is disabled, false if no edge could be found
+     * @throws InvalidIndexRuntimeException if either node index is invalid
+     */
+    public synchronized boolean disableEdge(int from, int to) {
+        if (isEdge(from, to)) {
+            super.removeEdge(from, to);
+            return true;
+        }
+        return false;
     }
 
     /**
      * Modify the graph by adding an instance of an edge between two existing nodes.
+     * If the edge already exists between the same node indices, it will be replaced.
      * If the graph is terminated, an edge can be added from a virtual start, or to a virtual end node.
      * @param from the source node index of the edge, -1 for a terminal start edge
      * @param to the destination node index of the edge, N for a terminal end edge, where N is the number of possible/valid nodes
@@ -64,6 +92,23 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
     public synchronized boolean addEdge(int from, int to, E edge) {
         if (addEdge(from, to)) {
             this.edges.put(getEdgeIndex(from, to), edge);
+            return true;
+        } else
+            return false;
+    }
+
+    /**
+     * Modify the graph by enabling an instance of an edge between two existing nodes.
+     * Requires that the edge already exists between the same node indices.
+     * If the graph is terminated, an edge can be added from a virtual start, or to a virtual end node.
+     * @param from the source node index of the edge, -1 for a terminal start edge
+     * @param to the destination node index of the edge, N for a terminal end edge, where N is the number of possible/valid nodes
+     * @return true if the edge instance was already there, so enabling could be completed, false if no edge instance was available
+     * @throws InvalidIndexRuntimeException if either node index is invalid
+     */
+    public synchronized boolean enableEdge(int from, int to) {
+        if (edges.get(getEdgeIndex(from, to)) != null) {
+            super.addEdge(from, to);
             return true;
         } else
             return false;

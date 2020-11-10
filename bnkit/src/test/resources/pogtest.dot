@@ -1,4 +1,4 @@
-digraph{
+digraph  {
 rankdir="LR";
 node [style="rounded,filled", shape=box, fixedsize=true];
 0 [fillcolor="#80B3E6",style="rounded,filled"];
@@ -31,8 +31,8 @@ node [style="rounded,filled", shape=box, fixedsize=true];
 27 [fillcolor="#80B3E6",style="rounded,filled"];
 28 [fillcolor="#80B3E6",style="rounded,filled"];
 29 [fillcolor="#80B3E6",style="rounded,filled"];
-_start [label="S",style=bold,fontcolor=red,width=0.25,fillcolor=gray,penwidth=0];
-_end [label="E",style=bold,fontcolor=red,width=0.25,fillcolor=gray,penwidth=0];
+_start [label="S()",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];
+_end [label="E()",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];
 {rank=source;_start;}
 {rank=sink;_end;}
 edge [];

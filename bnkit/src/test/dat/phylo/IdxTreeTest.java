@@ -38,14 +38,20 @@ class IdxTreeTest {
         pruned = IdxTree.createPrunedTree(defaultTree, s);
         assertEquals(defaultTree.getSize() - 1, pruned.getSize());
         assertEquals(3, pruned.getRoots().length);
+        IdxTree pruned_identical = IdxTree.createPrunedTree(defaultTree, defaultTree.getPrunedIndex(s));
+        assertEquals(pruned.getSize(), pruned_identical.getSize());
         s = IdxTree.getIndices(false, new Object[] {true, true, false, true, true, false, true, false, false, true, true, true, true, false});
         pruned = IdxTree.createPrunedTree(defaultTree, s);
         assertEquals(defaultTree.getSize() - 5, pruned.getSize());
         assertEquals(6, pruned.getRoots().length); // did not check manually!
+        pruned_identical = IdxTree.createPrunedTree(defaultTree, defaultTree.getPrunedIndex(s));
+        assertEquals(pruned.getSize(), pruned_identical.getSize());
         s = IdxTree.getIndices(false, new Object[] {false, true, true, true, false, true, true, false, true, false, false, true, true, true, true, false});
         pruned = IdxTree.createPrunedTree(defaultTree, s);
         assertEquals(defaultTree.getSize() - 6, pruned.getSize());
         assertEquals(7, pruned.getRoots().length); // did not check manually!
+        pruned_identical = IdxTree.createPrunedTree(defaultTree, defaultTree.getPrunedIndex(s));
+        assertEquals(pruned.getSize(), pruned_identical.getSize());
     }
 
     @Test

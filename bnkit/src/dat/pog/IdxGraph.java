@@ -268,7 +268,9 @@ public class IdxGraph {
 
     /**
      * Modify the graph by adding an instance of an edge between two existing nodes.
+     * If the edge already exists it will be replaced.
      * If the graph is terminated, an edge can be added from a virtual start, or to a virtual end node.
+     *
      * @param from the source node index of the edge, -1 for a terminal start edge
      * @param to the destination node index of the edge, N for a terminal end edge, where N is the number of possible/valid nodes
      * @throws InvalidIndexRuntimeException if either node index is invalid
@@ -296,7 +298,7 @@ public class IdxGraph {
     }
 
     /**
-     * Modify the graph by adding an instance of an edge between two existing nodes.
+     * Modify the graph by adding an edge between two existing nodes.
      * If the graph is terminated, an edge can be added from a virtual start, or to a virtual end node.
      * @param from the source node index of the edge, -1 for a terminal start edge
      * @param to the destination node index of the edge, N for a terminal end edge, where N is the number of possible/valid nodes
@@ -325,7 +327,7 @@ public class IdxGraph {
      * If graph is undirected, then it does not matter what the source node was when added.
      * If graph is directed, then the default is to only return the edges looking forward (from the source node when added).
      * @param idx
-     * @return
+     * @return an array with all indices; if no indices, the array will be length 0
      * @throws InvalidIndexRuntimeException if the index is invalid
      */
     public int[] getNodeIndices(int idx) {
@@ -336,7 +338,7 @@ public class IdxGraph {
      * Get indices of all nodes that can be reached in ONE step relative the given node index
      * @param idx index to node
      * @param look_forward if true, look forward, else backward
-     * @return
+     * @return an array with all indices; if no indices, the array will be length 0
      * @throws InvalidIndexRuntimeException if the index is invalid
      */
     public int[] getNodeIndices(int idx, boolean look_forward) {
@@ -361,6 +363,26 @@ public class IdxGraph {
             return indices;
         } else {
             throw new InvalidIndexRuntimeException("Cannot retrieve edges from non-existent/invalid node: " + idx);
+        }
+    }
+
+    /**
+     * Get number of nodes that can be reached in ONE step relative the given node index
+     * @param idx index of node
+     * @param look_forward if true, look forward, else backward
+     * @return cardinality of node
+     * @throws InvalidIndexRuntimeException if the node index is invalid
+     */
+    public int getCardinality(int idx, boolean look_forward) {
+        if (isNode(idx)) {
+            BitSet bs = (look_forward || !isDirected()) ? edgesForward[idx] : edgesBackward[idx];
+            return bs.cardinality();
+        } else if (idx == -1 && (look_forward || !isDirected())) {
+            return startNodes.cardinality();
+        } else if (idx == maxsize() && (!look_forward || !isDirected())) {
+            return endNodes.cardinality();
+        } else {
+            throw new InvalidIndexRuntimeException("Cannot retrieve cardinality of non-existent/invalid node: " + idx);
         }
     }
 
@@ -489,33 +511,33 @@ public class IdxGraph {
 
     public static void saveToDOT(String directory, IdxGraph... graphs) throws IOException, ASRException {
         File file = new File(directory);
-        // true if the directory was created, false otherwise
         StringBuilder sb = new StringBuilder();
-        if (file.mkdirs()) {
-            FileWriter freadme=new FileWriter(directory + "/README.txt");
-            BufferedWriter readme=new BufferedWriter(freadme);
-            int cnt = 0;
-            for (IdxGraph g : graphs) {
-                String name = directory + "/" + Integer.toString(cnt) + ".dot";
-                sb.append(name + " ");
-                FileWriter fwriter=new FileWriter(name);
-                BufferedWriter writer=new BufferedWriter(fwriter);
-                writer.write(g.toDOT());
-                writer.newLine();
-                writer.close();
-                fwriter.close();
-                cnt += 1;
-            }
-            readme.write("Install graphviz\nRun command:\n");
-            if (cnt > 1)
-                readme.write("gvpack -u " + sb.toString() + "| dot -Tpdf -opogs.pdf");
-            else
-                readme.write("dot -Tpdf " + sb.toString() + "-opog.pdf");
-            readme.newLine();
-            readme.close();
-            freadme.close();
+        if (file.mkdirs()) { // true if the directory was created, false otherwise
         } else {
-            throw new ASRException("Directory " + directory + " already exists");
+            System.err.println("Directory " + directory + " already exists");
+            //throw new ASRException("Directory " + directory + " already exists");
         }
+        FileWriter freadme=new FileWriter(directory + "/README.txt");
+        BufferedWriter readme=new BufferedWriter(freadme);
+        int cnt = 0;
+        for (IdxGraph g : graphs) {
+            String name = directory + "/" + Integer.toString(cnt) + ".dot";
+            sb.append(name + " ");
+            FileWriter fwriter=new FileWriter(name);
+            BufferedWriter writer=new BufferedWriter(fwriter);
+            writer.write(g.toDOT());
+            writer.newLine();
+            writer.close();
+            fwriter.close();
+            cnt += 1;
+        }
+        readme.write("Install graphviz\nRun command:\n");
+        if (cnt > 1)
+            readme.write("gvpack -u " + sb.toString() + "| dot -Tpdf -opogs.pdf");
+        else
+            readme.write("dot -Tpdf " + sb.toString() + "-opog.pdf");
+        readme.newLine();
+        readme.close();
+        freadme.close();
     }
 }

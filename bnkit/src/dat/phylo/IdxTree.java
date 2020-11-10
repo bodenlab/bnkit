@@ -10,10 +10,10 @@ import java.util.*;
  */
 public class IdxTree implements Iterable<Integer> {
     protected final Map<Object, Integer> index; // map label to index; FIXME: need to index ancestor@position where position is relevant only to duplications
-    protected final BranchPoint[] bpoints;  // store branch points in order of their index
-    protected final int[] parent;           // [child idx] = parent idx, parent idx is -1 if no parent (i.e. root)
-    protected final int[][] children;       // [parent idx] = [child 1][child 2]...[child n] where n is #children for parent
-    protected final double[] distance;      // [child idx] = distance to parent
+    protected final BranchPoint[] bpoints;      // store branch points in order of their index
+    protected final int[] parent;               // [child idx] = parent idx, parent idx is -1 if no parent (i.e. root)
+    protected final int[][] children;           // [parent idx] = [child 1][child 2]...[child n] where n is #children for parent
+    protected final double[] distance;          // [child idx] = distance to parent
 
     /**
      * Constructor for internal (factory method) use only.
@@ -83,6 +83,64 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
+     * Create an index from the current tree to create a new pruned version
+     * FIXME
+     * @return index with nominated branch points excluded
+     */
+    public int[] getPrunedIndex(Set<Integer> pruneMe) {
+        // dstidx counts branch points (kept from the source tree and) added to the new tree
+        int dstidx = 0; // also used as the index for destination tree
+        int[] match = new int[bpoints.length]; // a map for matching the source index to the destination index, -1 means no match
+        // the source tree is traversed depth-first, srcidx is the index for each branch point
+        for (int srcidx = 0; srcidx < bpoints.length; srcidx ++) {
+            if (!pruneMe.contains(srcidx)) {    // branch point definitely to be transferred to new tree
+                match[srcidx] = dstidx;         // update source-to-dest mapping, to use below
+                dstidx += 1;
+            } else
+                match[srcidx] = -1;             // update source-to-dest mapping, to indicate no match
+        }
+        return match;
+    }
+
+    /**
+     *
+     * @param source
+     * @param prunedIndex
+     * @return
+     */
+    public static IdxTree createPrunedTree(IdxTree source, int[] prunedIndex) {
+        int cnt = 0;
+        for (int i : prunedIndex)
+            if (i != -1)
+                cnt += 1;
+        // Create the bare-bones of the new pruned tree
+        IdxTree pruned = new IdxTree(cnt, source.distance != null);
+        for (int srcidx = 0; srcidx < source.bpoints.length; srcidx ++) { // loop again, this time to transfer parent and child pointers
+            int dstidx = prunedIndex[srcidx];
+            if (dstidx >= 0) { // this branch point is retained in new, destination tree
+                pruned.bpoints[dstidx] = source.bpoints[srcidx]; // transfer branch point data "by reference"
+                if (pruned.distance != null) pruned.distance[dstidx] = source.distance[srcidx]; // transfer distance
+                if (source.children[srcidx] != null) {                          // transfer children?
+                    List<Integer> keep = new ArrayList<>();                     // collect what children that should remain
+                    for (int j = 0; j < source.children[srcidx].length; j++) {  // by iterating through existing
+                        if (prunedIndex[source.children[srcidx][j]] >= 0)             // this child maps to a branch point that remains
+                            keep.add(prunedIndex[source.children[srcidx][j]]);        // so cache it
+                    }
+                    int[] replace = new int[keep.size()];                       // allocate array for storing those that remin
+                    for (int j = 0; j < keep.size(); j++)                       // copy the pointers
+                        replace[j] = keep.get(j);
+                    pruned.children[dstidx] = replace;                   // place in index
+                }
+                if (source.parent[srcidx] >= 0) { // the original has a parent
+                    // transfer parent pointer if it remains
+                    pruned.parent[dstidx] = prunedIndex[source.parent[srcidx]];
+                } else
+                    pruned.parent[dstidx] = -1;
+            }
+        }
+        return pruned;
+    }
+    /**
      * Create a new IdxTree which is a reduced version of the source tree by excluding indices for nominated branch points, and
      * adjusting parent-child relations, as well as distances, which are assumed to be additive.
      * Note that the source branch points are not cloned, but are still referenced by the new tree
@@ -113,7 +171,7 @@ public class IdxTree implements Iterable<Integer> {
                         if (match[source.children[srcidx][j]] >= 0)             // this child maps to a branch point that remains
                             keep.add(match[source.children[srcidx][j]]);        // so cache it
                     }
-                    int[] replace = new int[keep.size()];                       // allocate array for storing those that remin
+                    int[] replace = new int[keep.size()];                       // allocate array for storing those that remain
                     for (int j = 0; j < keep.size(); j++)                       // copy the pointers
                         replace[j] = keep.get(j);
                     pruned.children[dstidx] = replace;                   // place in index
