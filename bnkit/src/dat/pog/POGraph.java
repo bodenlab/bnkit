@@ -48,7 +48,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 
     /**
      * Determine the node indices that are behind (backward direction). Note that it completes at start node, and so does not return the start marker (-1).
-     * @param idx current node, use N for retrieving the start nodes, where N is the max number of positions in the POG
+     * @param idx current node, use N for retrieving the end nodes, where N is the max number of positions in the POG
      * @return the indices for nodes accessible directly forward from the current node; the array is empty if there are no indices
      */
     public int[] getBackward(int idx) {
@@ -64,7 +64,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
     /**
-     * Determine a topological ordering of the nodes
+     * Determine a topological ordering of the nodes; note that more than one topological order is likely to exist for bi- and multi-furcating POGs
      * @return an array with the indices of the POG in a topological order
      */
     public int[] getTopologicalOrder() {
@@ -84,7 +84,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                 ;
             }
         }
-        // go through all nodes, first those added above, incrementally adding those that are beyond
+        // go through all nodes, first those added above, incrementally adding those that are beyond/forward
         int exp_ptr = 0; // pointer to position to expand
         while (exp_ptr < add_ptr) {
             int current = ret[exp_ptr ++];
@@ -142,160 +142,6 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         return idx2 == nNodes ? isEndNode(idx1) : false; // if we are searching for end marker
     }
 
-    /**
-     * Class to perform A* search on this POGraph.
-     */
-    public class AStarSearch {
-
-        final int[] closed; // indices linking back, ultimately to -1 (start node)
-        final double[] actual; // actual costs when determined, and -1 before determined
-        final int N = maxsize();
-        final double minW; // smallest weight, if non-negative, else set to 1
-        final int[] toposort = getTopologicalOrder();
-        final int[] mapidx = new int[N + 2]; // offset by +1, so that index -1 works (at 0), and also N (at N + 1)
-
-        /**
-         * Create an A* search instance and perform the search
-         */
-        public AStarSearch() {
-            for (int i = 0; i < toposort.length; i ++)
-                mapidx[toposort[i] + 1] = i;
-            mapidx[N + 1] = N;
-            actual = new double[N + 1]; // space to store actual costs
-            Arrays.fill(actual, -1);
-            closed = new int[N + 1]; // space to store linkages leading-to a node index
-            Arrays.fill(closed, -N);
-            double saveW = Double.MAX_VALUE;
-            for (StatusEdge e : getEdges()) {
-                if (e.getWeight() < saveW)
-                    saveW = e.getWeight();
-            }
-            minW = saveW <= 0 ? 1 : saveW;
-            //
-            PriorityQueue<AStarNode> pq = new PriorityQueue<>();
-            int current = -1;
-            double cost = 0; // the cost to reach the start node is 0
-            while (true) {
-                // first, check if this is an end node, and if so add path to terminate
-                if (isEndNode(current)) {
-                    // create a new path to terminate graph, in turn calculate costs
-                    AStarNode node = new AStarNode(current, N);
-                    pq.add(node); // this will need eventual exploration
-                }
-                // second, check what the next frontier of nodes are, and add their paths
-                int[] nexts = getForward(current);
-                for (int next : nexts) { // add all nodes coming-up
-                    // create a new path to a search node, in turn calculate costs
-                    AStarNode node = new AStarNode(current, next);
-                    pq.add(node); // this will need eventual exploration
-                }
-                // third, poll the most promising node...
-                AStarNode promise = pq.poll();
-                if (promise == null) // no more nodes to explore, so terminate
-                    break;
-                current = promise.to;
-                cost = promise.g;
-                if (cost < 0)
-                    System.out.println("\t" + cost);
-                if (actual[current] < 0 || actual[current] > cost) { // not yet set, or just better
-                    actual[current] = cost;
-                    closed[current] = promise.from;
-                }
-                if (current == N)
-                    break;
-            }
-        }
-
-        /**
-         * Retrieve the optimal path
-         * @return an array with the optimal path as specified by the node indices, in order.
-         */
-        public int[] getPath() {
-            List<Integer> path = new ArrayList<>();
-            int current = N;
-            while (true) {
-                current = closed[current];
-                if (current < 0)
-                    break;
-                path.add(current);
-            }
-            int[] arr = new int[path.size()];
-            for (int i = 0; i < arr.length; i ++)
-                arr[i] = path.get(arr.length - i - 1);
-            return arr;
-        }
-
-        /**
-         * Retrieve the actual, optimal cost of visiting the node with the specified index
-         * @param idx the node index
-         * @return the cost
-         */
-        public double getCost(int idx) {
-            if (idx == -1)
-                return 0;
-            if (actual[idx] >= 0)
-                return actual[idx];
-            else
-                throw new ASRRuntimeException("Invalid A* search: cannot determine cost onwards index " + idx);
-        }
-
-        /**
-         * Retrieve the cost of reaching the end of the POGraph
-         * @return the cost, lower is better
-         */
-        public double getCost() {
-            return actual[N];
-        }
-
-        /**
-         * The admissible heuristic function used for finding the optimal path.
-         * The default function uses the topological order of the node relative to the end, multiplied by the minimum weight of the POG
-         * @param idx the node index
-         * @return the (optimistic) estimate of the remaining distance to reach the end
-         */
-        public double getH(int idx) {
-            return (N - mapidx[idx + 1]) * minW; // weight is minimally 1
-        }
-
-        /**
-         * Class that defines the A* search node, which is used in a PriorityQueue
-         */
-        public class AStarNode implements Comparable<AStarNode> {
-
-            final int from, to;
-            final StatusEdge edge;
-            final double h, g;
-
-            /**
-             * Create a search node from the two indices that are joined by the edge, which needs to be explored.
-             * A cost is assigned based on the actual cost to reach the source node, and the weight on the edge, factoring-in
-             * whether the edge is reciprocated or not
-             * @param from source node index
-             * @param to target node index
-             */
-            public AStarNode(int from, int to) {
-                this.from = from;
-                this.to = to;
-                this.edge = getEdge(from, to);
-                this.g = getCost(from) + ((mapidx[to + 1] - mapidx[from + 1]) * edge.getWeight()) * (edge.reciprocated ? 1 : N);
-                this.h = getH(this.to);
-            }
-
-            /**
-             * The search node can be compared to any other node, ensuring that the priority queue polls
-             * the node with the lowest estimated distance
-             * @param o other node
-             * @return -1 if this node is lower, +1 if this node is greater, or 0 if they are equal
-             */
-            @Override
-            public int compareTo(AStarNode o) {
-                double f1 = this.g + this.h;
-                double f2 = o.g + o.h;
-                return f1 < f2 ? -1 : f1 > f2 ? +1 : 0;
-            }
-        }
-
-    }
 
     /**
      * Get complete paths with reciprocated edges, and non-reciprocated edges used only if required to complete a path.
@@ -311,8 +157,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      * Perform A* search on the POG
      * @return
      */
-    public AStarSearch getMostSupported() {
-        AStarSearch astar = new AStarSearch();
+    public GraphSearch getMostSupported() {
+        GraphSearch astar = new GraphSearch(this);
+        //astar.runAStar();
         return astar;
     }
 
@@ -649,12 +496,19 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             this.reciprocated = reciprocated;
             this.weight = weight;
         }
+        public boolean getReciprocated() {
+            return reciprocated;
+        }
         public void setWeight(int weight) {
             this.weight = weight;
         }
         @Override
         public double getWeight() {
             return weight;
+        }
+        @Override
+        public String toString() {
+            return "<" + (getReciprocated()?"R":":") + String.format("%3.1f", getWeight()) + ">";
         }
         @Override
         public String toDOT() {
