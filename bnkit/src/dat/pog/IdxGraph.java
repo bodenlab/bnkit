@@ -351,12 +351,12 @@ public class IdxGraph {
             for (int i = bs.nextSetBit(0); i >= 0; i = bs.nextSetBit(i + 1))
                 indices[count ++] = i;
             return indices;
-        } else if (idx == -1 && (look_forward || !isDirected())) {
+        } else if (idx == -1 && (look_forward && isDirected())) {
             int[] indices = new int[startNodes.cardinality()];
             for (int i = startNodes.nextSetBit(0); i >= 0; i = startNodes.nextSetBit(i + 1))
                 indices[count ++] = i;
             return indices;
-        } else if (idx == maxsize() && (!look_forward || !isDirected())) {
+        } else if (idx == maxsize() && (!look_forward && isDirected())) {
             int[] indices = new int[endNodes.cardinality()];
             for (int i = endNodes.nextSetBit(0); i >= 0; i = endNodes.nextSetBit(i + 1))
                 indices[count ++] = i;

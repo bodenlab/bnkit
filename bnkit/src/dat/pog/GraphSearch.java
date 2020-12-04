@@ -5,7 +5,9 @@ import asr.ASRRuntimeException;
 import java.util.*;
 
 /**
- * Class to perform a search on a POGraph.
+ * Class to perform a search on a graph.
+ * The idea is to allow sub-classes to be specific to some class of graphs (sub-classing IdxEdgeGraph)
+ * and operate on some edge type and node constraints.
  */
 public class GraphSearch<E extends Edge & WeightedEdge> {
 
@@ -82,20 +84,33 @@ class DijkstraSearch<E extends POGraph.StatusEdge> extends GraphSearch<E> {
      * Create a search instance and perform the search
      */
     public DijkstraSearch(POGraph g) {
-        this((IdxEdgeGraph<E>) g, -1, g.maxsize());
+        this((IdxEdgeGraph<E>) g, -1, g.maxsize(), PRIORITY_RECIP_WEIGHT);
+    }
+
+    public DijkstraSearch(POGraph g, int mode) {
+        this((IdxEdgeGraph<E>) g, -1, g.maxsize(), mode);
     }
 
     /**
      * Create a search instance and perform the search
      */
+
     public DijkstraSearch(IdxEdgeGraph<E> g, int start, int goal) {
+        this(g, start, goal, PRIORITY_WEIGHT);
+    }
+
+    /**
+     * Create a search instance and perform the search
+     */
+    public DijkstraSearch(IdxEdgeGraph<E> g, int start, int goal, int mode) {
         super(g);
+        this.setPriorityMode(mode);
         actual = new double[N + 1]; // space to store actual costs
         Arrays.fill(actual, Double.POSITIVE_INFINITY);
         closed = new Set[N + 1]; // space to store linkages leading-to a node index
         this.start = start;
         this.goal = goal;
-        if (start >= 0) { // terminated graphs can't use index for initial terminal "-1"
+        if (start >= 0) { // terminated graphs can't refer to index for initial terminal "-1"
             actual[start] = 0; // the cost is by definition zero for the start node
             closed[start] = new HashSet();
         }
@@ -104,18 +119,26 @@ class DijkstraSearch<E extends POGraph.StatusEdge> extends GraphSearch<E> {
         while (current != goal) {
             // track visited nodes (by index) and cheapest path to each node; this is in "closed"
             // find the lowest-cost path from "start" (-1) to "anywhere"; this is in "actual"
-            int[] nexts = g.getNodeIndices(current); // all out-going edges; forward-looking if directed
+            int[] nexts;
+            nexts = g.getNodeIndices(current); // all out-going edges; forward-looking if directed
+            if (goal == N && g.isEndNode(current)) { // if goal is the terminus, need also check if the current node is an end node
+                // add N to next
+                int[] xnexts = new int[nexts.length + 1];
+                for (int i = 0; i < nexts.length; i++)
+                    xnexts[i] = nexts[i];
+                xnexts[nexts.length] = N;
+                nexts = xnexts;
+            }
             visited.add(current);
             for (int next : nexts) { // add all nodes coming-up
                 double cost_sofar = (current == start ? 0 : actual[current]);
-                Set nodes_sofar = (current == start ? new HashSet() : closed[current]);
                 E edge = g.getEdge(current, next);
                 double weight = getPriority(edge);
                 if (actual[next] > cost_sofar + weight) { // if better...
                     actual[next] = cost_sofar + weight;
                     closed[next] = new HashSet();
                     closed[next].add(current);
-                } else if (actual[next] == cost_sofar + edge.getWeight() && closed[next] != null) { // else if just equal...
+                } else if (actual[next] == cost_sofar + weight && closed[next] != null) { // else if just equal...
                     closed[next].add(current);
                 }
             }
@@ -129,13 +152,32 @@ class DijkstraSearch<E extends POGraph.StatusEdge> extends GraphSearch<E> {
                     }
                 }
             }
+            if (cheapest_cost == Double.POSITIVE_INFINITY)
+                break;
         }
+    }
+
+    public static final int PRIORITY_RECIPROCATED = 0x01;
+    public static final int PRIORITY_WEIGHT = 0x02;
+    public static final int PRIORITY_RECIP_WEIGHT = 0x04;
+
+    private int PRIORITY_MODE = 0x02;
+    public void setPriorityMode(int mode) {
+        PRIORITY_MODE = mode;
     }
 
     @Override
     public double getPriority(E edge) {
-        //return edge.getReciprocated() ? 0 : 1;
-        return edge.getWeight();
+        switch (PRIORITY_MODE) {
+            case PRIORITY_RECIPROCATED:
+                return edge.getReciprocated() ? 0 : 1;
+            case PRIORITY_WEIGHT:
+                return edge.getWeight();
+            case PRIORITY_RECIP_WEIGHT:
+                return edge.getReciprocated() ? edge.getWeight() : 1000 * edge.getWeight();
+            default:
+                return 0;
+        }
     }
 
     /**
@@ -176,8 +218,9 @@ class DijkstraSearch<E extends POGraph.StatusEdge> extends GraphSearch<E> {
             int idx2 = stack.pop();
             if (!visited.contains(idx2)) {
                 for (int idx1 : (Set<Integer>)closed[idx2]) {
-                    stack.push(idx1);
                     optimal.add(new POGEdge(idx1, idx2));
+                    if (idx1 != -1)
+                        stack.push(idx1);
                 }
             }
             visited.add(idx2);
@@ -200,11 +243,11 @@ class DijkstraSearch<E extends POGraph.StatusEdge> extends GraphSearch<E> {
     }
 
     /**
-     * Retrieve the cost of reaching the end of the POGraph
+     * Retrieve the cost of reaching the end of the search
      * @return the cost, lower is better
      */
     public double getCost() {
-        return actual[N];
+        return actual[this.goal];
     }
 
 }
