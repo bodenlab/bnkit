@@ -1,6 +1,7 @@
 package dat.phylo;
 
-import javax.swing.text.DefaultEditorKit;
+import asr.ASRRuntimeException;
+
 import java.util.*;
 
 /**
@@ -48,7 +49,8 @@ public class TreeInstance {
         this.instance = assign;
         Set s = new HashSet();
         for (int i = 0; i < instance.length; i ++) {
-            s.add(instance[i]);
+            if (instance[i] != null) // FIX: getEdgeInstance previously included null values
+                s.add(instance[i]);
         }
         this.possible = new Object[s.size()];
         s.toArray(this.possible);
@@ -128,6 +130,15 @@ public class TreeInstance {
     }
 
     /**
+     * Get an array containing all possible values that can instantiate branchpoints, excluding null
+     * @return possible values as an array
+     */
+    public Object[] getPossible() {
+        //for (int )
+        return possible;
+    }
+
+    /**
      * Get the total number of branch points in the tree, including leaves
      * @return the number of branch points
      */
@@ -173,4 +184,21 @@ public class TreeInstance {
             return "(" + sb.toString() + ")" + istr;
     }
 
+    public static class BlanketTreeDecor<E> implements TreeDecor<E> {
+        Object[] arr = null;
+        public BlanketTreeDecor(int nNodes, E val) {
+            arr = new Object[nNodes];
+            Arrays.fill(arr, val);
+        }
+
+        @Override
+        public E getDecoration(int idx) {
+            return (E)arr[idx];
+        }
+
+        @Override
+        public void decorate(TreeInstance ti) {
+            // nothing needs to be done
+        }
+    }
 }

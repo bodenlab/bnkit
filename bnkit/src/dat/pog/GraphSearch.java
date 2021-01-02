@@ -5,7 +5,7 @@ import asr.ASRRuntimeException;
 import java.util.*;
 
 /**
- * Class to perform a search on a graph.
+ * Container class to perform a search on a graph.
  * The idea is to allow sub-classes to be specific to some class of graphs (sub-classing IdxEdgeGraph)
  * and operate on some edge type and node constraints.
  */
@@ -15,7 +15,7 @@ public class GraphSearch<E extends Edge & WeightedEdge> {
     final int N;                // total number of nodes (excluding terminators)
 
     /**
-     * Create an A* search instance and perform the search
+     * Create a graph search instance and perform the search
      */
     public GraphSearch(IdxEdgeGraph<E> g) {
         this.g = g;
@@ -33,7 +33,7 @@ public class GraphSearch<E extends Edge & WeightedEdge> {
     };
 
     /**
-     * Class that defines a search node, which is used in a PriorityQueue by A* and by Dijkstra
+     * Class that defines a search node, which is used in a PriorityQueue by A*
      */
     public class SearchNode implements Comparable<SearchNode> {
 
@@ -78,7 +78,7 @@ class DijkstraSearch<E extends POGraph.StatusEdge> extends GraphSearch<E> {
 
     final Set[] closed;     // indices linking back, ultimately to -1 (start node)
     final double[] actual;  // actual costs/distance when determined and applicable; each element is -1 before determined
-    final int start, goal;            // start and goal nodes for search
+    final int start, goal;  // start and goal nodes for search
 
     /**
      * Create a search instance and perform the search

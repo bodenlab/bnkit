@@ -187,7 +187,7 @@ public class GRASP {
                 Prediction indelpred = null;
                 switch (INDEL_IDX) {
                     case 0: indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree); break;
-                    case 1: break;
+                    case 1: indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree); break;
                     case 2: indelpred = Prediction.PredictByIndelParsimony(pogtree); break;
                     case 3: indelpred = Prediction.PredictByIndelMaxLhood(pogtree); break;
                     case 4: indelpred = Prediction.PredictByParsimony(pogtree); break;

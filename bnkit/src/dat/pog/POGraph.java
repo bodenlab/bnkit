@@ -20,6 +20,49 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         super(nNodes, false, true);
     }
 
+    public static POGraph createFromAdjacency(int[] startnodes, int[] endnodes, int[][] adjacency) {
+        if (startnodes == null || endnodes == null || adjacency == null)
+            throw new ASRRuntimeException("Invalid POG adjacency specification");
+        if (startnodes.length < 1 && endnodes.length < 1)
+            throw new ASRRuntimeException("Start and end indices for nodes are not provided");
+        if (adjacency.length < 1)
+            throw new ASRRuntimeException("Empty adjacency matrix provided");
+        int N = adjacency.length;
+        for (int[] a : adjacency) {
+            if (a.length != N)
+                throw new ASRRuntimeException("Invalid adjacency matrix provided: rows are uneven");
+        }
+        POGraph pog = new POGraph(N);
+        for (int i : startnodes) {
+            pog.addNode(i, new Node());
+            pog.addEdge(-1, i);
+        }
+        for (int i : endnodes) {
+            if (!pog.isNode(i))
+                pog.addNode(i, new Node());
+            pog.addEdge(i, N);
+        }
+        for (int from = 0; from < adjacency.length; from ++) {
+            for (int to = 0; to < adjacency[from].length; to ++) {
+                if (from != to) {
+                    int from1 = from < to ? from : to;
+                    int to1 = from < to ? to : from;
+                    if (adjacency[from][to] > 0) { // edge present
+                        if (!pog.isNode(from1))
+                            pog.addNode(from1, new Node());
+                        if (!pog.isNode(to1))
+                            pog.addNode(to1, new Node());
+                        StatusEdge e = pog.getEdge(from1, to1);
+                        if (e == null)
+                            pog.addEdge(from1, to1);
+                        else
+                            e.reciprocated = true;
+                    }
+                }
+            }
+        }
+        return pog;
+    }
     /**
      * Get string representation of instance
      * @return
@@ -112,9 +155,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         int[][] pairs = new int[getEdgeCount()][];
         int cnt = 0;
         for (int from = -1; from < nNodes; from++) {
-            for (int to : getNodeIndices(from, true))
+            for (int to : getNodeIndices(from, true)) // all forward directed edges
                 pairs[cnt++] = new int[]{from, to};
-            if (isEndNode(from))
+            if (isEndNode(from)) // check if node is also terminal
                 pairs[cnt++] = new int[]{from, maxsize()};
         }
         return pairs;
@@ -149,8 +192,8 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      */
     public Set<POGEdge> getReciprocated() {
         Set<POGEdge> ret = new HashSet<>();
-
-        return ret;
+        throw new RuntimeException("Not implemented");
+//        return ret;
     }
 
     /**
@@ -158,9 +201,66 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      * @return
      */
     public GraphSearch getMostSupported() {
+        int[] depths = getDepths(true); // find how far (minimally) each (indexed) node is (in terms of number of edges) from end terminal
+        // assign weights for search
+        for (StatusEdge e : this.getEdges()) {
+            double w = e.getWeight();
+
+        }
         GraphSearch astar = new GraphSearch(this);
         //astar.runAStar();
-        return astar;
+        throw new RuntimeException("Not implemented");
+//        return astar;
+    }
+
+    /** Variable to hold search depths for getDepths */
+    private int[] searchdepths;
+
+    /**
+     * Helper function to determine search depths of nodes in POG
+     * @param toEnd if true, "ground zero" is the end, else the start of the POG
+     * @param currdepth
+     * @param queue
+     * @return
+     */
+    private List<Integer> findDepthsOf(boolean toEnd, int currdepth, List<Integer> queue) {
+        List<Integer> next = new ArrayList<>();
+        for (int i : queue) {
+            if (searchdepths[i] == 0 || searchdepths[i] > currdepth) {
+                searchdepths[i] = currdepth;
+                if (toEnd) {
+                    for (int j : this.getBackward(i))
+                        next.add(j);
+                } else { // forward-looking
+                    for (int j : this.getForward(i))
+                        next.add(j);
+                }
+            }
+        }
+        return next;
+    }
+
+    /**
+     * Determine the search depths from the end or the start (based on given param).
+     * @param toEnd if true, "ground zero" is the end, else the start of the POG
+     * @return an array with indices for all nodes in the POG, excluding terminal nodes, where each element indicating the search depth
+     */
+    public int[] getDepths(boolean toEnd) {
+        searchdepths = new int[this.maxsize()];
+        List<Integer> queue = new ArrayList<>();
+        if (toEnd) {
+            for (int j : this.getBackward())
+                queue.add(j);
+        } else {
+            for (int j : this.getForward())
+                queue.add(j);
+        }
+        int currdepth = 1;
+        while (queue.size() > 0) {
+            queue = findDepthsOf(toEnd, currdepth, queue);
+            currdepth += 1;
+        }
+        return searchdepths;
     }
 
     /**
@@ -270,7 +370,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      * Create a POG from an array of edge indices.
      * This is not uncomplicated as each INDEL needs to be considered in a broader context to form a valid, start-to-end POG.
      * @param nNodes number of nodes in new POG
-     * @param optional edges that CAN be TRUE
+     * @param optional edges that CAN be TRUE, but are precluded by "definitive"
      * @param definitive edges that MUST be TRUE
      * @return new POG
      */
@@ -312,7 +412,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      * Create a POG from an array of edge indices.
      * This is not uncomplicated as each INDEL needs to be considered in a broader context to form a valid, start-to-end POG.
      * @param nNodes number of nodes in new POG
-     * @param optional edges that CAN be TRUE
+     * @param optional edges that CAN be TRUE, but are precluded by "definitive"
      * @param definitive edges that MUST be TRUE
      * @return new POG
      */
@@ -451,20 +551,28 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 
     public void decorateNodes(Object[] states) {
         if (states == null)
-            throw new ASRRuntimeException("Retrieving states for sequence that has not been inferred");
+            throw new ASRRuntimeException("Attempting to assign uninstantiated states to POG");
+        if (states.length != this.nNodes)
+            throw new ASRRuntimeException("Attempting to assign invalid states to POG");
         nodes = SymNode.toArray(states);
     }
 
     public void decorateNodes(EnumDistrib[] distribs) {
         if (distribs == null)
-            throw new ASRRuntimeException("Retrieving distributions for sequence that has not been inferred");
+            throw new ASRRuntimeException("Attempting to assign uninstantiated distributions to POG");
+        if (distribs.length != this.nNodes)
+            throw new ASRRuntimeException("Attempting to assign invalid distributions to POG");
         nodes = EnumNode.toArray(distribs);
     }
 
+    /**
+     * Define the standard type of node for POGs that allow for tracing POG consistency
+     */
     public static class StatusNode extends Node {
         public static int FORWARD = 0x01;
         public static int BACKWARD = 0x02;
         int status = 0;
+        int[] mindist = null;
         public StatusNode() {
         }
         public int getStatus() {
@@ -479,9 +587,23 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         public boolean isStatus(int status) {
             return (this.status & status) > 0;
         }
+        public void setDistance(boolean toEnd, int dist) {
+            if (mindist == null) {
+                mindist = new int[2];
+                mindist[!toEnd ? 0 : 1] = -1;
+            }
+            mindist[toEnd ? 0 : 1] = dist;
+        }
+        public int getDistance(boolean toEnd) {
+            if (mindist == null)
+                return -1;
+            return mindist[toEnd ? 0 : 1];
+        }
     }
 
-
+    /**
+     * Define the standard type of edge for POGs as we use them in GRASP, with weight and support for "bi-directionality" status
+     */
     public static class StatusEdge extends Edge implements WeightedEdge {
         private double weight = 0;  // default
         private boolean reciprocated = false;

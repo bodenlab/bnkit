@@ -16,11 +16,27 @@ class POGraphTest {
     POGraph pog = null;
     POGraph[] pogs = new POGraph[N];
     POGraph dijk = null;
+    POGraph ex1 = null;
 
     Set<Integer> allNodes = new HashSet<>();
 
     @BeforeEach
     void setupPOG() {
+        int[] start = new int[] {0,2};
+        int[] end = new int[] {7,9};
+        int[][] adj = new int[][] {
+            {0,1,0,0,0,0,1,0,0,0},
+            {1,0,1,1,0,1,0,0,0,0},
+            {0,1,0,0,1,0,0,0,0,0},
+            {0,0,0,0,0,1,0,1,0,0},
+            {0,0,1,0,0,0,1,0,0,0},
+            {0,1,0,0,0,0,0,0,1,0},
+            {1,0,0,0,0,0,0,0,0,0},
+            {0,0,0,0,0,0,1,0,0,1},
+            {0,0,0,0,0,1,0,0,0,1},
+            {0,0,0,0,0,0,0,1,0,0},
+        };
+        ex1 = POGraph.createFromAdjacency(start, end, adj);
         pog = new POGraph(N);
         for (int i = 0; i < N; i ++) {
             pog.addNode(i, new EnumNode(Enumerable.aacid));
@@ -50,11 +66,14 @@ class POGraphTest {
         }
         if (last < N)
             pog.addEdge(last, N);
+        /*
         try {
+            //ex1.saveToDOT("bnkit/src/test/resources/ex1.dot");
             pog.saveToDOT("bnkit/src/test/resources/pogtest.dot");
         } catch (IOException e) {
             e.printStackTrace();
         }
+         */
     }
 
     void setupPOGS() {
@@ -128,7 +147,7 @@ class POGraphTest {
                 }
             }
         }
-
+        /*
         try {
             POGraph.saveToDOT("bnkit/src/test/resources/pogstest", pogs);
         } catch (ASRException e) {
@@ -136,6 +155,7 @@ class POGraphTest {
         } catch (IOException e) {
             e.printStackTrace();
         }
+         */
     }
 
     @Test
@@ -216,6 +236,48 @@ class POGraphTest {
         return mySet;
     }
 
+    @Test
+    void getDepth() {
+        int[] depths = ex1.getDepths(true);
+        assertTrue(depths[9] == 1);
+        assertTrue(depths[8] == 2);
+        assertTrue(depths[5] == 3);
+        assertTrue(depths[0] == 3);
+        assertEquals(4, depths[2]);
+        assertEquals(3, depths[1]);
+        assertEquals(2, depths[3]);
+        depths = ex1.getDepths(false);
+        assertEquals(2, depths[6]);
+        assertEquals(2, depths[1]);
+        assertEquals(4, depths[8]);
+        assertEquals(4, depths[9]);
+    }
+
+    @Test
+    void getDepth2() {
+        int[] depths = pog.getDepths(true);
+        // for each node, at least ONE of the next nodes must be at exactly ONE less level of depth, all others one less OR GREATER
+        for (int i = 0; i < depths.length; i ++) {
+            boolean oneless = false;
+            for (int j : pog.getForward(i)) {
+                if (depths[j] == depths[i] - 1)
+                    oneless = true;
+                assertTrue(depths[j] >= depths[i] - 1);
+            }
+            assertTrue(oneless || pog.getForward(i).length == 0);
+        }
+        depths = pog.getDepths(false);
+        // for each node, at least ONE of the next nodes must be at exactly ONE less level of depth, all others one less OR GREATER
+        for (int i = 0; i < depths.length; i ++) {
+            boolean oneless = false;
+            for (int j : pog.getBackward(i)) {
+                if (depths[j] == depths[i] - 1)
+                    oneless = true;
+                assertTrue(depths[j] >= depths[i] - 1);
+            }
+            assertTrue(oneless || pog.getBackward(i).length == 0);
+        }
+    }
 
     @Test
     void isPath() {

@@ -9,3 +9,4 @@ public interface TreeDecor<E> {
     E getDecoration(int idx);
     void decorate(TreeInstance ti);
 }
+

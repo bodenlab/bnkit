@@ -416,6 +416,11 @@ public class IdxTree implements Iterable<Integer> {
         return childset;
     }
 
+    /**
+     * Text representation (Newick) of subtree with the specified node index as root
+     * @param idx index of the root of the subtree
+     * @return text string representation on Newick format
+     */
     public String getSubtreeString(int idx) {
         int[] ch = getChildren(idx);
         if (ch != null) {
@@ -458,6 +463,10 @@ public class IdxTree implements Iterable<Integer> {
         return ret;
     }
 
+    /**
+     * Get the branch point indices for all leaf nodes in this tree.
+     * @return the subset of indices that identify leaves/extant species
+     */
     public int[] getLeaves() {
         int[] ret = new int[getNLeaves()];
         int cnt = 0;
@@ -467,6 +476,11 @@ public class IdxTree implements Iterable<Integer> {
         return ret;
     }
 
+    /**
+     * Get the branch point indices for all nodes in this tree that are NOT leaves,
+     * i.e. ancestors.
+     * @return the indices of all ancestor nodes
+     */
     public int[] getAncestors() {
         int[] ret = new int[getSize() - getNLeaves()];
         int cnt = 0;
@@ -479,7 +493,7 @@ public class IdxTree implements Iterable<Integer> {
     /**
      * Retrieve the index for a specified label (either user specified label or automatically assigned
      * @param label name or ancestor ID
-     * @return index of node, or -1 if not found
+     * @return index of tree node, or -1 if not found
      */
     public int getIndex(Object label) {
         for (int i : this) {
