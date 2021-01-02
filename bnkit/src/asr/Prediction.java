@@ -719,7 +719,6 @@ public class Prediction {
             if (jib[i] != null)
                 jib[i].decorate(tib[i]);
         }
-
         // inference done, now assemble...
         for (int j = 0; j < tree.getSize(); j++) { // we look at each branchpoint, corresponding to either an extant or ancestor sequence
             Object ancID = tree.getBranchPoint(j).getID();

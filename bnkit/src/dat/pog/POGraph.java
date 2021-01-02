@@ -326,7 +326,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      */
     public static POGraph createFromEdgeMap(int nPos, EdgeMap emap) {
         POGraph pog = null;
-        boolean tidy = true; // treat reciprocated edges as definitive, and non-reciprocated as optional
+        // FIXME: look into the "tidy" scheme, not working with BEML/grasp.aln, ancestor 3
+        boolean tidy = false; // treat reciprocated edges as definitive, and non-reciprocated as optional
+
         if (tidy) {
             pog = new POGraph(nPos);
             Set<POGEdge> optional = new HashSet<>();
