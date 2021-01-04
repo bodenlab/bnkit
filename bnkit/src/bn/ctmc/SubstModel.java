@@ -237,6 +237,8 @@ public abstract class SubstModel {
             return new Gap();
         } else if (name.equalsIgnoreCase("Yang")) {
             return new Yang();
+        } else if (name.equalsIgnoreCase("JC")) {
+            return new JC(1);
         } else if (name.equalsIgnoreCase("GLOOME1")) {
             return new GLOOME1();
         } else if (name.equalsIgnoreCase("WAG")) {

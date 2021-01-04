@@ -31,6 +31,7 @@ import java.util.*;
  */
 public class Prediction {
     public static boolean DEBUG = GRASP.VERBOSE;    // print out various information
+    public int NTHREADS = 4;                        // how many threads to utilise
     private final POGTree pogTree;                  // input data contained in a POGTree
     private final IdxTree phylotree;                // the input phylogenetic tree (is also accessible via POGTree)
     private int[] ancidxs = null;                   // store the sub-set of indices that are used for internal nodes (ancestors)
@@ -161,14 +162,19 @@ public class Prediction {
         // iterate through all ancestors, and extracting states from those that have been inferred
         for (int idx : getAncestorIndices()) {
             POGraph pog = ancarr[idx];
-            if (mode == GRASP.Inference.JOINT) {
-                if (states != null)
-                    pog.decorateNodes(states[idx]);
-            } else if (mode == GRASP.Inference.MARGINAL) {
-                if (distribs[idx] != null)
-                    pog.decorateNodes(distribs[idx]);
+            if (pog != null) {
+                if (mode == GRASP.Inference.JOINT) {
+                    if (states != null) {
+                        pog.decorateNodes(states[idx]);
+                        ancestors.put(phylotree.getLabel(idx), pog);
+                    }
+                } else if (mode == GRASP.Inference.MARGINAL) {
+                    if (distribs[idx] != null) {
+                        pog.decorateNodes(distribs[idx]);
+                        ancestors.put(phylotree.getLabel(idx), pog);
+                    }
+                }
             }
-            ancestors.put(phylotree.getLabel(idx), pog);
         }
         return ancestors;
     }
@@ -208,12 +214,15 @@ public class Prediction {
             throw new ASRRuntimeException("Invalid ancestor ID (not found in tree) " + ancestorID);
         if (distribs[bpidx] == null) {                                          // the ancestor has not yet been inferred, so DO it...
             IdxTree[] trees = new IdxTree[getPositions()];                      // this is how many position-specific trees we are dealing with
-            MaxLhood.Marginal[] inf = new MaxLhood.Marginal[getPositions()];    // which is also how many inferences we will carry out
+//            MaxLhood.Marginal[] inf = new MaxLhood.Marginal[getPositions()];    // which is also how many inferences we will carry out
+            // FIXME: create an index map for "inf" to enable generics <EnumDistrib>?
+            TreeDecor[] inf = new TreeDecor[getPositions()];    // which is also how many inferences we will carry out
+            ThreadedDecorators threadpool = new ThreadedDecorators(NTHREADS);
             for (int pos = 0; pos < getPositions(); pos ++) {                   // for each position...
                 trees[pos] = getTree(pos);                                      //   this is the tree with indels imputed
                 int ancidx = positidxs[pos][bpidx];                             //   index for sought ancestor in the position-specific tree
                 if (ancidx >= 0)                                                //   which may not exist, i.e. part of an indel, but if it is real...
-                    inf[pos] = new MaxLhood.Marginal(ancidx, trees[pos], MODEL);//     set-up the inference
+                    inf[pos] = threadpool.addDecorator(new MaxLhood.Marginal(ancidx, trees[pos], MODEL));//     set-up the inference
             }
             distribs[bpidx] = new EnumDistrib[pogTree.getPositions()];
             for (int pos = 0; pos < getPositions(); pos ++) {                   // for each position...
@@ -221,7 +230,12 @@ public class Prediction {
                 if (specidx >= 0) {                                             //   which may not exist, i.e. part of an indel, but if it is real...
                     TreeInstance ti = pogTree.getNodeInstance(pos, trees[pos]); //     get the instances at the leaves at that position, and...
                     inf[pos].decorate(ti);                                      //     perform inference
-                    distribs[bpidx][pos] = inf[pos].getDecoration(specidx);     //     extract distribution of marginal prob
+                }
+            }
+            for (int pos = 0; pos < getPositions(); pos ++) {                   // for each position...
+                int specidx = positidxs[pos][bpidx];                            //   index for sought ancestor in the position-specific tree
+                if (specidx >= 0) {                                             //   which may not exist, i.e. part of an indel, but if it is real...
+                    distribs[bpidx][pos] = (EnumDistrib)inf[pos].getDecoration(specidx);     //     extract distribution of marginal prob
                 }
             }
         }
@@ -237,22 +251,22 @@ public class Prediction {
     public Object[][] getJoint(SubstModel MODEL) {
         this.states = new Object[getTree().getSize()][getPositions()];
         IdxTree[] trees = new IdxTree[getPositions()];              // this is how many position-specific trees we are dealing with
-        MaxLhood.Joint[] inf = new MaxLhood.Joint[getPositions()];  // which is also how many inferences we will carry out
+        // FIXME: create an index map for "inf" to enable generics <EnumDistrib>?
+        TreeDecor[] inf = new TreeDecor[getPositions()];  // which is also how many inferences we will carry out
+        ThreadedDecorators threadpool = new ThreadedDecorators(NTHREADS);
         for (int pos = 0; pos < inf.length; pos++) {                // for each position...
             trees[pos] = getTree(pos);                              //   this is the tree with indels imputed
-            inf[pos] = new MaxLhood.Joint(trees[pos], MODEL);       //     set-up the inference
+            inf[pos] = threadpool.addDecorator(new MaxLhood.Joint(trees[pos], MODEL));       //     set-up the inference
         }
-        for (int idx : getAncestorIndices()) {
-//      for  (Map.Entry<Object, POGraph> entry : getAncestors().entrySet()) {
-            // Object ancID = entry.getKey();
-            for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
-                //int idx = pogTree.getTree().getIndex(ancID);        //   index for sought ancestor in the phylogenetic tree
+        for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
+            TreeInstance ti = pogTree.getNodeInstance(pos, trees[pos]); //     get the instances at the leaves at that position, and...
+            inf[pos].decorate(ti);                                      //     perform inference
+        }
+        for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
+            for (int idx : getAncestorIndices()) {
                 int ancidx = positidxs[pos][idx];                   //   index for sought ancestor in the position-specific tree
-                if (ancidx >= 0) {                                  //   which may not exist, i.e. part of an indel, but if it is real...
-                    TreeInstance ti = pogTree.getNodeInstance(pos, trees[pos]); //     get the instances at the leaves at that position, and...
-                    inf[pos].decorate(ti);                                      //     perform inference
+                if (ancidx >= 0)                                  //   which may not exist, i.e. part of an indel, but if it is real...
                     states[idx][pos] = inf[pos].getDecoration(ancidx);          //     extract state
-                }
             }
         }
         return states;

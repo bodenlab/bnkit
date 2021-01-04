@@ -110,16 +110,31 @@ public class MaxLhood {
         final private Object[] values;
         final private PhyloBN pbn;
 
+        /**
+         * Set-up a joint reconstruction; this creates a probabilistic graphical model with the structure and evolutionary
+         * distances as defined by the supplied tree and substitution model.
+         * @param tree
+         * @param model
+         */
         public Joint(IdxTree tree, SubstModel model) {
             pbn = PhyloBN.create(tree, model);
             values = new Object[pbn.bnodes.length];
         }
 
+        /**
+         * Retrieve the inferred state for a specified branch point, as determined by max likelihood
+         * @param idx branch point index
+         * @return state which jointly with all others assigns the greatest probability to the observed values (at leaves)
+         */
         @Override
         public Object getDecoration(int idx) {
             return values[idx];
         }
 
+        /**
+         * Determine the joint state that assigns the maximum likelihood to the specified observations
+         * @param ti observed tree states
+         */
         @Override
         public void decorate(TreeInstance ti) {
             Map<String, Integer> quick = new HashMap<>();
@@ -155,23 +170,26 @@ public class MaxLhood {
 
         private EnumDistrib value = null;
         final private PhyloBN pbn;
-        private int ancidx = 0;
+        final private int ancidx;
 
-        public Marginal(String ancestorID, IdxTree tree, SubstModel model) {
-            pbn = PhyloBN.create(tree, model);
-            for (int i = 0; i < pbn.bnodes.length; i++) {
-                if (pbn.bnodes[i].getVariable().getName().equals(ancestorID)) {
-                    ancidx = i;
-                    break;
-                }
-            }
-        }
-
-        public Marginal(int ancidx, IdxTree tree, SubstModel model) {
-            this.ancidx = ancidx;
+        /**
+         * Set-up inference of the posterior distribution at the specified ancestor branch point, by creating
+         * a probabilistic graphical model with the structure and evolutionary
+         * distances as defined by the supplied tree and substitution model.
+         * @param bpidx branch point index for the ancestor
+         * @param tree phylogenetic tree indexing the branch points and their distances
+         * @param model evolutionary model
+         */
+        public Marginal(int bpidx, IdxTree tree, SubstModel model) {
+            this.ancidx = bpidx;
             pbn = PhyloBN.create(tree, model);
         }
 
+        /**
+         * Retrieves the already computed distribution
+         * @param idx ancestor branch point index (must be the same as when the class instance was created)
+         * @return the posterior distribution over states defined by the substitution model
+         */
         @Override
         public EnumDistrib getDecoration(int idx) {
             if (idx == ancidx)
@@ -180,6 +198,10 @@ public class MaxLhood {
                 throw new ASRRuntimeException("Invalid ancestor index, not defined for marginal inference: " + idx);
         }
 
+        /**
+         * Determine the posterior distribution at the ancestor branch point, given the observations at certain branch points in the tree (i.e. leaves)
+         * @param ti observed states
+         */
         @Override
         public void decorate(TreeInstance ti) {
             // instantiate all nodes for which there are values, i.e. leaf nodes most probably

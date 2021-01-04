@@ -49,11 +49,11 @@ public class JC extends SubstModel {
 
     public static Character[] S = {'A','C','G','T'};
 
-    public JC(double gamma) {
-        this(gamma, S);
+    public JC(double mu) {
+        this(mu, S);
     }
-    public JC(double gamma, Object[] alphabet) {
-        super(F(alphabet.length), Q(gamma, alphabet.length), new Enumerable((alphabet)), false);
+    public JC(double mu, Object[] alphabet) {
+        super(F(alphabet.length), Q(mu, alphabet.length), new Enumerable((alphabet)), false);
     }
     public String getName() {
         return "JC";

@@ -53,13 +53,13 @@ public class GRASP {
                 "\toutput-file will be populated by inferred ancestor or ancestors; directory with files if format is DOT\n" +
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
-                "\t\"-savetree\" re-saves the tree on Newick format with ancestor names included\n" +
-                "\tThe output file is written on the specified format.\n" +
-                "\t-verbose will print out information about steps undertaken, and the time it took to finish.");
+                "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
+                "\tThe output file is written on the specified format\n" +
+                "\t-verbose will print out information about steps undertaken, and the time it took to finish");
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
-                "\tEvolutionary models include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman; \n" +
-                "\tthe only DNA model is that of Yang (general reversible process model).\n" +
+                "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman; \n" +
+                "\tDNA models include Jukes-Cantor and Yang (general reversible process model).\n" +
                 "\tIndel approaches include Bi-directional Edge Parsimony (default), Bi-directional Edge ML, \n" +
                 "\tSimple Indel Code Parsimony, Simple Indel Code ML, Position-specific Parsimony and Position-specific ML.\n" +
                 "\t~ This is version " + VERSION + " ~");
@@ -72,11 +72,11 @@ public class GRASP {
         String NEWICK = null;
         String OUTPUT = null;
 
-        String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang"};
+        String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
         int MODEL_IDX = 0; // default model is that above indexed 0
         SubstModel MODEL = null;
         // Alphabet is decided by MODEL_IDX
-        Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid};
+        Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
         // Indel approaches:
         String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
@@ -192,7 +192,7 @@ public class GRASP {
                     case 2: indelpred = Prediction.PredictByIndelParsimony(pogtree); break;
                     case 3: indelpred = Prediction.PredictByIndelMaxLhood(pogtree); break;
                     case 4: indelpred = Prediction.PredictByParsimony(pogtree); break;
-                    case 5: break;
+                    case 5: usage(3, "PSML is not implemented"); break;
                     default: break;
                 }
                 if (indelpred == null)
@@ -209,8 +209,8 @@ public class GRASP {
                 EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
                 if (CONSENSUS[FORMAT_IDX]) {
                     ii = 0;
-                    for (Object ancID : pogs.keySet())
-                        ancseqs[ii ++] = indelpred.getSequence(ancID, MODE, GAPPY);
+                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
+                        ancseqs[ii ++] = indelpred.getSequence(entry.getKey(), MODE, GAPPY);
                 }
                 switch (FORMAT_IDX) {
                     case 0: // FASTA
@@ -224,13 +224,7 @@ public class GRASP {
                         aw.close();
                         break;
                     case 3: // DOT
-                        try {
-                            IdxGraph.saveToDOT(OUTPUT, ancestors);
-                        } catch (IOException e) {
-                            usage(9, e.getMessage());
-                        } catch (ASRException e) {
-                            usage(10, e.getMessage());
-                        }
+                        IdxGraph.saveToDOT(OUTPUT, ancestors);
                         break;
                     case 1: // DISTRIB
                         EnumDistrib[] d = indelpred.getMarginal(MARG_NODE, MODEL);
@@ -264,10 +258,9 @@ public class GRASP {
                             usage(8, "Invalid ancestor node label: " + MARG_NODE);
                         break;
                 }
-/*
                 if (SAVE_TREE != null)
-                    asr.saveTree(SAVE_TREE);
-*/
+                    Newick.save(tree, SAVE_TREE, Newick.MODE_ANCESTOR);
+
                 ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
                 if (VERBOSE) {
                     System.out.println(String.format("Done in %d min, %d sec", TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME),
