@@ -491,6 +491,24 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
+     * Retrieve all indices of leaves that are part of the subtree under specified (root) index.
+     * @param bpidx specified (root) index
+     * @return an array with indices of all leaves
+     */
+    public int[] getLeaves(int bpidx) {
+        Set<Integer> subtree = getSubtreeIndices(bpidx);
+        Set<Integer> leaves = new HashSet<>();
+        for (int idx : subtree)
+            if (isLeaf(idx))
+                leaves.add(idx);
+        int[] leafarr = new int[leaves.size()];
+        int i = 0;
+        for (int idx : leaves)
+            leafarr[i ++] = idx;
+        return leafarr;
+    }
+
+    /**
      * Retrieve the index for a specified label (either user specified label or automatically assigned
      * @param label name or ancestor ID
      * @return index of tree node, or -1 if not found

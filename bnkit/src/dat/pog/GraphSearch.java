@@ -189,7 +189,7 @@ class DijkstraSearch<E extends POGraph.StatusEdge> extends GraphSearch<E> {
         int current = goal;
         if (closed[goal] == null)
             return null;
-        path.add(current);
+        //path.add(current);
         while (true) {
             current = (Integer)closed[current].iterator().next();
             if (current == start)

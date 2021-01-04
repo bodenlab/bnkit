@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "1007.2020";
+    public static String VERSION = "0104.2021";
     public static boolean VERBOSE = false;
     public enum Inference {
         JOINT,
@@ -80,10 +80,11 @@ public class GRASP {
         // Indel approaches:
         String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
-
         boolean GAPPY = false;
         String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL", "DOT"};
         int FORMAT_IDX = 0;
+        // To compute consensus path is determined by output format
+        boolean[] CONSENSUS = new boolean[] {true, false, true, false};
 
         int NTHREADS = 1;
         Inference MODE = Inference.JOINT;
@@ -196,27 +197,31 @@ public class GRASP {
                 }
                 if (indelpred == null)
                     usage(3, INDELS[INDEL_IDX] + " is not implemented");
-                POGraph[] ancestors = null;
-                if (MODE == Inference.JOINT) {
+                if (MODE == Inference.JOINT)
                     indelpred.getJoint(MODEL);
-                    Map<Object, POGraph> pogs = indelpred.getAncestors(Inference.JOINT);
-                    ancestors = new POGraph[pogs.size()];
-                    int i = 0;
-                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                        ancestors[i++] = entry.getValue();
-                } else if (MODE == Inference.MARGINAL) {
+                else if (MODE == Inference.MARGINAL)
                     indelpred.getMarginal(MARG_NODE, MODEL);
-                    Map<Object, POGraph> pogs = indelpred.getAncestors(Inference.MARGINAL);
-                    ancestors = new POGraph[pogs.size()];
-                    int i = 0;
-                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                        ancestors[i++] = entry.getValue();
+                Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
+                POGraph[] ancestors = new POGraph[pogs.size()];
+                int ii = 0;
+                for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
+                    ancestors[ii ++] = entry.getValue();
+                EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
+                if (CONSENSUS[FORMAT_IDX]) {
+                    ii = 0;
+                    for (Object ancID : pogs.keySet())
+                        ancseqs[ii ++] = indelpred.getSequence(ancID, MODE, GAPPY);
                 }
                 switch (FORMAT_IDX) {
                     case 0: // FASTA
                         FastaWriter fw = new FastaWriter(OUTPUT);
-//                        fw.save(ancseqs);
+                        fw.save(ancseqs);
                         fw.close();
+                        break;
+                    case 2: // CLUSTAL
+                        AlnWriter aw = new AlnWriter(OUTPUT);
+                        aw.save(ancseqs);
+                        aw.close();
                         break;
                     case 3: // DOT
                         try {
@@ -257,11 +262,6 @@ public class GRASP {
                             TSVFile.saveObjects(OUTPUT, m);
                         } else
                             usage(8, "Invalid ancestor node label: " + MARG_NODE);
-                        break;
-                    case 2: // CLUSTAL
-                        AlnWriter aw = new AlnWriter(OUTPUT);
- //                       aw.save(ancseqs);
-                        aw.close();
                         break;
                 }
 /*

@@ -171,11 +171,11 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      * @return true if there is a path, false otherwise
      */
     public boolean isPath(int idx1, int idx2) {
-        if (idx1 == idx2)
+        if (idx1 == idx2) // by def, a node has a path to itself
             return true;
-        if (!isNode(idx1) && idx1 != -1)
+        if (!isNode(idx1) && idx1 != -1) // the source node must either be the start terminal or a valid node (not just an index)
             return false;
-        if (!isNode(idx2) && idx2 != size())
+        if (!isNode(idx2) && idx2 != size()) // the target node must either be the end terminal or a valid node (not just an index)
             return false;
         int[] forw = getForward(idx1);
         for (int to : forw) {
@@ -197,20 +197,12 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
     /**
-     * Perform A* search on the POG
-     * @return
+     * Perform search on the POG based on currently set edge weights and status
+     * @return indices to the nodes that make up the "consensus" path
      */
-    public GraphSearch getMostSupported() {
-        int[] depths = getDepths(true); // find how far (minimally) each (indexed) node is (in terms of number of edges) from end terminal
-        // assign weights for search
-        for (StatusEdge e : this.getEdges()) {
-            double w = e.getWeight();
-
-        }
-        GraphSearch astar = new GraphSearch(this);
-        //astar.runAStar();
-        throw new RuntimeException("Not implemented");
-//        return astar;
+    public int[] getMostSupported() {
+        DijkstraSearch search = new DijkstraSearch(this);
+        return search.getOnePath();
     }
 
     /** Variable to hold search depths for getDepths */
@@ -326,9 +318,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      */
     public static POGraph createFromEdgeMap(int nPos, EdgeMap emap) {
         POGraph pog = null;
-        // FIXME: look into the "tidy" scheme, not working with BEML/grasp.aln, ancestor 3
-        boolean tidy = false; // treat reciprocated edges as definitive, and non-reciprocated as optional
-
+        boolean tidy = false; // DON'T USE: treat reciprocated edges as definitive, and non-reciprocated as optional
+        // FIXME: look into the "tidy" scheme, not working with BEML/grasp.aln, ancestor 3; depends on order of nodes added
+        // a fix may require checking if full paths are formed BEFORE adding nodes that otherwise would be redundant
         if (tidy) {
             pog = new POGraph(nPos);
             Set<POGEdge> optional = new HashSet<>();
@@ -624,6 +616,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             return reciprocated;
         }
         public void setWeight(int weight) {
+            this.weight = weight;
+        }
+        public void setWeight(double weight) {
             this.weight = weight;
         }
         @Override

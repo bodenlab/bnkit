@@ -5,15 +5,13 @@ import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.GLOOME1;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
+import dat.EnumSeq;
 import dat.Enumerable;
 import dat.Interval1D;
 import dat.phylo.IdxTree;
 import dat.phylo.TreeDecor;
 import dat.phylo.TreeInstance;
-import dat.pog.EdgeMap;
-import dat.pog.Node;
-import dat.pog.POGTree;
-import dat.pog.POGraph;
+import dat.pog.*;
 
 import java.util.*;
 
@@ -204,7 +202,7 @@ public class Prediction {
      * @param MODEL the substitution model
      * @return
      */
-    public EnumDistrib[] getMarginal(int ancestorID, SubstModel MODEL) {
+    public EnumDistrib[] getMarginal(Object ancestorID, SubstModel MODEL) {
         int bpidx = getBranchpointIndex(ancestorID);                            // the index of the ancestor as it appears in the phylogenetic tree
         if (bpidx == -1)
             throw new ASRRuntimeException("Invalid ancestor ID (not found in tree) " + ancestorID);
@@ -267,27 +265,89 @@ public class Prediction {
      * @param MODEL evolutionary model
      * @return the states at the ancestor (together with all the others) that assign the greatest likelihood to the observed states at extant sequences
      */
-    public Object[] getJoint(int ancestorID, SubstModel MODEL) {
+    public Object[] getJoint(Object ancestorID, SubstModel MODEL) {
         if (states == null)   // the ancestors has not yet been inferred
             getJoint(MODEL);
-        int idx = pogTree.getTree().getIndex(ancestorID);
-        return states[idx];
+        int bpidx = getBranchpointIndex(ancestorID);                            // the index of the ancestor as it appears in the phylogenetic tree
+        if (bpidx == -1)
+            throw new ASRRuntimeException("Invalid ancestor ID (not found in tree) " + ancestorID);
+        return states[bpidx];
     }
 
-
-    public int[] getConsensus(int ancID) {
+    /**
+     * Retrieve the inferred ancestor but as a sequence; requires that it has been inferred already
+     * @param ancID ancestor ID
+     * @param mode inference mode, currently JOINT and MARGINAL are supported (see enum defined in GRASP class)
+     * @param gappy whether gaps should be included (as they appear from the POG index)
+     * @return the sequence
+     */
+    public EnumSeq getSequence(Object ancID, GRASP.Inference mode, boolean gappy) {
         int bpidx = getBranchpointIndex(ancID);                            // the index of the ancestor as it appears in the phylogenetic tree
         if (bpidx == -1)
             throw new ASRRuntimeException("Invalid ancestor ID: " + ancID);
+        int[] idxs = getConsensus(bpidx);
+        int N = getPositions();
+        Object[] elems = new Object[gappy ? N : idxs.length];
+        EnumSeq seq = gappy ? new EnumSeq.Gappy(pogTree.getDomain()) : new EnumSeq(pogTree.getDomain());
+        if (mode == GRASP.Inference.JOINT) {
+            if (states == null) // not inferred yet
+                throw new ASRRuntimeException("Joint inference has not been performed: " + ancID);
+            for (int i = 0; i < idxs.length; i ++)
+                elems[gappy ? idxs[i] : i] = states[bpidx][idxs[i]];
+        } else if (mode == GRASP.Inference.MARGINAL) {
+            if (distribs[bpidx] == null) // not inferred yet
+                throw new ASRRuntimeException("Marginal inference has not been performed: " + ancID);
+            for (int i = 0; i < idxs.length; i ++)
+                elems[gappy ? idxs[i] : i] = distribs[bpidx][idxs[i]].getMax();
+        }
+        seq.set(elems);
+        seq.setName(ancID.toString());
+        return seq;
+    }
+
+    public int[] getConsensus(Object ancID) {
+        int bpidx = getBranchpointIndex(ancID);                            // the index of the ancestor as it appears in the phylogenetic tree
+        if (bpidx == -1)
+            throw new ASRRuntimeException("Invalid ancestor ID: " + ancID);
+        return getConsensus(bpidx);
+    }
+
+    public int[] getConsensus(int bpidx) {
         POGraph pog = this.ancarr[bpidx];
         if (pog == null)
-            throw new ASRRuntimeException("Ancestor has not been inferred: " + ancID);
+            throw new ASRRuntimeException("Ancestor has not been inferred: index is " + bpidx);
         // collect info to make decisions...
-        int[] depths = pog.getDepths(true); // determine the search depths/distances to the end terminal
-
-        // incorporate this info before performing search
-
-        throw new RuntimeException("Not implemented");
+        int[] leaves = phylotree.getLeaves(bpidx); // determine all branch points of leaves (i.e. extants) under this ancestor
+        // go through POG nodes, to determine the transition "weights"
+        PriorityQueue<Integer> queue = new PriorityQueue<>();
+        for (int idx : pog.getForward()) // to start us off: add all indices emanating from start
+            queue.add(idx);
+        // iterate through a queue, to which nodes are added if linked from "current" node
+        while (queue.size() > 0) { // until empty...
+            int curr = queue.poll();
+            int[] nexts = pog.getForward(curr);
+            if (pog.isEndNode(curr)) { // check if next node can be terminal
+                // if so, add to nexts
+                int[] nnexts = nexts;
+                nexts = new int[nnexts.length + 1];
+                for (int i = 0; i < nnexts.length; i ++)
+                    nexts[i] = nnexts[i];
+                nexts[nnexts.length] = pog.size(); // add the end terminus
+            }
+            double[] rates = pogTree.getEdgeRates(curr, nexts, leaves);
+            // set the weights
+            for (int i = 0; i < nexts.length; i ++) {
+                POGraph.StatusEdge edge = pog.getEdge(curr, nexts[i]);
+                edge.setWeight(-Math.log(rates[i])); // neg log of prob; so P=1 means zero weight, low P means high weight
+            }
+            // add indices of all nodes that can be visited next
+            for (int idx : nexts)
+                if (idx != pog.maxsize())
+                    queue.add(idx);
+        }
+        // with weights set, we find the optimal path (pick one if several; else need to query individual edges and assemble)
+        int[] consensus = pog.getMostSupported();
+        return consensus;
     }
 
     /**

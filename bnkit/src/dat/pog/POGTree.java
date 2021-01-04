@@ -40,7 +40,6 @@ public class POGTree {
      */
     public POGTree(dat.EnumSeq.Alignment<Enumerable> aln, IdxTree tree) {
         this.phylotree = tree;
-        //this.extants = new HashMap<>();
         this.id2bpidx = new HashMap<>();
         this.extarr = new POGraph[tree.getSize()]; // store extant POGs in array, indexed by branchpoint index
         this.domain = aln.getDomain();
@@ -49,7 +48,6 @@ public class POGTree {
         for (int j = 0; j < aln.getHeight(); j++) {
             EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(j);
             POGraph pog = new POGraph(aln.getWidth());
-            //extants.put(gseq.getName(), pog);
             int bpidx = tree.getIndex(gseq.getName());
             extarr[bpidx] = pog;
             id2bpidx.put(gseq.getName(), bpidx);
@@ -62,23 +60,33 @@ public class POGTree {
                     to = i;
                     pog.addNode(to, new SymNode(syms[i]));
                     pog.addEdge(from, to);
-//                    ivals.put(new Interval1D(from, to), gseq.getName());
                     ivals.put(new Interval1D(from, to), bpidx);
                 } else {
                     from = to;
                     to = i;
                     pog.addNode(to, new SymNode(syms[i]));
                     pog.addEdge(from, to);
-//                    ivals.put(new Interval1D(from, to), gseq.getName());
                     ivals.put(new Interval1D(from, to), bpidx);
                 }
             }
             from = to;
             to = pog.maxsize();
             pog.addEdge(from, to);
-//            ivals.put(new Interval1D(from, to), gseq.getName());
             ivals.put(new Interval1D(from, to), bpidx);
         }
+    }
+
+    /**
+     * Construct a POGTree from a collection of POGs, represented by a map keyed by sequence name,
+     * to match 1-1 against nodes in a phylogenetic tree.
+     *
+     * @param extants
+     * @param tree
+     */
+    public POGTree(Map<String, POGraph> extants, IdxTree tree) {
+        this.phylotree = tree;
+
+        throw new RuntimeException("Not implemented");
     }
 
     /**
@@ -119,6 +127,16 @@ public class POGTree {
     }
 
     /**
+     * Get the POG for a given extant sequence by its label
+     * @param id sequence name
+     * @return the POG
+     */
+    public POGraph getExtant(Object id) {
+        int bpidx = id2bpidx.get(id);
+        return bpidx != -1 ? extarr[bpidx] : null;
+    }
+
+    /**
      * Get the index of the branchpoint that this extant sequence is placed
      * @param name name of extant sequence
      * @return the index in the tree, which is the leaf node with the named sequence
@@ -145,16 +163,74 @@ public class POGTree {
     }
 
     /**
-     * Construct a POGTree from a collection of POGs, represented by a map keyed by sequence name,
-     * to match 1-1 against nodes in a phylogenetic tree.
-     *
-     * @param extants
-     * @param tree
+     * Determine a conditional probability for each nominated target transition from a given source node in a POG,
+     * based on a nominated set of extant sequences.
+     * @param from source node index in POG
+     * @param targets target node indices in POG
+     * @param extants the sequences on which the calculation is based, indexed by branch point
+     * @return
      */
-    public POGTree(Map<String, POGraph> extants, IdxTree tree) {
-        this.phylotree = tree;
+    public double[] getEdgeRates(int from, int[] targets, int[] extants) {
+        double[] rates = new double[targets.length];
+        double denom = 0;
+        for (int subidx : extants) {
+            if (phylotree.isLeaf(subidx)) {
+                int len = extarr[subidx].size();
+                denom += len; // normalisation factor
+                for (int i = 0; i <targets.length; i ++) {
+                    int to = targets[i];
+                    if (extarr[subidx].isEdge(from, to)) {
+                        rates[i] += len; // count each extant in proportion to its length
+                    }
+                }
+            }
+        }
+        // Above: count each sequence making a given jump, based on its length: longer sequences have greater weight
+        // Below: normalise the count, based on the overall sequence lengths
+        for (int i = 0; i <targets.length; i ++)
+            rates[i] /= denom; // normalise counts
+        return rates;
+    }
 
-        throw new RuntimeException("Not implemented");
+    /**
+     * Retrieve the indices of all extants that have a given edge
+     * @param from  source node for edge
+     * @param to target node for edge
+     * @return indices of extants that match
+     */
+    public int[] getExtantsWithEdge(int from, int to) {
+        int[] subtree = phylotree.getLeaves();
+        Set<Integer> matched = new HashSet<>();
+        for (int subidx : subtree) {
+            if (extarr[subidx].isEdge(from, to))
+                matched.add(subidx);
+        }
+        int[] arr = new int[matched.size()];
+        int i = 0;
+        for (int y : matched) arr[i ++] = y;
+        return arr;
+    }
+
+    /**
+     * Retrieve the indices of all extants under the given branch point index that have a given edge
+     * @param from  source node for edge
+     * @param to target node for edge
+     * @param bpidx the branch point of the subtree under which extants are checked
+     * @return indices of extants that match
+     */
+    public int[] getExtantsWithEdge(int from, int to, int bpidx) {
+        Set<Integer> subtree = phylotree.getSubtreeIndices(bpidx);
+        Set<Integer> matched = new HashSet<>();
+        for (int subidx : subtree) {
+            if (phylotree.isLeaf(subidx)) {
+                if (extarr[subidx].isEdge(from, to))
+                    matched.add(subidx);
+            }
+        }
+        int[] arr = new int[matched.size()];
+        int i = 0;
+        for (int y : matched) arr[i ++] = y;
+        return arr;
     }
 
     /**
@@ -334,16 +410,6 @@ public class POGTree {
                 instarr[i] = pog.getSimpleGapCode(indel.min, indel.max);
         }
         return new TreeInstance(phylotree, instarr);
-    }
-
-    /**
-     * Get the POG for a given extant sequence by its label
-     * @param id sequence name
-     * @return the POG
-     */
-    public POGraph getExtant(Object id) {
-        int bpidx = id2bpidx.get(id);
-        return bpidx != -1 ? extarr[bpidx] : null;
     }
 
     public static void main(String[] args) {
