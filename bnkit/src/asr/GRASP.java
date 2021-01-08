@@ -21,8 +21,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "0104.2021";
+    public static String VERSION = "0105.2021";
     public static boolean VERBOSE = false;
+    public static boolean TIME = false;
+    public static int NTHREADS = 1;
+
     public enum Inference {
         JOINT,
         MARGINAL
@@ -46,7 +49,7 @@ public class GRASP {
                 "\t{-gap}\n" +
                 "\t{-savetree <tree-file>}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT>}\n" +
-                "\t{-verbose}{-help}");
+                "\t{-time}{-verbose}{-help}");
         out.println("where \n" +
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
@@ -55,7 +58,7 @@ public class GRASP {
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
                 "\tThe output file is written on the specified format\n" +
-                "\t-verbose will print out information about steps undertaken, and the time it took to finish");
+                "\t-verbose will print out information about steps undertaken, and -time the time it took to finish");
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
                 "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman; \n" +
@@ -86,7 +89,6 @@ public class GRASP {
         // To compute consensus path is determined by output format
         boolean[] CONSENSUS = new boolean[] {true, false, true, false};
 
-        int NTHREADS = 1;
         Inference MODE = Inference.JOINT;
         Integer MARG_NODE = null;
         String SAVE_TREE = null;
@@ -108,6 +110,8 @@ public class GRASP {
                     GAPPY = true;
                 } else if (arg.equalsIgnoreCase("verbose")) {
                     VERBOSE = true;
+                } else if (arg.equalsIgnoreCase("time")) {
+                    TIME = true;
                 } else if (arg.equalsIgnoreCase("savetree") && args.length > a + 1) {
                     SAVE_TREE = args[++a];
                 } else if (arg.equalsIgnoreCase("marg") && args.length > a + 1) {
@@ -262,7 +266,7 @@ public class GRASP {
                     Newick.save(tree, SAVE_TREE, Newick.MODE_ANCESTOR);
 
                 ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
-                if (VERBOSE) {
+                if (VERBOSE || TIME) {
                     System.out.println(String.format("Done in %d min, %d sec", TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME),
                             TimeUnit.MILLISECONDS.toSeconds(ELAPSED_TIME) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME))));
                 }

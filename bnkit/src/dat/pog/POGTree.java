@@ -172,7 +172,8 @@ public class POGTree {
      */
     public double[] getEdgeRates(int from, int[] targets, int[] extants) {
         double[] rates = new double[targets.length];
-        double denom = 0;
+        Arrays.fill(rates, 1); // pseudo count
+        double denom = targets.length; // consider pseudo count
         for (int subidx : extants) {
             if (phylotree.isLeaf(subidx)) {
                 int len = extarr[subidx].size();
@@ -323,16 +324,18 @@ public class POGTree {
      *
      * @param index index of column of alignment, or position in POG
      * @param tree        tree that specifies the relationship between leaf nodes; note that the original tree in the POGTree is overridden
+     * @param idxmap  map gloabl branch point index to position-specific branch point index
      * @return a tree instance with states set according to extant sequences' character states
      */
-    public TreeInstance getNodeInstance(int index, IdxTree tree) {
+    public TreeInstance getNodeInstance(int index, IdxTree tree, int[] idxmap) {
         Object[] instarr = new Object[tree.getSize()];
-        for (int i : getLeafIndices()) {
+        int[] leaves = getLeafIndices();
+        for (int i : leaves) {
             POGraph pog = extarr[i];
             if (pog != null) {
                 SymNode node = (SymNode) pog.getNode(index);
                 if (node != null)
-                    instarr[i] = node.get();
+                    instarr[idxmap[i]] = node.get();
             }
         }
         return new TreeInstance(tree, instarr);

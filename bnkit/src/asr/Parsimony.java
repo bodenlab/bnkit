@@ -15,6 +15,10 @@ import java.util.Random;
  */
 public class Parsimony implements TreeDecor<List> {
 
+    // TODO: re-write the constructor and decorate so that the tree instance is passed per TreeDecor,
+    //  which in turn means that multi-threading can be implemented easily.
+    // TODO: implement multi-threading in Prediction for INDEL inference
+
     private final TreeInstance treeInstance;
     private final double[][] scores;        // [node idx][parent value] the optimal score for each parent value
     private final int[][][][] traceback;    // [node idx][parent value][child branch][best child value/s: 0, 1, 2, ...] = optimal child state,

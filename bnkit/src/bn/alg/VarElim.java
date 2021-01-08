@@ -19,6 +19,7 @@ package bn.alg;
 
 import bn.BNet;
 import bn.BNode;
+import bn.ctmc.SubstNode;
 import dat.EnumVariable;
 import bn.factor.Factor;
 import bn.JPT;
@@ -26,13 +27,9 @@ import dat.Variable;
 import bn.factor.AbstractFactor;
 import bn.factor.Factorize;
 import bn.factor.Factorize.FactorProductTree;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Exact inference in Bayesian network by variable elimination, more
@@ -197,12 +194,15 @@ public class VarElim implements Inference {
             } catch (ClassCastException e) {
                 ;
             }
-        }        
+        }
         int nBuckets = buckets.size();
+
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
-        for (Variable var : q.getRelevant().keySet()) {
+        Map<Variable, Object> relmap = q.getRelevant();
+        for (Variable var : relmap.keySet()) {
             BNode node = bn.getNode(var);
-            AbstractFactor ft = node.makeDenseFactor(q.getRelevant()); // forces new makeFactor method to be used on only relevant nodes
+            // next call is causing delays with threading
+            AbstractFactor ft = node.makeDenseFactor(relmap); // forces new makeFactor method to be used on only relevant nodes
             boolean added = false;
             if (!ft.hasEnumVars()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
                 buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
@@ -210,7 +210,8 @@ public class VarElim implements Inference {
                 continue;
             }
             // go through buckets in reverse order, choosing the first (from end) which "matches" the variables of the FT
-            for (int i = nBuckets - 1; i >= 0 && !added; i--) { 
+            long START_TIME2 = System.currentTimeMillis();
+            for (int i = nBuckets - 1; i >= 0 && !added; i--) {
                 Bucket b = buckets.get(i);
                 if (b.match(ft)) {
                     b.put(ft);
@@ -218,7 +219,7 @@ public class VarElim implements Inference {
                     break;
                 }
             }
-            if (!added) { // if not added as per sum-out variable 
+            if (!added) { // if not added as per sum-out variable
                 // FT is somehow corrupt, e.g. no variables
                 throw new VarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
             }

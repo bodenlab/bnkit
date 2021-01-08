@@ -376,7 +376,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             for (int idx : edge)
                 if (!(idx == -1 || idx == pog.nNodes || pog.isNode(idx)))
                     pog.addNode(idx, new StatusNode());
-            pog.addEdge(edge[0], edge[1]);
+            pog.addEdge(edge[0], edge[1], new StatusEdge(true));
         }
         // find and cripple precluded paths, for each definite edge
         for (int[] edge : definitive) {

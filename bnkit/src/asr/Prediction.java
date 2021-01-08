@@ -1,12 +1,10 @@
 package asr;
 
-import bn.Distrib;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.GLOOME1;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
-import dat.Enumerable;
 import dat.Interval1D;
 import dat.phylo.IdxTree;
 import dat.phylo.TreeDecor;
@@ -14,6 +12,7 @@ import dat.phylo.TreeInstance;
 import dat.pog.*;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Container class for
@@ -214,29 +213,34 @@ public class Prediction {
             throw new ASRRuntimeException("Invalid ancestor ID (not found in tree) " + ancestorID);
         if (distribs[bpidx] == null) {                                          // the ancestor has not yet been inferred, so DO it...
             IdxTree[] trees = new IdxTree[getPositions()];                      // this is how many position-specific trees we are dealing with
-//            MaxLhood.Marginal[] inf = new MaxLhood.Marginal[getPositions()];    // which is also how many inferences we will carry out
             // FIXME: create an index map for "inf" to enable generics <EnumDistrib>?
             TreeDecor[] inf = new TreeDecor[getPositions()];    // which is also how many inferences we will carry out
-            ThreadedDecorators threadpool = new ThreadedDecorators(NTHREADS);
             for (int pos = 0; pos < getPositions(); pos ++) {                   // for each position...
                 trees[pos] = getTree(pos);                                      //   this is the tree with indels imputed
                 int ancidx = positidxs[pos][bpidx];                             //   index for sought ancestor in the position-specific tree
                 if (ancidx >= 0)                                                //   which may not exist, i.e. part of an indel, but if it is real...
-                    inf[pos] = threadpool.addDecorator(new MaxLhood.Marginal(ancidx, trees[pos], MODEL));//     set-up the inference
+                    inf[pos] = new MaxLhoodMarginal(ancidx, trees[pos], MODEL);//     set-up the inference
             }
+
             distribs[bpidx] = new EnumDistrib[pogTree.getPositions()];
+            TreeInstance[] tis = new TreeInstance[pogTree.getPositions()];
             for (int pos = 0; pos < getPositions(); pos ++) {                   // for each position...
                 int specidx = positidxs[pos][bpidx];                            //   index for sought ancestor in the position-specific tree
                 if (specidx >= 0) {                                             //   which may not exist, i.e. part of an indel, but if it is real...
-                    TreeInstance ti = pogTree.getNodeInstance(pos, trees[pos]); //     get the instances at the leaves at that position, and...
-                    inf[pos].decorate(ti);                                      //     perform inference
+                    tis[pos] = pogTree.getNodeInstance(pos, trees[pos], positidxs[pos]); //     get the instances at the leaves at that position, and...
                 }
             }
-            for (int pos = 0; pos < getPositions(); pos ++) {                   // for each position...
-                int specidx = positidxs[pos][bpidx];                            //   index for sought ancestor in the position-specific tree
-                if (specidx >= 0) {                                             //   which may not exist, i.e. part of an indel, but if it is real...
-                    distribs[bpidx][pos] = (EnumDistrib)inf[pos].getDecoration(specidx);     //     extract distribution of marginal prob
+            ThreadedDecorators threadpool = new ThreadedDecorators(inf, tis, GRASP.NTHREADS);
+            try {
+                Map<Integer, TreeDecor> ret = threadpool.runBatch();
+                for (int pos = 0; pos < getPositions(); pos ++) {                   // for each position...
+                    int specidx = positidxs[pos][bpidx];                            //   index for sought ancestor in the position-specific tree
+                    if (specidx >= 0) {                                             //   which may not exist, i.e. part of an indel, but if it is real...
+                        distribs[bpidx][pos] = (EnumDistrib)ret.get(pos).getDecoration(specidx);     //     extract distribution of marginal prob
+                    }
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
         // at this point we know the ancestor has been inferred
@@ -249,26 +253,32 @@ public class Prediction {
      * @return the states at all ancestors that assign the greatest likelihood to the observed states at extant sequences
      */
     public Object[][] getJoint(SubstModel MODEL) {
+
         this.states = new Object[getTree().getSize()][getPositions()];
         IdxTree[] trees = new IdxTree[getPositions()];              // this is how many position-specific trees we are dealing with
         // FIXME: create an index map for "inf" to enable generics <EnumDistrib>?
         TreeDecor[] inf = new TreeDecor[getPositions()];  // which is also how many inferences we will carry out
-        ThreadedDecorators threadpool = new ThreadedDecorators(NTHREADS);
         for (int pos = 0; pos < inf.length; pos++) {                // for each position...
             trees[pos] = getTree(pos);                              //   this is the tree with indels imputed
-            inf[pos] = threadpool.addDecorator(new MaxLhood.Joint(trees[pos], MODEL));       //     set-up the inference
+            inf[pos] = new MaxLhoodJoint(trees[pos], MODEL);       //     set-up the inference
         }
-        for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
-            TreeInstance ti = pogTree.getNodeInstance(pos, trees[pos]); //     get the instances at the leaves at that position, and...
-            inf[pos].decorate(ti);                                      //     perform inference
+        TreeInstance[] tis = new TreeInstance[getPositions()];
+        for (int pos = 0; pos < getPositions(); pos ++) {        // for each position...
+            tis[pos] = pogTree.getNodeInstance(pos, trees[pos], positidxs[pos]); // get the instances at the leaves at that position, and...
         }
-        for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
-            for (int idx : getAncestorIndices()) {
-                int ancidx = positidxs[pos][idx];                   //   index for sought ancestor in the position-specific tree
-                if (ancidx >= 0)                                  //   which may not exist, i.e. part of an indel, but if it is real...
-                    states[idx][pos] = inf[pos].getDecoration(ancidx);          //     extract state
+        ThreadedDecorators threadpool = new ThreadedDecorators(inf, tis, GRASP.NTHREADS);
+        try {
+            Map<Integer, TreeDecor> ret = threadpool.runBatch();for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
+                for (int idx : getAncestorIndices()) {
+                    int ancidx = positidxs[pos][idx];                   //   index for sought ancestor in the position-specific tree
+                    if (ancidx >= 0)                                  //   which may not exist, i.e. part of an indel, but if it is real...
+                        states[idx][pos] = ret.get(pos).getDecoration(ancidx);          //     extract state
+                }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+
         return states;
     }
 
@@ -290,7 +300,7 @@ public class Prediction {
 
     /**
      * Retrieve the inferred ancestor but as a sequence; requires that it has been inferred already
-     * @param ancID ancestor ID
+     * @param ancID ancestor ID (as named internally in GRASP, e.g. "3" for "N3" which then links to a specific branch point index, say 5
      * @param mode inference mode, currently JOINT and MARGINAL are supported (see enum defined in GRASP class)
      * @param gappy whether gaps should be included (as they appear from the POG index)
      * @return the sequence
@@ -300,6 +310,8 @@ public class Prediction {
         if (bpidx == -1)
             throw new ASRRuntimeException("Invalid ancestor ID: " + ancID);
         int[] idxs = getConsensus(bpidx);
+        if (idxs == null)
+            throw new ASRRuntimeException("Failed to find optimal path for ancestor ID: " + ancID);
         int N = getPositions();
         Object[] elems = new Object[gappy ? N : idxs.length];
         EnumSeq seq = gappy ? new EnumSeq.Gappy(pogTree.getDomain()) : new EnumSeq(pogTree.getDomain());
@@ -315,7 +327,8 @@ public class Prediction {
                 elems[gappy ? idxs[i] : i] = distribs[bpidx][idxs[i]].getMax();
         }
         seq.set(elems);
-        seq.setName(ancID.toString());
+        String name = ancID.toString().startsWith("N") ? ancID.toString() : "N" + ancID.toString();
+        seq.setName(name); // FIXME: internal label is here re-named to have an "N" in-front: make naming strategy more principled?
         return seq;
     }
 
@@ -334,8 +347,11 @@ public class Prediction {
         int[] leaves = phylotree.getLeaves(bpidx); // determine all branch points of leaves (i.e. extants) under this ancestor
         // go through POG nodes, to determine the transition "weights"
         PriorityQueue<Integer> queue = new PriorityQueue<>();
-        for (int idx : pog.getForward()) // to start us off: add all indices emanating from start
+        Set<Integer> visiting = new HashSet<>();
+        for (int idx : pog.getForward()) { // to start us off: add all indices emanating from start
             queue.add(idx);
+            visiting.add(idx);
+        }
         // iterate through a queue, to which nodes are added if linked from "current" node
         while (queue.size() > 0) { // until empty...
             int curr = queue.poll();
@@ -346,18 +362,28 @@ public class Prediction {
                 nexts = new int[nnexts.length + 1];
                 for (int i = 0; i < nnexts.length; i ++)
                     nexts[i] = nnexts[i];
-                nexts[nnexts.length] = pog.size(); // add the end terminus
+                nexts[nnexts.length] = pog.maxsize(); // add the end terminus
             }
             double[] rates = pogTree.getEdgeRates(curr, nexts, leaves);
             // set the weights
             for (int i = 0; i < nexts.length; i ++) {
                 POGraph.StatusEdge edge = pog.getEdge(curr, nexts[i]);
-                edge.setWeight(-Math.log(rates[i])); // neg log of prob; so P=1 means zero weight, low P means high weight
+                if (edge != null) {
+                    double w = -Math.log(rates[i]);
+                    if (w > 10000)
+                        System.out.println("Weight is " + w + " = log(" + rates[i]);
+                    edge.setWeight(w > 10000 ? 10000 : w); // neg log of prob; so P=1 means zero weight, low P means high weight
+                } else {
+                    throw new ASRRuntimeException("Invalid POG with missing edge: " + pog.getName() + " edge=" + curr + "-" +nexts[i]);
+                }
             }
             // add indices of all nodes that can be visited next
-            for (int idx : nexts)
-                if (idx != pog.maxsize())
+            for (int idx : nexts) {
+                if (idx != pog.maxsize() && !visiting.contains(idx)) {
                     queue.add(idx);
+                    visiting.add(idx);
+                }
+            }
         }
         // with weights set, we find the optimal path (pick one if several; else need to query individual edges and assemble)
         int[] consensus = pog.getMostSupported();
@@ -588,9 +614,9 @@ public class Prediction {
         // that are inferred to be non-gapped with a probability 􏰀0.5."
         // To do this would require a switch to marginal inference, then thresholding for 0.5.
         TreeInstance[] ti = pogTree.getIndelInstances(); // instantiate a tree for each "indel", assigning leaf states as per extants
-        MaxLhood.Joint[] ji = new MaxLhood.Joint[ti.length];
+        MaxLhoodJoint[] ji = new MaxLhoodJoint[ti.length];
         for (int i = 0; i < ji.length; i++) // for each "indel" we need to infer either gain or loss, so set-up inference
-            ji[i] = new MaxLhood.Joint(tree, gain_loss_model);
+            ji[i] = new MaxLhoodJoint(tree, gain_loss_model);
         // Below is where the main inference occurs
         // this stage should be multi-threaded... not so at the moment
         for (int i = 0; i < ti.length; i++) { // for each "indel"
@@ -769,7 +795,7 @@ public class Prediction {
                 jif[i] = new TreeInstance.BlanketTreeDecor(tif[i].getSize(), possible[0]);
             } else {
                 SubstModel substmodel = new JC(1, possible); // need to know the alphabet...
-                jif[i] = new MaxLhood.Joint(tree, substmodel);
+                jif[i] = new MaxLhoodJoint(tree, substmodel);
             }
         }
         for (int i = 0; i < jib.length; i++) {
@@ -780,18 +806,17 @@ public class Prediction {
                 jib[i] = new TreeInstance.BlanketTreeDecor(tib[i].getSize(), possible[0]);
             } else {
                 SubstModel substmodel = new JC(1, possible); // need to know the alphabet...
-                jib[i] = new MaxLhood.Joint(tree, substmodel);
+                jib[i] = new MaxLhoodJoint(tree, substmodel);
             }
         }
+        ThreadedDecorators fpool = new ThreadedDecorators(jif, tif, GRASP.NTHREADS / 2);
+        ThreadedDecorators bpool = new ThreadedDecorators(jib, tib, GRASP.NTHREADS / 2);
         // Below is where the main inference occurs
-        // this stage should be multi-threaded... not so at the moment
-        for (int i = 0; i < tif.length; i++) {
-            if (jif[i] != null)
-                jif[i].decorate(tif[i]);
-        }
-        for (int i = 0; i < tib.length; i++) {
-            if (jib[i] != null)
-                jib[i].decorate(tib[i]);
+        try {
+            Map<Integer, TreeDecor> fret = fpool.runBatch();
+            Map<Integer, TreeDecor> bret = bpool.runBatch();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         // inference done, now assemble...
         for (int j = 0; j < tree.getSize(); j++) { // we look at each branchpoint, corresponding to either an extant or ancestor sequence

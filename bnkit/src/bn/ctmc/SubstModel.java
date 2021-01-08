@@ -25,9 +25,17 @@ import dat.Enumerable;
 import bn.ctmc.matrix.*;
 import bn.math.Matrix.Exp;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
- *
+ * Conditional probability table for CTMC based on discrete alphabets
  * @author mikael
+ *
+ * TODO: optimise the access to conditional probabilities @ time,
+ * thread-aware cache and possibly compromise on precision; also be mindful of alphabet size.
+ * ALternatively, clone the model for each node.
+ *
  */
 public abstract class SubstModel {
     
@@ -151,6 +159,30 @@ public abstract class SubstModel {
     private double time = 0.0;
     // private boolean updateRequired = true;
 
+    // To speed up calculation, store recent probability matrices
+    private Map<Double, double[][]> probscache = new HashMap<>();
+
+    // size of cache
+    public int CACHE_SIZE = 10000;
+
+    /**
+     * Set another cached prob matrix
+     */
+    private void setCache(double time, double[][] p) {
+        if (probscache.size() < CACHE_SIZE)
+            probscache.put(time, p);
+    }
+
+    private double[][] getCache(double time) {
+        double[][] p = probscache.get(time);
+        if (p == null) {
+            synchronized (this) {
+               p = getProbs(time);
+               setCache(time, p);
+            }
+        }
+        return p;
+    }
     /**
      * Get conditional probability P(X=x|Y=y,time)
      * @param X
@@ -160,7 +192,7 @@ public abstract class SubstModel {
      */
     public double getProb(Object X, Object Y, double time) {
         if (this.time != time || probs == null) // only re-compute matrix if time has changed
-            probs = getProbs(time);
+            probs = getCache(time);
         int index_X = alpha.getIndex(X);
         int index_Y = alpha.getIndex(Y);
         return probs[index_Y][index_X];
@@ -188,7 +220,7 @@ public abstract class SubstModel {
     
     public EnumDistrib getDistrib(Object Y, double time) {
         if (this.time != time || probs == null || table == null) { // only re-compute matrix if time has changed
-            probs = getProbs(time);
+            probs = getCache(time);
             table = new EnumTable<>(new EnumVariable(alpha), new EnumVariable(alpha));
             for (int i = 0; i < probs.length; i ++) {
                 EnumDistrib d = new EnumDistrib(alpha, probs[i]);
