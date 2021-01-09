@@ -39,16 +39,19 @@ import java.util.*;
  * @author mikael
  *
  * TODO: create a "final" probs matrix, remove ref to subst model (as it is shared between nodes, and therefore not thread safe)
+ * This will essentially make this class into a CPT
  */
 public class SubstNode implements BNode, TiedNode {
     
     private final EnumVariable var;
     private final EnumVariable parent;
     private final List<EnumVariable> parentAsList;
+    protected final EnumTable<EnumDistrib> table; // table of (enumerable) probability distributions
+    private final double[][] probs;
+    private final EnumDistrib prior; // one (enumerable) probability distribution that is used if this variable is NOT conditioned
+
     private SubstModel model;
     private final Enumerable alpha;
-    private final double[][] probs; // cond probs
-    private final double[] f; // char frequencies
     private final Object[] values;
     private boolean gap;
 
@@ -67,14 +70,18 @@ public class SubstNode implements BNode, TiedNode {
      */
     public SubstNode(EnumVariable var, EnumVariable parent, SubstModel model, double t) {
         this.var = var;
-        this.values = var.getDomain().getValues();
         this.parent = parent;
         this.parentAsList = Collections.singletonList(parent);
         this.time = t;
         this.model = model;
         this.alpha = model.getDomain();
+        this.values = this.alpha.getValues();
+        this.table = new EnumTable<>(parent);
         this.probs = model.getProbs(t);
-        this.f = null; // this is a cond prob
+        for (int i = 0; i < this.values.length; i ++) {
+            table.setValue(i, new EnumDistrib(this.alpha, probs[i]));
+        }
+        this.prior = null; // this is a cond prob
     }
 
     /**
@@ -85,11 +92,12 @@ public class SubstNode implements BNode, TiedNode {
      */
     public SubstNode(EnumVariable var, SubstModel model) {
         this.var = var;
-        this.values = var.getDomain().getValues();
         this.model = model;
         this.alpha = model.getDomain();
+        this.values = this.alpha.getValues();
+        this.table = null;
         this.probs = null;
-        this.f = model.F;
+        this.prior = new EnumDistrib(var.getDomain(), model.F);
         this.parent = null; // this is a root node
         this.parentAsList = null;
         this.time = 0;
@@ -124,7 +132,8 @@ public class SubstNode implements BNode, TiedNode {
     public double getProb(Object X, Object Y) {
         int index_X = alpha.getIndex(X);
         int index_Y = alpha.getIndex(Y);
-        return probs[index_Y][index_X];
+        //return probs[index_Y][index_X];
+        return this.table.getValue(index_X).get(index_Y);
     }
 
     /**
@@ -134,7 +143,8 @@ public class SubstNode implements BNode, TiedNode {
      */
     public double getProb(Object X) {
         int index_X = alpha.getIndex(X);
-        return f[index_X];
+        //return f[index_X];
+        return this.prior.get(index_X);
     }
 
     /**
@@ -147,9 +157,10 @@ public class SubstNode implements BNode, TiedNode {
     public Double get(Object[] key, Object value) {
         if (key != null) {
             if (key.length == 1) {
-                Object Y = key[0];
-                Object X = value;
-                return getProb(X, Y);
+                return table.getValue(key).get(value);
+                //Object Y = key[0];
+                //Object X = value;
+                //return getProb(X, Y);
             }
         }
         throw new RuntimeException("Invalid key: " + key);
@@ -162,7 +173,8 @@ public class SubstNode implements BNode, TiedNode {
 
     @Override
     public Double get(Object value) {
-        return getProb(value);
+        return this.prior.get(value);
+        //return getProb(value);
     }
 
     @Override
@@ -198,17 +210,42 @@ public class SubstNode implements BNode, TiedNode {
      * @return
      * @deprecated pog2020 -- remove all refs to model to make thread safe
      */
+    /*   @Override
+    public Distrib getDistrib(Object[] condition) {
+        //return model.getDistrib(condition[0], time);
+        probs.
+        return getget(key[0]);
+    }
+    */
+    /**
+     * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
+     * Requires all parent nodes to be instantiated.
+     * @param key the parent values
+     * @return the distribution of the variable for this node
+     */
     @Override
     public Distrib getDistrib(Object[] key) {
-        return model.getDistrib(key[0], time);
+        if (this.table == null || key == null)
+            return this.getDistrib();
+        try {
+            return this.table.getValue(key);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("Evaluation of SubstNode " + this.toString() + " failed since condition was not fully specified: " + e.getMessage());
+        }
     }
 
+    /*
     @Override
     public Distrib getDistrib() {
         EnumDistrib d = new EnumDistrib(var.getDomain()); 
-        for (Object y : d.getDomain().getValues())
-            d.set(y, model.getProb(y));
+        for (Object x : d.getDomain().getValues())
+            d.set(x, getProb(x));
         return d;
+    }
+    */
+    @Override
+    public EnumDistrib getDistrib() {
+        return prior;
     }
 
     @Override

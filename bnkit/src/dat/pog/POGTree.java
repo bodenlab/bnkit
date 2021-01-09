@@ -322,9 +322,12 @@ public class POGTree {
      * Determine a TreeInstance for a given node index in the POGs, for a specified tree, based on symbols at leaf nodes;
      * the return value will represent the tree with nodes representing ancestors to be populated with content.
      *
-     * @param index index of column of alignment, or position in POG
-     * @param tree        tree that specifies the relationship between leaf nodes; note that the original tree in the POGTree is overridden
-     * @param idxmap  map gloabl branch point index to position-specific branch point index
+     * @param index index of column of alignment, which is the same as the position in the POG
+     * @param tree tree that specifies the relationship between leaf nodes; note that it the tree instance uses
+     *             the index of the provided (position-specific) tree, NOT the phylogenetic tree of the POGTree
+     * @param idxmap  map global branch point index to position-specific branch point index; this is used to map
+     *                character states of the extant sequences (which use the phylogenetic tree of the POGTree)
+     *                to the position-specific tree
      * @return a tree instance with states set according to extant sequences' character states
      */
     public TreeInstance getNodeInstance(int index, IdxTree tree, int[] idxmap) {
