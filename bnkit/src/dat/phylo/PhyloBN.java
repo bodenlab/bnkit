@@ -56,6 +56,8 @@ public class PhyloBN {
 
     /**
      * Construct a BN for specified phylogenetic tree using a single, supplied model.
+     * Note that the tree could in fact be multiple trees, representing separate insertion events for a locus/position in an alignment.
+     * There is a single BN regardless but with separate modules, graphically disconnected.
      *
      * @param tree  phylogenetic tree
      * @param model evolutionary model

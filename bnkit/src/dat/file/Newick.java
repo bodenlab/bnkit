@@ -1,7 +1,9 @@
 package dat.file;
 
 import dat.phylo.BranchPoint;
+import dat.phylo.IdxTree;
 import dat.phylo.Tree;
+import dat.phylo.TreeInstance;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -297,6 +299,41 @@ public class Newick {
         }
     }
 
+    public static String nprint(int idx, IdxTree tree, Object[] instance) {
+        StringBuilder sb = new StringBuilder();
+        String dstr = null;
+        int[] children = tree.getChildren(idx);
+        int cnt = 0;
+        for (int child : children) {
+            sb.append(nprint(child, tree, instance));
+            if (++cnt < children.length)
+                sb.append(",");
+        }
+
+        String label = tree.getLabel(idx).toString();
+        try {
+            if (children.length > 0) {
+                Integer.parseInt(label);
+                label = "N" + label; // tagging-on an "N"
+            }
+        } catch (NumberFormatException e) {
+        }
+        if (instance[idx] != null)
+            label = label + "=" + instance[idx];
+        try {
+            double dist = tree.getDistance(idx);
+            if (children.length == 0)
+                return label + ":" + dist;
+            else
+                return "(" + sb.toString() + ")" + label + ":" + dist;
+        } catch (RuntimeException e) { // distance is not set
+            if (children.length == 0)
+                return label;
+            else
+                return "(" + sb.toString() + ")" + label;
+        }
+    }
+
     public static void save(Tree tree, String filename) throws IOException {
         save(tree, filename, MODE_DEFAULT);
     }
@@ -306,6 +343,27 @@ public class Newick {
         String s = sprint(tree.getRoot(), MODE);
         bw.write(s + ";\n");
         bw.close();
+    }
+
+    public static void save(TreeInstance treeinstance, String filename) throws IOException {
+        save(treeinstance.getTree(), filename, treeinstance.getInstance());
+    }
+
+    public static void save(IdxTree tree, String filename, Object[] instances) throws IOException {
+        int[] ridxs = tree.getRoots(); // may have multiple "roots", i.e. separate "insertion" events
+        for (int i = 0; i < ridxs.length; i ++) { // a separate tree for each root
+            int pos_ext = filename.lastIndexOf("."); // position of the file extension
+            String extension = ".nwk";
+            if (pos_ext == -1)
+                pos_ext = filename.length();
+            else
+                extension = "." + Integer.toString(i+1) + extension;
+            String actualfile = filename.substring(0, pos_ext) +  extension;
+            BufferedWriter bw = new BufferedWriter(new FileWriter(actualfile));
+            String s = nprint(ridxs[i], tree, instances);
+            bw.write(s + ";\n");
+            bw.close();
+        }
     }
 
 }

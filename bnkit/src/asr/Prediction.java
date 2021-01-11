@@ -6,11 +6,16 @@ import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Interval1D;
+import dat.file.Newick;
 import dat.phylo.IdxTree;
 import dat.phylo.TreeDecor;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +42,7 @@ public class Prediction {
     //private final Map<Object, POGraph> ancestors; // named ancestors
     private final POGraph[] ancarr;                 // ancestors by branchpoint index
     private final IdxTree[] positrees;              // position-specific tree, or an edited form of the original tree for the purpose of inferring content
+    private TreeInstance[]  treeinstances;          // position-specific tree instances, which contain instantiated (by extants) and inferred content (duplicating the content in POGs)
     // Indexing of ancestors by ID to branch point index in phylogenetic tree and position-specific trees
     private final int[][] positidxs;                // position-specific tree indices [aligned pos]["global" branchpoint idx]
     private final EnumDistrib[][] distribs;         // Probability distributions of ancestor states by branchpoint and position index
@@ -76,6 +82,25 @@ public class Prediction {
     }
 
     /**
+     * Map a local, position-specific branch point index to the global index, applicable in the original phylogenetic tree.
+     * Computationally costly...
+     * @param pos position in POG/alignment
+     * @param local_idx the index at the given position
+     * @return global index, or -1 if the local index is not used
+     */
+    private int local2global(int pos, int local_idx) {
+        for (int global_idx = 0; global_idx < positidxs[pos].length; global_idx ++) {
+            if (positidxs[pos][global_idx] == local_idx)
+                return global_idx;
+        }
+        return -1;
+    }
+
+    private int global2local(int pos, int global_idx) {
+        return positidxs[pos][global_idx];
+    }
+
+    /**
      * Retrieve the original phylogenetic tree, unspecific to position.
      * @return index tree
      */
@@ -105,6 +130,7 @@ public class Prediction {
                         pruneMe.add(idx);
                 }
             }
+            // pruneMe contains indices that SHOULD BE REMOVED
             int[] indices = phylo.getPrunedIndex(pruneMe);
             // save indices for quick re-retrieval later
             positidxs[position] = indices;
@@ -112,6 +138,33 @@ public class Prediction {
             positrees[position] = IdxTree.createPrunedTree(phylo, indices);
         } // else the index tree was already cached...
         return positrees[position];
+    }
+
+    public TreeInstance getTreeInstance(int position, GRASP.Inference mode) {
+        if (mode == GRASP.Inference.JOINT) {
+            if (states != null) { // states[bpidx][pos]
+                IdxTree tree = getTree(position);
+                Object[] assigned = new Object[tree.getSize()];
+                for (int i = 0; i < assigned.length; i ++) {
+                    int global_idx = local2global(position, i);
+                    if (global_idx != -1) { // exists in "local", position-specific tree
+                        POGraph pog = pogTree.getExtant(global_idx);
+                        if (pog != null) {
+                            SymNode node = (SymNode) pog.getNode(position);
+                            if (node != null)
+                                assigned[i] = node.get();
+                        } else
+                            assigned[i] = states[global_idx][position];
+                    }
+                }
+                TreeInstance ti = new TreeInstance(getTree(position), assigned);
+                return ti;
+            }
+            throw new ASRRuntimeException("Ancestor states have not been inferred");
+        } else if (mode == GRASP.Inference.MARGINAL) {
+            throw new ASRRuntimeException("Not implemented: requires all ancestors present in nominated position to have been inferred");
+        }
+        throw new ASRRuntimeException("Unknown inference mode: " + mode);
     }
 
     /**
@@ -223,14 +276,14 @@ public class Prediction {
             }
 
             distribs[bpidx] = new EnumDistrib[pogTree.getPositions()];
-            TreeInstance[] tis = new TreeInstance[pogTree.getPositions()];
+            treeinstances = new TreeInstance[pogTree.getPositions()];
             for (int pos = 0; pos < getPositions(); pos ++) {                   // for each position...
                 int specidx = positidxs[pos][bpidx];                            //   index for sought ancestor in the position-specific tree
                 if (specidx >= 0) {                                             //   which may not exist, i.e. part of an indel, but if it is real...
-                    tis[pos] = pogTree.getNodeInstance(pos, trees[pos], positidxs[pos]); //     get the instances at the leaves at that position, and...
+                    treeinstances[pos] = pogTree.getNodeInstance(pos, trees[pos], positidxs[pos]); //     get the instances at the leaves at that position, and...
                 }
             }
-            ThreadedDecorators threadpool = new ThreadedDecorators(inf, tis, GRASP.NTHREADS);
+            ThreadedDecorators threadpool = new ThreadedDecorators(inf, treeinstances, GRASP.NTHREADS);
             try {
                 Map<Integer, TreeDecor> ret = threadpool.runBatch();
                 for (int pos = 0; pos < getPositions(); pos ++) {                   // for each position...
@@ -262,16 +315,16 @@ public class Prediction {
             trees[pos] = getTree(pos);                              //   this is the tree with indels imputed
             inf[pos] = new MaxLhoodJoint(trees[pos], MODEL);       //     set-up the inference
         }
-        TreeInstance[] tis = new TreeInstance[getPositions()];
+        treeinstances = new TreeInstance[getPositions()];
         for (int pos = 0; pos < getPositions(); pos ++) {        // for each position...
-            tis[pos] = pogTree.getNodeInstance(pos, trees[pos], positidxs[pos]); // get the instances at the leaves at that position, and...
+            treeinstances[pos] = pogTree.getNodeInstance(pos, trees[pos], positidxs[pos]); // get the instances at the leaves at that position, and...
         }
-        ThreadedDecorators threadpool = new ThreadedDecorators(inf, tis, GRASP.NTHREADS);
+        ThreadedDecorators threadpool = new ThreadedDecorators(inf, treeinstances, GRASP.NTHREADS);
         try {
             Map<Integer, TreeDecor> ret = threadpool.runBatch();for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
                 for (int idx : getAncestorIndices()) {
                     int ancidx = positidxs[pos][idx];                   //   index for sought ancestor in the position-specific tree
-                    if (ancidx >= 0)                                  //   which may not exist, i.e. part of an indel, but if it is real...
+                    if (ancidx >= 0)                                   //   which may not exist, i.e. part of an indel, but if it is real...
                         states[idx][pos] = ret.get(pos).getDecoration(ancidx);          //     extract state
                 }
             }
@@ -841,5 +894,20 @@ public class Prediction {
         }
         return new Prediction(pogTree, ancestors);
     }
+
+    public void saveTreeInstances(String directory) throws IOException, ASRException {
+        File file = new File(directory);
+        StringBuilder sb = new StringBuilder();
+        if (file.mkdirs()) { // true if the directory was created, false otherwise
+        } else {
+            System.err.println("Directory " + directory + " already exists");
+            //throw new ASRException("Directory " + directory + " already exists");
+        }
+        for (int pos = 0; pos < getPositions(); pos ++) {
+            String name = directory + "/T" + Integer.toString(pos + 1) + ".nwk";
+            Newick.save(getTreeInstance(pos, GRASP.Inference.JOINT), name);
+        }
+    }
+
 
 }

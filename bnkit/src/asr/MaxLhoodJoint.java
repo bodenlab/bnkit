@@ -71,8 +71,9 @@ public class MaxLhoodJoint implements TreeDecor<Object> {
         Variable.Assignment[] assign = r1.getMPE();
         for (Variable.Assignment assign1 : assign) {
             Integer idx = quick.get(assign1.var.getName());
-            if (idx != null)
+            if (idx != null) {
                 values[idx] = assign1.val;
+            }
         }
     }
 }

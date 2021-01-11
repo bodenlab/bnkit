@@ -5,7 +5,9 @@ import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.*;
+import dat.phylo.IdxTree;
 import dat.phylo.Tree;
+import dat.phylo.TreeInstance;
 import dat.pog.IdxGraph;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
@@ -21,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "0105.2021";
+    public static String VERSION = "0110.2021";
     public static boolean VERBOSE = false;
     public static boolean TIME = false;
     public static int NTHREADS = 1;
@@ -41,14 +43,14 @@ public class GRASP {
         if (msg != null)
             out.println(msg + " (Error " + error + ")");
         out.println("Usage: asr.GRASP \n" +
-                "\t[-aln <alignment-file> -nwk <tree-file> -out <output-file>]\n" +
+                "\t[-aln <alignment-file> -nwk <tree-file> -out <output-file-or-directory>]\n" +
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|Yang>}\n" +
                 "\t{-thr <n-threads>}\n" +
                 "\t{-joint (default) | -marg <branchpoint-id>} \n" +
                 "\t{-indel <BEP(default)|BEML|SICP|SICML|PSP|PSML>}\n" +
                 "\t{-gap}\n" +
-                "\t{-savetree <tree-file>}\n" +
-                "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT>}\n" +
+                "\t{-savetree <tree-directory>}\n" +
+                "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT|TREE>}\n" +
                 "\t{-time}{-verbose}{-help}");
         out.println("where \n" +
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
@@ -84,10 +86,10 @@ public class GRASP {
         String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
         boolean GAPPY = false;
-        String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL", "DOT"};
+        String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE"};
         int FORMAT_IDX = 0;
         // To compute consensus path is determined by output format
-        boolean[] CONSENSUS = new boolean[] {true, false, true, false};
+        boolean[] CONSENSUS = new boolean[] {true, false, true, false, false};
 
         Inference MODE = Inference.JOINT;
         Integer MARG_NODE = null;
@@ -229,6 +231,9 @@ public class GRASP {
                         break;
                     case 3: // DOT
                         IdxGraph.saveToDOT(OUTPUT, ancestors);
+                        break;
+                    case 4: // TREE
+                        indelpred.saveTreeInstances(OUTPUT);
                         break;
                     case 1: // DISTRIB
                         EnumDistrib[] d = indelpred.getMarginal(MARG_NODE, MODEL);

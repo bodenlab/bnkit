@@ -1,5 +1,11 @@
 package dat.phylo;
 
+import asr.ASRException;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -18,14 +24,14 @@ public class IdxTree implements Iterable<Integer> {
     /**
      * Constructor for internal (factory method) use only.
      * @param n number of branch points
-     * @param distances if true, create storage for distances
+     * @param usedistances if true, create storage for distances
      */
-    private IdxTree(int n, boolean distances) {
+    private IdxTree(int n, boolean usedistances) {
         bpoints = new BranchPoint[n];
         parent = new int[bpoints.length];
         children = new int[bpoints.length][];
         index = new HashMap<>();
-        distance = (distances ? new double[bpoints.length] : null);
+        distance = (usedistances ? new double[bpoints.length] : null);
     }
 
     /**
@@ -52,10 +58,9 @@ public class IdxTree implements Iterable<Integer> {
                 index.put(bp.getID(), i);
                 BranchPoint ancestor = bp.getParent();
                 if (ancestor != null) { // root node, possibly internal
-                    Double dist = null;
                     try {
-                        if (ancestor.getParent() != null)
-                            distances[i] = ancestor.getDistance();
+                        if (bp.getParent() != null)
+                            distances[i] = bp.getDistance();
                     } catch (RuntimeException e) {
                         distances_found = false;
                     }
@@ -83,8 +88,8 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
-     * Create an index from the current tree to create a new pruned version
-     * FIXME
+     * Create an index from the current tree to create a new pruned version, by excluding branch points nominated in the parameter pruneMe
+     * @param pruneMe indices of branch points to be removed
      * @return index with nominated branch points excluded
      */
     public int[] getPrunedIndex(Set<Integer> pruneMe) {
@@ -93,7 +98,7 @@ public class IdxTree implements Iterable<Integer> {
         int[] match = new int[bpoints.length]; // a map for matching the source index to the destination index, -1 means no match
         // the source tree is traversed depth-first, srcidx is the index for each branch point
         for (int srcidx = 0; srcidx < bpoints.length; srcidx ++) {
-            if (!pruneMe.contains(srcidx)) {    // branch point definitely to be transferred to new tree
+            if (!pruneMe.contains(srcidx)) {    // branch point is not in the nominated kill-list, so WILL BE transferred to new tree
                 match[srcidx] = dstidx;         // update source-to-dest mapping, to use below
                 dstidx += 1;
             } else
@@ -119,7 +124,8 @@ public class IdxTree implements Iterable<Integer> {
             int dstidx = prunedIndex[srcidx];
             if (dstidx >= 0) { // this branch point is retained in new, destination tree
                 pruned.bpoints[dstidx] = source.bpoints[srcidx]; // transfer branch point data "by reference"
-                if (pruned.distance != null) pruned.distance[dstidx] = source.distance[srcidx]; // transfer distance
+                if (pruned.distance != null)
+                    pruned.distance[dstidx] = source.distance[srcidx]; // transfer distance
                 if (source.children[srcidx] != null) {                          // transfer children?
                     List<Integer> keep = new ArrayList<>();                     // collect what children that should remain
                     for (int j = 0; j < source.children[srcidx].length; j++) {  // by iterating through existing
@@ -447,7 +453,7 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
-     * Retrieve indices of all roots, i.e. branch points with no parents
+     * Retrieve indices of all roots, i.e. branch points with no parents (but children, TODO)
      * @return indices to roots
      */
     public int[] getRoots() {

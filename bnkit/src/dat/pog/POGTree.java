@@ -136,6 +136,10 @@ public class POGTree {
         return bpidx != -1 ? extarr[bpidx] : null;
     }
 
+    public POGraph getExtant(int bpidx) {
+        return extarr[bpidx];
+    }
+
     /**
      * Get the index of the branchpoint that this extant sequence is placed
      * @param name name of extant sequence

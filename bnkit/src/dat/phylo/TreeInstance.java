@@ -1,7 +1,9 @@
 package dat.phylo;
 
 import asr.ASRRuntimeException;
+import dat.file.Newick;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -100,6 +102,14 @@ public class TreeInstance {
     }
 
     /**
+     * Retrieve the values at all branch points, indexed by the associated IdxTree
+     * @return instance values (assigned or inferred)
+     */
+    public Object[] getInstance() {
+        return instance;
+    }
+
+    /**
      * The branch points can be assigned n defined values. This function determines the value based on the index i in 0 to n-1.
      * @param idx4val index of value
      * @return the value
@@ -182,6 +192,16 @@ public class TreeInstance {
             return istr;
         else
             return "(" + sb.toString() + ")" + istr;
+    }
+
+    /**
+     * Save instantiation of tree in Newick format.
+     * If multiple trees, each will be given an index in the file extension.
+     * @param filename
+     * @throws IOException
+     */
+    public void save(String filename) throws IOException {
+        Newick.save(this.tree, filename, this.instance);
     }
 
     public static class BlanketTreeDecor<E> implements TreeDecor<E> {
