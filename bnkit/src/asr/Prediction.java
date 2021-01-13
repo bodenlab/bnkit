@@ -75,6 +75,10 @@ public class Prediction {
         return pogTree.getPositions();
     }
 
+    /**
+     * Retrieve all indices in the original phylogenetic tree that represent ancestors
+     * @return ancestor branch point indices
+     */
     private int[] getAncestorIndices() {
         if (ancidxs == null)
             ancidxs = phylotree.getAncestors();
@@ -96,6 +100,12 @@ public class Prediction {
         return -1;
     }
 
+    /**
+     * Map a global branch point index to a local, position-specific index
+     * @param pos position in alignment or POG
+     * @param global_idx branch point index in phylogenetic tree
+     * @return the index in the local, position-specific tree
+     */
     private int global2local(int pos, int global_idx) {
         return positidxs[pos][global_idx];
     }
@@ -140,6 +150,15 @@ public class Prediction {
         return positrees[position];
     }
 
+    /**
+     * Retrieve all necessary values to instantiate the tree at a specified position. These values are based on:
+     * Each leaf (branch point with no children) is assigned a state as input to inference.
+     * After inference, each ancestor branch point is assigned a state GIVEN leaf states.
+     *
+     * @param position the position in the input alignment/or POG
+     * @param mode inference mode, currently only GRASP.Inference.JOINT is supported
+     * @return a TreeInstance with states from input data and from inference
+     */
     public TreeInstance getTreeInstance(int position, GRASP.Inference mode) {
         if (mode == GRASP.Inference.JOINT) {
             if (states != null) { // states[bpidx][pos]
@@ -385,6 +404,13 @@ public class Prediction {
         return seq;
     }
 
+    /**
+     * Retrieve the most-supported sequence for a given ancestor.
+     * Currently, it is the most probable path as estimated by looking at all sequences descendant to the ancestor,
+     * using a dynamic programming algorithm
+     * @param ancID the identifier/label for the ancestor
+     * @return the positions of the corresponding ancestor POG that make up the "consensus" path
+     */
     public int[] getConsensus(Object ancID) {
         int bpidx = getBranchpointIndex(ancID);                            // the index of the ancestor as it appears in the phylogenetic tree
         if (bpidx == -1)
@@ -392,6 +418,13 @@ public class Prediction {
         return getConsensus(bpidx);
     }
 
+    /**
+     * Retrieve the most-supported sequence for a given ancestor.
+     * Currently, it is the most probable path as estimated by looking at all sequences descendant to the ancestor,
+     * using a dynamic programming algorithm
+     * @param bpidx the branch point index of the ancestor, in the phylogenetic tree
+     * @return the positions of the corresponding ancestor POG that make up the "consensus" path
+     */
     public int[] getConsensus(int bpidx) {
         POGraph pog = this.ancarr[bpidx];
         if (pog == null)
@@ -442,6 +475,32 @@ public class Prediction {
         int[] consensus = pog.getMostSupported();
         return consensus;
     }
+
+    /**
+     * Save all position-specific trees, as instantiated by either the input data (extants) or inference
+     * @param directory the name of the directory in which all individual files will be saved
+     * @throws IOException
+     * @throws ASRException
+     */
+    public void saveTreeInstances(String directory) throws IOException, ASRException {
+        File file = new File(directory);
+        StringBuilder sb = new StringBuilder();
+        if (file.mkdirs()) { // true if the directory was created, false otherwise
+        } else {
+            System.err.println("Directory " + directory + " already exists");
+            //throw new ASRException("Directory " + directory + " already exists");
+        }
+        for (int pos = 0; pos < getPositions(); pos ++) {
+            String name = directory + "/T" + Integer.toString(pos + 1) + ".nwk";
+            Newick.save(getTreeInstance(pos, GRASP.Inference.JOINT), name);
+        }
+    }
+
+
+    // --------------------------------------------------------------------------------------------------------------- //
+    // static methods for constructing Prediction instances
+    // including indel inference by parsimony and maximum likelihood
+    // --------------------------------------------------------------------------------------------------------------- //
 
     /**
      * Basic inference of gaps by position-specific parsimony.
@@ -893,20 +952,6 @@ public class Prediction {
             }
         }
         return new Prediction(pogTree, ancestors);
-    }
-
-    public void saveTreeInstances(String directory) throws IOException, ASRException {
-        File file = new File(directory);
-        StringBuilder sb = new StringBuilder();
-        if (file.mkdirs()) { // true if the directory was created, false otherwise
-        } else {
-            System.err.println("Directory " + directory + " already exists");
-            //throw new ASRException("Directory " + directory + " already exists");
-        }
-        for (int pos = 0; pos < getPositions(); pos ++) {
-            String name = directory + "/T" + Integer.toString(pos + 1) + ".nwk";
-            Newick.save(getTreeInstance(pos, GRASP.Inference.JOINT), name);
-        }
     }
 
 

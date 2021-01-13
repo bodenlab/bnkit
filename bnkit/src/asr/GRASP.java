@@ -55,7 +55,7 @@ public class GRASP {
         out.println("where \n" +
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
-                "\toutput-file will be populated by inferred ancestor or ancestors; directory with files if format is DOT\n" +
+                "\toutput-file will be populated by inferred ancestor or ancestors; directory with files if format is DOT or TREE\n" +
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
