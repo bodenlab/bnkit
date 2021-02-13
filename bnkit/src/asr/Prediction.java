@@ -35,18 +35,17 @@ import java.util.concurrent.TimeUnit;
  */
 public class Prediction {
     public static boolean DEBUG = GRASP.VERBOSE;    // print out various information
-    public int NTHREADS = 4;                        // how many threads to utilise
     private final POGTree pogTree;                  // input data contained in a POGTree
     private final IdxTree phylotree;                // the input phylogenetic tree (is also accessible via POGTree)
     private int[] ancidxs = null;                   // store the sub-set of indices that are used for internal nodes (ancestors)
     //private final Map<Object, POGraph> ancestors; // named ancestors
-    private final POGraph[] ancarr;                 // ancestors by branchpoint index
+    private final POGraph[] ancarr;                 // ancestors by branch point index
     private final IdxTree[] positrees;              // position-specific tree, or an edited form of the original tree for the purpose of inferring content
     private TreeInstance[]  treeinstances;          // position-specific tree instances, which contain instantiated (by extants) and inferred content (duplicating the content in POGs)
     // Indexing of ancestors by ID to branch point index in phylogenetic tree and position-specific trees
-    private final int[][] positidxs;                // position-specific tree indices [aligned pos]["global" branchpoint idx]
-    private final EnumDistrib[][] distribs;         // Probability distributions of ancestor states by branchpoint and position index
-    private Object[][] states = null;               // Actual values at inferred branch points, indexed by branchpoint index and position
+    private final int[][] positidxs;                // position-specific tree indices [aligned pos]["global" branch point idx]
+    private final EnumDistrib[][] distribs;         // Probability distributions of ancestor states by branch point and position index
+    private Object[][] states = null;               // Actual values at inferred branch points, indexed by branch point index and position
 
     /**
      * Basic constructor, not intended for use as it forgoes/assumes prior prediction.

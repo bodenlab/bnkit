@@ -34,7 +34,7 @@ public class TSVFile {
 
     /**
      * Construct a TSV data structure from a matrix of objects, which has a header row (first row)
-     * @param objects
+     * @param objects the values in the matrix, index by row then column
      * @param useHeader indicate if the header row is used to label columns or ignored
      */
     public TSVFile(Object[][] objects, boolean useHeader) {
@@ -59,7 +59,7 @@ public class TSVFile {
 
     /**
      * Construct a TSV data structure from a matrix of objects, with all values (no header)
-     * @param objects
+     * @param objects the values in the matrix, index by row then column
      */
     public TSVFile(Object[][] objects) {
         if (objects.length > 0) {
@@ -231,6 +231,33 @@ public class TSVFile {
         Object[][] ret = new Object[rows.size()][];
         for (int i = 0; i < rows.size(); i ++)
             ret[i] = getRow(i);
+        return ret;
+    }
+
+    /**
+     * Retrieve whole column by index
+     * @param column_index the index of the column
+     * @return values in specified column in order of row
+     */
+    public Object[] getCol(int column_index) {
+        Object[] ret = new Object[rows.size()];
+        for (int i = 0; i < rows.size(); i ++)
+            ret[i] = getRow(i)[column_index];
+        return ret;
+    }
+
+    /**
+     * Retrieve whole columns by index;
+     * this is the matrix "transposed"
+     * @param column_indices the indices of the columns
+     * @return values in specified columns in order of row
+     */
+    public Object[][] getCols(int[] column_indices) {
+        Object[][] ret = new Object[column_indices.length][rows.size()];
+        for (int i = 0; i < rows.size(); i ++) {
+            for (int j = 0; j < column_indices.length; j ++)
+                ret[j][i] = rows.get(i)[column_indices[j]];
+        }
         return ret;
     }
 
