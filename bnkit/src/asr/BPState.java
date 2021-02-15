@@ -3,6 +3,7 @@ package asr;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
+import dat.file.Newick;
 import dat.file.TSVFile;
 import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
@@ -27,11 +28,11 @@ public class BPState {
                 "\t{-model <uniform(default)>}\n" +
                 "\t{-gamma <gamma-value(default 1.0)>}\n" +
                 "\t{-joint (default) | -marg <branchpoint-id>} \n" +
-                "\t{-format <TSV(default)>}\n");
+                "\t{-format <TSV(default), TREE, STDOUT>}\n");
         out.println("where \n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
                 "\tinput-file is a table with sequence or ancestor names, and corresponding values (empty implies not assigned) on TSV format\n" +
-                "\toutput-file will be populated by inferred branch point states on specified format (TSV by default)\n" +
+                "\toutput-file will be populated by inferred branch point states on specified format (TSV by default, TREE is a labelled tree on Newick format)\n" +
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n");
         out.println("Notes: \n" +
                 "\tEvolutionary models are currently limited to uniform, which is an adaptation of Jukes-Cantor for arbitrary number of states.\n\tgamma-value is used by this model\n");
@@ -46,7 +47,7 @@ public class BPState {
         String[] MODELS = new String[] {"uniform"};
         int MODEL_IDX = 0; // default model is that above indexed 0
         SubstModel MODEL = null;
-        String[] FORMATS = new String[] {"TSV"};
+        String[] FORMATS = new String[] {"TSV", "TREE", "STDOUT"};
         int FORMAT_IDX = 0;
         asr.GRASP.Inference MODE = asr.GRASP.Inference.JOINT;
         Object MARG_LABEL = null;
@@ -139,9 +140,28 @@ public class BPState {
             if (MODE == GRASP.Inference.JOINT) {
                 MaxLhoodJoint inf = new MaxLhoodJoint(tree, MODEL);
                 inf.decorate(ti);
+                Object[][] save = new Object[tree.getSize()][2];
+                Object[] vals = new Object[tree.getSize()];
                 for (int bpidx : tree) {
                     Object state = inf.getDecoration(bpidx);
-                    System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" + state);
+                    save[bpidx][0] = tree.getLabel(bpidx);
+                    save[bpidx][1] = state;
+                    vals[bpidx] = state;
+                    if (FORMAT_IDX == 2)
+                        System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" + state);
+                }
+                if (FORMAT_IDX == 0) {
+                    try {
+                        TSVFile.saveObjects(OUTPUT, save);
+                    } catch (IOException e) {
+                        usage(6, "Failed to save output to " + OUTPUT);
+                    }
+                } else if (FORMAT_IDX == 1) { // TREE
+                    try {
+                        Newick.save(tree, OUTPUT, vals);
+                    } catch (IOException e) {
+                        usage(6, "Failed to save output to " + OUTPUT);
+                    }
                 }
             } else if (MODE == GRASP.Inference.MARGINAL) {
                 int bpidx = tree.getIndex(MARG_LABEL);
@@ -151,7 +171,23 @@ public class BPState {
                 MaxLhoodMarginal inf = new MaxLhoodMarginal(bpidx, tree, MODEL);
                 inf.decorate(ti);
                 EnumDistrib distrib = inf.getDecoration(bpidx);
-                System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" + distrib);
+                Object[][] save = new Object[2][1 + distrib.getDomain().size()];
+                save[0][0] = "";
+                save[1][0] = tree.getLabel(bpidx);
+                Object[] vals = distrib.getDomain().getValues();
+                for (int i = 0; i < vals.length; i ++)
+                    save[0][1 + i] = vals[i];
+                for (int i = 0; i < vals.length; i ++)
+                    save[1][1 + i] = distrib.get(i);
+                if (FORMAT_IDX == 2)
+                    System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" + distrib);
+                else if (FORMAT_IDX == 0) {
+                    try {
+                        TSVFile.saveObjects(OUTPUT, save);
+                    } catch (IOException e) {
+                        usage(6, "Failed to save output to " + OUTPUT);
+                    }
+                }
             }
         } else {
             usage(4, "Both an input-file and a tree-file are required");
