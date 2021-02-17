@@ -93,11 +93,12 @@ public class GRASP {
 
         Inference MODE = Inference.JOINT;
         Integer MARG_NODE = null;
-        String SAVE_TREE = null;
+        boolean SAVE_TREE = false;
 
         long START_TIME, ELAPSED_TIME;
 
         for (int a = 0; a < args.length; a ++) {
+            System.out.println(args[a]);
             if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
                 if (arg.equalsIgnoreCase("aln") && args.length > a + 1) {
@@ -114,8 +115,11 @@ public class GRASP {
                     VERBOSE = true;
                 } else if (arg.equalsIgnoreCase("time")) {
                     TIME = true;
-                } else if (arg.equalsIgnoreCase("savetree") && args.length > a + 1) {
-                    SAVE_TREE = args[++a];
+                } else if (arg.equalsIgnoreCase("savetree")) {
+                    SAVE_TREE = true;
+                    System.out.println("SAVE TREE");
+                    System.out.println(SAVE_TREE);
+
                 } else if (arg.equalsIgnoreCase("marg") && args.length > a + 1) {
                     MODE = Inference.MARGINAL;
                     String ancid = args[++a];
@@ -218,14 +222,17 @@ public class GRASP {
                     for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
                         ancseqs[ii ++] = indelpred.getSequence(entry.getKey(), MODE, GAPPY);
                 }
+                File file = new File(OUTPUT);
+                file.mkdirs();
                 switch (FORMAT_IDX) {
+
                     case 0: // FASTA
-                        FastaWriter fw = new FastaWriter(OUTPUT);
+                        FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
                         fw.save(ancseqs);
                         fw.close();
                         break;
                     case 2: // CLUSTAL
-                        AlnWriter aw = new AlnWriter(OUTPUT);
+                        AlnWriter aw = new AlnWriter(new File (OUTPUT, "GRASP_ancestors.aln");
                         aw.save(ancseqs);
                         aw.close();
                         break;
@@ -267,8 +274,8 @@ public class GRASP {
                             usage(8, "Invalid ancestor node label: " + MARG_NODE);
                         break;
                 }
-                if (SAVE_TREE != null)
-                    Newick.save(tree, SAVE_TREE, Newick.MODE_ANCESTOR);
+                if (SAVE_TREE)
+                    Newick.save(tree, OUTPUT + "/GRASP_ancestors.nwk", Newick.MODE_ANCESTOR);
 
                 ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
                 if (VERBOSE || TIME) {
@@ -285,7 +292,7 @@ public class GRASP {
  */
             }
 
-        } else if (OUTPUT == null && NEWICK != null && SAVE_TREE != null) {
+        } else if (OUTPUT == null && NEWICK != null && SAVE_TREE) {
         } else if (ALIGNMENT == null)
                 usage(3, "Need to specify alignment (Clustal or FASTA file)");
         else if (NEWICK == null)

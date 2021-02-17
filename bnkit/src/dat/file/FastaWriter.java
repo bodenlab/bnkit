@@ -39,8 +39,7 @@ public class FastaWriter {
     public FastaWriter(File file) throws IOException {
         fileExists=file.exists();
         try {
-            file.mkdirs();
-            FileWriter fwriter=new FileWriter(file + "/" + "GRASP_ancestors" + ".fasta");
+            FileWriter fwriter=new FileWriter(file);
             writer=new BufferedWriter(fwriter);
         } catch (IOException e) {
             writer=null;

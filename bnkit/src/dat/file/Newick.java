@@ -339,7 +339,7 @@ public class Newick {
     }
 
     public static void save(Tree tree, String filename, int MODE) throws IOException {
-        BufferedWriter bw = new BufferedWriter(new FileWriter(filename + "/" + "tree" + ".nwk"));
+        BufferedWriter bw = new BufferedWriter(new FileWriter(filename));
         String s = sprint(tree.getRoot(), MODE);
         bw.write(s + ";\n");
         bw.close();

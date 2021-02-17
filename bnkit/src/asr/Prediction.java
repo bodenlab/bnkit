@@ -456,11 +456,9 @@ public class Prediction {
                 POGraph.StatusEdge edge = pog.getEdge(curr, nexts[i]);
                 if (edge != null) {
                     double w = -Math.log(rates[i]);
-                    if (w > 10000)
-                        System.out.println("Weight is " + w + " = log(" + rates[i]);
                     edge.setWeight(w > 10000 ? 10000 : w); // neg log of prob; so P=1 means zero weight, low P means high weight
                 } else {
-                    throw new ASRRuntimeException("Invalid POG with missing edge: " + pog.getName() + " edge=" + curr + "-" +nexts[i]);
+                    throw new ASRRuntimeException("Invalid POG with missing edge: \"" + pog.getName() + "\" edge=" + curr + "-" +nexts[i]);
                 }
             }
             // add indices of all nodes that can be visited next
@@ -498,7 +496,7 @@ public class Prediction {
 
 
     // --------------------------------------------------------------------------------------------------------------- //
-    // static methods for constructing Prediction instances
+    // static "factory" methods for constructing Prediction instances
     // including indel inference by parsimony and maximum likelihood
     // --------------------------------------------------------------------------------------------------------------- //
 
@@ -552,12 +550,12 @@ public class Prediction {
                 for (int to : entry.getValue()) { // link anchored Node to each of the admissible nodes in the anchor set
                     if (to < nPos)
                         pog.addNode(to, new Node());
-                    pog.addEdge(anchor, to);
+                    pog.addEdge(anchor, to, new POGraph.StatusEdge(true));
                 }
                 for (int from : entry.getValue()) { // all possible pairs of admissible Nodes are linked
                     for (int to : entry.getValue()) {
                         if (from < to)
-                            pog.addEdge(from, to);
+                            pog.addEdge(from, to, new POGraph.StatusEdge(true));
                     }
                 }
             }
@@ -921,8 +919,8 @@ public class Prediction {
                 jib[i] = new MaxLhoodJoint(tree, substmodel);
             }
         }
-        ThreadedDecorators fpool = new ThreadedDecorators(jif, tif, GRASP.NTHREADS / 2);
-        ThreadedDecorators bpool = new ThreadedDecorators(jib, tib, GRASP.NTHREADS / 2);
+        ThreadedDecorators fpool = new ThreadedDecorators(jif, tif, (GRASP.NTHREADS + 1)/ 2);
+        ThreadedDecorators bpool = new ThreadedDecorators(jib, tib, (GRASP.NTHREADS + 1)/ 2);
         // Below is where the main inference occurs
         try {
             Map<Integer, TreeDecor> fret = fpool.runBatch();
