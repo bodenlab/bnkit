@@ -117,8 +117,6 @@ public class GRASP {
                     TIME = true;
                 } else if (arg.equalsIgnoreCase("savetree")) {
                     SAVE_TREE = true;
-                    System.out.println("SAVE TREE");
-                    System.out.println(SAVE_TREE);
 
                 } else if (arg.equalsIgnoreCase("marg") && args.length > a + 1) {
                     MODE = Inference.MARGINAL;
@@ -202,7 +200,7 @@ public class GRASP {
                     case 2: indelpred = Prediction.PredictByIndelParsimony(pogtree); break;
                     case 3: indelpred = Prediction.PredictByIndelMaxLhood(pogtree); break;
                     case 4: indelpred = Prediction.PredictByParsimony(pogtree); break;
-                    case 5: usage(3, "PSML is not implemented"); break;
+                    case 5: indelpred = Prediction.PredictbyMaxLhood(pogtree); break;
                     default: break;
                 }
                 if (indelpred == null)
@@ -232,7 +230,7 @@ public class GRASP {
                         fw.close();
                         break;
                     case 2: // CLUSTAL
-                        AlnWriter aw = new AlnWriter(new File (OUTPUT, "GRASP_ancestors.aln");
+                        AlnWriter aw = new AlnWriter(new File (OUTPUT, "GRASP_ancestors.aln"));
                         aw.save(ancseqs);
                         aw.close();
                         break;
