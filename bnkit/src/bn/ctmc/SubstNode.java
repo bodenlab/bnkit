@@ -37,17 +37,25 @@ import java.util.*;
 /**
  *
  * @author mikael
+ *
+ * TODO: create a "final" probs matrix, remove ref to subst model (as it is shared between nodes, and therefore not thread safe)
+ * This will essentially make this class into a CPT
  */
 public class SubstNode implements BNode, TiedNode {
     
     private final EnumVariable var;
     private final EnumVariable parent;
     private final List<EnumVariable> parentAsList;
+    protected final EnumTable<EnumDistrib> table; // table of (enumerable) probability distributions
+    private final double[][] probs;
+    private final EnumDistrib prior; // one (enumerable) probability distribution that is used if this variable is NOT conditioned
+
     private SubstModel model;
+    private final Enumerable alpha;
     private final Object[] values;
     private boolean gap;
 
-    private double time = 0.0;
+    private double time;
     private Object instance = null;
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
 
@@ -62,11 +70,18 @@ public class SubstNode implements BNode, TiedNode {
      */
     public SubstNode(EnumVariable var, EnumVariable parent, SubstModel model, double t) {
         this.var = var;
-        this.values = var.getDomain().getValues();
         this.parent = parent;
         this.parentAsList = Collections.singletonList(parent);
         this.time = t;
         this.model = model;
+        this.alpha = model.getDomain();
+        this.values = this.alpha.getValues();
+        this.table = new EnumTable<>(parent);
+        this.probs = model.getProbs(t);
+        for (int i = 0; i < this.values.length; i ++) {
+            table.setValue(i, new EnumDistrib(this.alpha, probs[i]));
+        }
+        this.prior = null; // this is a cond prob
     }
 
     /**
@@ -77,10 +92,15 @@ public class SubstNode implements BNode, TiedNode {
      */
     public SubstNode(EnumVariable var, SubstModel model) {
         this.var = var;
-        this.values = var.getDomain().getValues();
         this.model = model;
+        this.alpha = model.getDomain();
+        this.values = this.alpha.getValues();
+        this.table = null;
+        this.probs = null;
+        this.prior = new EnumDistrib(var.getDomain(), model.F);
         this.parent = null; // this is a root node
         this.parentAsList = null;
+        this.time = 0;
     }
     
     @Override
@@ -104,6 +124,30 @@ public class SubstNode implements BNode, TiedNode {
     }
 
     /**
+     * Get conditional probability P(X=x|Y=y,time)
+     * @param X
+     * @param Y
+     * @return
+     */
+    public double getProb(Object X, Object Y) {
+        int index_X = alpha.getIndex(X);
+        int index_Y = alpha.getIndex(Y);
+        //return probs[index_Y][index_X];
+        return this.table.getValue(index_X).get(index_Y);
+    }
+
+    /**
+     * Get probability P(X=x)
+     * @param X
+     * @return
+     */
+    public double getProb(Object X) {
+        int index_X = alpha.getIndex(X);
+        //return f[index_X];
+        return this.prior.get(index_X);
+    }
+
+    /**
      * Determine the conditional probability P(X=value|Y=key).
      * @param key the condition Y, one value only
      * @param value the value assigned to the variable X represented by this node
@@ -113,9 +157,10 @@ public class SubstNode implements BNode, TiedNode {
     public Double get(Object[] key, Object value) {
         if (key != null) {
             if (key.length == 1) {
-                Object Y = key[0];
-                Object X = value;
-                return model.getProb(X, Y, time);
+                return table.getValue(key).get(value);
+                //Object Y = key[0];
+                //Object X = value;
+                //return getProb(X, Y);
             }
         }
         throw new RuntimeException("Invalid key: " + key);
@@ -128,7 +173,8 @@ public class SubstNode implements BNode, TiedNode {
 
     @Override
     public Double get(Object value) {
-        return model.getProb(value);
+        return this.prior.get(value);
+        //return getProb(value);
     }
 
     @Override
@@ -144,7 +190,12 @@ public class SubstNode implements BNode, TiedNode {
     public double getTime() {
         return time;
     }
-    
+
+    /**
+     *
+     * @return
+     * @deprecated pog2020 -- remove all refs to model to make thread safe
+     */
     public SubstModel getModel() {
         return model;
     }
@@ -154,17 +205,47 @@ public class SubstNode implements BNode, TiedNode {
         throw new UnsupportedOperationException("Not supported."); 
     }
 
+    /**
+     *
+     * @return
+     * @deprecated pog2020 -- remove all refs to model to make thread safe
+     */
+    /*   @Override
+    public Distrib getDistrib(Object[] condition) {
+        //return model.getDistrib(condition[0], time);
+        probs.
+        return getget(key[0]);
+    }
+    */
+    /**
+     * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
+     * Requires all parent nodes to be instantiated.
+     * @param key the parent values
+     * @return the distribution of the variable for this node
+     */
     @Override
     public Distrib getDistrib(Object[] key) {
-        return model.getDistrib(key[0], time);
+        if (this.table == null || key == null)
+            return this.getDistrib();
+        try {
+            return this.table.getValue(key);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("Evaluation of SubstNode " + this.toString() + " failed since condition was not fully specified: " + e.getMessage());
+        }
     }
 
+    /*
     @Override
     public Distrib getDistrib() {
         EnumDistrib d = new EnumDistrib(var.getDomain()); 
-        for (Object y : d.getDomain().getValues())
-            d.set(y, model.getProb(y));
+        for (Object x : d.getDomain().getValues())
+            d.set(x, getProb(x));
         return d;
+    }
+    */
+    @Override
+    public EnumDistrib getDistrib() {
+        return prior;
     }
 
     @Override
@@ -308,7 +389,7 @@ public class SubstNode implements BNode, TiedNode {
                     // F(X, Y) from P(X | Y)
                     for (Object X : values) {
                         for (Object Y : values) {
-                            ft.setFactor(new Object[] {X, Y}, model.getProb(X, Y, time));
+                            ft.setFactor(new Object[] {X, Y}, getProb(X, Y));
                         }
                     }
                     return ft;
@@ -318,7 +399,7 @@ public class SubstNode implements BNode, TiedNode {
                     for (Object X : values) {
                         double sum = 0;
                         for (Object Y : values) {
-                            sum += model.getProb(X, Y, time);
+                            sum += getProb(X, Y);
                         }
                         ft.setFactor(new Object[] {X}, sum);
                     }
@@ -335,7 +416,7 @@ public class SubstNode implements BNode, TiedNode {
                     // F(Y) from P(X = x| Y)
                     Object X = varinstance;
                     for (Object Y : values) {
-                        ft.setFactor(new Object[] {Y}, model.getProb(X, Y, time));
+                        ft.setFactor(new Object[] {Y}, getProb(X, Y));
                     }
                     return ft;
                 } else { // parent is NOT relevant
@@ -345,7 +426,7 @@ public class SubstNode implements BNode, TiedNode {
                     Object X = varinstance;
                     double sum = 0;
                     for (Object Y : values) {
-                        sum += model.getProb(X, Y, time);
+                        sum += getProb(X, Y);
                     }
                     ft.setFactor(sum);
                     return ft;
@@ -360,7 +441,7 @@ public class SubstNode implements BNode, TiedNode {
                 // F(X) from P(X | Y)
                 Object Y = parinstance;
                 for (Object X : values) {
-                    ft.setFactor(new Object[] {X}, model.getProb(X, Y, time));
+                    ft.setFactor(new Object[] {X}, getProb(X, Y));
                 }
                 return ft;
             }
@@ -368,14 +449,14 @@ public class SubstNode implements BNode, TiedNode {
         } else { // no parents, just a prior
             if (varinstance != null) { // instantiated prior
                 Factor ft = new Factor();
-                ft.setFactor(model.getProb(varinstance));
+                ft.setFactor(getProb(varinstance));
                 return ft;
             } else { // not instantiated
                 List<Variable> vars_new = new ArrayList<>(1);
                 vars_new.add(myvar);
                 Factor ft = new Factor(vars_new);
                 for (Object X : values) {
-                    ft.setFactor(new Object[] {X}, model.getProb(X));
+                    ft.setFactor(new Object[] {X}, getProb(X));
                 }
                 return ft;
             }
@@ -402,7 +483,6 @@ public class SubstNode implements BNode, TiedNode {
             boolean parent_is_relevant = relevant.containsKey(mypar);
             // get value of the parent node, if any assigned
             Object parinstance = relevant.get(mypar);
-            
             // option 1
             if (varinstance == null && parinstance == null) { 
                 if (parent_is_relevant) {
@@ -413,9 +493,9 @@ public class SubstNode implements BNode, TiedNode {
                     for (Object X : values) {
                         for (Object Y : values) {
                             if (cond_first)
-                                ft.setValue(new Object[] {Y, X}, model.getProb(X, Y, time));
+                                ft.setValue(new Object[] {Y, X}, getProb(X, Y));
                             else
-                                ft.setValue(new Object[] {X, Y}, model.getProb(X, Y, time));
+                                ft.setValue(new Object[] {X, Y}, getProb(X, Y));
                         }
                     }
                     return ft;
@@ -425,7 +505,7 @@ public class SubstNode implements BNode, TiedNode {
                     for (Object X : values) {
                         double sum = 0;
                         for (Object Y : values) {
-                            sum += model.getProb(X, Y, time);
+                            sum += getProb(X, Y);
                         }
                         ft.setValue(new Object[] {X}, sum);
                     }
@@ -440,7 +520,7 @@ public class SubstNode implements BNode, TiedNode {
                     // F(Y) from P(X = x| Y)
                     Object X = varinstance;
                     for (Object Y : values) {
-                        ft.setValue(new Object[] {Y}, model.getProb(X, Y, time));
+                        ft.setValue(new Object[] {Y}, getProb(X, Y));
                     }
                     return ft;
                 } else { // parent is NOT relevant
@@ -450,7 +530,7 @@ public class SubstNode implements BNode, TiedNode {
                     Object X = varinstance;
                     double sum = 0;
                     for (Object Y : values) {
-                        sum += model.getProb(X, Y, time);
+                        sum += getProb(X, Y);
                     }
                     ft.setValue(sum);
                     return ft;
@@ -463,7 +543,7 @@ public class SubstNode implements BNode, TiedNode {
                 // F(X) from P(X | Y)
                 Object Y = parinstance;
                 for (Object X : values) {
-                    ft.setValue(new Object[] {X}, model.getProb(X, Y, time));
+                    ft.setValue(new Object[] {X}, getProb(X, Y));
                 }
                 return ft;
             }
@@ -471,12 +551,12 @@ public class SubstNode implements BNode, TiedNode {
         } else { // no parents, just a prior
             if (varinstance != null) { // instantiated prior
                 AbstractFactor ft = new DenseFactor();
-                ft.setValue(model.getProb(varinstance));
+                ft.setValue(getProb(varinstance));
                 return ft;
             } else { // not instantiated
                 AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
                 for (Object X : values) {
-                    ft.setValue(new Object[] {X}, model.getProb(X));
+                    ft.setValue(new Object[] {X}, getProb(X));
                 }
                 return ft;
             }

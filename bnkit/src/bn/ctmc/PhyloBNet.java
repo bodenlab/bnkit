@@ -35,6 +35,7 @@ import java.util.Set;
 /**
  * Class for a Bayesian network that represent a phylogenetic tree.
  * @author mikael
+ * @deprecated
  */
 public class PhyloBNet {
 

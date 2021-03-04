@@ -25,12 +25,20 @@ import dat.Enumerable;
 import bn.ctmc.matrix.*;
 import bn.math.Matrix.Exp;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
- *
+ * Conditional probability table for CTMC based on discrete alphabets
  * @author mikael
+ *
+ * TODO: optimise the access to conditional probabilities @ time,
+ * thread-aware cache and possibly compromise on precision; also be mindful of alphabet size.
+ * ALternatively, clone the model for each node.
+ *
  */
 public abstract class SubstModel {
-    
+
     final double[][] R; // This is the IRM, sometimes referred to as Q
     final double[] F;   // This is the frequencies of the character states
     final Exp Rexp;     // exp(IRM)
@@ -46,7 +54,7 @@ public abstract class SubstModel {
     public SubstModel(double[] F, double[][] S, Enumerable alphabet) {
         this(F, S, alphabet, true);
     }
-    
+
     /**
      * Create evolutionary model.
      * @param F stationary base frequencies
@@ -114,7 +122,7 @@ public abstract class SubstModel {
     public Enumerable getDomain() {
         return alpha;
     }
-    /** 
+    /**
      * Make it a valid rate matrix (make sum of rows = 0) "in place"
      * @param R the potentially invalid R, to be modified in place
      */
@@ -151,6 +159,30 @@ public abstract class SubstModel {
     private double time = 0.0;
     // private boolean updateRequired = true;
 
+    // To speed up calculation, store recent probability matrices
+    private Map<Double, double[][]> probscache = new HashMap<>();
+
+    // size of cache
+    public int CACHE_SIZE = 10000;
+
+    /**
+     * Set another cached prob matrix
+     */
+    private void setCache(double time, double[][] p) {
+        if (probscache.size() < CACHE_SIZE)
+            probscache.put(time, p);
+    }
+
+    private double[][] getCache(double time) {
+        double[][] p = probscache.get(time);
+        if (p == null) {
+            synchronized (this) {
+                p = getProbs(time);
+                setCache(time, p);
+            }
+        }
+        return p;
+    }
     /**
      * Get conditional probability P(X=x|Y=y,time)
      * @param X
@@ -160,7 +192,7 @@ public abstract class SubstModel {
      */
     public double getProb(Object X, Object Y, double time) {
         if (this.time != time || probs == null) // only re-compute matrix if time has changed
-            probs = getProbs(time);
+            probs = getCache(time);
         int index_X = alpha.getIndex(X);
         int index_Y = alpha.getIndex(Y);
         return probs[index_Y][index_X];
@@ -185,11 +217,11 @@ public abstract class SubstModel {
         int index_X = alpha.getIndex(X);
         return F[index_X];
     }
-    
+
     public EnumDistrib getDistrib(Object Y, double time) {
         if (this.time != time || probs == null || table == null) { // only re-compute matrix if time has changed
-            probs = getProbs(time);
-            table = new EnumTable<>(new EnumVariable(alpha), new EnumVariable(alpha));
+            probs = getCache(time);
+            table = new EnumTable<>(new EnumVariable(alpha));
             for (int i = 0; i < probs.length; i ++) {
                 EnumDistrib d = new EnumDistrib(alpha, probs[i]);
                 table.setValue(i, d);
@@ -197,7 +229,7 @@ public abstract class SubstModel {
         }
         return table.getValue(new Object[] {Y});
     }
-    
+
     /**
      * Compute the transition probabilities for an expected distance
      * using the pre-specified rate matrix
@@ -231,9 +263,33 @@ public abstract class SubstModel {
         }
         return prob;
     }
-    
+
+    public static SubstModel createModel(String name) {
+        if (name.equalsIgnoreCase("Gap")) {
+            return new Gap();
+        } else if (name.equalsIgnoreCase("Yang")) {
+            return new Yang();
+        } else if (name.equalsIgnoreCase("JC")) {
+            return new JC(1);
+        } else if (name.equalsIgnoreCase("GLOOME1")) {
+            return new GLOOME1();
+        } else if (name.equalsIgnoreCase("WAG")) {
+            return new WAG();
+        } else if (name.equalsIgnoreCase("LG")) {
+            return new LG();
+        }   else if (name.equalsIgnoreCase("JTT")) {
+            return new JTT();
+        } else if (name.equalsIgnoreCase("Dayhoff")) {
+            return new Dayhoff();
+        } else if (name.equalsIgnoreCase("SIMPLE_3")) {
+            return new SIMPLE_3();
+        } else
+            return null;
+    }
+
     public static void main(String[] argv) {
         SubstModel sm_gap = new Gap();
+        SubstModel sm_gloome1 = new GLOOME1();
         SubstModel sm_yang = new Yang();
         SubstModel sm_wag = new WAG();
         SubstModel sm_lg = new LG();
@@ -242,6 +298,8 @@ public abstract class SubstModel {
 
         System.out.println("R (Gap)");
         bn.math.Matrix.print(sm_gap.getR());
+        System.out.println("R (GLOOME1)");
+        bn.math.Matrix.print(sm_gloome1.getR());
         System.out.println("R (Yang)");
         bn.math.Matrix.print(sm_yang.getR());
 
@@ -257,6 +315,10 @@ public abstract class SubstModel {
         double[][] prob = sm_gap.getProbs(time);
         bn.math.Matrix.print(prob);
 
+        System.out.println("\n\nTransition probabilities of R (GLOOME1) @ time = " + time);
+        prob = sm_gloome1.getProbs(time);
+        bn.math.Matrix.print(prob);
+
         System.out.println("\n\nTransition probabilities of R (Yang) @ time = " + time);
         prob = sm_yang.getProbs(time);
         bn.math.Matrix.print(prob);
@@ -264,7 +326,7 @@ public abstract class SubstModel {
         System.out.println("\n\nTransition probabilities of R (WAG) @ time = " + time);
         prob = sm_wag.getProbs(time);
         bn.math.Matrix.print(prob);
-        
+
         System.out.println("\nTransition probabilities of R (LG) @ time = " + time);
         prob = sm_lg.getProbs(time);
         bn.math.Matrix.print(prob);

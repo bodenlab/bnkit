@@ -376,7 +376,7 @@ public class ConsensusObject {
         if (!isBidirectional && to.getId() != finalNode.getId() && from.getId() != initialNode.getId()) {
             multiplier = 2 * numberPositionsInSequence;
         }
-        if (isBidirectional) // give bi-directional edges a tiny advantage, regardless
+        if (!isBidirectional) // give bi-directional edges a tiny advantage, regardless
             multiplier *= 1.001;
 
         double val = 1 - weight;
@@ -544,6 +544,8 @@ public class ConsensusObject {
         boolean printout = false;
         while (!openSet.isEmpty()) {
             Node current = getLowestCostNode(openSet); //openSet.poll();
+            if (current.id == 1446)
+                System.out.println(current.id);
             if (current == null) {
                 current = openSet.get(0);
                 openSet.remove(current);

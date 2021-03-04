@@ -32,10 +32,10 @@ Continuous variables are less constrained since they can be assigned an infinite
     Variable varY = Predef.Real("Y");
 </pre>
 
-        <h3>Define nodes</h3>
+        <h3>Define branchPoints</h3>
 
-Once all variables are properly defined, it is time to connect them in the guise of nodes. There is currently two types of nodes, one for <code>EnumVariable</code> and one for <code>Variable&lt;Continuous&gt;</code>.
-They are known as {@link bn.CPT} (conditional probability table) and {@link bn.GDT} (Gaussian density table), respectively. They both implement the {@link bn.BNode} interface. (If you want to develop new node types, they need to implement this interface too.)
+Once all variables are properly defined, it is time to connect them in the guise of branchPoints. There is currently two types of branchPoints, one for <code>EnumVariable</code> and one for <code>Variable&lt;Continuous&gt;</code>.
+They are known as {@link bn.CPT} (conditional probability table) and {@link bn.GDT} (Gaussian density table), respectively. They both implement the {@link bn.BNode} interface. (If you want to develop new branchPoint types, they need to implement this interface too.)
 Currently, any {@link bn.BNode} will have to be based on enumerable parents. (Continuous "parents" make little sense, probabilistically, anyway.)
 <br>
 Here's an example based on one used in the literature (Russell and Norvig (2003; p. 493-494)):
@@ -55,9 +55,9 @@ Here's an example based on one used in the literature (Russell and Norvig (2003;
     CPT m = new CPT(M,    A);
 
 </pre>
-The code defines six variables and then defines six nodes, connecting variables B and E as parents to A, E to S, abd variable A as a parent to both J and M. B and E have no parents.
+The code defines six variables and then defines six branchPoints, connecting variables B and E as parents to A, E to S, abd variable A as a parent to both J and M. B and E have no parents.
 <br>
-The parameters of the nodes can be manually assigned, like so:
+The parameters of the branchPoints can be manually assigned, like so:
 <pre>
     b.put(new EnumDistrib(Enumerable.bool, 0.001, 0.999));
     e.put(new EnumDistrib(Enumerable.bool, 0.002, 0.998));
@@ -79,13 +79,13 @@ The second part is a list of values assigned to the parents, following the same 
 
         <h3>Define network</h3>
 
-The final step before you can use the Bayesian network is to package your nodes into the BNet class. This will make sure you can treat the network as a self-contained "unit", ready for saving, inference and training etc. 
+The final step before you can use the Bayesian network is to package your branchPoints into the BNet class. This will make sure you can treat the network as a self-contained "unit", ready for saving, inference and training etc.
 You can add them one-by-one, or together.
 <pre>
     BNet bn = new BNet();
     bn.add(b, e, s, a, j, m);
 </pre>
-If you want to, you can specify the Bayesian network in an XML file. This will impose some limitations as all variable and node types need to be pre-defined as discussed earlier.
+If you want to, you can specify the Bayesian network in an XML file. This will impose some limitations as all variable and branchPoint types need to be pre-defined as discussed earlier.
 Indeed, these limitations apply if you want to save your network too. Here's how you could save the definitions above to a file "bn_example.xml".
 <pre>
     file.BNBuf.save(bn, "bn_example.xml");
@@ -98,12 +98,12 @@ If you are interested in how you can write your own XML files, please look in th
         <h3>Make inference</h3>
         
 Inference involves specifying available evidence (observations), and then the variable(s) for which probabilities are sought.
-We don't assign observations to variables, but to nodes in the Bayesian network, like so:
+We don't assign observations to variables, but to branchPoints in the Bayesian network, like so:
 <pre>
     j.setInstance(true);
     m.setInstance(true);
 </pre>
-Of course the values we assign to the nodes must be valid values according to the domains of the variables in the nodes.
+Of course the values we assign to the branchPoints must be valid values according to the domains of the variables in the branchPoints.
 Then finally, we use an inference engine (that should implement the interface {@link bn.alg.Inference}) such as {@link bn.alg.VarElim}.
 To enable optimisations to occur inside the inference engine, we provide query variables to it, and the engine come up with a useful representation.
 (In some applications, the same query may be posed many times, but with different evidence, or vice versa.)

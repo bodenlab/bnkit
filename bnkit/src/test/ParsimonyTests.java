@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Created by mikael on 17/8/17.
+ * @deprecated
  */
 public class ParsimonyTests {
 

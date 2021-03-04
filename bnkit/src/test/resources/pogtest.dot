@@ -1,0 +1,59 @@
+digraph  {
+rankdir="LR";
+node [style="rounded,filled", shape=box, fixedsize=true];
+0 [fillcolor="#80B3E6",style="rounded,filled"];
+1 [fillcolor="#80B3E6",style="rounded,filled"];
+2 [fillcolor="#80B3E6",style="rounded,filled"];
+3 [fillcolor="#80B3E6",style="rounded,filled"];
+4 [fillcolor="#80B3E6",style="rounded,filled"];
+5 [fillcolor="#80B3E6",style="rounded,filled"];
+6 [fillcolor="#80B3E6",style="rounded,filled"];
+7 [fillcolor="#80B3E6",style="rounded,filled"];
+8 [fillcolor="#80B3E6",style="rounded,filled"];
+9 [fillcolor="#80B3E6",style="rounded,filled"];
+10 [fillcolor="#80B3E6",style="rounded,filled"];
+11 [fillcolor="#80B3E6",style="rounded,filled"];
+12 [fillcolor="#80B3E6",style="rounded,filled"];
+13 [fillcolor="#80B3E6",style="rounded,filled"];
+14 [fillcolor="#80B3E6",style="rounded,filled"];
+15 [fillcolor="#80B3E6",style="rounded,filled"];
+16 [fillcolor="#80B3E6",style="rounded,filled"];
+17 [fillcolor="#80B3E6",style="rounded,filled"];
+18 [fillcolor="#80B3E6",style="rounded,filled"];
+19 [fillcolor="#80B3E6",style="rounded,filled"];
+20 [fillcolor="#80B3E6",style="rounded,filled"];
+21 [fillcolor="#80B3E6",style="rounded,filled"];
+22 [fillcolor="#80B3E6",style="rounded,filled"];
+23 [fillcolor="#80B3E6",style="rounded,filled"];
+24 [fillcolor="#80B3E6",style="rounded,filled"];
+25 [fillcolor="#80B3E6",style="rounded,filled"];
+26 [fillcolor="#80B3E6",style="rounded,filled"];
+27 [fillcolor="#80B3E6",style="rounded,filled"];
+28 [fillcolor="#80B3E6",style="rounded,filled"];
+29 [fillcolor="#80B3E6",style="rounded,filled"];
+_start [label="S()",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];
+_end [label="E()",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];
+{rank=source;_start;}
+{rank=sink;_end;}
+edge [];
+_start -> 1
+_start -> 6
+_start -> 8
+1 -> 3
+3 -> 5
+5 -> 7
+6 -> 13
+7 -> 9
+8 -> 17
+9 -> 11
+11 -> 13
+13 -> 15
+13 -> 20
+15 -> 17
+17 -> 19
+17 -> 26
+19 -> 21
+20 -> _end
+21 -> _end
+26 -> _end
+}
