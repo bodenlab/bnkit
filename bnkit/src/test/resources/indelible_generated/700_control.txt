@@ -1,0 +1,18 @@
+[TYPE] AMINOACID 1
+[SETTINGS]
+ [ancestralprint] NEW
+ [output] FASTA
+ [fastaextension] fasta
+ [randomseed] 2232
+ [markdeletedinsertions] FALSE
+ [insertaslowercase] TRUE
+ [fileperrep] TRUE
+[MODEL] model1
+ [submodel] WAG
+ [indelmodel] POW 1.7 20
+ [indelrate] 0.01
+[TREE] tree1
+ [unrooted] 700
+[PARTITIONS] partition1
+ [tree1 model1 100]
+[EVOLVE] partition1 5 700

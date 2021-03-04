@@ -38,7 +38,7 @@ import java.util.Map;
  *
  */
 public abstract class SubstModel {
-    
+
     final double[][] R; // This is the IRM, sometimes referred to as Q
     final double[] F;   // This is the frequencies of the character states
     final Exp Rexp;     // exp(IRM)
@@ -54,7 +54,7 @@ public abstract class SubstModel {
     public SubstModel(double[] F, double[][] S, Enumerable alphabet) {
         this(F, S, alphabet, true);
     }
-    
+
     /**
      * Create evolutionary model.
      * @param F stationary base frequencies
@@ -122,7 +122,7 @@ public abstract class SubstModel {
     public Enumerable getDomain() {
         return alpha;
     }
-    /** 
+    /**
      * Make it a valid rate matrix (make sum of rows = 0) "in place"
      * @param R the potentially invalid R, to be modified in place
      */
@@ -177,8 +177,8 @@ public abstract class SubstModel {
         double[][] p = probscache.get(time);
         if (p == null) {
             synchronized (this) {
-               p = getProbs(time);
-               setCache(time, p);
+                p = getProbs(time);
+                setCache(time, p);
             }
         }
         return p;
@@ -217,7 +217,7 @@ public abstract class SubstModel {
         int index_X = alpha.getIndex(X);
         return F[index_X];
     }
-    
+
     public EnumDistrib getDistrib(Object Y, double time) {
         if (this.time != time || probs == null || table == null) { // only re-compute matrix if time has changed
             probs = getCache(time);
@@ -229,7 +229,7 @@ public abstract class SubstModel {
         }
         return table.getValue(new Object[] {Y});
     }
-    
+
     /**
      * Compute the transition probabilities for an expected distance
      * using the pre-specified rate matrix
@@ -281,6 +281,8 @@ public abstract class SubstModel {
             return new JTT();
         } else if (name.equalsIgnoreCase("Dayhoff")) {
             return new Dayhoff();
+        } else if (name.equalsIgnoreCase("SIMPLE_3")) {
+            return new SIMPLE_3();
         } else
             return null;
     }
@@ -324,7 +326,7 @@ public abstract class SubstModel {
         System.out.println("\n\nTransition probabilities of R (WAG) @ time = " + time);
         prob = sm_wag.getProbs(time);
         bn.math.Matrix.print(prob);
-        
+
         System.out.println("\nTransition probabilities of R (LG) @ time = " + time);
         prob = sm_lg.getProbs(time);
         bn.math.Matrix.print(prob);

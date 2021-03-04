@@ -27,8 +27,9 @@ class GRASPTest {
     static void setup() {
         try {
 
-            EnumSeq.Alignment aln = Utils.loadAlignment("src/test/resources/basic_5_cut.aln", Enumerable.aacid);
-            Tree tree = Utils.loadTree("src/test/resources/basic_5.nwk");
+            EnumSeq.Alignment aln = Utils.loadAlignment("src/test/resources/indelible_generated/700_3_2232.fasta", Enumerable.aacid);
+            Tree tree = Utils.loadTree("src/test/resources/indelible_generated/700_3_2232.nwk");
+
 
             pogTree = new POGTree(aln, tree);
 
@@ -39,6 +40,44 @@ class GRASPTest {
         } catch (IOException | ASRException e) {
             System.err.println(e.getMessage());
             System.exit(1);
+        }
+    }
+
+    @Test
+    void test_Indelible_Data_Returns_Prediction() {
+
+        Prediction indelpred = Prediction.PredictByIndelMaxLhood(pogTree);
+        assertTrue(indelpred instanceof Prediction);
+        indelpred.getJoint(jtt);
+        Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
+
+
+        POGraph[] ancestors = new POGraph[pogs.size()];
+
+        int i = 0;
+        for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
+            ancestors[i ++] = entry.getValue();
+        EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
+
+        int ii = 0;
+
+        for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+            ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
+        }
+
+        for (int s = 0; s < ancseqs.length; s++) {
+            Object[] str = ancseqs[s].get();
+
+            String anc_str = "";
+
+            for (i = 0; i < str.length; i++) {
+                try {
+                    anc_str += str[i].toString();
+                } catch (NullPointerException npe) {
+                    anc_str += "-";
+                }
+            }
+            System.out.println(anc_str);
         }
     }
 
