@@ -11,11 +11,7 @@ import dat.phylo.IdxTree;
 import dat.phylo.TreeDecor;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -655,7 +651,7 @@ public class Prediction {
      * @param pogTree
      * @return instance of IndelPrediction
      */
-    public static Prediction PredictByIndelParsimony(POGTree pogTree) {
+    public static Prediction PredictByIndelParsimony(POGTree pogTree, Boolean forceLinear) {
         int nPos = pogTree.getPositions(); //
         IdxTree tree = pogTree.getTree();
         Map<Object, POGraph> ancestors = new HashMap<>();
@@ -733,10 +729,7 @@ public class Prediction {
                 i ++;
             }
             if (DEBUG) System.out.println();
-            int[][] edges_optional = new int[optionally_true.size()][2];
-            i = 0;
-            for (Interval1D edge : optionally_true)
-                edges_optional[i++] = new int[]{edge.min, edge.max};
+
             // Second, use only indels that are not contained within an unambiguously TRUE indel
             Set<Interval1D> discarded = new HashSet<>();
             i = 0; // interval index
@@ -748,11 +741,31 @@ public class Prediction {
                     discarded.add(ival);
                 i += 1;
             }
+
+            // Add in all of the linear neighbours that are partially ordered
+
+            if (forceLinear) {
+                for (Interval1D poval : pogTree.getPOVals()) {
+                    optionally_true.add(poval);
+                    int count_contains = 0;
+                    for (Interval1D definitive : definitively_true)
+                        count_contains += definitive.contains(poval) ? 1 : 0;
+                    if (count_contains > 1)
+                        discarded.add(poval);
+                }
+            }
+
+            int[][] edges_optional = new int[optionally_true.size()][2];
+            i = 0;
+            for (Interval1D edge : optionally_true)
+                edges_optional[i++] = new int[]{edge.min, edge.max};
+
             definitively_true.removeAll(discarded);
             int[][] edges_definitive = new int[definitively_true.size()][];
             i = 0;
             for (Interval1D edge : definitively_true)
                 edges_definitive[i++] = new int[]{edge.min, edge.max};
+
             // finally put the info into a POG
             POGraph pog = POGraph.createFromEdgeIndicesWithoutDeadends(nPos, edges_optional, edges_definitive);
             ancestors.put(ancID, pog);
@@ -767,14 +780,14 @@ public class Prediction {
      * @param pogTree
      * @return instance of IndelPrediction
      */
-    public static Prediction PredictByIndelMaxLhood(POGTree pogTree) {
+    public static Prediction PredictByIndelMaxLhood(POGTree pogTree, Boolean forceLinear) {
 
 
         Object[] possible = {true, false};
         SubstModel substmodel = new JC(1, possible);
 
 
-        return Prediction.PredictByIndelMaxLhood(pogTree, substmodel);
+        return Prediction.PredictByIndelMaxLhood(pogTree, forceLinear, substmodel);
     }
 
     /**
@@ -784,7 +797,7 @@ public class Prediction {
      * @param gain_loss_model model for gain and loss events
      * @return instance of IndelPrediction
      */
-    public static Prediction PredictByIndelMaxLhood(POGTree pogTree, SubstModel gain_loss_model) {
+    public static Prediction PredictByIndelMaxLhood(POGTree pogTree, Boolean forceLinear, SubstModel gain_loss_model) {
         int nPos = pogTree.getPositions(); // number of positions in alignment/POG
         IdxTree tree = pogTree.getTree();  // the tree that represents phylogenetic relationships between extants
         Map<Object, POGraph> ancestors = new HashMap<>();
@@ -871,10 +884,6 @@ public class Prediction {
                 i ++;
             }
             if (DEBUG) System.out.println();
-            int[][] edges_optional = new int[optionally_true.size()][2];
-            i = 0;
-            for (Interval1D edge : optionally_true)
-                edges_optional[i++] = new int[]{edge.min, edge.max};
             // Second, use only indels that are not contained within an unambiguously TRUE indel
             Set<Interval1D> discarded = new HashSet<>();
             i = 0; // interval index
@@ -886,7 +895,28 @@ public class Prediction {
                     discarded.add(ival);
                 i += 1;
             }
+
+            // Add in all of the linear neighbours that are partially ordered
+
+            if (forceLinear) {
+
+                for (Interval1D poval : pogTree.getPOVals()) {
+                    optionally_true.add(poval);
+                    int count_contains = 0;
+                    for (Interval1D definitive : definitively_true)
+                        count_contains += definitive.contains(poval) ? 1 : 0;
+                    if (count_contains > 1)
+                        discarded.add(poval);
+                }
+            }
+
             definitively_true.removeAll(discarded);
+
+            int[][] edges_optional = new int[optionally_true.size()][2];
+            i = 0;
+            for (Interval1D edge : optionally_true)
+                edges_optional[i++] = new int[]{edge.min, edge.max};
+
             int[][] edges_definitive = new int[definitively_true.size()][];
             i = 0;
             for (Interval1D edge : definitively_true)

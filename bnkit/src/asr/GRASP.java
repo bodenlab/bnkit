@@ -4,6 +4,8 @@ import bn.ctmc.SubstModel;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
+import dat.Interval1D;
+import dat.IntervalST;
 import dat.file.*;
 import dat.phylo.IdxTree;
 import dat.phylo.Tree;
@@ -26,6 +28,7 @@ public class GRASP {
     public static String VERSION = "0110.2021";
     public static boolean VERBOSE = false;
     public static boolean TIME = false;
+    public static boolean FORCELINEAR = false;
     public static int NTHREADS = 1;
 
     public enum Inference {
@@ -50,6 +53,7 @@ public class GRASP {
                 "\t{-indel <BEP(default)|BEML|SICP|SICML|PSP|PSML>}\n" +
                 "\t{-gap}\n" +
                 "\t{-savetree <tree-directory>}\n" +
+                "\t{-forcelinear}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT|TREE>}\n" +
                 "\t{-time}{-verbose}{-help}");
         out.println("where \n" +
@@ -60,6 +64,7 @@ public class GRASP {
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
                 "\tThe output file is written on the specified format\n" +
+                "\t-forcelinear forces a linear ordering between neighbouring columns\n" +
                 "\t-verbose will print out information about steps undertaken, and -time the time it took to finish");
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
@@ -115,6 +120,8 @@ public class GRASP {
                     VERBOSE = true;
                 } else if (arg.equalsIgnoreCase("time")) {
                     TIME = true;
+                } else if (arg.equalsIgnoreCase("forcelinear")) {
+                    FORCELINEAR = true;
                 } else if (arg.equalsIgnoreCase("savetree")) {
                     SAVE_TREE = true;
 
@@ -197,8 +204,8 @@ public class GRASP {
                 switch (INDEL_IDX) {
                     case 0: indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree); break;
                     case 1: indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree); break;
-                    case 2: indelpred = Prediction.PredictByIndelParsimony(pogtree); break;
-                    case 3: indelpred = Prediction.PredictByIndelMaxLhood(pogtree); break;
+                    case 2: indelpred = Prediction.PredictByIndelParsimony(pogtree, FORCELINEAR); break;
+                    case 3: indelpred = Prediction.PredictByIndelMaxLhood(pogtree, FORCELINEAR); break;
                     case 4: indelpred = Prediction.PredictByParsimony(pogtree); break;
                     case 5: indelpred = Prediction.PredictbyMaxLhood(pogtree); break;
                     default: break;
@@ -211,9 +218,32 @@ public class GRASP {
                     indelpred.getMarginal(MARG_NODE, MODEL);
                 Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
                 POGraph[] ancestors = new POGraph[pogs.size()];
+
+
+
+
+
                 int ii = 0;
                 for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
                     ancestors[ii ++] = entry.getValue();
+
+                // Below is being used to write out a file for each reconstruction that states for each edge between a
+                // set of partially ordered columns if these edges are present in each ancestral graph
+
+//                FileWriter writer = new FileWriter(new File (OUTPUT, "povals.txt"));
+//
+//                IntervalST<Integer> povals = pogtree.getPOVals();
+//
+//                for (POGraph ancgraph : ancestors) {
+//
+//                    for (Interval1D poval : povals) {
+//                        writer.write(poval.toString() + "\n");
+//                        writer.write(String.valueOf(ancgraph.isPath(poval.min, poval.max)) + "\n");
+//                    }
+//                }
+//                writer.close();
+
+
                 EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
                 if (CONSENSUS[FORMAT_IDX]) {
                     ii = 0;

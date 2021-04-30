@@ -3,6 +3,7 @@ package dat.pog;
 import asr.ASRRuntimeException;
 import bn.prob.EnumDistrib;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -376,19 +377,28 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             for (int idx : edge)
                 if (!(idx == -1 || idx == pog.nNodes || pog.isNode(idx)))
                     pog.addNode(idx, new StatusNode());
-            pog.addEdge(edge[0], edge[1], new StatusEdge(true));
+                pog.addEdge(edge[0], edge[1], new StatusEdge(true));
+
         }
+
         // find and cripple precluded paths, for each definite edge
         for (int[] edge : definitive) {
+
             int[][] ends = pog.findEndsOfPrecludedEdges(edge[0], edge[1]);
             for (int[] end : ends)
                 pog.removeEdge(end[0], end[1]);
+
         }
+
         // remove all dead-ends
         for (int idx : pog.getForward())
             visitForward(pog, idx);
+
         for (int idx : pog.getBackward())
             visitBackward(pog, idx);
+
+
+
         for (int idx = 0; idx < pog.nNodes; idx ++) {
             if (pog.isNode(idx)) {
                 StatusNode snode = (StatusNode) pog.getNode(idx);
@@ -399,6 +409,8 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                 }
             }
         }
+
+
         return pog;
     }
 
@@ -433,6 +445,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             int[][] ends = pog.findEndsOfPrecludedEdges(edge[0], edge[1]);
             for (int[] end : ends)
                 pog.removeEdge(end[0], end[1]);
+
         }
         // remove all dead-ends
         for (int idx : pog.getForward())

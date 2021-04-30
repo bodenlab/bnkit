@@ -27,6 +27,7 @@ public class POGTree {
     private POGraph[] extarr;               // POGs for extant sequences, indexed by branchpoint index
     private Map<Object, Integer> id2bpidx;  // the indices of extant sequences
     private IntervalST<Integer> ivals;      // Aggregation of all indels indicated by extant sequences (refactored to map-to bpidx Dec 2020)
+    private IntervalST<Integer> povals;     // All of the neighouring columns that have partial ordering
     private Enumerable domain;              // the alphabet
     private final int nNodes;
 
@@ -73,6 +74,15 @@ public class POGTree {
             to = pog.maxsize();
             pog.addEdge(from, to);
             ivals.put(new Interval1D(from, to), bpidx);
+        }
+
+        // Add an interval between each linear position at a single sequence (to force linearity for Simple Indel Coding)
+
+        this.povals = new IntervalST<>();
+        for (int i = 0; i < aln.getWidth(); i++) {
+            if (! ivals.contains(new Interval1D(i, i+1))){
+                povals.put(new Interval1D(i, i+1), 0);
+            }
         }
     }
 
@@ -156,6 +166,14 @@ public class POGTree {
      */
     public IntervalST<Integer> getIntervalTree() {
         return ivals;
+    }
+
+    /**
+     * Get the data structure holding all the linear neighbours that are partially ordered
+     * @return the interval tree that contains all partially ordered neighbours (as intervals)
+     */
+    public IntervalST<Integer> getPOVals() {
+        return povals;
     }
 
     /**
