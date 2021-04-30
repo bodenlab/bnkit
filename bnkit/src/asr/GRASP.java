@@ -4,6 +4,8 @@ import bn.ctmc.SubstModel;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
+import dat.Interval1D;
+import dat.IntervalST;
 import dat.file.*;
 import dat.phylo.IdxTree;
 import dat.phylo.Tree;
@@ -26,6 +28,7 @@ public class GRASP {
     public static String VERSION = "0110.2021";
     public static boolean VERBOSE = false;
     public static boolean TIME = false;
+    public static boolean FORCELINEAR = false;
     public static int NTHREADS = 1;
 
     public enum Inference {
@@ -50,6 +53,7 @@ public class GRASP {
                 "\t{-indel <BEP(default)|BEML|SICP|SICML|PSP|PSML>}\n" +
                 "\t{-gap}\n" +
                 "\t{-savetree <tree-directory>}\n" +
+                "\t{-forcelinear}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT|TREE>}\n" +
                 "\t{-time}{-verbose}{-help}");
         out.println("where \n" +
@@ -60,6 +64,7 @@ public class GRASP {
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
                 "\tThe output file is written on the specified format\n" +
+                "\t-forcelinear forces a linear ordering between neighbouring columns\n" +
                 "\t-verbose will print out information about steps undertaken, and -time the time it took to finish");
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
@@ -93,11 +98,12 @@ public class GRASP {
 
         Inference MODE = Inference.JOINT;
         Integer MARG_NODE = null;
-        String SAVE_TREE = null;
+        boolean SAVE_TREE = false;
 
         long START_TIME, ELAPSED_TIME;
 
         for (int a = 0; a < args.length; a ++) {
+            System.out.println(args[a]);
             if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
                 if (arg.equalsIgnoreCase("aln") && args.length > a + 1) {
@@ -114,8 +120,11 @@ public class GRASP {
                     VERBOSE = true;
                 } else if (arg.equalsIgnoreCase("time")) {
                     TIME = true;
-                } else if (arg.equalsIgnoreCase("savetree") && args.length > a + 1) {
-                    SAVE_TREE = args[++a];
+                } else if (arg.equalsIgnoreCase("forcelinear")) {
+                    FORCELINEAR = true;
+                } else if (arg.equalsIgnoreCase("savetree")) {
+                    SAVE_TREE = true;
+
                 } else if (arg.equalsIgnoreCase("marg") && args.length > a + 1) {
                     MODE = Inference.MARGINAL;
                     String ancid = args[++a];
@@ -195,10 +204,10 @@ public class GRASP {
                 switch (INDEL_IDX) {
                     case 0: indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree); break;
                     case 1: indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree); break;
-                    case 2: indelpred = Prediction.PredictByIndelParsimony(pogtree); break;
-                    case 3: indelpred = Prediction.PredictByIndelMaxLhood(pogtree); break;
+                    case 2: indelpred = Prediction.PredictByIndelParsimony(pogtree, FORCELINEAR); break;
+                    case 3: indelpred = Prediction.PredictByIndelMaxLhood(pogtree, FORCELINEAR); break;
                     case 4: indelpred = Prediction.PredictByParsimony(pogtree); break;
-                    case 5: usage(3, "PSML is not implemented"); break;
+                    case 5: indelpred = Prediction.PredictbyMaxLhood(pogtree); break;
                     default: break;
                 }
                 if (indelpred == null)
@@ -209,23 +218,49 @@ public class GRASP {
                     indelpred.getMarginal(MARG_NODE, MODEL);
                 Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
                 POGraph[] ancestors = new POGraph[pogs.size()];
+
+
+
+
+
                 int ii = 0;
                 for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
                     ancestors[ii ++] = entry.getValue();
+
+                // Below is being used to write out a file for each reconstruction that states for each edge between a
+                // set of partially ordered columns if these edges are present in each ancestral graph
+
+//                FileWriter writer = new FileWriter(new File (OUTPUT, "povals.txt"));
+//
+//                IntervalST<Integer> povals = pogtree.getPOVals();
+//
+//                for (POGraph ancgraph : ancestors) {
+//
+//                    for (Interval1D poval : povals) {
+//                        writer.write(poval.toString() + "\n");
+//                        writer.write(String.valueOf(ancgraph.isPath(poval.min, poval.max)) + "\n");
+//                    }
+//                }
+//                writer.close();
+
+
                 EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
                 if (CONSENSUS[FORMAT_IDX]) {
                     ii = 0;
                     for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
                         ancseqs[ii ++] = indelpred.getSequence(entry.getKey(), MODE, GAPPY);
                 }
+                File file = new File(OUTPUT);
+                file.mkdirs();
                 switch (FORMAT_IDX) {
+
                     case 0: // FASTA
-                        FastaWriter fw = new FastaWriter(OUTPUT);
+                        FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
                         fw.save(ancseqs);
                         fw.close();
                         break;
                     case 2: // CLUSTAL
-                        AlnWriter aw = new AlnWriter(OUTPUT);
+                        AlnWriter aw = new AlnWriter(new File (OUTPUT, "GRASP_ancestors.aln"));
                         aw.save(ancseqs);
                         aw.close();
                         break;
@@ -267,8 +302,8 @@ public class GRASP {
                             usage(8, "Invalid ancestor node label: " + MARG_NODE);
                         break;
                 }
-                if (SAVE_TREE != null)
-                    Newick.save(tree, SAVE_TREE, Newick.MODE_ANCESTOR);
+                if (SAVE_TREE)
+                    Newick.save(tree, OUTPUT + "/GRASP_ancestors.nwk", Newick.MODE_ANCESTOR);
 
                 ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
                 if (VERBOSE || TIME) {
@@ -285,7 +320,7 @@ public class GRASP {
  */
             }
 
-        } else if (OUTPUT == null && NEWICK != null && SAVE_TREE != null) {
+        } else if (OUTPUT == null && NEWICK != null && SAVE_TREE) {
         } else if (ALIGNMENT == null)
                 usage(3, "Need to specify alignment (Clustal or FASTA file)");
         else if (NEWICK == null)

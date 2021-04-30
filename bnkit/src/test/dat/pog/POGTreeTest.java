@@ -52,7 +52,8 @@ class POGTreeTest {
 
     @Test
     void parsimonyAncestors2() {
-        Prediction ap = Prediction.PredictByIndelParsimony(pogt2);
+        Boolean forceLinear = false;
+        Prediction ap = Prediction.PredictByIndelParsimony(pogt2, forceLinear);
         for (int idx : pogt2.getTree()) {
             if (!pogt2.getTree().isLeaf(idx)) { // ancestor
                 Object ancID = pogt2.getTree().getLabel(idx);

@@ -11,11 +11,7 @@ import dat.phylo.IdxTree;
 import dat.phylo.TreeDecor;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -35,17 +31,18 @@ import java.util.concurrent.TimeUnit;
  */
 public class Prediction {
     public static boolean DEBUG = GRASP.VERBOSE;    // print out various information
+    public int NTHREADS = 4;                        // how many threads to utilise
     private final POGTree pogTree;                  // input data contained in a POGTree
     private final IdxTree phylotree;                // the input phylogenetic tree (is also accessible via POGTree)
     private int[] ancidxs = null;                   // store the sub-set of indices that are used for internal nodes (ancestors)
     //private final Map<Object, POGraph> ancestors; // named ancestors
-    private final POGraph[] ancarr;                 // ancestors by branch point index
+    private final POGraph[] ancarr;                 // ancestors by branchpoint index
     private final IdxTree[] positrees;              // position-specific tree, or an edited form of the original tree for the purpose of inferring content
     private TreeInstance[]  treeinstances;          // position-specific tree instances, which contain instantiated (by extants) and inferred content (duplicating the content in POGs)
     // Indexing of ancestors by ID to branch point index in phylogenetic tree and position-specific trees
-    private final int[][] positidxs;                // position-specific tree indices [aligned pos]["global" branch point idx]
-    private final EnumDistrib[][] distribs;         // Probability distributions of ancestor states by branch point and position index
-    private Object[][] states = null;               // Actual values at inferred branch points, indexed by branch point index and position
+    private final int[][] positidxs;                // position-specific tree indices [aligned pos]["global" branchpoint idx]
+    private final EnumDistrib[][] distribs;         // Probability distributions of ancestor states by branchpoint and position index
+    private Object[][] states = null;               // Actual values at inferred branch points, indexed by branchpoint index and position
 
     /**
      * Basic constructor, not intended for use as it forgoes/assumes prior prediction.
@@ -545,10 +542,12 @@ public class Prediction {
             for (Map.Entry<Integer, Set<Integer>> entry : anchorsets.entrySet()) {
                 int anchor = entry.getKey();
                 if (anchor >= 0)
-                    pog.addNode(anchor, new Node());
+                    if (pog.getNode(anchor) == null)
+                        pog.addNode(anchor, new Node());
                 for (int to : entry.getValue()) { // link anchored Node to each of the admissible nodes in the anchor set
                     if (to < nPos)
-                        pog.addNode(to, new Node());
+                        if (pog.getNode(to) == null)
+                            pog.addNode(to, new Node());
                     pog.addEdge(anchor, to, new POGraph.StatusEdge(true));
                 }
                 for (int from : entry.getValue()) { // all possible pairs of admissible Nodes are linked
@@ -559,6 +558,75 @@ public class Prediction {
                 }
             }
         }
+        return new Prediction(pogTree, ancestors);
+    }
+
+    public static Prediction PredictbyMaxLhood(POGTree pogTree){
+
+        int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
+        IdxTree tree = pogTree.getTree();  // indexed tree (quick access to branch points, no editing)
+        Map<Object, POGraph> ancestors = new HashMap<>(); // prepare where predictions will go
+        TreeInstance[] ti = pogTree.getNodeInstances(true);   // extract gap/no-gap (boolean) leaf instantiation for every position
+
+        MaxLhoodJoint[] ji = new MaxLhoodJoint[ti.length];
+        for (int i = 0; i < ji.length; i++) {
+            if (i == 1) {
+            }
+            Object[] possible = {true, false};
+            SubstModel substmodel = new JC(1, possible); // need to know the alphabet...
+            ji[i] = new MaxLhoodJoint(tree, substmodel);
+        }
+        // Below is where the main inference occurs
+        // this stage should be multi-threaded... not so at the moment
+        for (int i = 0; i < ti.length; i++) {
+            ji[i].decorate(ti[i]);
+        }
+
+        for (int j = 0; j < tree.getSize(); j ++) {         // for every (indexed) branch point (IdxTree defaults to depth-first order)
+            if (tree.isLeaf(j))             // if leaf, ignore and
+                continue;
+
+            Object ancID = tree.getBranchPoint(j).getID();  // unique ancestor ID from BranchPoint class (modifiable only before assembled into IdxTree when creating Tree)
+        POGraph pog = new POGraph(nPos);                // blank POG
+        ancestors.put(ancID, pog);                      // put blank POG in place, to be modified below
+        // each anchor-set (below) is a range of indices for the POG; the key is a position that MUST be entered, values contain admissible positions that follow
+        Map<Integer, Set<Integer>> anchorsets = new HashMap<>();
+        int current_anchor = -1; // the first jump always from the start position
+        Set<Integer> anchorset = new HashSet<>();
+
+        for (int i = 0; i < nPos; i ++) {   // now traverse all positions, consider if GAP, not-GAP or admissible
+             if (ji[i].getDecoration(j) == Boolean.FALSE) { // ALWAYS character (i.e. not-GAP), so required position
+                anchorset.add(i);
+                anchorsets.put(current_anchor, anchorset);  // anchor set is linked to the position at which it started
+                anchorset = new HashSet<>();                // re-set anchor set
+                current_anchor = i;                         // next anchor set is headed by this, not-GAP required position
+            }
+            // else it is a GAP only (so NOT added to admissible set, NOT an anchor)
+        }
+        anchorset.add(nPos);    // finish-up last anchor set
+        anchorsets.put(current_anchor, anchorset);
+        // next, peruse anchor sets, adding Nodes for all anchored or admissible positions
+        for (Map.Entry<Integer, Set<Integer>> entry : anchorsets.entrySet()) {
+            int anchor = entry.getKey();
+            if (anchor >= 0)
+                if (pog.getNode(anchor) == null)
+                    pog.addNode(anchor, new Node());
+            for (int to : entry.getValue()) { // link anchored Node to each of the admissible nodes in the anchor set
+                if (to < nPos)
+                    if (pog.getNode(to) == null)
+                        pog.addNode(to, new Node());
+                pog.addEdge(anchor, to, new POGraph.StatusEdge(true));
+            }
+            for (int from : entry.getValue()) { // all possible pairs of admissible Nodes are linked
+                for (int to : entry.getValue()) {
+                    if (from < to)
+                        pog.addEdge(from, to, new POGraph.StatusEdge(true));
+                }
+            }
+        }
+    }
+
+
         return new Prediction(pogTree, ancestors);
     }
 
@@ -583,7 +651,7 @@ public class Prediction {
      * @param pogTree
      * @return instance of IndelPrediction
      */
-    public static Prediction PredictByIndelParsimony(POGTree pogTree) {
+    public static Prediction PredictByIndelParsimony(POGTree pogTree, Boolean forceLinear) {
         int nPos = pogTree.getPositions(); //
         IdxTree tree = pogTree.getTree();
         Map<Object, POGraph> ancestors = new HashMap<>();
@@ -661,10 +729,7 @@ public class Prediction {
                 i ++;
             }
             if (DEBUG) System.out.println();
-            int[][] edges_optional = new int[optionally_true.size()][2];
-            i = 0;
-            for (Interval1D edge : optionally_true)
-                edges_optional[i++] = new int[]{edge.min, edge.max};
+
             // Second, use only indels that are not contained within an unambiguously TRUE indel
             Set<Interval1D> discarded = new HashSet<>();
             i = 0; // interval index
@@ -676,11 +741,31 @@ public class Prediction {
                     discarded.add(ival);
                 i += 1;
             }
+
+            // Add in all of the linear neighbours that are partially ordered
+
+            if (forceLinear) {
+                for (Interval1D poval : pogTree.getPOVals()) {
+                    optionally_true.add(poval);
+                    int count_contains = 0;
+                    for (Interval1D definitive : definitively_true)
+                        count_contains += definitive.contains(poval) ? 1 : 0;
+                    if (count_contains > 1)
+                        discarded.add(poval);
+                }
+            }
+
+            int[][] edges_optional = new int[optionally_true.size()][2];
+            i = 0;
+            for (Interval1D edge : optionally_true)
+                edges_optional[i++] = new int[]{edge.min, edge.max};
+
             definitively_true.removeAll(discarded);
             int[][] edges_definitive = new int[definitively_true.size()][];
             i = 0;
             for (Interval1D edge : definitively_true)
                 edges_definitive[i++] = new int[]{edge.min, edge.max};
+
             // finally put the info into a POG
             POGraph pog = POGraph.createFromEdgeIndicesWithoutDeadends(nPos, edges_optional, edges_definitive);
             ancestors.put(ancID, pog);
@@ -695,8 +780,14 @@ public class Prediction {
      * @param pogTree
      * @return instance of IndelPrediction
      */
-    public static Prediction PredictByIndelMaxLhood(POGTree pogTree) {
-        return Prediction.PredictByIndelMaxLhood(pogTree, new GLOOME1());
+    public static Prediction PredictByIndelMaxLhood(POGTree pogTree, Boolean forceLinear) {
+
+
+        Object[] possible = {true, false};
+        SubstModel substmodel = new JC(1, possible);
+
+
+        return Prediction.PredictByIndelMaxLhood(pogTree, forceLinear, substmodel);
     }
 
     /**
@@ -706,7 +797,7 @@ public class Prediction {
      * @param gain_loss_model model for gain and loss events
      * @return instance of IndelPrediction
      */
-    public static Prediction PredictByIndelMaxLhood(POGTree pogTree, SubstModel gain_loss_model) {
+    public static Prediction PredictByIndelMaxLhood(POGTree pogTree, Boolean forceLinear, SubstModel gain_loss_model) {
         int nPos = pogTree.getPositions(); // number of positions in alignment/POG
         IdxTree tree = pogTree.getTree();  // the tree that represents phylogenetic relationships between extants
         Map<Object, POGraph> ancestors = new HashMap<>();
@@ -724,11 +815,12 @@ public class Prediction {
         // To do this would require a switch to marginal inference, then thresholding for 0.5.
         TreeInstance[] ti = pogTree.getIndelInstances(); // instantiate a tree for each "indel", assigning leaf states as per extants
         MaxLhoodJoint[] ji = new MaxLhoodJoint[ti.length];
-        for (int i = 0; i < ji.length; i++) // for each "indel" we need to infer either gain or loss, so set-up inference
+        for (int i = 0; i < ji.length; i++) { // for each "indel" we need to infer either gain or loss, so set-up inference
             ji[i] = new MaxLhoodJoint(tree, gain_loss_model);
+        }
         // Below is where the main inference occurs
         // this stage should be multi-threaded... not so at the moment
-        for (int i = 0; i < ti.length; i++) { // for each "indel"
+        for (int i = 0; i < ti.length; i++) { // for each "indel" we need to infer either gain or loss, so set-up inference
             ji[i].decorate(ti[i]);
         }
         if (DEBUG) {
@@ -792,10 +884,6 @@ public class Prediction {
                 i ++;
             }
             if (DEBUG) System.out.println();
-            int[][] edges_optional = new int[optionally_true.size()][2];
-            i = 0;
-            for (Interval1D edge : optionally_true)
-                edges_optional[i++] = new int[]{edge.min, edge.max};
             // Second, use only indels that are not contained within an unambiguously TRUE indel
             Set<Interval1D> discarded = new HashSet<>();
             i = 0; // interval index
@@ -807,7 +895,28 @@ public class Prediction {
                     discarded.add(ival);
                 i += 1;
             }
+
+            // Add in all of the linear neighbours that are partially ordered
+
+            if (forceLinear) {
+
+                for (Interval1D poval : pogTree.getPOVals()) {
+                    optionally_true.add(poval);
+                    int count_contains = 0;
+                    for (Interval1D definitive : definitively_true)
+                        count_contains += definitive.contains(poval) ? 1 : 0;
+                    if (count_contains > 1)
+                        discarded.add(poval);
+                }
+            }
+
             definitively_true.removeAll(discarded);
+
+            int[][] edges_optional = new int[optionally_true.size()][2];
+            i = 0;
+            for (Interval1D edge : optionally_true)
+                edges_optional[i++] = new int[]{edge.min, edge.max};
+
             int[][] edges_definitive = new int[definitively_true.size()][];
             i = 0;
             for (Interval1D edge : definitively_true)
@@ -903,6 +1012,7 @@ public class Prediction {
             } else if (possible.length < 2) { // nothing to infer, can only take one value, so create blanket output
                 jif[i] = new TreeInstance.BlanketTreeDecor(tif[i].getSize(), possible[0]);
             } else {
+
                 SubstModel substmodel = new JC(1, possible); // need to know the alphabet...
                 jif[i] = new MaxLhoodJoint(tree, substmodel);
             }
@@ -934,7 +1044,15 @@ public class Prediction {
                 EdgeMap emap = new EdgeMap();
                 for (int i = -1; i <= nPos; i ++) {
                     if (i != nPos) {
+
+
+                        if (DEBUG) {
+                            System.out.println("i " + i);
+                            System.out.println("j " + j);
+                            System.out.println(jif[i + 1].getDecoration(j));
+                        }
                         Object solutsf = jif[i + 1].getDecoration(j);
+
                         int next = ((Integer) solutsf).intValue();
                         emap.add(i, next);
                     }
