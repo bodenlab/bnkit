@@ -381,6 +381,16 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 
         }
 
+        System.out.println("Find precluded paths");
+
+        // Save the partial order graph at this stage to a dot file
+
+        try {
+            pog.saveToDOT("currgraph.dot");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         // find and cripple precluded paths, for each definite edge
         for (int[] edge : definitive) {
 
@@ -516,6 +526,10 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                 if (nextidx <= dest_idx && all_unique)
                     visited.add(new int[]{pos, nextidx});
             }
+
+            System.out.println("Visited size is");
+            System.out.println(visited.toArray().length);
+
             for (int nextidx : nextidxs) {
                 if (nextidx <= dest_idx)
                     carryUniqueForward(pog, unique_idx, dest_idx, nextidx, visited);

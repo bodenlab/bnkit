@@ -166,11 +166,11 @@ class IndelTest {
         try {
 
             Tree tree = Utils.loadTree("src/test/resources/currently_failing/1.nwk");
-            EnumSeq.Alignment aln = Utils.loadAlignment("src/test/resources/currently_failing/1_cutdown2.fasta", Enumerable.aacid);
+            EnumSeq.Alignment aln = Utils.loadAlignment("src/test/resources/currently_failing/1_cutdown3.fasta", Enumerable.aacid);
 
             POGTree pogTree = new POGTree(aln, tree);
 
-            Boolean forceLinear = false;
+            Boolean forceLinear = true;
 
 //            Prediction indelpred = Prediction.PredictByParsimony(         pogTree);
 //            Prediction indelpred = Prediction.PredictbyMaxLhood(         pogTree);
