@@ -230,18 +230,24 @@ public class GRASP {
                 // Below is being used to write out a file for each reconstruction that states for each edge between a
                 // set of partially ordered columns if these edges are present in each ancestral graph
 
-//                FileWriter writer = new FileWriter(new File (OUTPUT, "povals.txt"));
-//
-//                IntervalST<Integer> povals = pogtree.getPOVals();
-//
-//                for (POGraph ancgraph : ancestors) {
-//
-//                    for (Interval1D poval : povals) {
-//                        writer.write(poval.toString() + "\n");
-//                        writer.write(String.valueOf(ancgraph.isPath(poval.min, poval.max)) + "\n");
-//                    }
-//                }
-//                writer.close();
+                if (FORCELINEAR && (INDEL_IDX == 2) || (INDEL_IDX == 3)) {
+
+                    FileWriter writer = new FileWriter(new File(OUTPUT, "povals.txt"));
+
+                    IntervalST<Integer> povals = pogtree.getPOVals();
+
+                    for (POGraph ancgraph : ancestors) {
+                        System.out.println(ancgraph.toString());
+
+                        for (Interval1D poval : povals) {
+//                            System.out.println(poval.toString());
+//                            System.out.println(ancgraph.isPath(poval.min, poval.max));
+                            writer.write(poval.toString() + "\n");
+                            writer.write(String.valueOf(ancgraph.isPath(poval.min, poval.max)) + "\n");
+                        }
+                    }
+                    writer.close();
+                }
 
 
                 EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
@@ -322,10 +328,10 @@ public class GRASP {
 
         } else if (OUTPUT == null && NEWICK != null && SAVE_TREE) {
         } else if (ALIGNMENT == null)
-                usage(3, "Need to specify alignment (Clustal or FASTA file)");
+            usage(3, "Need to specify alignment (Clustal or FASTA file)");
         else if (NEWICK == null)
-                usage(4, "Need to specify phylogenetic tree (Newick file)");
+            usage(4, "Need to specify phylogenetic tree (Newick file)");
         else if (OUTPUT == null)
-                usage(5, "Need to specify output file");
+            usage(5, "Need to specify output file");
     }
 }
