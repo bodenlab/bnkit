@@ -60,6 +60,9 @@ class IndelTest {
         if (printPOVals) {
 
             for (POGraph ancgraph : ancestors) {
+                System.out.println("Got here");
+
+
 
 
                 for (Interval1D poval : povals) {
@@ -101,9 +104,9 @@ class IndelTest {
             boolean forceLinear = false;
 
 //            Prediction indelpred = Prediction.PredictByParsimony(         pogTree);
-            Prediction indelpred = Prediction.PredictbyMaxLhood(pogTree);
+//            Prediction indelpred = Prediction.PredictbyMaxLhood(pogTree);
 
-//            Prediction indelpred = Prediction.PredictByIndelParsimony(pogTree, forceLinear);
+            Prediction indelpred = Prediction.PredictByIndelParsimony(pogTree, forceLinear);
 //            Prediction indelpred = Prediction.PredictByIndelMaxLhood(pogTree, forceLinear);
 
 //            Prediction indelpred = Prediction.PredictByBidirEdgeParsimony(pogTree);
@@ -132,6 +135,7 @@ class IndelTest {
             POGTree pogTree = new POGTree(aln, tree);
 
             Boolean forceLinear = false;
+            System.out.println("Made prediction");
 
 //            Prediction indelpred = Prediction.PredictByParsimony(         pogTree);
 //            Prediction indelpred = Prediction.PredictbyMaxLhood(         pogTree);
@@ -142,6 +146,40 @@ class IndelTest {
 //            Prediction indelpred = Prediction.PredictByBidirEdgeParsimony(         pogTree);
 //            Prediction indelpred = Prediction.PredictByBidirEdgeMaxLHood(         pogTree);
 
+
+            printAncestors(indelpred, pogTree, forceLinear);
+
+        } catch (IOException | ASRException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+        }
+
+    }
+
+    // The visited Array in POGraph grows too large when using Simple Indel Coding methods
+    // Especially bad when using forceLinear toggle
+
+    @Test
+    @DisplayName("Length of Visited array grows too large")
+    void visitedArrayGrowsLarge() throws IOException, ASRException {
+
+        try {
+
+            Tree tree = Utils.loadTree("src/test/resources/currently_failing/1.nwk");
+            EnumSeq.Alignment aln = Utils.loadAlignment("src/test/resources/currently_failing/1_cutdown2.fasta", Enumerable.aacid);
+
+            POGTree pogTree = new POGTree(aln, tree);
+
+            Boolean forceLinear = false;
+
+//            Prediction indelpred = Prediction.PredictByParsimony(         pogTree);
+//            Prediction indelpred = Prediction.PredictbyMaxLhood(         pogTree);
+
+            Prediction indelpred = Prediction.PredictByIndelParsimony(pogTree, forceLinear);
+//            Prediction indelpred = Prediction.PredictByIndelMaxLhood(pogTree, forceLinear);
+
+//            Prediction indelpred = Prediction.PredictByBidirEdgeParsimony(         pogTree);
+//            Prediction indelpred = Prediction.PredictByBidirEdgeMaxLHood(         pogTree);
 
             printAncestors(indelpred, pogTree, forceLinear);
 
