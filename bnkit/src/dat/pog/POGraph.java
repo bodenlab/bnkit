@@ -384,9 +384,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         // find and cripple precluded paths, for each definite edge
         for (int[] edge : definitive) {
 
-            int[][] ends = pog.findEndsOfPrecludedEdges(edge[0], edge[1]);
-            for (int[] end : ends)
-                pog.removeEdge(end[0], end[1]);
+            POGEdge[] ends = pog.findEndsOfPrecludedEdges(edge[0], edge[1]);
+            for (POGEdge end : ends)
+                pog.removeEdge(end.idx1, end.idx2);
 
         }
 
@@ -442,10 +442,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         }
         // find and cripple precluded paths, for each definite edge
         for (int[] edge : definitive) {
-            int[][] ends = pog.findEndsOfPrecludedEdges(edge[0], edge[1]);
-            for (int[] end : ends)
-                pog.removeEdge(end[0], end[1]);
-
+            POGEdge[] ends = pog.findEndsOfPrecludedEdges(edge[0], edge[1]);
+            for (POGEdge end : ends)
+                pog.removeEdge(end.idx1, end.idx2);
         }
         // remove all dead-ends
         for (int idx : pog.getForward())
@@ -465,8 +464,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         return pog;
     }
 
-    public int[][] findEndsOfPrecludedEdges(int unique_idx, int dest_idx) {
-        Set<int[]> visited = new HashSet<>();
+    public POGEdge[] findEndsOfPrecludedEdges(int unique_idx, int dest_idx) {
+        Set<POGEdge> visited = new HashSet<>();
+        Set<Integer> visitedNode = new HashSet();
         int[] next = getForward(unique_idx);
         if (isEndNode(unique_idx)) { // special case...
             int[] nnext = Arrays.copyOf(next, next.length + 1);
@@ -475,33 +475,33 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         }
         for (int pos : next) {
             if (pos <= dest_idx)
-                visited.add(new int[] {unique_idx, pos});
+                visited.add(new POGEdge(unique_idx, pos));
         }
         for (int pos : next) {
-            if (pos <= dest_idx)
-                carryUniqueForward(this, unique_idx, dest_idx, pos, visited);
+            if (pos <= dest_idx && !(visitedNode.contains(pos)))
+                carryUniqueForward(this, unique_idx, dest_idx, pos, visited, visitedNode);
         }
-        Set<int[]> preclude = new HashSet<>();
-        for (int[] pair : visited) {
-            if (pair[1] == dest_idx && pair[0] != unique_idx)
+        Set<POGEdge> preclude = new HashSet<>();
+        for (POGEdge pair : visited) {
+            if (pair.idx2 == dest_idx && pair.idx1 != unique_idx)
                 preclude.add(pair);
         }
-        int[][] precarr = new int[preclude.size()][];
+        POGEdge[] precarr = new POGEdge[preclude.size()];
         preclude.toArray(precarr);
         return precarr;
     }
 
-    private static void carryUniqueForward(POGraph pog, int unique_idx, int dest_idx, int pos, Set<int[]> visited) {
+    private static void carryUniqueForward(POGraph pog, int unique_idx, int dest_idx, int pos, Set<POGEdge> visited, Set<Integer> visitedNode) {
         boolean all_unique = true;
         if (pog.isNode(pos)) {
             for (int previdx : pog.getBackward(pos)) {
                 // make sure {previdx, pos} is in there; if not, {pos, nextidx} is not a unique path to dest_idx
                 boolean edge_checked = false;
-                for (int[] edge : visited) {
-                    if (edge[0] == previdx && edge[1] == pos) {
-                        edge_checked = true;
-                        break;
-                    }
+
+                POGEdge backwardsEdge = new POGEdge(previdx, pos);
+
+                if (visited.contains(backwardsEdge)){
+                    edge_checked = true;
                 }
                 if (!edge_checked)
                     all_unique = false;
@@ -513,12 +513,15 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                 nextidxs = nnextidxs;
             }
             for (int nextidx : nextidxs) {
-                if (nextidx <= dest_idx && all_unique)
-                    visited.add(new int[]{pos, nextidx});
+
+                if (nextidx <= dest_idx && all_unique) {
+                    visited.add(new POGEdge(pos, nextidx));
+                    visitedNode.add(new Integer(pos));
+                }
             }
             for (int nextidx : nextidxs) {
-                if (nextidx <= dest_idx)
-                    carryUniqueForward(pog, unique_idx, dest_idx, nextidx, visited);
+                if (nextidx <= dest_idx && !(visitedNode.contains(nextidx)))
+                    carryUniqueForward(pog, unique_idx, dest_idx, nextidx, visited, visitedNode);
             }
         }
     }
