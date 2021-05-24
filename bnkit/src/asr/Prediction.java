@@ -774,6 +774,135 @@ public class Prediction {
     }
 
     /**
+     * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." 2000
+     * This version does NOT incorporate multiple, optional INDELs, and thus suited to emulate FastML.
+     * It DOES generate POGs, but they are single-path POGs.
+     * @param pogTree
+     * @return instance of Prediction
+     */
+    public static Prediction PredictBySICP(POGTree pogTree) {
+        Random rand = new Random(pogTree.getPositions()); // random seed set here
+//        Random rand = new Random(System.currentTimeMillis()); // random seed set here
+        int nPos = pogTree.getPositions(); //
+        IdxTree tree = pogTree.getTree();
+        Map<Object, POGraph> ancestors = new HashMap<>();
+        // Retrieve an instance for each indel across the whole alignment (ordered by interval tree)
+        // (state for each extant-indel: present, absent or permissible/neutral, as per Simmons and Ochoterena, 2000)
+        // initially "permissible/neutral" is encoded as null (the variable is uninstantiated); see POGraph.getSimpleGapCode)
+        // inference will infer true, false, or accept that both true and false can be correct
+        TreeInstance[] ti = pogTree.getIndelInstances();
+        Parsimony[] pi = new Parsimony[ti.length];
+        // Below is where the main inference occurs
+        // this stage should be multi-threaded... not so at the moment
+        for (int i = 0; i < ti.length; i++) { // for each "indel"
+            pi[i] = new Parsimony(ti[i]);
+            pi[i].forward();
+            pi[i].backward();
+        }
+        if (DEBUG) {
+            // print out tables...
+            int i = 0; // interval index
+            System.out.println("Indels---------");
+            for (Interval1D ival : pogTree.getIntervalTree())
+                System.out.println(i++ + "\t" + ival);
+            // now decorate the ancestors
+            System.out.println("Sequences---------");
+            i = 0; // interval index
+            for (Interval1D ival : pogTree.getIntervalTree())
+                System.out.print("\t" + i++);
+            System.out.println();
+        }
+        // the code below
+        // (1) regardless, if an ancestor or extant, we can pull out what the INDEL states are: absent (false), present (true) or permissible (true/false)
+        // (2) if an ancestor, an ancestor POG is created, using the info from (1)
+        for (int j = 0; j < tree.getSize(); j++) { // we look at each branch point, corresponding to either an extant or ancestor sequence
+            Object ancID = tree.getBranchPoint(j).getID();
+            if (tree.getChildren(j).length == 0) { // not an ancestor
+                if (DEBUG) {
+                    POGraph pog = pogTree.getExtant(ancID);
+                    System.out.print(ancID + "\t");
+                    if (pog != null) {
+                        int i = 0;
+                        for (Interval1D ival : pogTree.getIntervalTree()) {
+                            StringBuilder sb = new StringBuilder();
+                            List calls = pi[i].getOptimal(j);
+                            for (Object b : calls) // each "b" is a Boolean
+                                sb.append(b.toString().substring(0, 1)); // this converts each value to "t" or "f"
+                            System.out.print(sb.toString() + "\t");
+                            i++;
+                        }
+                    }
+                    System.out.println();
+                }
+                continue; // skip the code below, only predictions for ancestors are used to compose POGs
+            }
+            // else: ancestor branch point
+            // (1) Find ancestor STATE for each INDEL, but to resolve (2) what the POG looks like we determine...
+            // all TRUE indels, as they will preclude "contained" indels, and other sequence
+            List<Interval1D> include_me = new ArrayList<>();
+            if (DEBUG) System.out.print(ancID + "\t");
+            int i = 0; // interval index
+            for (Interval1D ival : pogTree.getIntervalTree()) {
+                List<Boolean> calls = pi[i].getOptimal(j);
+                if (DEBUG) {
+                    StringBuilder sb = new StringBuilder();
+                    for (Boolean b : calls)
+                        sb.append(b.toString().substring(0, 1));
+                    System.out.print(sb.toString() + "\t");
+                }
+                if (calls.contains(Boolean.TRUE)) { // INDEL can be TRUE'
+                    if (calls.size() == 1) // the ONLY value is TRUE so DEFINITIVELY so
+                        include_me.add(ival);
+                    else {
+                        if (rand.nextBoolean())
+                            include_me.add(ival);
+                    }
+                }
+                i ++;
+            }
+            Collections.sort(include_me);
+            if (DEBUG) System.out.println();
+
+            // Second, use only indels that are not contained within an unambiguously TRUE indel
+            List<Interval1D> definitive = new ArrayList<>();
+            Interval1D precluder = null;
+            for (int cnt = 0; cnt < include_me.size(); cnt ++) {
+                Interval1D current = include_me.get(cnt);
+                if (cnt < include_me.size() - 1) { // there is at least one more after this...
+                    Interval1D next = include_me.get(cnt + 1);
+                    if (!next.contains(current)) { // next is not precluding current, so consider if the previous does
+                        if (precluder != null) {
+                            if (!precluder.contains(current)) {
+                                definitive.add(current);
+                                precluder = current;
+                            }
+                        } else {
+                            definitive.add(current);
+                            precluder = current;
+                        }
+                    } // else: can ignore current
+                } else // none after so include...
+                    definitive.add(current);
+            }
+            Collections.sort(definitive);
+            EdgeMap emap = new EdgeMap();
+            int prev = -1;
+            for (Interval1D edge : definitive) {
+                if (edge.min > prev) { // time to patch...
+                    for (int ptr = prev; ptr < edge.min; ptr++)
+                        emap.add(ptr, ptr + 1);
+                }
+                emap.add(edge.min, edge.max);
+                prev = edge.max;
+            }
+            // finally put the info into a POG
+            POGraph pog = POGraph.createFromEdgeMap(nPos, emap);
+            ancestors.put(ancID, pog);
+        }
+        return new Prediction(pogTree, ancestors);
+    }
+
+    /**
      * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." (2000).
      * Inference with ML, using a gain/loss model similar to FastML (based on Cohen and Pupko 2010 M1).
      * Note that FastML uses a mixture of two models (termed M1 and M2) but both have loss rates which dominate gain.

@@ -3,6 +3,7 @@ package dat.pog;
 import asr.ASRRuntimeException;
 import bn.prob.EnumDistrib;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
@@ -380,7 +381,11 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                 pog.addEdge(edge[0], edge[1], new StatusEdge(true));
 
         }
-
+        try {
+            pog.saveToDOT(File.createTempFile("POG_", ".dot").getAbsolutePath());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         // find and cripple precluded paths, for each definite edge
         for (int[] edge : definitive) {
 

@@ -1,7 +1,6 @@
 package asr;
 
 import bn.ctmc.SubstModel;
-import bn.ctmc.matrix.GLOOME1;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.Interval1D;
@@ -11,14 +10,11 @@ import dat.phylo.Tree;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 
 class IndelTest {
@@ -28,6 +24,7 @@ class IndelTest {
 
     @BeforeAll
     static void setup() {
+        GRASP.VERBOSE = true;
         jtt = SubstModel.createModel("JTT");
         joint = GRASP.Inference.JOINT;
     }
@@ -135,8 +132,8 @@ class IndelTest {
 
 //            Prediction indelpred = Prediction.PredictByParsimony(         pogTree);
 //            Prediction indelpred = Prediction.PredictbyMaxLhood(         pogTree);
-
-            Prediction indelpred = Prediction.PredictByIndelParsimony(pogTree, forceLinear);
+            Prediction indelpred = Prediction.PredictBySICP(pogTree);
+//            Prediction indelpred = Prediction.PredictByIndelParsimony(pogTree, forceLinear);
 //            Prediction indelpred = Prediction.PredictByIndelMaxLhood(pogTree, forceLinear);
 
 //            Prediction indelpred = Prediction.PredictByBidirEdgeParsimony(         pogTree);
