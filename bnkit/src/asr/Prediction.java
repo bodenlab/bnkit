@@ -6,6 +6,7 @@ import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Interval1D;
+import dat.IntervalST;
 import dat.file.Newick;
 import dat.phylo.IdxTree;
 import dat.phylo.TreeDecor;
@@ -775,22 +776,21 @@ public class Prediction {
 
     /**
      * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." 2000
-     * This version does NOT incorporate multiple, optional INDELs, and thus suited to emulate FastML.
+     * This version does incorporate multiple, optional INDELs
      * It DOES generate POGs, but they are single-path POGs.
      * @param pogTree
      * @return instance of Prediction
      */
     public static Prediction PredictBySICP(POGTree pogTree) {
-        Random rand = new Random(pogTree.getPositions()); // random seed set here
-//        Random rand = new Random(System.currentTimeMillis()); // random seed set here
         int nPos = pogTree.getPositions(); //
+        Random rand = new Random(nPos); // random seed set here
         IdxTree tree = pogTree.getTree();
         Map<Object, POGraph> ancestors = new HashMap<>();
         // Retrieve an instance for each indel across the whole alignment (ordered by interval tree)
         // (state for each extant-indel: present, absent or permissible/neutral, as per Simmons and Ochoterena, 2000)
         // initially "permissible/neutral" is encoded as null (the variable is uninstantiated); see POGraph.getSimpleGapCode)
+        TreeInstance[] ti = pogTree.getIndelInstances(); // a pogTree has a list of "indels"; here leaves are instantiated with applicable indels
         // inference will infer true, false, or accept that both true and false can be correct
-        TreeInstance[] ti = pogTree.getIndelInstances();
         Parsimony[] pi = new Parsimony[ti.length];
         // Below is where the main inference occurs
         // this stage should be multi-threaded... not so at the moment
@@ -799,100 +799,135 @@ public class Prediction {
             pi[i].forward();
             pi[i].backward();
         }
-        if (DEBUG) {
-            // print out tables...
-            int i = 0; // interval index
-            System.out.println("Indels---------");
-            for (Interval1D ival : pogTree.getIntervalTree())
-                System.out.println(i++ + "\t" + ival);
-            // now decorate the ancestors
-            System.out.println("Sequences---------");
-            i = 0; // interval index
-            for (Interval1D ival : pogTree.getIntervalTree())
-                System.out.print("\t" + i++);
-            System.out.println();
-        }
         // the code below
         // (1) regardless, if an ancestor or extant, we can pull out what the INDEL states are: absent (false), present (true) or permissible (true/false)
         // (2) if an ancestor, an ancestor POG is created, using the info from (1)
         for (int j = 0; j < tree.getSize(); j++) { // we look at each branch point, corresponding to either an extant or ancestor sequence
             Object ancID = tree.getBranchPoint(j).getID();
-            if (tree.getChildren(j).length == 0) { // not an ancestor
-                if (DEBUG) {
-                    POGraph pog = pogTree.getExtant(ancID);
-                    System.out.print(ancID + "\t");
-                    if (pog != null) {
-                        int i = 0;
-                        for (Interval1D ival : pogTree.getIntervalTree()) {
-                            StringBuilder sb = new StringBuilder();
-                            List calls = pi[i].getOptimal(j);
-                            for (Object b : calls) // each "b" is a Boolean
-                                sb.append(b.toString().substring(0, 1)); // this converts each value to "t" or "f"
-                            System.out.print(sb.toString() + "\t");
-                            i++;
-                        }
-                    }
-                    System.out.println();
-                }
+            if (tree.getChildren(j).length == 0) // not an ancestor
                 continue; // skip the code below, only predictions for ancestors are used to compose POGs
-            }
             // else: ancestor branch point
-            // (1) Find ancestor STATE for each INDEL, but to resolve (2) what the POG looks like we determine...
-            // all TRUE indels, as they will preclude "contained" indels, and other sequence
-            List<Interval1D> include_me = new ArrayList<>();
-            if (DEBUG) System.out.print(ancID + "\t");
-            int i = 0; // interval index
-            for (Interval1D ival : pogTree.getIntervalTree()) {
-                List<Boolean> calls = pi[i].getOptimal(j);
-                if (DEBUG) {
-                    StringBuilder sb = new StringBuilder();
-                    for (Boolean b : calls)
-                        sb.append(b.toString().substring(0, 1));
-                    System.out.print(sb.toString() + "\t");
-                }
-                if (calls.contains(Boolean.TRUE)) { // INDEL can be TRUE'
-                    if (calls.size() == 1) // the ONLY value is TRUE so DEFINITIVELY so
-                        include_me.add(ival);
-                    else {
-                        if (rand.nextBoolean())
-                            include_me.add(ival);
-                    }
+            // (1) Find ancestor STATE for each INDEL, and
+            // (2) resolve what the POG looks like...
+
+            // First, construct a list to include all unambiguously true indels, some of which are
+            // rendered inapplicable (due to being precluded by others)
+            List<Interval1D> unambiguous = new ArrayList<>();
+            List<Interval1D> ambiguous = new ArrayList<>();
+            int i = 0; // interval index; this order is decided above when indels are instantiated and inferred
+            for (Interval1D ival : pogTree.getIntervalTree()) { // order specific to pogTree, and linked with ti and pi
+                List<Boolean> calls = pi[i].getOptimal(j); // for ancestor index j
+                if (calls.contains(Boolean.TRUE)) { // INDEL can be TRUE
+                    if (calls.size() == 1) // the ONLY value is TRUE so DEFINITIVELY include
+                        unambiguous.add(ival);
+                    else
+                        ambiguous.add(ival);
                 }
                 i ++;
             }
-            Collections.sort(include_me);
-            if (DEBUG) System.out.println();
-
-            // Second, use only indels that are not contained within an unambiguously TRUE indel
-            List<Interval1D> definitive = new ArrayList<>();
-            Interval1D precluder = null;
-            for (int cnt = 0; cnt < include_me.size(); cnt ++) {
-                Interval1D current = include_me.get(cnt);
-                if (cnt < include_me.size() - 1) { // there is at least one more after this...
-                    Interval1D next = include_me.get(cnt + 1);
-                    if (!next.contains(current)) { // next is not precluding current, so consider if the previous does
-                        if (precluder != null) {
-                            if (!precluder.contains(current)) {
-                                definitive.add(current);
-                                precluder = current;
+            // the order in which the intervals are considered is important: sorted by first start-index, within-which end-index
+            Collections.sort(unambiguous);
+            // Second, construct an interval tree definitive, with INDELs that are not contained within a TRUE INDEL
+            IntervalST<Boolean> definitive = new IntervalST<>(); // to hold all unambiguously TRUE and not-precluded INDELs
+            Interval1D precluder = null; // the interval that is the last to have been added, when considered "in order"
+            for (int cnt = 0; cnt < unambiguous.size(); cnt ++) {
+                Interval1D current = unambiguous.get(cnt);          // "current" interval under consideration...
+                if (cnt < unambiguous.size() - 1) {                 // there is at least one more after this...
+                    Interval1D next = unambiguous.get(cnt + 1);     // so look-ahead to the "next" interval
+                    if (!next.contains(current)) {                  // next is not precluding current...
+                        if (precluder != null) {                    // consider if the last-addition does
+                            if (!precluder.contains(current)) {     // last-addition does NOT preclude the current one either, so...
+                                definitive.put(current, true);// add current interval to interval tree, true indicates that it is unambiguous
+                                precluder = current;                // update last-addition
                             }
-                        } else {
-                            definitive.add(current);
-                            precluder = current;
+                        } else {                                    // there isn't a "last-addition", so...
+                            definitive.put(current, true);    // add current
+                            precluder = current;                    // update last-addition to current
                         }
-                    } // else: can ignore current
-                } else // none after so include...
-                    definitive.add(current);
+                    }                                               // else: next interval precludes current, so can ignore current
+                } else { // none after so include...
+                    if (precluder != null) {                        // consider if the last-addition does
+                        if (!precluder.contains(current)) {         // last-addition does NOT preclude the current one either, so...
+                            definitive.put(current, true);    // add current interval to interval tree, the cnt is not relevant at this stage
+                        }
+                    } else {                                        // there isn't a "last-addition", so...
+                        definitive.put(current, true);
+                    }
+                }
             }
-            Collections.sort(definitive);
+            // optionally, add ambiguous calls, i.e. indels that are optimally both true and false.
+            // the code below is just an slightly altered (mostly extended) version of the above strategy, further
+            // checking that the ambiguous call is not precluded by any of the unambiguous calls made above.
+            // the order in which the intervals are considered is important: sorted by first start-index, then end-index
+            Collections.sort(ambiguous);
+            precluder = null; // the interval that is the last to have been added, when considered "in order"
+            for (int cnt = 0; cnt < ambiguous.size(); cnt ++) {
+                Interval1D current = ambiguous.get(cnt);        // "current" interval under consideration...
+                if (cnt < ambiguous.size() - 1) {               // there is at least one more after this...
+                    Interval1D next = ambiguous.get(cnt + 1);   // so look-ahead to the "next" interval
+                    if (!next.contains(current)) {              // next is not precluding current...
+                        if (precluder != null) {                // consider if the last-addition does
+                            if (!precluder.contains(current)) { // last-addition does NOT preclude the current one either, so...
+                                boolean not_contained = true;
+                                for (Interval1D overlap : definitive.searchAll(current))
+                                    if (overlap.contains(current)) {
+                                        not_contained = false;
+                                        break;
+                                    }
+                                if (not_contained) {
+                                    definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
+                                    precluder = current;            // update last-addition
+                                }
+                            }
+                        } else {                                // there isn't a "last-addition", so...
+                            boolean not_contained = true;
+                            for (Interval1D overlap : definitive.searchAll(current))
+                                if (overlap.contains(current)) {
+                                    not_contained = false;
+                                    break;
+                                }
+                            if (not_contained) {
+                                definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
+                                precluder = current;            // update last-addition
+                            }
+                        }
+                    }                                           // else: next interval precludes current, so can ignore current
+                } else { // none after so include...
+                    if (precluder != null) {                // consider if the last-addition does
+                        if (!precluder.contains(current)) { // last-addition does NOT preclude the current one either, so...
+                            boolean not_contained = true;
+                            for (Interval1D overlap : definitive.searchAll(current))
+                                if (overlap.contains(current)) {
+                                    not_contained = false;
+                                    break;
+                                }
+                            if (not_contained)
+                                definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
+                        }
+                    } else {                                // there isn't a "last-addition", so...
+                        boolean not_contained = true;
+                        for (Interval1D overlap : definitive.searchAll(current))
+                            if (overlap.contains(current)) {
+                                not_contained = false;
+                                break;
+                            }
+                        if (not_contained)
+                            definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
+                    }
+                }
+            }
+            // finally, we are now in a position to create edges for a POG, including edges that are just linkers,
+            // representing discontinuous sequence without decision
             EdgeMap emap = new EdgeMap();
             int prev = -1;
             for (Interval1D edge : definitive) {
-                if (edge.min > prev) { // time to patch...
+                if (edge.min > prev) { // linker required, so time to patch the way we anticipate sequence based implementations do...
                     for (int ptr = prev; ptr < edge.min; ptr++)
                         emap.add(ptr, ptr + 1);
                 }
                 emap.add(edge.min, edge.max);
+//                if (definitive.get(edge).contains(true)) // possibly test if it is unambiguous or ambiguous, before deciding...
+                    emap.add(edge.min, edge.max); // "reciprocated"
                 prev = edge.max;
             }
             // finally put the info into a POG

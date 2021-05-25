@@ -14,6 +14,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -141,6 +144,64 @@ class IndelTest {
 
 
             printAncestors(indelpred, pogTree, forceLinear);
+
+        } catch (IOException | ASRException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+        }
+
+    }
+    // This test performs a reconstruction of INDELs with SICP, into POGs.
+    // It then compares the predictions with the gappy reconstruction of FastML using parsimony for INDELs
+    @Test
+    @DisplayName("Compare SICP POGs against FastML sequences")
+    void SICP_v_FastML() throws IOException, ASRException {
+
+        try {
+
+            Tree tree = Utils.loadTree("src/test/resources/indels/FastML_test_100.nwk");
+            EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/FastML_test_100.aln", Enumerable.aacid);
+            EnumSeq.Alignment output = Utils.loadAlignment("src/test/resources/indels/FastMLp_ancestors_extants_100.aln", Enumerable.aacid);
+            Map<String, Integer> name2idx = new HashMap<>();
+            String[] names = output.getNames();
+            for (int i = 0; i < names.length; i ++)
+                name2idx.put(names[i], i);
+            POGTree pogTree = new POGTree(input, tree);
+            Prediction indelpred = Prediction.PredictBySICP(pogTree);
+            Map<String, List<String>> logerr = new HashMap<>();
+            for (Integer idx : tree) {
+                if (!tree.isLeaf(idx)) { // is ancestor
+                    POGraph pog = indelpred.getAncestor(tree.getLabel(idx));
+                    if (pog != null) {
+                        int fastml_idx = name2idx.get("N" + tree.getLabel(idx));
+                        EnumSeq.Gappy fastml_seq = output.getEnumSeq(fastml_idx);
+                        int correct = 0;
+                        int incorrect = 0;
+                        int prev = -1;
+                        Object prevx = null;
+                        List<String> errs = new ArrayList<>();
+                        for (int i = 0; i < fastml_seq.length(); i ++) {
+                            Object x = fastml_seq.get(i);
+                            if (x != null) {
+                                if (pog.isEdge(prev, i))
+                                    correct += 1;
+                                else {
+                                    incorrect += 1;
+                                    if (prevx != null)
+                                        errs.add(String.format("%s%d-%s%d", prevx, prev, x, i));
+                                    else
+                                        errs.add(String.format("%d-%c%s", prev, x, i));
+                                }
+                                prev = i;
+                                prevx = x;
+                            }
+                        }
+                        System.out.println(idx + "\tN" + tree.getLabel(idx) + "\t" + correct + "\t" + (correct + incorrect));
+                        if (incorrect > 0)
+                            logerr.put("N" + tree.getLabel(idx), errs);
+                    }
+                }
+            }
 
         } catch (IOException | ASRException e) {
             System.err.println(e.getMessage());
