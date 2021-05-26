@@ -219,11 +219,6 @@ public class GRASP {
                     indelpred.getMarginal(MARG_NODE, MODEL);
                 Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
                 POGraph[] ancestors = new POGraph[pogs.size()];
-
-
-
-
-
                 int ii = 0;
                 for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
                     ancestors[ii ++] = entry.getValue();

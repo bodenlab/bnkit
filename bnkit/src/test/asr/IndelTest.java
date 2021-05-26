@@ -7,6 +7,7 @@ import dat.Interval1D;
 import dat.IntervalST;
 import dat.file.Utils;
 import dat.phylo.Tree;
+import dat.pog.IdxGraph;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import org.junit.jupiter.api.BeforeAll;
@@ -18,6 +19,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
 class IndelTest {
@@ -157,6 +160,7 @@ class IndelTest {
     @DisplayName("Compare SICP POGs against FastML sequences")
     void SICP_v_FastML() throws IOException, ASRException {
 
+        String OUTPUT = "/Users/mikael/simhome/ASR/SICPtests/100";
         try {
 
             Tree tree = Utils.loadTree("src/test/resources/indels/FastML_test_100.nwk");
@@ -168,6 +172,7 @@ class IndelTest {
                 name2idx.put(names[i], i);
             POGTree pogTree = new POGTree(input, tree);
             Prediction indelpred = Prediction.PredictBySICP(pogTree);
+//            Prediction indelpred = Prediction.PredictByIndelParsimony(pogTree, false);
             Map<String, List<String>> logerr = new HashMap<>();
             for (Integer idx : tree) {
                 if (!tree.isLeaf(idx)) { // is ancestor
@@ -202,7 +207,14 @@ class IndelTest {
                     }
                 }
             }
-
+            indelpred.getJoint(jtt);
+            Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
+            POGraph[] ancestors = new POGraph[pogs.size()];
+            int ii = 0;
+            for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
+                ancestors[ii ++] = entry.getValue();
+            IdxGraph.saveToDOT(OUTPUT, ancestors);
+            assertEquals(0, logerr.size());
         } catch (IOException | ASRException e) {
             System.err.println(e.getMessage());
             System.exit(1);

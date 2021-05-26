@@ -828,8 +828,9 @@ public class Prediction {
             // the order in which the intervals are considered is important: sorted by first start-index, within-which end-index
             Collections.sort(unambiguous);
             // Second, construct an interval tree definitive, with INDELs that are not contained within a TRUE INDEL
-            IntervalST<Boolean> definitive = new IntervalST<>(); // to hold all unambiguously TRUE and not-precluded INDELs
-            Interval1D precluder = null; // the interval that is the last to have been added, when considered "in order"
+            IntervalST<Boolean> definitive = new IntervalST<>();    // to hold all unambiguously TRUE and not-precluded INDELs
+            Set<Integer> valididx = new HashSet<>();                // the set of indices that are used to hold all unambiguous calls
+            Interval1D precluder = null;                            // the interval that is the last to have been added, when considered "in order"
             for (int cnt = 0; cnt < unambiguous.size(); cnt ++) {
                 Interval1D current = unambiguous.get(cnt);          // "current" interval under consideration...
                 if (cnt < unambiguous.size() - 1) {                 // there is at least one more after this...
@@ -838,10 +839,14 @@ public class Prediction {
                         if (precluder != null) {                    // consider if the last-addition does
                             if (!precluder.contains(current)) {     // last-addition does NOT preclude the current one either, so...
                                 definitive.put(current, true);// add current interval to interval tree, true indicates that it is unambiguous
+                                valididx.add(current.min);
+                                valididx.add(current.max);
                                 precluder = current;                // update last-addition
                             }
                         } else {                                    // there isn't a "last-addition", so...
                             definitive.put(current, true);    // add current
+                            valididx.add(current.min);
+                            valididx.add(current.max);
                             precluder = current;                    // update last-addition to current
                         }
                     }                                               // else: next interval precludes current, so can ignore current
@@ -849,76 +854,49 @@ public class Prediction {
                     if (precluder != null) {                        // consider if the last-addition does
                         if (!precluder.contains(current)) {         // last-addition does NOT preclude the current one either, so...
                             definitive.put(current, true);    // add current interval to interval tree, the cnt is not relevant at this stage
+                            valididx.add(current.min);
+                            valididx.add(current.max);
                         }
                     } else {                                        // there isn't a "last-addition", so...
                         definitive.put(current, true);
+                        valididx.add(current.min);
+                        valididx.add(current.max);
                     }
                 }
             }
             // optionally, add ambiguous calls, i.e. indels that are optimally both true and false.
-            // the code below is just an slightly altered (mostly extended) version of the above strategy, further
-            // checking that the ambiguous call is not precluded by any of the unambiguous calls made above.
-            // the order in which the intervals are considered is important: sorted by first start-index, then end-index
+            // With SICP, an unambiguous call for an indel A precludes other calls, say B, if B is contained in A,
+            // regardless of B being unambiguous or ambiguous.
+            // However, an ambiguous call for an indel C does NOT preclude calls for other ambiguous calls.
+            // To incorporate ambiguous calls, we thus (a) refrain from adding those which are contained by unambiguous
+            // indels (which are not themselves contained), and (b) add ambiguous calls that have start and end points that
+            // are supported by unambiguous calls.
+            // the code below is an altered (mostly extended) version of the above strategy.
+            // Sorting is important: ambiguous indels added to the definitive interval tree in-order,
+            // will never contain those that follow.
+            // Last statement is un-true!!!! This is what needs to be fixed!!!
             Collections.sort(ambiguous);
-            precluder = null; // the interval that is the last to have been added, when considered "in order"
+            EdgeMap emap = new EdgeMap();
+            List<Interval1D> ambigedges = new ArrayList<>();
             for (int cnt = 0; cnt < ambiguous.size(); cnt ++) {
                 Interval1D current = ambiguous.get(cnt);        // "current" interval under consideration...
-                if (cnt < ambiguous.size() - 1) {               // there is at least one more after this...
-                    Interval1D next = ambiguous.get(cnt + 1);   // so look-ahead to the "next" interval
-                    if (!next.contains(current)) {              // next is not precluding current...
-                        if (precluder != null) {                // consider if the last-addition does
-                            if (!precluder.contains(current)) { // last-addition does NOT preclude the current one either, so...
-                                boolean not_contained = true;
-                                for (Interval1D overlap : definitive.searchAll(current))
-                                    if (overlap.contains(current)) {
-                                        not_contained = false;
-                                        break;
-                                    }
-                                if (not_contained) {
-                                    definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
-                                    precluder = current;            // update last-addition
-                                }
-                            }
-                        } else {                                // there isn't a "last-addition", so...
-                            boolean not_contained = true;
-                            for (Interval1D overlap : definitive.searchAll(current))
-                                if (overlap.contains(current)) {
-                                    not_contained = false;
-                                    break;
-                                }
-                            if (not_contained) {
-                                definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
-                                precluder = current;            // update last-addition
-                            }
+                if (valididx.contains(current.min) && valididx.contains(current.max)) { // require both indices to be included from unambiguous calls
+                    boolean not_contained = true;
+                    for (Interval1D overlap : definitive.searchAll(current))
+                        if (overlap.contains(current)) {
+                            not_contained = false;
+                            break;
                         }
-                    }                                           // else: next interval precludes current, so can ignore current
-                } else { // none after so include...
-                    if (precluder != null) {                // consider if the last-addition does
-                        if (!precluder.contains(current)) { // last-addition does NOT preclude the current one either, so...
-                            boolean not_contained = true;
-                            for (Interval1D overlap : definitive.searchAll(current))
-                                if (overlap.contains(current)) {
-                                    not_contained = false;
-                                    break;
-                                }
-                            if (not_contained)
-                                definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
-                        }
-                    } else {                                // there isn't a "last-addition", so...
-                        boolean not_contained = true;
-                        for (Interval1D overlap : definitive.searchAll(current))
-                            if (overlap.contains(current)) {
-                                not_contained = false;
-                                break;
-                            }
-                        if (not_contained)
-                            definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
-                    }
+                    if (not_contained)
+                        ambigedges.add(current);
+                        //emap.add(current.min, current.max);
+                        //definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
                 }
             }
+            for (Interval1D ival : ambigedges)
+                definitive.put(ival, false);
             // finally, we are now in a position to create edges for a POG, including edges that are just linkers,
             // representing discontinuous sequence without decision
-            EdgeMap emap = new EdgeMap();
             int prev = -1;
             for (Interval1D edge : definitive) {
                 if (edge.min > prev) { // linker required, so time to patch the way we anticipate sequence based implementations do...
@@ -926,8 +904,8 @@ public class Prediction {
                         emap.add(ptr, ptr + 1);
                 }
                 emap.add(edge.min, edge.max);
-//                if (definitive.get(edge).contains(true)) // possibly test if it is unambiguous or ambiguous, before deciding...
-                    emap.add(edge.min, edge.max); // "reciprocated"
+                if (definitive.get(edge).contains(true))    // possibly test if it is unambiguous or ambiguous, before deciding to...
+                    emap.add(edge.min, edge.max);           // label the edge as "reciprocated"
                 prev = edge.max;
             }
             // finally put the info into a POG
