@@ -206,7 +206,7 @@ public class GRASP {
                     case 1: indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree); break;
 //                    case 2: indelpred = Prediction.PredictByIndelParsimony(pogtree, FORCELINEAR); break;
                     case 2: indelpred = Prediction.PredictBySICP(pogtree); break;
-                    case 3: indelpred = Prediction.PredictByIndelMaxLhood(pogtree, FORCELINEAR); break;
+                    case 3: indelpred = Prediction.PredictBySICML(pogtree); break;
                     case 4: indelpred = Prediction.PredictByParsimony(pogtree); break;
                     case 5: indelpred = Prediction.PredictbyMaxLhood(pogtree); break;
                     default: break;
@@ -225,7 +225,7 @@ public class GRASP {
 
                 // Below is being used to write out a file for each reconstruction that states for each edge between a
                 // set of partially ordered columns if these edges are present in each ancestral graph
-
+                /*
                 if (FORCELINEAR && (INDEL_IDX == 2) || (INDEL_IDX == 3)) {
 
                     FileWriter writer = new FileWriter(new File(OUTPUT, "povals.txt"));
@@ -244,7 +244,7 @@ public class GRASP {
                     }
                     writer.close();
                 }
-
+                */
 
                 EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
                 if (CONSENSUS[FORMAT_IDX]) {
