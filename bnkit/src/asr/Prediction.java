@@ -816,14 +816,16 @@ public class Prediction {
             List<Interval1D> ambiguous = new ArrayList<>();
             int i = 0; // interval index; this order is decided above when indels are instantiated and inferred
             for (Interval1D ival : pogTree.getIntervalTree()) { // order specific to pogTree, and linked with ti and pi
-                List<Boolean> calls = pi[i].getOptimal(j); // for ancestor index j
-                if (calls.contains(Boolean.TRUE)) { // INDEL can be TRUE
-                    if (calls.size() == 1) // the ONLY value is TRUE so DEFINITIVELY include
-                        unambiguous.add(ival);
-                    else
-                        ambiguous.add(ival);
+                if (ival.getWidth() > 1 || ival.min == -1 || ival.max == pogTree.getPositions()) { // exclude non-gaps
+                    List<Boolean> calls = pi[i].getOptimal(j); // for ancestor index j
+                    if (calls.contains(Boolean.TRUE)) { // INDEL can be TRUE
+                        if (calls.size() == 1) // the ONLY value is TRUE so DEFINITIVELY include
+                            unambiguous.add(ival);
+                        else
+                            ambiguous.add(ival);
+                    }
+                    i++;
                 }
-                i ++;
             }
             // the order in which the intervals are considered is important: sorted by first start-index, within-which end-index
             Collections.sort(unambiguous);
@@ -831,6 +833,9 @@ public class Prediction {
             IntervalST<Boolean> definitive = new IntervalST<>();    // to hold all unambiguously TRUE and not-precluded INDELs
             Set<Integer> valididx = new HashSet<>();                // the set of indices that are used to hold all unambiguous calls
             Interval1D precluder = null;                            // the interval that is the last to have been added, when considered "in order"
+            Set<Integer> frontedges = new HashSet<>();              // the set of edges current at the "front" of reaching the terminal
+            int prev = -1;
+            frontedges.add(prev);
             for (int cnt = 0; cnt < unambiguous.size(); cnt ++) {
                 Interval1D current = unambiguous.get(cnt);          // "current" interval under consideration...
                 if (cnt < unambiguous.size() - 1) {                 // there is at least one more after this...
@@ -863,6 +868,30 @@ public class Prediction {
                         valididx.add(current.max);
                     }
                 }
+                if (!frontedges.contains(current.min)) { // just added an edge without a known source node
+                    int biggest = -1;
+                    for (int src : frontedges)
+                        biggest = src > biggest ? src : biggest;
+                    for (; biggest < current.min; biggest ++) {
+                        Interval1D pad = new Interval1D(biggest, biggest + 1);
+                        if (precluder != null) {                        // consider if the last-addition does // FIXME: probably no need to check...
+                            if (!precluder.contains(pad)) {        // last-addition does NOT preclude the current one either, so...
+                                definitive.put(pad, false); // add one-step patch to interval tree; false indicates that it is not based on ML inference
+                                valididx.add(pad.min);
+                                valididx.add(pad.max);
+                            }
+                        } else  {                                        // there isn't a "last-addition", so...
+                            definitive.put(pad, false); // add one-step patch to interval tree; false indicates that it is not based on ML inference
+                            valididx.add(pad.min);
+                            valididx.add(pad.max);
+                        }
+                    }
+                }
+                if (current.min > prev) { // check if we've moved beyond the source index (can do because the intervals are sorted)
+                    frontedges.remove(prev);
+                    prev = current.min;
+                }
+                frontedges.add(current.max);
             }
             // optionally, add ambiguous calls, i.e. indels that are optimally both true and false.
             // With SICP, an unambiguous call for an indel A precludes other calls, say B, if B is contained in A,
@@ -874,7 +903,6 @@ public class Prediction {
             // the code below is an altered (mostly extended) version of the above strategy.
             // Sorting is important: ambiguous indels added to the definitive interval tree in-order,
             // will never contain those that follow.
-            // Last statement is un-true!!!! This is what needs to be fixed!!!
             Collections.sort(ambiguous);
             EdgeMap emap = new EdgeMap();
             List<Interval1D> ambigedges = new ArrayList<>();
@@ -889,24 +917,16 @@ public class Prediction {
                         }
                     if (not_contained)
                         ambigedges.add(current);
-                        //emap.add(current.min, current.max);
-                        //definitive.put(current, false);   // add current interval to interval tree, false means it is ambiguous
                 }
             }
             for (Interval1D ival : ambigedges)
                 definitive.put(ival, false);
             // finally, we are now in a position to create edges for a POG, including edges that are just linkers,
             // representing discontinuous sequence without decision
-            int prev = -1;
             for (Interval1D edge : definitive) {
-                if (edge.min > prev) { // linker required, so time to patch the way we anticipate sequence based implementations do...
-                    for (int ptr = prev; ptr < edge.min; ptr++)
-                        emap.add(ptr, ptr + 1);
-                }
                 emap.add(edge.min, edge.max);
                 if (definitive.get(edge).contains(true))    // possibly test if it is unambiguous or ambiguous, before deciding to...
                     emap.add(edge.min, edge.max);           // label the edge as "reciprocated"
-                prev = edge.max;
             }
             // finally put the info into a POG
             POGraph pog = POGraph.createFromEdgeMap(nPos, emap);
@@ -966,12 +986,14 @@ public class Prediction {
             int i = 0; // interval index
             System.out.println("Indels---------");
             for (Interval1D ival : pogTree.getIntervalTree())
-                System.out.println(i++ + "\t" + ival);
+                if (ival.getWidth() > 1 || ival.min == -1 || ival.max == pogTree.getPositions()) // exclude non-gaps
+                    System.out.println(i++ + "\t" + ival);
             // now decorate the ancestors
             System.out.println("Sequences---------");
             i = 0; // interval index
             for (Interval1D ival : pogTree.getIntervalTree())
-                System.out.print("\t" + i++);
+                if (ival.getWidth() > 1 || ival.min == -1 || ival.max == pogTree.getPositions()) // exclude non-gaps
+                    System.out.print("\t" + i++);
             System.out.println();
         }
         // the code below
@@ -986,8 +1008,8 @@ public class Prediction {
                     if (pog != null) {
                         int i = 0;
                         for (Interval1D ival : pogTree.getIntervalTree()) {
-                            System.out.print(((Boolean)ji[i].getDecoration(j) ? "L" : "G") + "\t");
-                            i++;
+                            if (ival.getWidth() > 1 || ival.min == -1 || ival.max == pogTree.getPositions()) // exclude non-gaps
+                                System.out.print(((Boolean)ji[i ++].getDecoration(j) ? "L" : "G") + "\t");
                         }
                     }
                     System.out.println();
@@ -1003,20 +1025,24 @@ public class Prediction {
             if (DEBUG) System.out.print(ancID + "\t");
             int i = 0; // interval index; this order is decided above when indels are instantiated and inferred
             for (Interval1D ival : pogTree.getIntervalTree()) { // order specific to pogTree, and linked with ti and pi
-                Boolean call = (Boolean)ji[i].getDecoration(j);
-                if (DEBUG)
-                    System.out.print((call ? "L" : "G") + "\t");
-                if (call)
-                    unambiguous.add(ival);
-                i ++;
+                if (ival.getWidth() > 1 || ival.min == -1 || ival.max == pogTree.getPositions()) { // exclude non-gaps
+                    Boolean call = (Boolean) ji[i].getDecoration(j);
+                    if (DEBUG)
+                        System.out.print((call ? "L" : "G") + "\t");
+                    if (call)
+                        unambiguous.add(ival);
+                    i++;
+                }
             }
             if (DEBUG) System.out.println();
             // the order in which the intervals are considered is important: sorted by first start-index, within-which end-index
             Collections.sort(unambiguous);
             // Second, construct an interval tree definitive, with INDELs that are not contained within a TRUE INDEL
             IntervalST<Boolean> definitive = new IntervalST<>();    // to hold all unambiguously TRUE and not-precluded INDELs
-            Set<Integer> valididx = new HashSet<>();                // the set of indices that are used to hold all unambiguous calls
             Interval1D precluder = null;                            // the interval that is the last to have been added, when considered "in order"
+            Set<Integer> frontedges = new HashSet<>();              // the set of edges current at the "front" of reaching the terminal
+            int prev = -1;
+            frontedges.add(prev);
             for (int cnt = 0; cnt < unambiguous.size(); cnt ++) {
                 Interval1D current = unambiguous.get(cnt);          // "current" interval under consideration...
                 if (cnt < unambiguous.size() - 1) {                 // there is at least one more after this...
@@ -1025,14 +1051,10 @@ public class Prediction {
                         if (precluder != null) {                    // consider if the last-addition does
                             if (!precluder.contains(current)) {     // last-addition does NOT preclude the current one either, so...
                                 definitive.put(current, true);// add current interval to interval tree, true indicates that it is unambiguous
-                                valididx.add(current.min);
-                                valididx.add(current.max);
                                 precluder = current;                // update last-addition
                             }
                         } else {                                    // there isn't a "last-addition", so...
                             definitive.put(current, true);    // add current
-                            valididx.add(current.min);
-                            valididx.add(current.max);
                             precluder = current;                    // update last-addition to current
                         }
                     }                                               // else: next interval precludes current, so can ignore current
@@ -1040,29 +1062,37 @@ public class Prediction {
                     if (precluder != null) {                        // consider if the last-addition does
                         if (!precluder.contains(current)) {         // last-addition does NOT preclude the current one either, so...
                             definitive.put(current, true);    // add current interval to interval tree, the cnt is not relevant at this stage
-                            valididx.add(current.min);
-                            valididx.add(current.max);
                         }
                     } else {                                        // there isn't a "last-addition", so...
                         definitive.put(current, true);
-                        valididx.add(current.min);
-                        valididx.add(current.max);
                     }
                 }
+                if (!frontedges.contains(current.min)) { // just added an edge without a known source node
+                    int biggest = -1;
+                    for (int src : frontedges)
+                        biggest = src > biggest ? src : biggest;
+                    for (; biggest < current.min; biggest ++) {
+                        Interval1D pad = new Interval1D(biggest, biggest + 1);
+                        if (precluder != null) {                        // consider if the last-addition does // FIXME: probably no need to check...
+                            if (!precluder.contains(pad))           // last-addition does NOT preclude the current one either, so...
+                                definitive.put(pad, false); // add one-step patch to interval tree; false indicates that it is not based on ML inference
+                        } else                                          // there isn't a "last-addition", so...
+                            definitive.put(pad, false); // add one-step patch to interval tree; false indicates that it is not based on ML inference
+                    }
+                }
+                if (current.min > prev) { // check if we've moved beyond the source index (can do because the intervals are sorted)
+                    frontedges.remove(prev);
+                    prev = current.min;
+                }
+                frontedges.add(current.max);
             }
             // finally, we are now in a position to create edges for a POG, including edges that are just linkers,
             // representing discontinuous sequence without decision
             EdgeMap emap = new EdgeMap();
-            int prev = -1;
             for (Interval1D edge : definitive) {
-                if (edge.min > prev) { // linker required, so time to patch the way we anticipate sequence based implementations do...
-                    for (int ptr = prev; ptr < edge.min; ptr++)
-                        emap.add(ptr, ptr + 1);
-                }
                 emap.add(edge.min, edge.max);
                 if (definitive.get(edge).contains(true))    // possibly test if it is unambiguous or ambiguous, before deciding to...
                     emap.add(edge.min, edge.max);           // label the edge as "reciprocated"
-                prev = edge.max;
             }
             // finally put the info into a POG
             POGraph pog = POGraph.createFromEdgeMap(nPos, emap);

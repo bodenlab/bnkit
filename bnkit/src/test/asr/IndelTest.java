@@ -6,6 +6,7 @@ import dat.EnumSeq;
 import dat.Enumerable;
 import dat.Interval1D;
 import dat.IntervalST;
+import dat.file.FastaWriter;
 import dat.file.Utils;
 import dat.phylo.Tree;
 import dat.pog.IdxGraph;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -165,7 +167,7 @@ class IndelTest {
         String OUTPUT = "/Users/mikael/simhome/ASR/SICPtests/50";
         try {
 
-            Tree tree = Utils.loadTree("src/test/resources/indels/FastML_test_50.nwk");
+            Tree tree = Utils.loadTree("src/test/resources/indels/FastML_50.nwk");
             EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/FastML_test_50.aln", Enumerable.aacid);
             EnumSeq.Alignment output = Utils.loadAlignment("src/test/resources/indels/FastMLp_ancestors_extants_50.aln", Enumerable.aacid);
             Map<String, Integer> name2idx = new HashMap<>();
@@ -212,9 +214,15 @@ class IndelTest {
             indelpred.getJoint(jtt);
             Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
             POGraph[] ancestors = new POGraph[pogs.size()];
+            EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
             int ii = 0;
-            for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                ancestors[ii ++] = entry.getValue();
+            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                ancestors[ii ] = entry.getValue();
+                ancseqs[ii ++] = indelpred.getSequence(entry.getKey(), joint, true);
+            }
+            FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
+            fw.save(ancseqs);
+            fw.close();
             IdxGraph.saveToDOT(OUTPUT, ancestors);
             assertEquals(0, logerr.size());
         } catch (IOException | ASRException e) {
@@ -240,8 +248,8 @@ class IndelTest {
             POGTree pogTree = new POGTree(input, tree);
             Object[] possible = {true, false};
             SubstModel substmodel = new JC(1, possible);
-            //Prediction indelpred = Prediction.PredictBySICML(pogTree, substmodel);
-            Prediction indelpred = Prediction.PredictByIndelMaxLhood(pogTree, false);
+            Prediction indelpred = Prediction.PredictBySICML(pogTree, substmodel);
+            //Prediction indelpred = Prediction.PredictByIndelMaxLhood(pogTree, false);
             Map<String, List<String>> logerr = new HashMap<>();
             for (Integer idx : tree) {
                 if (!tree.isLeaf(idx)) { // is ancestor
@@ -279,9 +287,15 @@ class IndelTest {
             indelpred.getJoint(jtt);
             Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
             POGraph[] ancestors = new POGraph[pogs.size()];
+            EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
             int ii = 0;
-            for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                ancestors[ii ++] = entry.getValue();
+            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                ancestors[ii ] = entry.getValue();
+                ancseqs[ii ++] = indelpred.getSequence(entry.getKey(), joint, true);
+            }
+            FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
+            fw.save(ancseqs);
+            fw.close();
             IdxGraph.saveToDOT(OUTPUT, ancestors);
         } catch (IOException | ASRException e) {
             System.err.println(e.getMessage());

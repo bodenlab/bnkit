@@ -418,10 +418,13 @@ public class POGTree {
      * @return an array with TreeInstances indexed by edge in order of interval tree
      */
     public TreeInstance[] getIndelInstances() {
-        TreeInstance[] insts = new TreeInstance[ivals.size()];
-        int i = 0;
-        for (Interval1D ival : ivals)
-            insts[i ++] = getIndelInstance(ival);
+        List<TreeInstance> instances = new ArrayList<>();
+        for (Interval1D ival : ivals) {
+            if (ival.getWidth() > 1 || ival.min == -1 || ival.max == this.nNodes) // exclude non-gaps
+                instances.add(getIndelInstance(ival));
+        }
+        TreeInstance[] insts = new TreeInstance[instances.size()];
+        instances.toArray(insts);
         return insts;
     }
 

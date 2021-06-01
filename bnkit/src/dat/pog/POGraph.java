@@ -289,8 +289,10 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             // check if this POG has a jump that matches exactly
             if (this.isEdge(from, to))
                 return GAP_STATUS_PRESENT;
-            // check containment status
+            // now we know it is a "jump", so check containment status
             int[] ahead = this.getForward(from); // inspect jumps forward relative the query start position
+//            if ((ahead.length > 0 || from == -1) && to - from == 1) // query is not a "jump"" at all, but intersects with one, so must be ...
+//                return GAP_STATUS_ABSENT;
             for (int i = 0; i < ahead.length; i++) {
                 if (ahead[i] < to) // the gap in this POG ends BEFORE that of the query
                     return GAP_STATUS_ABSENT;
@@ -298,11 +300,15 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             return GAP_STATUS_UNKNOWN; // the gap ends AFTER that of the query
         } else if (isNode(to) || to == maxsize()) { // the gap starts BEFORE "from"
             int[] before = this.getBackward(to);
+//            if ((before.length > 0 || to == maxsize()) && to - from == 1) // query is not a "jump" at all, but intersects with one, so must be ...
+//                return GAP_STATUS_ABSENT;
             for (int i = 0; i < before.length; i++) {
                 if (before[i] > from) // the gap in this POG begins AFTER that of the query
                     return GAP_STATUS_ABSENT;
             }
             return GAP_STATUS_UNKNOWN;
+ //       } else if (to - from == 1) { // not a "jump"" at all, and just internal content
+ //           return GAP_STATUS_ABSENT;
         } else { // the query gap started BEFORE and completed AFTER, but there could be internal content
             for (int i = from + 1; i < to - 1; i ++) {
                 if (isNode(i))
