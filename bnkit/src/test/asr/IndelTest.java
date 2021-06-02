@@ -164,12 +164,12 @@ class IndelTest {
     @DisplayName("Compare SICP POGs against FastML sequences")
     void SICP_v_FastML() throws IOException, ASRException {
 
-        String OUTPUT = "/Users/mikael/simhome/ASR/SICPtests/50";
+        String OUTPUT = "/Users/mikael/simhome/ASR/SICPtests/100";
         try {
 
-            Tree tree = Utils.loadTree("src/test/resources/indels/FastML_50.nwk");
-            EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/FastML_test_50.aln", Enumerable.aacid);
-            EnumSeq.Alignment output = Utils.loadAlignment("src/test/resources/indels/FastMLp_ancestors_extants_50.aln", Enumerable.aacid);
+            Tree tree = Utils.loadTree("src/test/resources/indels/FastML_test_100.nwk");
+            EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/FastML_test_100.aln", Enumerable.aacid);
+            EnumSeq.Alignment output = Utils.loadAlignment("src/test/resources/indels/FastMLp_ancestors_extants_100.aln", Enumerable.aacid);
             Map<String, Integer> name2idx = new HashMap<>();
             String[] names = output.getNames();
             for (int i = 0; i < names.length; i ++)
@@ -178,6 +178,8 @@ class IndelTest {
             Prediction indelpred = Prediction.PredictBySICP(pogTree);
 //            Prediction indelpred = Prediction.PredictByIndelParsimony(pogTree, false);
             Map<String, List<String>> logerr = new HashMap<>();
+            int maxincorr = 0;
+            int maxidx = -1;
             for (Integer idx : tree) {
                 if (!tree.isLeaf(idx)) { // is ancestor
                     POGraph pog = indelpred.getAncestor(tree.getLabel(idx));
@@ -205,12 +207,19 @@ class IndelTest {
                                 prevx = x;
                             }
                         }
-                        System.out.println(idx + "\tN" + tree.getLabel(idx) + "\t" + correct + "\t" + (correct + incorrect));
-                        if (incorrect > 0)
+                        System.out.println(idx + "\tN" + tree.getLabel(idx) + "\t" + correct + "\t" + (correct + incorrect) + "\t" + incorrect + "\t" + tree.getDepth(idx));
+                        if (incorrect > 0) {
                             logerr.put("N" + tree.getLabel(idx), errs);
+                            if (incorrect > maxincorr) {
+                                maxidx = idx;
+                                maxincorr = incorrect;
+                            }
+                        }
                     }
                 }
             }
+            if (maxidx > -1)
+                System.out.println("Branchpoint " + maxidx + " failed on " + maxincorr);
             indelpred.getJoint(jtt);
             Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
             POGraph[] ancestors = new POGraph[pogs.size()];

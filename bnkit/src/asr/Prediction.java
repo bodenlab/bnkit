@@ -720,7 +720,7 @@ public class Prediction {
                     StringBuilder sb = new StringBuilder();
                     for (Boolean b : calls)
                         sb.append(b.toString().substring(0, 1));
-                    System.out.print(sb.toString() + "\t");
+                    System.out.print(sb + "\t");
                 }
                 if (calls.contains(Boolean.TRUE)) { // INDEL can be TRUE
                     optionally_true.add(ival);
@@ -799,17 +799,52 @@ public class Prediction {
             pi[i].forward();
             pi[i].backward();
         }
+        if (DEBUG) {
+            // print out tables...
+            int i = 0; // interval index
+            System.out.println("Indels---------");
+            for (Interval1D ival : pogTree.getIntervalTree())
+                if (ival.getWidth() > 1 || ival.min == -1 || ival.max == pogTree.getPositions()) // exclude non-gaps
+                    System.out.println(i++ + "\t" + ival);
+            // now decorate the ancestors
+            System.out.println("Sequences---------");
+            i = 0; // interval index
+            for (Interval1D ival : pogTree.getIntervalTree()) {
+                if (ival.getWidth() > 1 || ival.min == -1 || ival.max == pogTree.getPositions()) // exclude non-gaps
+                    System.out.print("\t" + i++);
+            }
+            System.out.println();
+        }
         // the code below
         // (1) regardless, if an ancestor or extant, we can pull out what the INDEL states are: absent (false), present (true) or permissible (true/false)
         // (2) if an ancestor, an ancestor POG is created, using the info from (1)
         for (int j = 0; j < tree.getSize(); j++) { // we look at each branch point, corresponding to either an extant or ancestor sequence
             Object ancID = tree.getBranchPoint(j).getID();
-            if (tree.getChildren(j).length == 0) // not an ancestor
+            if (tree.getChildren(j).length == 0) { // not an ancestor
+                if (DEBUG) {
+                    POGraph pog = pogTree.getExtant(ancID);
+                    System.out.print(ancID + "\t");
+                    if (pog != null) {
+                        int i = 0;
+                        for (Interval1D ival : pogTree.getIntervalTree()) {
+                            if (ival.getWidth() > 1 || ival.min == -1 || ival.max == pogTree.getPositions()) { // exclude non-gaps
+                                StringBuilder sb = new StringBuilder();
+                                List calls = pi[i].getOptimal(j);
+                                for (Object b : calls) // each "b" is a Boolean
+                                    sb.append(b.toString().substring(0, 1)); // this converts each value to "t" or "f"
+                                System.out.print(sb + "\t");
+                                i++;
+                            }
+                        }
+                    }
+                    System.out.println();
+                }
                 continue; // skip the code below, only predictions for ancestors are used to compose POGs
+            }
             // else: ancestor branch point
             // (1) Find ancestor STATE for each INDEL, and
             // (2) resolve what the POG looks like...
-
+            if (DEBUG) System.out.print(ancID + "\t");
             // First, construct a list to include all unambiguously true indels, some of which are
             // rendered inapplicable (due to being precluded by others)
             List<Interval1D> unambiguous = new ArrayList<>();
@@ -818,6 +853,12 @@ public class Prediction {
             for (Interval1D ival : pogTree.getIntervalTree()) { // order specific to pogTree, and linked with ti and pi
                 if (ival.getWidth() > 1 || ival.min == -1 || ival.max == pogTree.getPositions()) { // exclude non-gaps
                     List<Boolean> calls = pi[i].getOptimal(j); // for ancestor index j
+                    if (DEBUG) {
+                        StringBuilder sb = new StringBuilder();
+                        for (Boolean b : calls)
+                            sb.append(b.toString().substring(0, 1));
+                        System.out.print(sb + "\t");
+                    }
                     if (calls.contains(Boolean.TRUE)) { // INDEL can be TRUE
                         if (calls.size() == 1) // the ONLY value is TRUE so DEFINITIVELY include
                             unambiguous.add(ival);
@@ -827,6 +868,7 @@ public class Prediction {
                     i++;
                 }
             }
+            if (DEBUG) System.out.println();
             // the order in which the intervals are considered is important: sorted by first start-index, within-which end-index
             Collections.sort(unambiguous);
             // Second, construct an interval tree definitive, with INDELs that are not contained within a TRUE INDEL
