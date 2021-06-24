@@ -52,8 +52,10 @@ public class Variable<E extends Domain> implements Comparable {
      */
     public Variable(E domain, String name) {
         this.domain = domain;
-        Variable.pool.put(this, Variable.pool.size());
-        this.canonicalIndex = Variable.pool.get(this);
+        synchronized (pool) {
+            Variable.pool.put(this, Variable.pool.size());
+            this.canonicalIndex = Variable.pool.get(this);
+        }
         this.name = name;
     }
 
@@ -63,8 +65,10 @@ public class Variable<E extends Domain> implements Comparable {
      */
     public Variable(E domain) {
         this.domain = domain;
-        Variable.pool.put(this, Variable.pool.size());
-        this.canonicalIndex = Variable.pool.get(this);
+        synchronized (pool) {
+            Variable.pool.put(this, Variable.pool.size());
+            this.canonicalIndex = Variable.pool.get(this);
+        }
     }
 
     /**
@@ -105,7 +109,9 @@ public class Variable<E extends Domain> implements Comparable {
      * @return true of the same (in the current namespace)
      */
     public boolean equals(Object var) {
-        return (this.canonicalIndex == Variable.pool.get(var));
+        synchronized (pool) {
+            return (this.canonicalIndex == Variable.pool.get(var));
+        }
     }
 
     /**
