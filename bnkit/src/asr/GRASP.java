@@ -4,12 +4,8 @@ import bn.ctmc.SubstModel;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
-import dat.Interval1D;
-import dat.IntervalST;
 import dat.file.*;
-import dat.phylo.IdxTree;
 import dat.phylo.Tree;
-import dat.phylo.TreeInstance;
 import dat.pog.IdxGraph;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
@@ -25,11 +21,12 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "0110.2021";
+    public static String VERSION = "29-Jun-2021";
     public static boolean VERBOSE = false;
     public static boolean TIME = false;
     public static boolean FORCELINEAR = false;
     public static int NTHREADS = 1;
+    public static boolean NIBBLE = false;
 
     public enum Inference {
         JOINT,
@@ -53,7 +50,8 @@ public class GRASP {
                 "\t{-indel <BEP(default)|BEML|SICP|SICML|PSP|PSML>}\n" +
                 "\t{-gap}\n" +
                 "\t{-savetree <tree-directory>}\n" +
-                "\t{-forcelinear}\n" +
+                "\t{-nibble}\n" +
+//                "\t{-forcelinear}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT|TREE>}\n" +
                 "\t{-time}{-verbose}{-help}");
         out.println("where \n" +
@@ -64,8 +62,9 @@ public class GRASP {
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
                 "\tThe output file is written on the specified format\n" +
-                "\t-forcelinear forces a linear ordering between neighbouring columns\n" +
-                "\t-verbose will print out information about steps undertaken, and -time the time it took to finish");
+                "\t-nibble removes positions in partial order graphs that cannot form a path from start to end\n" +
+//                "\t-forcelinear forces a linear ordering between neighbouring columns\n" +
+                "\t-verbose prints out information about steps undertaken, and -time the time it took to finish");
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
                 "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman; \n" +
@@ -103,7 +102,6 @@ public class GRASP {
         long START_TIME, ELAPSED_TIME;
 
         for (int a = 0; a < args.length; a ++) {
-            System.out.println(args[a]);
             if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
                 if (arg.equalsIgnoreCase("aln") && args.length > a + 1) {
@@ -122,6 +120,8 @@ public class GRASP {
                     TIME = true;
                 } else if (arg.equalsIgnoreCase("forcelinear")) {
                     FORCELINEAR = true;
+                } else if (arg.equalsIgnoreCase("nibble")) {
+                    NIBBLE = true;
                 } else if (arg.equalsIgnoreCase("savetree")) {
                     SAVE_TREE = true;
 

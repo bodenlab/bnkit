@@ -52,8 +52,7 @@ class POGTreeTest {
 
     @Test
     void parsimonyAncestors2() {
-        Boolean forceLinear = false;
-        Prediction ap = Prediction.PredictByIndelParsimony(pogt2, forceLinear);
+        Prediction ap = Prediction.PredictBySICP(pogt2);
         for (int idx : pogt2.getTree()) {
             if (!pogt2.getTree().isLeaf(idx)) { // ancestor
                 Object ancID = pogt2.getTree().getLabel(idx);
@@ -110,11 +109,10 @@ class POGTreeTest {
         for (int i = 0; i < nPos; i ++)
             ti[i] = pogTree.getNodeInstance(i, true);
         for (int i = 0; i < nPos; i ++) {
-            Parsimony p = new Parsimony(ti[i]);
+            Parsimony p = new Parsimony(ti[i].getTree());
             //p.SET_RANDOM_PARSIMONY = true; // default is false
             //p.SET_ONE_TARGET_PARSIMONY = true; // default is false
-            p.forward();
-            p.backward();
+            p.infer(ti[i], false);
             pi[i] = p;
         }
         for (int j = 0; j < tree.getSize(); j ++) {

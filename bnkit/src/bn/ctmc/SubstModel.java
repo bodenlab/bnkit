@@ -18,6 +18,7 @@
 
 package bn.ctmc;
 
+import asr.ASRRuntimeException;
 import bn.prob.EnumDistrib;
 import dat.EnumTable;
 import dat.EnumVariable;
@@ -27,6 +28,7 @@ import bn.math.Matrix.Exp;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.PriorityQueue;
 
 /**
  * Conditional probability table for CTMC based on discrete alphabets
@@ -285,6 +287,44 @@ public abstract class SubstModel {
             return new SIMPLE_3();
         } else
             return null;
+    }
+
+    public static class ModelCache {
+        final Map<Object, SubstModel> cache = new HashMap<>();
+        final Map<Object, Integer> count = new HashMap<>();
+        final int maxsize;
+        Object replaceme = null; // pointer to tag that should be replaced next
+        public ModelCache(int maxsize) {
+            this.maxsize = maxsize;
+        }
+        public int size() {
+            return cache.size();
+        }
+        public void add(SubstModel model, Object tag) {
+            if (cache.size() >= maxsize) {
+                cache.remove(replaceme);
+                count.remove(replaceme);
+            }
+            cache.put(tag, model);
+            count.put(tag, 0);
+            replaceme = tag;
+        }
+        public SubstModel get(Object tag) {
+            SubstModel m = cache.get(tag);
+            if (m == null)
+                return null;
+            int cnt = count.get(tag);
+            if (tag == replaceme) { // may need to update which tag is at the bottom of the list
+                for (Map.Entry<Object, Integer> entry : count.entrySet()) {
+                    if (entry.getValue() < cnt + 1) {
+                        replaceme = entry.getKey();
+                        break;
+                    }
+                }
+            }
+            count.put(tag, cnt + 1);
+            return m;
+        }
     }
 
     public static void main(String[] argv) {

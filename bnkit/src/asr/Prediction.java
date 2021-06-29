@@ -1,7 +1,6 @@
 package asr;
 
 import bn.ctmc.SubstModel;
-import bn.ctmc.matrix.GLOOME1;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
@@ -14,7 +13,6 @@ import dat.phylo.TreeInstance;
 import dat.pog.*;
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Container class for
@@ -128,11 +126,11 @@ public class Prediction {
             IdxTree phylo = pogTree.getTree();
             Set<Integer> pruneMe = new HashSet<>();
             for (int idx : phylo) {
-                Object ancid = phylo.getLabel(idx);
+                // Object ancid = phylo.getLabel(idx);
                 if (!phylo.isLeaf(idx)) { // ancestor
-                    POGraph pog = getAncestor(ancid);
+                    POGraph pog = ancarr[idx]; // getAncestor(ancid);
                     if (pog == null)
-                        throw new ASRRuntimeException("Invalid ancestor ID " + ancid);
+                        throw new ASRRuntimeException("Invalid ancestor at branchpoint " + idx);
                     if (!pog.isNode(position))
                         pruneMe.add(idx);
                 }
@@ -326,10 +324,10 @@ public class Prediction {
         this.states = new Object[getTree().getSize()][getPositions()];
         IdxTree[] trees = new IdxTree[getPositions()];              // this is how many position-specific trees we are dealing with
         // FIXME: create an index map for "inf" to enable generics <EnumDistrib>?
-        TreeDecor[] inf = new TreeDecor[getPositions()];  // which is also how many inferences we will carry out
-        for (int pos = 0; pos < inf.length; pos++) {                // for each position...
+        TreeDecor[] inf = new TreeDecor[getPositions()];            // number of positions is also how many inferences we will carry out
+        for (int pos = 0; pos < inf.length; pos++) {                // so for each position...
             trees[pos] = getTree(pos);                              //   this is the tree with indels imputed
-            inf[pos] = new MaxLhoodJoint(trees[pos], MODEL);       //     set-up the inference
+            inf[pos] = new MaxLhoodJoint(trees[pos], MODEL);        //   set-up the inference
         }
         treeinstances = new TreeInstance[getPositions()];
         for (int pos = 0; pos < getPositions(); pos ++) {        // for each position...
@@ -337,17 +335,17 @@ public class Prediction {
         }
         ThreadedDecorators threadpool = new ThreadedDecorators(inf, treeinstances, GRASP.NTHREADS);
         try {
-            Map<Integer, TreeDecor> ret = threadpool.runBatch();for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
+            Map<Integer, TreeDecor> ret = threadpool.runBatch();
+            for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
                 for (int idx : getAncestorIndices()) {
-                    int ancidx = positidxs[pos][idx];                   //   index for sought ancestor in the position-specific tree
-                    if (ancidx >= 0)                                   //   which may not exist, i.e. part of an indel, but if it is real...
+                    int ancidx = positidxs[pos][idx];               //   index for sought ancestor in the position-specific tree
+                    if (ancidx >= 0)                                //   which may not exist, i.e. part of an indel, but if it is real...
                         states[idx][pos] = ret.get(pos).getDecoration(ancidx);          //     extract state
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         return states;
     }
 
@@ -450,12 +448,16 @@ public class Prediction {
             double[] rates = pogTree.getEdgeRates(curr, nexts, leaves);
             // set the weights
             for (int i = 0; i < nexts.length; i ++) {
-                POGraph.StatusEdge edge = pog.getEdge(curr, nexts[i]);
-                if (edge != null) {
+                try {
+                    POGraph.StatusEdge edge = pog.getEdge(curr, nexts[i]);
                     double w = -Math.log(rates[i]);
+                    if (edge == null) { // the target node may not have been inferred
+                        edge = new POGraph.StatusEdge(false);
+                        pog.addEdge(curr, nexts[i], edge);
+                    }
                     edge.setWeight(w > 10000 ? 10000 : w); // neg log of prob; so P=1 means zero weight, low P means high weight
-                } else {
-                    throw new ASRRuntimeException("Invalid POG with missing edge: \"" + pog.getName() + "\" edge=" + curr + "-" +nexts[i]);
+                } catch (RuntimeException e) {
+                    throw new ASRRuntimeException("Invalid POG with missing edge: " + pog.getName() + " message=\"" + e.getMessage() + "\"");
                 }
             }
             // add indices of all nodes that can be visited next
@@ -491,7 +493,6 @@ public class Prediction {
         }
     }
 
-
     // --------------------------------------------------------------------------------------------------------------- //
     // static "factory" methods for constructing Prediction instances
     // including indel inference by parsimony and maximum likelihood
@@ -510,9 +511,8 @@ public class Prediction {
         Parsimony[] pi = new Parsimony[nPos]; // prepare array where all inferred gap states will go
         // next stage should be multi-threaded... not so at the moment
         for (int i = 0; i < nPos; i ++) { // for every position...
-            pi[i] = new Parsimony(ti[i]); // this is where the inferred states for an individual position goes
-            pi[i].forward();  // inference part 1
-            pi[i].backward(); // inference part 2
+            pi[i] = new Parsimony(ti[i].getTree(), false); // this is where the inferred states for an individual position goes
+            pi[i].decorate(ti[i]);  // inference
         }
         // unpack the results, branch point by branch point
         for (int j = 0; j < tree.getSize(); j ++) {         // for every (indexed) branch point (IdxTree defaults to depth-first order)
@@ -635,22 +635,9 @@ public class Prediction {
     /**
      * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." 2000
      *
-     * Seq.A    GG---1---CCTT------3-----GG
-     * Seq.B    GG---1---CCTT------3-----GG
-     * Seq.C    GGAAA---2--TT-4-AC-5--AAAGG
-     * Seq.D    GGAAA---2--TT-4-AC-5--AAAGG
-     * Seq.E    GGAAACCCCCCTTCAAACCCCAAAAGG
-     *
-     *          1 2 3 4 5
-     *          ---------
-     * Seq.A    1 0 1 - -
-     * Seq.B    1 0 1 - -
-     * Seq.C    0 1 0 1 1
-     * Seq.D    0 1 0 1 1
-     * Seq.E    0 0 0 0 0
-     *
      * @param pogTree
      * @return instance of IndelPrediction
+     * @deprecated
      */
     public static Prediction PredictByIndelParsimony(POGTree pogTree, Boolean forceLinear) {
         int nPos = pogTree.getPositions(); //
@@ -665,9 +652,8 @@ public class Prediction {
         // Below is where the main inference occurs
         // this stage should be multi-threaded... not so at the moment
         for (int i = 0; i < ti.length; i++) { // for each "indel"
-            pi[i] = new Parsimony(ti[i]);
-            pi[i].forward();
-            pi[i].backward();
+            pi[i] = new Parsimony(ti[i].getTree());
+            pi[i].decorate(ti[i]);
         }
         if (DEBUG) {
             // print out tables...
@@ -776,8 +762,22 @@ public class Prediction {
 
     /**
      * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." 2000
+     * Seq.A    GG---1---CCTT------3-----GG
+     * Seq.B    GG---1---CCTT------3-----GG
+     * Seq.C    GGAAA---2--TT-4-AC-5--AAAGG
+     * Seq.D    GGAAA---2--TT-4-AC-5--AAAGG
+     * Seq.E    GGAAACCCCCCTTCAAACCCCAAAAGG
+     *
+     *          1 2 3 4 5
+     *          ---------
+     * Seq.A    1 0 1 - -
+     * Seq.B    1 0 1 - -
+     * Seq.C    0 1 0 1 1
+     * Seq.D    0 1 0 1 1
+     * Seq.E    0 0 0 0 0
+     *
      * This version does incorporate multiple, optional INDELs
-     * It DOES generate POGs, but they are single-path POGs.
+     * It DOES generate POGs, and they are multi-path POGs.
      * @param pogTree
      * @return instance of Prediction
      */
@@ -795,9 +795,8 @@ public class Prediction {
         // Below is where the main inference occurs
         // this stage should be multi-threaded... not so at the moment
         for (int i = 0; i < ti.length; i++) { // for each "indel"
-            pi[i] = new Parsimony(ti[i]);
-            pi[i].forward();
-            pi[i].backward();
+            pi[i] = new Parsimony(ti[i].getTree(), false);
+            pi[i].decorate(ti[i]);
         }
         if (DEBUG) {
             // print out tables...
@@ -868,6 +867,9 @@ public class Prediction {
                     i++;
                 }
             }
+            //Set<Interval1D> unambigset = pogTree.getIntervalTree().flatten2Set();
+            //unambiguous = new ArrayList<>();
+            //unambiguous.addAll(unambigset);
             if (DEBUG) System.out.println();
             // the order in which the intervals are considered is important: sorted by first start-index, within-which end-index
             Collections.sort(unambiguous);
@@ -979,8 +981,7 @@ public class Prediction {
 
     /**
      * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." (2000).
-     * Inference with ML, using a gain/loss model similar to FastML (based on Cohen and Pupko 2010 M1).
-     * Note that FastML uses a mixture of two models (termed M1 and M2) but both have loss rates which dominate gain.
+     * Inference with ML, using a gain/loss model; this implementation is using a uniform model, unlike that used in FastML (based on Cohen and Pupko 2010).
      * @param pogTree
      * @return instance of IndelPrediction
      */
@@ -992,10 +993,11 @@ public class Prediction {
 
     /**
      * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." (2000).
-     * Inference with ML.
-     * @param pogTree
+     * Inference with ML using a user specified model; our default is a uniform model, whose implementation is a generalisation of Jukes-Cantor.
+     * FastML uses a mixture of two models (termed M1 and M2) but both have loss rates which dominate gain. There's a model GLOOME that implements M1.
+     * @param pogTree the data structure holding the extants and the tree
      * @param gain_loss_model model for gain and loss events
-     * @return instance of IndelPrediction
+     * @return instance of IndelPrediction, with ancestor POGs (without character state)
      */
     public static Prediction PredictBySICML(POGTree pogTree, SubstModel gain_loss_model) {
         int nPos = pogTree.getPositions(); // number of positions in alignment/POG
@@ -1042,6 +1044,7 @@ public class Prediction {
         // (1) regardless, if an ancestor or extant, we can pull out what the INDEL states are: absent (false), present (true)
         // (2) if an ancestor, an ancestor POG is created, using the info from (1)
         for (int j = 0; j < tree.getSize(); j++) { // we look at each branch point, corresponding to either an extant or ancestor sequence
+
             Object ancID = tree.getBranchPoint(j).getID();
             if (tree.getChildren(j).length == 0) { // not an ancestor, so we just print out debug info below before continuing with next
                 if (DEBUG) {
@@ -1116,10 +1119,10 @@ public class Prediction {
                     for (; biggest < current.min; biggest ++) {
                         Interval1D pad = new Interval1D(biggest, biggest + 1);
                         if (precluder != null) {                        // consider if the last-addition does // FIXME: probably no need to check...
-                            if (!precluder.contains(pad))           // last-addition does NOT preclude the current one either, so...
-                                definitive.put(pad, false); // add one-step patch to interval tree; false indicates that it is not based on ML inference
+                            if (!precluder.contains(pad))               // last-addition does NOT preclude the current one either, so...
+                                definitive.put(pad, false);       // add one-step patch to interval tree; false indicates that it is not based on ML inference
                         } else                                          // there isn't a "last-addition", so...
-                            definitive.put(pad, false); // add one-step patch to interval tree; false indicates that it is not based on ML inference
+                            definitive.put(pad, false);           // add one-step patch to interval tree; false indicates that it is not based on ML inference
                     }
                 }
                 if (current.min > prev) { // check if we've moved beyond the source index (can do because the intervals are sorted)
@@ -1140,6 +1143,8 @@ public class Prediction {
             POGraph pog = POGraph.createFromEdgeMap(nPos, emap);
             ancestors.put(ancID, pog);
         }
+        if (DEBUG) System.out.println("Now checking if all POGs are complete...");
+        //ancestors = patchAncestorsWithBEP(pogTree, ancestors);
         return new Prediction(pogTree, ancestors);
     }
 
@@ -1149,6 +1154,7 @@ public class Prediction {
      * Note that FastML uses a mixture of two models (termed M1 and M2) but both have loss rates which dominate gain.
      * @param pogTree
      * @return instance of IndelPrediction
+     * @deprecated
      */
     public static Prediction PredictByIndelMaxLhood(POGTree pogTree, Boolean forceLinear) {
         Object[] possible = {true, false};
@@ -1162,6 +1168,7 @@ public class Prediction {
      * @param pogTree
      * @param gain_loss_model model for gain and loss events
      * @return instance of IndelPrediction
+     * @deprecated
      */
     public static Prediction PredictByIndelMaxLhood(POGTree pogTree, Boolean forceLinear, SubstModel gain_loss_model) {
         int nPos = pogTree.getPositions(); // number of positions in alignment/POG
@@ -1313,44 +1320,152 @@ public class Prediction {
             tif[i+1] = pogTree.getEdgeInstance(i, POGTree.EDGE_FORWARD);
             tib[i+1] = pogTree.getEdgeInstance(i, POGTree.EDGE_BACKWARD);
         }
-        Parsimony[] pif = new Parsimony[tif.length];
-        Parsimony[] pib = new Parsimony[tib.length];
-        // Below is where the main inference occurs
-        // this stage should be multi-threaded... not so at the moment
-        for (int i = -1; i <= nPos; i++) { // for each position, FIXME: some unnecessary inferences at termini below
-            pif[i+1] = new Parsimony(tif[i+1]);
-            pib[i+1] = new Parsimony(tib[i+1]);
-            pif[i+1].forward();
-            pif[i+1].backward();
-            pib[i+1].forward();
-            pib[i+1].backward();
+        if (DEBUG) System.out.println("Created " + (tif.length) + " forward and " + (tib.length) + " backward trees for parsimony");
+        TreeDecor[] pif = new TreeDecor[tif.length];
+        TreeDecor[] pib = new TreeDecor[tib.length];
+        // Below is where the main inference is set-up
+        for (int i = -1; i <= nPos; i++) {
+            Object[] possible = tif[i + 1].getPossible();
+            if (possible.length < 1) { // nothing to infer, not used at all
+                pif[i + 1] = null;
+            } else {
+                pif[i + 1] = new Parsimony(tif[i + 1].getTree(), true);
+            }
         }
-        // inference done, now assemble...
+        for (int i = -1; i <= nPos; i++) {
+            Object[] possible = tib[i + 1].getPossible();
+            if (possible.length < 1) { // nothing to infer, not used at all
+                pib[i + 1] = null;
+            } else {
+                pib[i + 1] = new Parsimony(tib[i + 1].getTree(), true); //
+            }
+        }
+        if (DEBUG) System.out.println("Created " + (pif.length) + " + " + (pib.length) + " inference objects to now be run with " + (GRASP.NTHREADS) + " threads");
+        // put all parsimony objects in threads
+        ThreadedDecorators fpool = new ThreadedDecorators(pif, tif, GRASP.NTHREADS);
+        ThreadedDecorators bpool = new ThreadedDecorators(pib, tib, GRASP.NTHREADS);
+        try {
+            // Below is where the main inference occurs
+            Map<Integer, TreeDecor> fret = fpool.runBatch();
+            Map<Integer, TreeDecor> bret = bpool.runBatch();
+            if (DEBUG)
+                System.out.println("Threads completed, now time for assembling " + (tree.getSize() - tree.getNLeaves()) + " POGs");
+            // inference done, now assemble... TODO: use threads here too
+            for (int j = 0; j < tree.getSize(); j++) { // we look at each branchpoint, corresponding to either an extant or ancestor sequence
+                Object ancID = tree.getBranchPoint(j).getID();
+                if (tree.getChildren(j).length > 0) { // an ancestor
+                    //if (DEBUG) System.out.println("Assembling ancestor N" + ancID + " at branchpoint index " + j);
+                    EdgeMap emap = new EdgeMap();
+                    for (int i = -1; i <= nPos; i++) {
+                        if (i != nPos && pif[i + 1] != null) {
+                            List solutsf = (List) pif[i + 1].getDecoration(j);
+                            for (Object s : solutsf) {
+                                int next = ((Integer) s).intValue();
+                                emap.add(i, next);
+                            }
+                        }
+                        if (i != -1 && pib[i + 1] != null) {
+                            List solutsb = (List) pib[i + 1].getDecoration(j);
+                            for (Object s : solutsb) {
+                                int prev = ((Integer) s).intValue();
+                                emap.add(prev, i);
+                            }
+                        }
+                    }
+                    POGraph pog = POGraph.createFromEdgeMap(nPos, emap);
+                    ancestors.put(ancID, pog);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+        // there is a chance that the POG has loose ends BECAUSE edges have been deemed
+        // not optimal when NULL edges are considered, thus possibly causing discontinuities;
+        // one strategy to rescue such is to re-run parsimony WITHOUT NULL edges:
+        ancestors = patchAncestorsWithBEP(pogTree, ancestors);
+        return new Prediction(pogTree, ancestors);
+    }
+
+    /**
+     * Fixes discontinuous POGs by performing parsimony of edges when NULL (deleted) leaf states are excluded.
+     * @param pogTree
+     * @param ancestors
+     * @return
+     */
+    private static Map<Object, POGraph> patchAncestorsWithBEP(POGTree pogTree, Map<Object, POGraph> ancestors) {
+        IdxTree tree = pogTree.getTree();
+        HashMap<Object, Set<Integer>> crippled = new HashMap<>();
         for (int j = 0; j < tree.getSize(); j++) { // we look at each branchpoint, corresponding to either an extant or ancestor sequence
             Object ancID = tree.getBranchPoint(j).getID();
             if (tree.getChildren(j).length > 0) { // an ancestor
-                EdgeMap emap = new EdgeMap();
-                for (int i = -1; i <= nPos; i ++) {
-                    if (i != nPos) {
-                        List solutsf = pif[i + 1].getOptimal(j);
-                        for (Object s : solutsf) {
-                            int next = ((Integer) s).intValue();
-                            emap.add(i, next);
-                        }
-                    }
-                    if (i != -1) {
-                        List solutsb = pib[i + 1].getOptimal(j);
-                        for (Object s : solutsb) {
-                            int prev = ((Integer) s).intValue();
-                            emap.add(prev, i);
+                POGraph pog = ancestors.get(ancID);
+                if (!pog.isContiguous()) {                  // there is no path from start to end
+                    Set<Integer> idxs = pog.getProtruding();// grab all nodes that are likely to have been clipped by inferred edge (or node) absence
+                    crippled.put(ancID, idxs);              // add this POG to one that must be fixed
+                } else {                                    // there is a path from start to end
+                    if (GRASP.NIBBLE)
+                        pog.nibble();                       // clean up nodes that "stick-out"
+                }
+            }
+        }
+        Set<Integer> columns = new HashSet<>();
+        for (Map.Entry<Object, Set<Integer>> entry : crippled.entrySet())
+            columns.addAll(entry.getValue());
+        while (columns.size() > 0) {
+            List<Integer> cols_ordered = new ArrayList<>(columns);
+            TreeInstance[] tis = new TreeInstance[cols_ordered.size()]; // package the trees for inference
+            Parsimony.Inference[] pinf = new Parsimony.Inference[cols_ordered.size()];
+            for (int i = 0; i < cols_ordered.size(); i ++) {
+                int idx = cols_ordered.get(i);
+                int col = Math.abs(idx);
+                boolean STATUS_FORWARD = idx > 0;
+                tis[i] = pogTree.getEdgeInstance(col, STATUS_FORWARD);
+                Parsimony p = new Parsimony(tis[i].getTree(), false);
+                pinf[i] = p.infer(tis[i], false);
+            }
+            // patch the POGs with newly inferred edges...
+            Set<Object> fixme = new HashSet<>(crippled.keySet());
+            if (DEBUG) System.out.println("Patching "+ crippled.size() +" ancestor POGs by (re)inferring "+cols_ordered.size()+" positions");
+            for (Object ancID : fixme) {
+                int bpidx = pogTree.getTree().getIndex(ancID);
+                POGraph pog = ancestors.get(ancID);
+                Set<Integer> idxs = crippled.get(ancID);
+                for (int i = 0; i < cols_ordered.size(); i ++) {
+                    int idx = cols_ordered.get(i);
+                    int col = Math.abs(idx);
+                    boolean STATUS_FORWARD = idx > 0;
+                    if (idxs.contains(idx)) {
+                        List opts = pinf[i].getOptimal(bpidx);
+                        for (Object opt : opts) {
+                            try {
+                                int inferred = (Integer) opt;
+                                if (!pog.isNode(inferred) && inferred != pog.maxsize() && inferred != -1) // check if new node is needed
+                                    pog.addNode(inferred, new Node());
+                                if (STATUS_FORWARD)
+                                    pog.addEdge(col, inferred, new POGraph.StatusEdge(false));
+                                else
+                                    pog.addEdge(inferred, col, new POGraph.StatusEdge(false));
+                            } catch (ClassCastException e) {
+                                throw new ASRRuntimeException("Invalid inferred edge index: " + opt);
+                            }
                         }
                     }
                 }
-                POGraph pog = POGraph.createFromEdgeMap(nPos, emap);
-                ancestors.put(ancID, pog);
+                if (!pog.isContiguous()) {                  // there is (still) no path from start to end
+                    idxs = pog.getProtruding();             // grab all nodes that are likely to have been clipped by inferred edge (or node) absence
+                    crippled.put(ancID, idxs);              // update this POG with positions that remain to be fixed
+                } else {                                    // there is now a path from start to end, yay!
+                    if (GRASP.NIBBLE)
+                        pog.nibble();                       // clean up nodes that "stick-out"
+                    crippled.remove(ancID);                 // remove the POG from our list to work on
+                }
             }
+            columns = new HashSet<>();
+            for (Map.Entry<Object, Set<Integer>> entry : crippled.entrySet())
+                columns.addAll(entry.getValue());
         }
-        return new Prediction(pogTree, ancestors);
+        return ancestors;
     }
 
     /**
@@ -1364,76 +1479,89 @@ public class Prediction {
         Map<Object, POGraph> ancestors = new HashMap<>();
         TreeInstance[] tif = new TreeInstance[nPos + 2]; // forward
         TreeInstance[] tib = new TreeInstance[nPos + 2]; // backward
-        for (int i = -1; i <= nPos; i ++) {
-            tif[i+1] = pogTree.getEdgeInstance(i, POGTree.EDGE_FORWARD);
-            tib[i+1] = pogTree.getEdgeInstance(i, POGTree.EDGE_BACKWARD);
+        for (int i = -1; i <= nPos; i++) {
+            tif[i + 1] = pogTree.getEdgeInstance(i, POGTree.EDGE_FORWARD);
+            tib[i + 1] = pogTree.getEdgeInstance(i, POGTree.EDGE_BACKWARD);
         }
         // ML inference will maximise the JOINT probability of the observed extant edge states GIVEN the combination of the edge states at the ancestors.
         TreeDecor[] jif = new TreeDecor[tif.length];
         TreeDecor[] jib = new TreeDecor[tib.length];
+        // TODO: pool SubstModels so that they can be re-used (with speed-ups)
+        SubstModel.ModelCache modelcache = new SubstModel.ModelCache(20);
         for (int i = 0; i < jif.length; i++) {
             Object[] possible = tif[i].getPossible();
             if (possible.length < 1) { // nothing to infer, not used at all
                 jif[i] = null;
-            } else if (possible.length < 2) { // nothing to infer, can only take one value, so create blanket output
-                jif[i] = new TreeInstance.BlanketTreeDecor(tif[i].getSize(), possible[0]);
             } else {
-
-                SubstModel substmodel = new JC(1, possible); // need to know the alphabet...
-                jif[i] = new MaxLhoodJoint(tree, substmodel);
+                //SubstModel substmodel = new JC(1, possible); // need to know the alphabet...
+                jif[i] = new MaxLhoodJoint(tree, modelcache);
             }
         }
         for (int i = 0; i < jib.length; i++) {
             Object[] possible = tib[i].getPossible();
             if (possible.length < 1) { // nothing to infer, not used at all
                 jib[i] = null;
-            } else if (possible.length < 2) { // nothing to infer, can only take one value
-                jib[i] = new TreeInstance.BlanketTreeDecor(tib[i].getSize(), possible[0]);
             } else {
-                SubstModel substmodel = new JC(1, possible); // need to know the alphabet...
-                jib[i] = new MaxLhoodJoint(tree, substmodel);
+                //SubstModel substmodel = new JC(1, possible); // need to know the alphabet...
+                jib[i] = new MaxLhoodJoint(tree, modelcache);
             }
         }
-        ThreadedDecorators fpool = new ThreadedDecorators(jif, tif, (GRASP.NTHREADS + 1)/ 2);
-        ThreadedDecorators bpool = new ThreadedDecorators(jib, tib, (GRASP.NTHREADS + 1)/ 2);
-        // Below is where the main inference occurs
+        if (DEBUG)
+            System.out.println("Created " + (jif.length) + " + " + (jib.length) + " inference objects to now be run with " + (GRASP.NTHREADS) + " threads");
+        ThreadedDecorators fpool = new ThreadedDecorators(jif, tif, GRASP.NTHREADS);
+        ThreadedDecorators bpool = new ThreadedDecorators(jib, tib, GRASP.NTHREADS);
         try {
+            // Below is where the main inference occurs
             Map<Integer, TreeDecor> fret = fpool.runBatch();
             Map<Integer, TreeDecor> bret = bpool.runBatch();
+/*            for (int i = 0; i < jif.length; i++) {
+                if (jif[i] != null) {
+                    MaxLhoodJoint mlj = (MaxLhoodJoint) jif[i];
+                    System.out.println("Forward Col " + i + "\tAncs " + tif[i].getTree().getNParents() + "\tSyms " + tif[i].getNPossibleValues() + "\t" + mlj.toElapsedTime());
+                }
+            }
+            for (int i = 0; i < jib.length; i++) {
+                if (jib[i] != null) {
+                    MaxLhoodJoint mlj = (MaxLhoodJoint) jib[i];
+                    System.out.println("Backward Col " + i + "\tAncs " + tib[i].getTree().getNParents() + "\tSyms " + tib[i].getNPossibleValues() + "\t" + mlj.toElapsedTime());
+                }
+            } */
+                if (DEBUG)
+                System.out.println("Threads completed, now time for assembling " + (tree.getSize() - tree.getNLeaves()) + " POGs");
+            // inference done, now assemble... TODO: multi-thread, also create module for this as the same process applies to BEP
+            for (int j = 0; j < tree.getSize(); j++) { // we look at each branchpoint, corresponding to either an extant or ancestor sequence
+                Object ancID = tree.getBranchPoint(j).getID();
+                if (tree.getChildren(j).length > 0) { // an ancestor
+                    EdgeMap emap = new EdgeMap();
+                    for (int i = -1; i <= nPos; i++) {
+                        if (i != nPos) {
+                            Object solutsf = jif[i + 1].getDecoration(j);
+                            if (solutsf != null) { // if this is null, it means the most probable edge (forward) is actually none at all.
+                                int next = ((Integer) solutsf).intValue();
+                                emap.add(i, next);
+                            }
+                        }
+                        if (i != -1) {
+                            Object solutsb = jib[i + 1].getDecoration(j);
+                            if (solutsb != null) { // if this is null, it means the most probable edge (backward) is actually none at all.
+                                int prev = ((Integer) solutsb).intValue();
+                                emap.add(prev, i);
+                            }
+                        }
+                    }
+                    POGraph pog = POGraph.createFromEdgeMap(nPos, emap);
+                    ancestors.put(ancID, pog);
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
+            return null;
         }
-        // inference done, now assemble...
-        for (int j = 0; j < tree.getSize(); j++) { // we look at each branchpoint, corresponding to either an extant or ancestor sequence
-            Object ancID = tree.getBranchPoint(j).getID();
-            if (tree.getChildren(j).length > 0) { // an ancestor
-                EdgeMap emap = new EdgeMap();
-                for (int i = -1; i <= nPos; i ++) {
-                    if (i != nPos) {
-
-
-                        if (DEBUG) {
-                            System.out.println("i " + i);
-                            System.out.println("j " + j);
-                            System.out.println(jif[i + 1].getDecoration(j));
-                        }
-                        Object solutsf = jif[i + 1].getDecoration(j);
-
-                        int next = ((Integer) solutsf).intValue();
-                        emap.add(i, next);
-                    }
-                    if (i != -1) {
-                        Object solutsb = jib[i + 1].getDecoration(j);
-                        int prev = ((Integer) solutsb).intValue();
-                        emap.add(prev, i);
-                    }
-                }
-                POGraph pog = POGraph.createFromEdgeMap(nPos, emap);
-                ancestors.put(ancID, pog);
-            }
-        }
+        // there is a chance that the POG has loose ends BECAUSE edges have been deemed
+        // not optimal when NULL edges are considered, thus possibly causing discontinuities;
+        // one strategy to rescue such is to run parsimony WITHOUT NULL edges.
+        // TODO: implement same type of rescue method for BEML
+        ancestors = patchAncestorsWithBEP(pogTree, ancestors);
         return new Prediction(pogTree, ancestors);
     }
-
-
 }

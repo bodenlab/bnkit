@@ -177,7 +177,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             return true;
         if (!isNode(idx1) && idx1 != -1) // the source node must either be the start terminal or a valid node (not just an index)
             return false;
-        if (!isNode(idx2) && idx2 != size()) // the target node must either be the end terminal or a valid node (not just an index)
+        if (!isNode(idx2) && idx2 != nNodes) // the target node must either be the end terminal or a valid node (not just an index)
             return false;
         int[] forw = getForward(idx1);
         for (int to : forw) {
@@ -187,7 +187,13 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         return idx2 == nNodes ? isEndNode(idx1) : false; // if we are searching for end marker
     }
 
-
+    /**
+     * Is this POG contiguous?
+     * @return
+     */
+    public boolean isContiguous() {
+        return isPath(-1, nNodes);
+    }
     /**
      * Get complete paths with reciprocated edges, and non-reciprocated edges used only if required to complete a path.
      * @return
@@ -326,38 +332,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      */
     public static POGraph createFromEdgeMap(int nPos, EdgeMap emap) {
         POGraph pog = null;
-        boolean tidy = false; // DON'T USE: treat reciprocated edges as definitive, and non-reciprocated as optional
-        // FIXME: look into the "tidy" scheme, not working with BEML/grasp.aln, ancestor 3; depends on order of nodes added
-        // a fix may require checking if full paths are formed BEFORE adding nodes that otherwise would be redundant
-        if (tidy) {
-            pog = new POGraph(nPos);
-            Set<POGEdge> optional = new HashSet<>();
-            for (POGEdge edge : emap.getRecip()) {
-                if (edge.idx1 != -1 && !pog.isNode(edge.idx1))
-                    pog.addNode(edge.idx1, new Node());
-                if (edge.idx2 != nPos && !pog.isNode(edge.idx2))
-                    pog.addNode(edge.idx2, new Node());
-                pog.addEdge(edge.idx1, edge.idx2, new StatusEdge(true));
-            }
-            for (POGEdge edge : emap.getEdges()) {
-                if (!emap.isReciprocated(edge)) {
-                    if (pog.isNode(edge.idx1) || pog.isNode(edge.idx2)) {
-                        if (!pog.isPath(edge.idx1, edge.idx2))
-                            optional.add(edge);
-                    }
-                }
-            }
-            for (POGEdge edge : optional) {
-                if (edge.idx1 != -1 && !pog.isNode(edge.idx1))
-                    pog.addNode(edge.idx1, new Node());
-                if (edge.idx2 != nPos && !pog.isNode(edge.idx2))
-                    pog.addNode(edge.idx2, new Node());
-                pog.addEdge(edge.idx1, edge.idx2, new StatusEdge(false));
-            }
-            // TODO: remove deadends
-        } else {
-            pog = new POGraph(nPos);
-            for (POGEdge edge : emap.getEdges()) {
+        pog = new POGraph(nPos);
+        for (POGEdge edge : emap.getEdges()) {
+            synchronized (pog) {
                 if (edge.idx1 != -1 && !pog.isNode(edge.idx1))
                     pog.addNode(edge.idx1, new Node());
                 if (edge.idx2 != nPos && !pog.isNode(edge.idx2))
@@ -367,6 +344,97 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         }
         return pog;
     }
+
+    /**
+     * Check if node sticks out in one direction
+     * @param index node
+     * @param direction_start if true, sticking out without an edge that could lead from start; else, sticking out without an edge that could lead to the end
+     * @return true if the node sticks out
+     */
+    private synchronized boolean nibble(int index, boolean direction_start) {
+        if (direction_start && index > -1) { // all nodes (except start node) must have backward links
+            if (!isStartNode(index)) {
+                int[] backw = getBackward(index);
+                return (backw.length == 0);
+            }
+        }
+        if (!direction_start && index < nNodes) { // all nodes (except terminal node) must have forward links
+            if (!isEndNode(index)) {
+                int[] forw = getForward(index);
+                return (forw.length == 0);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Remove nodes that "stick-out" in either direction.
+     * TODO: consider option to not calculate topological order (may not be necessary in most cases)
+     * @return number of nodes removed in total
+     */
+    public int nibble() {
+        int cnt = 0; // how many we removed
+        // first work from the start
+        int[] idxs = getTopologicalOrder();
+        for (int i = 0; i < idxs.length; i ++) {
+            int idx = idxs[i];
+            if (idx >= 0 && idx < nNodes) {
+                if (nodes[idx] != null) {
+                    if (nibble(idx, true)) {
+                        cnt += 1;
+                        removeNode(idx);
+                    }
+                }
+            }
+        }
+        // next, work from the end
+        for (int i = idxs.length - 1; i >= 0; i --) {
+            int idx = idxs[i];
+            if (idx >= 0 && idx < nNodes) {
+                if (nodes[idx] != null) {
+                    if (nibble(idx, false)) {
+                        cnt += 1;
+                        removeNode(idx);
+                    }
+                }
+            }
+        }
+        return cnt;
+    }
+
+    /**
+     * Retrieve indices in POG that "stick-out" i.e. nodes that protrude (in either direction) forming anomalous start and end nodes.
+     * Indices that have direction start-to-end are 1, 2, ... N; Indices from end-to-start are 0, -1, -2, ..., -(N-1).
+     * TODO: consider option to not calculate topological order (may not be necessary in most cases)
+     * @return columns
+     */
+    public Set<Integer> getProtruding() {
+        // first work from the start
+        int[] idxs = getTopologicalOrder();
+        Set<Integer> cols = new HashSet<>();
+        for (int i = 0; i < idxs.length; i ++) {
+            int idx = idxs[i];
+            if (idx >= 0 && idx < nNodes) {
+                if (nodes[idx] != null) {
+                    if (nibble(idx, false))
+                        cols.add(idx);
+                }
+            }
+        }
+        // next, work from the end
+        for (int i = idxs.length - 1; i >= 0; i --) {
+            int idx = idxs[i];
+            if (idx >= 0 && idx < nNodes) {
+                if (nodes[idx] != null) {
+                    if (nibble(idx, true))
+                        cols.add(-idx); // note that index is negative to mark direction end-->start
+                }
+            }
+        }
+        return cols;
+    }
+
+
 
     /**
      * Create a POG from an array of edge indices.

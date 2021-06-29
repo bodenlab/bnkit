@@ -17,7 +17,8 @@ public class IdxGraph {
     protected final boolean directed;
     public String nodeDOT = "style=\"rounded,filled\", shape=box, fixedsize=true";
     public String edgeDOT = ""; //""style=\"bold\"";
-    protected Node[] nodes;    // indexed by internal node ID i in {0..N}, node i does not exist if nodes[i] = null
+    protected Node[] nodes;    // indexed by internal node ID i in {0..N}; FIXME: node i does not exist if nodes[i] = null
+    protected boolean[] allnodes;
     protected int nNodes;
     protected BitSet[] edgesForward;
     protected BitSet[] edgesBackward = null;
@@ -27,7 +28,7 @@ public class IdxGraph {
 
     public IdxGraph(int nNodes, boolean undirected, boolean terminated) {
         this.nodes = new Node[nNodes];
-        //for (int i = 0; i < nNodes; i ++) this.nodes.add(null); // set all node indices to indicate "no node"
+        this.allnodes = new boolean[nNodes]; // initially NO nodes
         this.nNodes = nNodes;
         this.directed = !undirected;
         this.edgesForward = new BitSet[nNodes];
@@ -72,13 +73,13 @@ public class IdxGraph {
     public int size() {
         int cnt = 0;
         for (int i = 0; i < this.nNodes; i ++)
-            cnt += this.nodes[i] != null ? 1 : 0;
+            cnt += this.allnodes[i] ? 1 : 0;
         return cnt;
     }
 
     public synchronized int getFreeIndex() {
         for (int i = 0; i < this.nNodes; i ++)
-            if (this.nodes[i] == null)
+            if (this.allnodes[i] == false)
                 return i;
         throw new RuntimeException("There are no free indices in graph");
     }
@@ -116,7 +117,7 @@ public class IdxGraph {
      */
     public boolean isNode(int idx) {
         if (isIndex(idx))
-            return (nodes[idx] != null);
+            return allnodes[idx];
         return false;
     }
 
@@ -224,6 +225,7 @@ public class IdxGraph {
     public synchronized int addNode(int nid, Node node) {
         if (isIndex(nid)) {
             this.nodes[nid] = node;
+            this.allnodes[nid] = true;
             this.edgesForward[nid] = new BitSet(maxsize());
             if (isDirected())
                 this.edgesBackward[nid] = new BitSet(maxsize());
@@ -254,6 +256,7 @@ public class IdxGraph {
             for (int prev : getNodeIndices(nid, false))
                 this.removeEdge(prev, nid);
             this.nodes[nid] = null;
+            this.allnodes[nid] = false;
             this.edgesForward[nid] = null;
             if (isDirected())
                 this.edgesBackward[nid] = null;
@@ -427,9 +430,10 @@ public class IdxGraph {
             buf.append("digraph " + getName() + " {\nrankdir=\"LR\";\nnode [" + nodeDOT + "];\n");
         for (int i = 0; i < nodes.length; i ++) {
             Node n = nodes[i];
-            if (n != null) {
-                buf.append(Integer.toString(i) + " [" + n.toDOT() + "];\n");
-            }
+            if (n != null)
+                buf.append(i + " [" + n.toDOT() + "];\n");
+            else
+                buf.append(i + ";\n");
         }
         if (isTerminated()) {
             buf.append("_start [label=\"S(" + getName() + ")\",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];\n");

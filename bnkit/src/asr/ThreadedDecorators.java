@@ -32,8 +32,9 @@ public class ThreadedDecorators<E> { //
         executor = Executors.newFixedThreadPool(nThreads);
         // create jobs
         for (int i = 0; i < decors.length; i ++) {
-            if (decors[i] != null)
+            if (decors[i] != null) {
                 jobsToDo.put(i, new Job<>(decors[i], tis[i]));
+            }
         }
     }
 
@@ -59,8 +60,10 @@ public class ThreadedDecorators<E> { //
             Integer tag = entry.getKey();
             Future<TreeDecor<E>> future = entry.getValue();
             try {
-                res.put(tag, future.get());
+                TreeDecor ret = future.get();
+                res.put(tag, ret);
             } catch (InterruptedException | ExecutionException e) {
+                System.err.println("Failed with thread for " + tag + " with future " + future);
                 e.printStackTrace();
             }
         }

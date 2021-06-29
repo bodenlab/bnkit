@@ -319,23 +319,6 @@ public class POGTree {
                 else if (node != null)
                     instarr[i] = Boolean.FALSE; // not gap
             }
-                /*
-                if (phylotree.getChildren(i).length == 0) { // leaf node, see if we can instantiate
-                    Object label = phylotree.getLabel(i);
-                    if (label != null) {
-                        POGraph pog = extants.get(label);
-                        if (pog != null) {
-                            SymNode node = (SymNode) pog.getNode(index);
-                            if (node != null && !nullNotnull)
-                                instarr[i] = node.get();
-                            else if (node == null && nullNotnull)
-                                instarr[i] = Boolean.TRUE;  // gap
-                            else if (node != null)
-                                instarr[i] = Boolean.FALSE; // not gap
-                        }
-                    }
-                }
-                */
         }
         return new TreeInstance(phylotree, instarr);
     }

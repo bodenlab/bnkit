@@ -20,9 +20,8 @@ class ThreadedDecoratorsTest {
         public int secs = 0;
         public MyDecor(String name, IdxTree tree) {
             this.name = name;
-            //System.out.println("Began creating " + name);
             pbn = PhyloBN.create(tree, new JC(1, Enumerable.aacid.getValues()));
-            //System.out.println("Finished creating " + name);
+
         }
         @Override
         public Integer getDecoration(int idx) {

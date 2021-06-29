@@ -30,14 +30,19 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
      * @throws InvalidIndexRuntimeException if either node index is invalid
      */
     public E getEdge(int from, int to) {
+        boolean valid_from = isNode(from);
+        boolean valid_to = isNode(to);
         if (isNode(from) && isNode(to)) {
-            return this.edges.get(getEdgeIndex(from, to));
+            int eidx = getEdgeIndex(from, to);
+            return this.edges.get(eidx);
         } else if (from == -1 && isNode(to) && isTerminated()) {
-            return this.edges.get(getEdgeIndex(from, to));
+            int eidx = getEdgeIndex(from, to);
+            return this.edges.get(eidx);
         } else if (isNode(from) && to == this.maxsize() && isTerminated()) {
-            return this.edges.get(getEdgeIndex(from, to));
+            int eidx = getEdgeIndex(from, to);
+            return this.edges.get(eidx);
         } else {
-            throw new InvalidIndexRuntimeException("Cannot retrieve edge between non-existent node/s: " + from + " or " + to);
+            throw new InvalidIndexRuntimeException("Cannot retrieve edge between non-existent node/s: " + from + (valid_from ? " (valid) -- " : " (invalid) -- ") + to + (valid_to ? " (valid)" : " (invalid)"));
         }
     }
 

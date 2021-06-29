@@ -130,7 +130,8 @@ public class Tree extends IdxTree {
             Tree edge1 = Newick.load("/Users/mikael/simhome/ASR/edge1.nwk");
             System.out.println(edge1);
             Alignment aln = new Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/gap1.aln", Enumerable.aacid));
-            Parsimony tip = new Parsimony(edge1.getInstance(aln.getNames(), aln.getGapColumn(1)));
+            TreeInstance ti = edge1.getInstance(aln.getNames(), aln.getGapColumn(1));
+            Parsimony tip = new Parsimony(ti.getTree());
             System.out.println(tip);
         } catch (IOException ex) {
             ex.printStackTrace();

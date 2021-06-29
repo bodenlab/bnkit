@@ -8,7 +8,7 @@ import java.util.*;
  */
 public class EdgeMap {
 
-    private final Map<Integer, Set<Integer>> links = new HashMap<>();
+    private final Map<Integer, Set<Integer>> links = new HashMap<>(); // map that will match every idx with those that it connects with
     private final Set<POGEdge> edges = new HashSet<>();
     private final Set<POGEdge> recip = new HashSet<>(); // reciprocated edges only
 

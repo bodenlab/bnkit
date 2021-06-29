@@ -352,17 +352,19 @@ public class Newick {
     public static void save(IdxTree tree, String filename, Object[] instances) throws IOException {
         int[] ridxs = tree.getRoots(); // may have multiple "roots", i.e. separate "insertion" events
         for (int i = 0; i < ridxs.length; i ++) { // a separate tree for each root
-            int pos_ext = filename.lastIndexOf("."); // position of the file extension
-            String extension = ".nwk";
-            if (pos_ext == -1) // did not find an extension at all
-                pos_ext = filename.length();
-            else if (ridxs.length > 1 || !filename.endsWith(extension)) // more than one root, or filename did not have .nwk extension already
-                extension = "." + Integer.toString(i+1) + extension;
-            String actualfile = filename.substring(0, pos_ext) +  extension;
-            BufferedWriter bw = new BufferedWriter(new FileWriter(actualfile));
-            String s = nprint(ridxs[i], tree, instances);
-            bw.write(s + ";\n");
-            bw.close();
+            if (tree.isParent(ridxs[i])) { // check so that "root" is also a parent (has children); else not a tree worth saving
+                int pos_ext = filename.lastIndexOf("."); // position of the file extension
+                String extension = ".nwk";
+                if (pos_ext == -1) // did not find an extension at all
+                    pos_ext = filename.length();
+                else if (ridxs.length > 1 || !filename.endsWith(extension)) // more than one root, or filename did not have .nwk extension already
+                    extension = "." + Integer.toString(ridxs[i]) + extension;
+                String actualfile = filename.substring(0, pos_ext) + extension;
+                BufferedWriter bw = new BufferedWriter(new FileWriter(actualfile));
+                String s = nprint(ridxs[i], tree, instances);
+                bw.write(s + ";\n");
+                bw.close();
+            }
         }
     }
 

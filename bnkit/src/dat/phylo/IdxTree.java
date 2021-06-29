@@ -1,11 +1,5 @@
 package dat.phylo;
 
-import asr.ASRException;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.*;
 
 /**
@@ -300,6 +294,18 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
+     * Determine the number of ancestors in the tree.
+     * @return the number of ancestors in the tree
+     */
+    public int getNParents() {
+        int count = 0;
+        for (int idx = 0; idx < children.length; idx ++)
+            if (children[idx] != null)
+                count += (children[idx].length > 0) ? 1 : 0;
+        return count;
+    }
+
+    /**
      * Determine if this branch point is a leaf (of the tree), i.e. does not have children.
      * @param idx
      * @return
@@ -309,6 +315,22 @@ public class IdxTree implements Iterable<Integer> {
             if (children[idx] == null)
                 return true;
             if (children[idx].length == 0)
+                return true;
+            return false;
+        }
+        throw new TreeRuntimeException("Invalid branch point index: " + idx);
+    }
+
+    /**
+     * Determine if this branch point is a parent, i.e. has children.
+     * @param idx
+     * @return
+     */
+    public boolean isParent(int idx) {
+        if (idx >= 0 && idx < getSize()) {
+            if (children[idx] == null)
+                return false;
+            if (children[idx].length > 0)
                 return true;
             return false;
         }
@@ -335,6 +357,18 @@ public class IdxTree implements Iterable<Integer> {
         if (idx >= 0 && idx < getSize())
             return children[idx];
         throw new TreeRuntimeException("Invalid branch point index: " + idx);
+    }
+
+    /**
+     * Determine if branchpoint is connected to others, i.e. have either children or parents.
+     * @param idx branchpoint index: 0 for root
+     * @return true if connected, false otherwise
+     */
+    public boolean isConnected(int idx) {
+        if (this.children[idx].length > 0 || this.parent[idx] != -1)
+            return true;
+        else
+            return false;
     }
 
     /**
