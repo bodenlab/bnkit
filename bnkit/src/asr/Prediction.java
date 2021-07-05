@@ -814,6 +814,7 @@ public class Prediction {
             }
             System.out.println();
         }
+        if (DEBUG) System.out.println("Less conservative option turned ON");
         // the code below
         // (1) regardless, if an ancestor or extant, we can pull out what the INDEL states are: absent (false), present (true) or permissible (true/false)
         // (2) if an ancestor, an ancestor POG is created, using the info from (1)
@@ -846,6 +847,7 @@ public class Prediction {
             if (DEBUG) System.out.print(ancID + "\t");
             // First, construct a list to include all unambiguously true indels, some of which are
             // rendered inapplicable (due to being precluded by others)
+            IntervalST unamb_tree = new IntervalST();
             List<Interval1D> unambiguous = new ArrayList<>();
             List<Interval1D> ambiguous = new ArrayList<>();
             int i = 0; // interval index; this order is decided above when indels are instantiated and inferred
@@ -859,84 +861,101 @@ public class Prediction {
                         System.out.print(sb + "\t");
                     }
                     if (calls.contains(Boolean.TRUE)) { // INDEL can be TRUE
-                        if (calls.size() == 1) // the ONLY value is TRUE so DEFINITIVELY include
+                        if (calls.size() == 1) { // the ONLY value is TRUE so DEFINITIVELY include
                             unambiguous.add(ival);
-                        else
+                            unamb_tree.put(ival, true);
+                        } else
                             ambiguous.add(ival);
                     }
                     i++;
                 }
             }
-            //Set<Interval1D> unambigset = pogTree.getIntervalTree().flatten2Set();
-            //unambiguous = new ArrayList<>();
-            //unambiguous.addAll(unambigset);
+            Set<Interval1D> unambigset = unamb_tree.flatten2Set(false);
+            unambiguous = new ArrayList<>();
+            unambiguous.addAll(unambigset);
             if (DEBUG) System.out.println();
             // the order in which the intervals are considered is important: sorted by first start-index, within-which end-index
             Collections.sort(unambiguous);
             // Second, construct an interval tree definitive, with INDELs that are not contained within a TRUE INDEL
             IntervalST<Boolean> definitive = new IntervalST<>();    // to hold all unambiguously TRUE and not-precluded INDELs
             Set<Integer> valididx = new HashSet<>();                // the set of indices that are used to hold all unambiguous calls
-            Interval1D precluder = null;                            // the interval that is the last to have been added, when considered "in order"
-            Set<Integer> frontedges = new HashSet<>();              // the set of edges current at the "front" of reaching the terminal
-            int prev = -1;
-            frontedges.add(prev);
-            for (int cnt = 0; cnt < unambiguous.size(); cnt ++) {
-                Interval1D current = unambiguous.get(cnt);          // "current" interval under consideration...
-                if (cnt < unambiguous.size() - 1) {                 // there is at least one more after this...
-                    Interval1D next = unambiguous.get(cnt + 1);     // so look-ahead to the "next" interval
-                    if (!next.contains(current)) {                  // next is not precluding current...
-                        if (precluder != null) {                    // consider if the last-addition does
-                            if (!precluder.contains(current)) {     // last-addition does NOT preclude the current one either, so...
-                                definitive.put(current, true);// add current interval to interval tree, true indicates that it is unambiguous
+            // TWO OPTIONS:
+            // (1) Use precluder edges to serially imprint gaps on the ancestor
+//            if (GRASP.INDEL_CONSERVATIVE) {
+                Interval1D precluder = null;                            // the interval that is the last to have been added, when considered "in order"
+                Set<Integer> frontedges = new HashSet<>();              // the set of edges current at the "front" of reaching the terminal
+                int prev = -1;
+                frontedges.add(prev);
+                for (int cnt = 0; cnt < unambiguous.size(); cnt++) {
+                    Interval1D current = unambiguous.get(cnt);          // "current" interval under consideration...
+                    if (cnt < unambiguous.size() - 1) {                 // there is at least one more after this...
+                        Interval1D next = unambiguous.get(cnt + 1);     // so look-ahead to the "next" interval
+                        if (!next.contains(current)) {                  // next is not precluding current...
+                            if (precluder != null) {                    // consider if the last-addition does
+                                if (!precluder.contains(current)) {     // last-addition does NOT preclude the current one either, so...
+                                    definitive.put(current, true);// add current interval to interval tree, true indicates that it is unambiguous
+                                    valididx.add(current.min);
+                                    valididx.add(current.max);
+                                    precluder = current;                // update last-addition
+                                }
+                            } else {                                    // there isn't a "last-addition", so...
+                                definitive.put(current, true);    // add current
                                 valididx.add(current.min);
                                 valididx.add(current.max);
-                                precluder = current;                // update last-addition
+                                precluder = current;                    // update last-addition to current
                             }
-                        } else {                                    // there isn't a "last-addition", so...
-                            definitive.put(current, true);    // add current
+                        }                                               // else: next interval precludes current, so can ignore current
+                    } else { // none after so include...
+                        if (precluder != null) {                        // consider if the last-addition does
+                            if (!precluder.contains(current)) {         // last-addition does NOT preclude the current one either, so...
+                                definitive.put(current, true);    // add current interval to interval tree, the cnt is not relevant at this stage
+                                valididx.add(current.min);
+                                valididx.add(current.max);
+                            }
+                        } else {                                        // there isn't a "last-addition", so...
+                            definitive.put(current, true);
                             valididx.add(current.min);
                             valididx.add(current.max);
-                            precluder = current;                    // update last-addition to current
                         }
-                    }                                               // else: next interval precludes current, so can ignore current
-                } else { // none after so include...
-                    if (precluder != null) {                        // consider if the last-addition does
-                        if (!precluder.contains(current)) {         // last-addition does NOT preclude the current one either, so...
-                            definitive.put(current, true);    // add current interval to interval tree, the cnt is not relevant at this stage
-                            valididx.add(current.min);
-                            valididx.add(current.max);
-                        }
-                    } else {                                        // there isn't a "last-addition", so...
-                        definitive.put(current, true);
-                        valididx.add(current.min);
-                        valididx.add(current.max);
                     }
-                }
-                if (!frontedges.contains(current.min)) { // just added an edge without a known source node
-                    int biggest = -1;
-                    for (int src : frontedges)
-                        biggest = src > biggest ? src : biggest;
-                    for (; biggest < current.min; biggest ++) {
-                        Interval1D pad = new Interval1D(biggest, biggest + 1);
-                        if (precluder != null) {                        // consider if the last-addition does // FIXME: probably no need to check...
-                            if (!precluder.contains(pad)) {        // last-addition does NOT preclude the current one either, so...
+                    if (!frontedges.contains(current.min)) { // just added an edge without a known source node
+                        int biggest = -1;
+                        for (int src : frontedges)
+                            biggest = src > biggest ? src : biggest;
+                        for (; biggest < current.min; biggest++) {
+                            Interval1D pad = new Interval1D(biggest, biggest + 1);
+                            if (precluder != null) {                        // consider if the last-addition does // FIXME: probably no need to check...
+                                if (!precluder.contains(pad)) {        // last-addition does NOT preclude the current one either, so...
+                                    definitive.put(pad, false); // add one-step patch to interval tree; false indicates that it is not based on ML inference
+                                    valididx.add(pad.min);
+                                    valididx.add(pad.max);
+                                }
+                            } else {                                        // there isn't a "last-addition", so...
                                 definitive.put(pad, false); // add one-step patch to interval tree; false indicates that it is not based on ML inference
                                 valididx.add(pad.min);
                                 valididx.add(pad.max);
                             }
-                        } else  {                                        // there isn't a "last-addition", so...
-                            definitive.put(pad, false); // add one-step patch to interval tree; false indicates that it is not based on ML inference
-                            valididx.add(pad.min);
-                            valididx.add(pad.max);
                         }
                     }
+                    if (current.min > prev) { // check if we've moved beyond the source index (can do because the intervals are sorted)
+                        frontedges.remove(prev);
+                        prev = current.min;
+                    }
+                    frontedges.add(current.max);
                 }
-                if (current.min > prev) { // check if we've moved beyond the source index (can do because the intervals are sorted)
-                    frontedges.remove(prev);
-                    prev = current.min;
-                }
-                frontedges.add(current.max);
-            }
+//            } else
+            // add edges whenever true, and rely on consensus paths to find best
+//            {
+//                for (int cnt = 0; cnt < unambiguous.size(); cnt ++) {
+//                    Interval1D current = unambiguous.get(cnt);          // "current" interval under consideration...
+//                    definitive.put(current, true);// add current interval to interval tree, true indicates that it is unambiguous
+//                    valididx.add(current.min);
+//                    valididx.add(current.max);
+//                }
+//                // TODO: pad sequence
+//            }
+
+            // After, unambiguous calls...
             // optionally, add ambiguous calls, i.e. indels that are optimally both true and false.
             // With SICP, an unambiguous call for an indel A precludes other calls, say B, if B is contained in A,
             // regardless of B being unambiguous or ambiguous.
@@ -978,6 +997,7 @@ public class Prediction {
         }
         return new Prediction(pogTree, ancestors);
     }
+
 
     /**
      * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." (2000).
@@ -1044,7 +1064,6 @@ public class Prediction {
         // (1) regardless, if an ancestor or extant, we can pull out what the INDEL states are: absent (false), present (true)
         // (2) if an ancestor, an ancestor POG is created, using the info from (1)
         for (int j = 0; j < tree.getSize(); j++) { // we look at each branch point, corresponding to either an extant or ancestor sequence
-
             Object ancID = tree.getBranchPoint(j).getID();
             if (tree.getChildren(j).length == 0) { // not an ancestor, so we just print out debug info below before continuing with next
                 if (DEBUG) {
@@ -1066,6 +1085,7 @@ public class Prediction {
             // (2) resolve what the POG looks like...
             // First, construct a list to include all unambiguously true indels, some of which are
             // rendered inapplicable (due to being precluded by others)
+            IntervalST unamb_tree = new IntervalST();
             List<Interval1D> unambiguous = new ArrayList<>();
             if (DEBUG) System.out.print(ancID + "\t");
             int i = 0; // interval index; this order is decided above when indels are instantiated and inferred
@@ -1075,11 +1095,12 @@ public class Prediction {
                     if (DEBUG)
                         System.out.print((call ? "L" : "G") + "\t");
                     if (call)
-                        unambiguous.add(ival);
+                        unamb_tree.put(ival, true);
                     i++;
                 }
             }
             if (DEBUG) System.out.println();
+            unambiguous.addAll(unamb_tree.flatten2Set(false));
             // the order in which the intervals are considered is important: sorted by first start-index, within-which end-index
             Collections.sort(unambiguous);
             // Second, construct an interval tree definitive, with INDELs that are not contained within a TRUE INDEL

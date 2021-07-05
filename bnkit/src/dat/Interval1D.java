@@ -87,13 +87,29 @@ public class Interval1D implements Comparable<Interval1D> {
     }
 
     /**
-     * Check if this interval intersects with another
+     * Check if this interval intersects with another.
+     * Note that this returns true if the intervals "touch" one another, i.e. they need not overlap
+     * @see {@link Interval1D#overlaps(Interval1D)}
      * @param that other interval
      * @return true if this and that intervals intersect, false otherwise
      */
     public boolean intersects(Interval1D that) {
         if (that.max < this.min) return false;
         if (this.max < that.min) return false;
+        return true;
+    }
+
+    /**
+     * Check if this interval overlaps with another.
+     * Note that this returns false if the intervals only "touch" one another,
+     * instead they must share part of their intervals for this function to return true
+     * @see {@link Interval1D#intersects(Interval1D)}
+     * @param that other interval
+     * @return true if this and that intervals overlap, false otherwise
+     */
+    public boolean overlaps(Interval1D that) {
+        if (that.max <= this.min) return false;
+        if (this.max <= that.min) return false;
         return true;
     }
 

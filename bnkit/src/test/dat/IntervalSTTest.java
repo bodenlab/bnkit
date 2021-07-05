@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Created by mikael on 13/10/16.
  */
 public class IntervalSTTest  {
-    private IntervalST<String> st1, st1checkme, st1q, st2, st3, st4, st5, st6;
+    private IntervalST<String> st0, st1, st1checkme, st1q, st2, st3, st4, st5, st6;
     private Set<Interval1D> ovlaps = new HashSet<>();
     private Set<Interval1D> queries = new HashSet<>();
 
@@ -209,6 +209,10 @@ public class IntervalSTTest  {
         assertTrue(ivals.size() == 3);
         IntervalST<String> tst1 = st1.flatten2Tree();
         assertTrue(tst1.size() == 3);
+        ivals = st0.flatten2Set(true);
+        assertTrue(ivals.size() == 1);
+        ivals = st0.flatten2Set(false);
+        assertTrue(ivals.size() == 4);
         ivals = st3.flatten2Set();
         assertTrue(ivals.size() == 2);
         IntervalST<String> tst3 = st3.flatten2Tree();
@@ -260,6 +264,11 @@ public class IntervalSTTest  {
         System.out.println(nq + " closest-tests");
     }
 
+    int[][] ivals0 = new int[][] {
+            { 5, 21},
+            {21, 50},
+            {50, 99},
+            {99, 100}};
     int[][] ivals1 = new int[][] {
             {10, 15},
             {11, 17},
@@ -335,7 +344,10 @@ public class IntervalSTTest  {
 
     @BeforeEach
     public void SetupTest() {
-        st1 = new IntervalST<>(1);
+        st0 = new IntervalST<>();
+        for (int i = 0; i < ivals0.length; i ++)
+            st0.put(new Interval1D(ivals0[i][0], ivals0[i][1]), "I0_"+(i+1));
+        st1 = new IntervalST<>();
         for (int i = 0; i < ivals1.length; i ++)
             st1.put(new Interval1D(ivals1[i][0], ivals1[i][1]), "I1_"+(i+1));
         st1checkme = new IntervalST<>(1);

@@ -543,10 +543,21 @@ public class IntervalST<Value> implements Iterable<Interval1D> {
      ***************************************************************************/
 
     /**
-     * In a union-like operation, extract the intest continuous intervals from the tree.
+     * In a union-like operation, extract the continuously intersecting intervals from the tree.
+     * Flat intervals are created from intervals that simply "touch" one another;
+     * they are not required to overlap.
      * @return the set of intervals that represent the (flat) union of the intervals in this tree
      */
     public Set<Interval1D> flatten2Set() {
+        return flatten2Set(true);
+    }
+    /**
+     * In a union-like operation, extract the continuously intersecting intervals from the tree.
+     * @param FLATTEN_BY_TOUCH set to true so that flat intervals are created from intervals that simply "touch",
+     *                         not extend over, one another; set to false, to require that they overlap
+     * @return the set of intervals that represent the (flat) union of the intervals in this tree
+     */
+    public Set<Interval1D> flatten2Set(boolean FLATTEN_BY_TOUCH) {
         Set<Interval1D> ret = new HashSet<>();
         Interval1D current = null;
         for (Interval1D ival : this) {
@@ -554,7 +565,7 @@ public class IntervalST<Value> implements Iterable<Interval1D> {
                 current = new Interval1D(ival.min, ival.max);
             } else {
                 if (ival.max > current.max) { // we will update
-                    if (ival.min <= current.max) { // just extending the current
+                    if (FLATTEN_BY_TOUCH ? (ival.min <= current.max) : (ival.min < current.max)) { // just extending the current
                         current = new Interval1D(current.min, ival.max);
                     } else { // ival.min > current.max, i.e. we need to create a new
                         ret.add(current);

@@ -389,4 +389,42 @@ class IndelTest {
             System.exit(1);
         }
     }
+    @Test
+    @DisplayName("Debugging SICP")
+    void SICP_Fail() throws IOException, ASRException {
+        String OUTPUT = "/Users/mikael/simhome/ASR/250_SICP/";
+        try {
+            Tree tree = Utils.loadTree("src/test/resources/indels/250.nwk");
+            EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/250.aln", Enumerable.aacid);
+            POGTree pogTree = new POGTree(input, tree);
+            System.out.println("---Loaded data");
+            GRASP.VERBOSE = true;
+            Prediction indelpred = Prediction.PredictBySICP(pogTree);
+            if (indelpred == null) {
+                System.err.println("Failed to perform indel prediction");
+                System.exit(111);
+            }
+            System.out.println("---Completed indel inference");
+            indelpred.getJoint(jtt);
+            Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
+            System.out.println("---Completed character inference");
+            POGraph[] ancestors = new POGraph[pogs.size()];
+            EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
+            int ii = 0;
+            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                ancestors[ii++] = entry.getValue();
+            }
+            IdxGraph.saveToDOT(OUTPUT, ancestors);
+            ii = 0;
+            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
+            }
+            FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
+            fw.save(ancseqs);
+            fw.close();
+        } catch (IOException | ASRException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+        }
+    }
 }

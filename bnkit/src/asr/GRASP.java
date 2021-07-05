@@ -21,12 +21,13 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "29-Jun-2021";
+    public static String VERSION = "05-Jul-2021";
     public static boolean VERBOSE = false;
     public static boolean TIME = false;
     public static boolean FORCELINEAR = false;
     public static int NTHREADS = 1;
     public static boolean NIBBLE = false;
+    public static boolean INDEL_CONSERVATIVE = true;
 
     public enum Inference {
         JOINT,
@@ -43,7 +44,7 @@ public class GRASP {
         if (msg != null)
             out.println(msg + " (Error " + error + ")");
         out.println("Usage: asr.GRASP \n" +
-                "\t[-aln <alignment-file> -nwk <tree-file> -out <output-file-or-directory>]\n" +
+                "\t[-aln <alignment-file> -nwk <tree-file> -out <output-dir>]\n" +
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|Yang>}\n" +
                 "\t{-thr <n-threads>}\n" +
                 "\t{-joint (default) | -marg <branchpoint-id>} \n" +
@@ -57,7 +58,7 @@ public class GRASP {
         out.println("where \n" +
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
-                "\toutput-file will be populated by inferred ancestor or ancestors; directory with files if format is DOT or TREE\n" +
+                "\toutput-dir will be populated by inferred ancestor or ancestors, tree, etc. as specified by format\n" +
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
@@ -71,6 +72,7 @@ public class GRASP {
                 "\tDNA models include Jukes-Cantor and Yang (general reversible process model).\n" +
                 "\tIndel approaches include Bi-directional Edge Parsimony (default), Bi-directional Edge ML, \n" +
                 "\tSimple Indel Code Parsimony, Simple Indel Code ML, Position-specific Parsimony and Position-specific ML.\n" +
+                "\tAdd '*' to indel option for less conservative setting (if available)\n" +
                 "\t~ This is version " + VERSION + " ~");
         System.exit(error);
     }
@@ -148,9 +150,11 @@ public class GRASP {
                 } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
                     boolean found_indel = false;
                     for (int i = 0; i < INDELS.length; i++) {
-                        if (args[a + 1].equalsIgnoreCase(INDELS[i])) {
+                        if (args[a + 1].startsWith(INDELS[i])) {
                             INDEL_IDX = i;
                             found_indel = true;
+                            if (args[a + 1].endsWith("*"))
+                                INDEL_CONSERVATIVE = false;
                         }
                     }
                     if (!found_indel)
@@ -204,7 +208,6 @@ public class GRASP {
                 switch (INDEL_IDX) {
                     case 0: indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree); break;
                     case 1: indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree); break;
-//                    case 2: indelpred = Prediction.PredictByIndelParsimony(pogtree, FORCELINEAR); break;
                     case 2: indelpred = Prediction.PredictBySICP(pogtree); break;
                     case 3: indelpred = Prediction.PredictBySICML(pogtree); break;
                     case 4: indelpred = Prediction.PredictByParsimony(pogtree); break;
@@ -253,7 +256,11 @@ public class GRASP {
                         ancseqs[ii ++] = indelpred.getSequence(entry.getKey(), MODE, GAPPY);
                 }
                 File file = new File(OUTPUT);
-                file.mkdirs();
+                if (file.mkdirs()) { // true if the directory was created, false otherwise
+                } else {
+                    System.err.println("Directory " + OUTPUT + " already exists");
+                    //throw new ASRException("Directory " + directory + " already exists");
+                }
                 switch (FORMAT_IDX) {
 
                     case 0: // FASTA

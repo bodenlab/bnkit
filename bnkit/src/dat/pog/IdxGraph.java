@@ -514,13 +514,7 @@ public class IdxGraph {
     }
 
     public static void saveToDOT(String directory, IdxGraph... graphs) throws IOException, ASRException {
-        File file = new File(directory);
         StringBuilder sb = new StringBuilder();
-        if (file.mkdirs()) { // true if the directory was created, false otherwise
-        } else {
-            System.err.println("Directory " + directory + " already exists");
-            //throw new ASRException("Directory " + directory + " already exists");
-        }
         FileWriter freadme=new FileWriter(directory + "/README.txt");
         BufferedWriter readme=new BufferedWriter(freadme);
         int cnt = 0;
