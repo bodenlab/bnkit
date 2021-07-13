@@ -7,31 +7,31 @@
 <var name="Mary calls" type="Boolean"/>
 <var name="Alarm" type="Boolean"/>
 </def>
-<node type="CPT" var="Burglary">
+<branchPoint type="CPT" var="Burglary">
 <params>
 0.001, 0.999;
 </params>
-</node>
-<node type="CPT" var="John calls">
+</branchPoint>
+<branchPoint type="CPT" var="John calls">
 <parent var="Alarm"/>
 <params>
 0: 0.9, 0.1; (true)
 1: 0.05, 0.95; (false)
 </params>
-</node>
-<node type="CPT" var="Earthquake">
+</branchPoint>
+<branchPoint type="CPT" var="Earthquake">
 <params>
 0.002, 0.998;
 </params>
-</node>
-<node type="CPT" var="Mary calls">
+</branchPoint>
+<branchPoint type="CPT" var="Mary calls">
 <parent var="Alarm"/>
 <params>
 0: 0.7, 0.3; (true)
 1: 0.01, 0.99; (false)
 </params>
-</node>
-<node type="CPT" var="Alarm">
+</branchPoint>
+<branchPoint type="CPT" var="Alarm">
 <parent var="Burglary"/>
 <parent var="Earthquake"/>
 <params>
@@ -40,5 +40,5 @@
 2: 0.29, 0.71; (false, true)
 3: 0.001, 0.999; (false, false)
 </params>
-</node>
+</branchPoint>
 </bnet>

@@ -8,7 +8,7 @@
 <var name="Humidity" type="Real"/>
 <var name="Rain" type="Boolean"/>
 </def>
-<node type="CPT" var="WetGrass">
+<branchPoint type="CPT" var="WetGrass">
 <parent var="Sprinkler"/>
 <parent var="Rain"/>
 <params>
@@ -17,38 +17,38 @@
 2: 0.9, 0.1; (false, true)
 3: 0.01, 0.99; (false, false)
 </params>
-</node>
-<node type="CPT" var="Cloudy">
+</branchPoint>
+<branchPoint type="CPT" var="Cloudy">
 <params>
 0.5, 0.5;
 </params>
-</node>
-<node type="CPT" var="Sun">
+</branchPoint>
+<branchPoint type="CPT" var="Sun">
 <parent var="Cloudy"/>
 <params>
 0: 0.0, 0.25, 0.75; (true)
 1: 1.0, 0.0, 0.0; (false)
 </params>
-</node>
-<node type="CPT" var="Sprinkler">
+</branchPoint>
+<branchPoint type="CPT" var="Sprinkler">
 <parent var="Cloudy"/>
 <params>
 0: 0.1, 0.9; (true)
 1: 0.5, 0.5; (false)
 </params>
-</node>
-<node type="GDT" var="Humidity">
+</branchPoint>
+<branchPoint type="GDT" var="Humidity">
 <parent var="Rain"/>
 <params>
 0: 70.0, 90.0; (true)
 1: 30.0, 90.0; (false)
 </params>
-</node>
-<node type="CPT" var="Rain">
+</branchPoint>
+<branchPoint type="CPT" var="Rain">
 <parent var="Cloudy"/>
 <params>
 0: 0.25, 0.75; (true)
 1: 0.0, 1.0; (false)
 </params>
-</node>
+</branchPoint>
 </bnet>
