@@ -306,7 +306,7 @@ public class GRASP {
                                         m[j + 1][jj + 1] = null;
                                 }
                             }
-                            TSVFile.saveObjects(OUTPUT, m);
+                            TSVFile.saveObjects(OUTPUT + "/distrib.tsv", m);
                         } else
                             usage(8, "Invalid ancestor node label: " + MARG_NODE);
                         break;
