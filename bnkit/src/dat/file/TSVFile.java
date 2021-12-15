@@ -280,20 +280,22 @@ public class TSVFile {
         String line = br.readLine();
         List<Object[]> alldata = new ArrayList<>();
         while (line != null) {
-            String[] tokens = line.split("\t");
-            Object[] values = new Object[tokens.length];
-            for (int i = 0; i < tokens.length; i++) {
-                try {
-                    values[i] = Integer.valueOf(tokens[i]); // value is an int
-                } catch (NumberFormatException e1) {
+            if (!line.startsWith("#")) {
+                String[] tokens = line.split("\t");
+                Object[] values = new Object[tokens.length];
+                for (int i = 0; i < tokens.length; i++) {
                     try {
-                        values[i] = Double.valueOf(tokens[i]); // value is a double
-                    } catch (NumberFormatException e2) {
-                        values[i] = tokens[i]; // value is a string
+                        values[i] = Integer.valueOf(tokens[i]); // value is an int
+                    } catch (NumberFormatException e1) {
+                        try {
+                            values[i] = Double.valueOf(tokens[i]); // value is a double
+                        } catch (NumberFormatException e2) {
+                            values[i] = tokens[i]; // value is a string
+                        }
                     }
                 }
+                alldata.add(values);
             }
-            alldata.add(values);
             line = br.readLine();
         }
         data = new Object[alldata.size()][];

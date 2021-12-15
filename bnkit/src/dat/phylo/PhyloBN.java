@@ -17,7 +17,8 @@ public class PhyloBN {
 
     private final BNet bn;
     private final SubstModel model;
-    private double rate = 1.0;
+    /** Default relative rate */
+    public static double DEFAULT_RATE = 1.0;
     private BNode[] bp2node = null; // branchpoint index to BN node
 
     /**
@@ -67,7 +68,7 @@ public class PhyloBN {
      * @return the phylogenetic Bayesian network
      */
     public static PhyloBN create(IdxTree tree, SubstModel model) {
-        return create(tree, model, 1.0);
+        return create(tree, model, DEFAULT_RATE);
     }
 
     /**
@@ -82,7 +83,6 @@ public class PhyloBN {
      */
     public static PhyloBN create(IdxTree tree, SubstModel model, double rate) {
         PhyloBN pbn = new PhyloBN(model);
-        pbn.rate = rate;
         pbn.bp2node = new BNode[tree.getSize()];
         //  create variables and nodes
         for (int idx : tree) { // iterate through tree depth-first
@@ -94,7 +94,7 @@ public class PhyloBN {
                     pbn.bp2node[idx] = new SubstNode(rvar, model);
                 } else { // there's a parent, and because the iterator is "depth-first", the parent must already have been created
                     EnumVariable prvar = (EnumVariable) pbn.bp2node[parent].getVariable();
-                    pbn.bp2node[idx] = new SubstNode(rvar, prvar, model, bp.getDistance());
+                    pbn.bp2node[idx] = new SubstNode(rvar, prvar, model, bp.getDistance() * rate); // this is where relative rate is incorporated
                 }
                 pbn.bn.add(pbn.bp2node[idx]);
             }

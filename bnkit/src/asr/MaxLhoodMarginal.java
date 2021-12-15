@@ -30,6 +30,22 @@ public class MaxLhoodMarginal implements TreeDecor<EnumDistrib> {
      * @param bpidx branch point index for the ancestor
      * @param tree phylogenetic tree indexing the branch points and their distances
      * @param model evolutionary model
+     * @param rate relative evolutionary rate (for the index in POG/alignment)
+     */
+    public MaxLhoodMarginal(int bpidx, IdxTree tree, SubstModel model, double rate) {
+        this.tree = tree;
+        this.model = model;
+        this.bpidx = bpidx;
+        pbn = PhyloBN.create(tree, model, rate);;
+    }
+
+    /**
+     * Set-up inference of the posterior distribution at the specified ancestor branch point, by creating
+     * a probabilistic graphical model with the structure and evolutionary
+     * distances as defined by the supplied tree and substitution model.
+     * @param bpidx branch point index for the ancestor
+     * @param tree phylogenetic tree indexing the branch points and their distances
+     * @param model evolutionary model
      */
     public MaxLhoodMarginal(int bpidx, IdxTree tree, SubstModel model) {
         this.tree = tree;
@@ -37,6 +53,7 @@ public class MaxLhoodMarginal implements TreeDecor<EnumDistrib> {
         this.bpidx = bpidx;
         pbn = PhyloBN.create(tree, model);;
     }
+
 
     /**
      * Retrieves the already computed distribution

@@ -1,6 +1,7 @@
 package asr;
 
 import bn.ctmc.SubstModel;
+import bn.ctmc.SubstNode;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
@@ -8,6 +9,7 @@ import dat.Interval1D;
 import dat.IntervalST;
 import dat.file.Newick;
 import dat.phylo.IdxTree;
+import dat.phylo.PhyloBN;
 import dat.phylo.TreeDecor;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
@@ -274,7 +276,11 @@ public class Prediction {
      * @param MODEL the substitution model
      * @return
      */
-    public EnumDistrib[] getMarginal(Object ancestorID, SubstModel MODEL) {
+    public EnumDistrib[] getMarginal(Object ancestorID, SubstModel MODEL, double[] rates) {
+        if (rates == null) {
+            rates = new double[getPositions()];
+            Arrays.fill(rates, PhyloBN.DEFAULT_RATE);
+        }
         int bpidx = getBranchpointIndex(ancestorID);                            // the index of the ancestor as it appears in the phylogenetic tree
         if (bpidx == -1)
             throw new ASRRuntimeException("Invalid ancestor ID (not found in tree) " + ancestorID);
@@ -286,7 +292,7 @@ public class Prediction {
                 trees[pos] = getTree(pos);                                      //   this is the tree with indels imputed
                 int ancidx = positidxs[pos][bpidx];                             //   index for sought ancestor in the position-specific tree
                 if (ancidx >= 0)                                                //   which may not exist, i.e. part of an indel, but if it is real...
-                    inf[pos] = new MaxLhoodMarginal(ancidx, trees[pos], MODEL);//     set-up the inference
+                    inf[pos] = new MaxLhoodMarginal(ancidx, trees[pos], MODEL, rates[pos]);//     set-up the inference
             }
 
             distribs[bpidx] = new EnumDistrib[pogTree.getPositions()];
@@ -320,14 +326,27 @@ public class Prediction {
      * @return the states at all ancestors that assign the greatest likelihood to the observed states at extant sequences
      */
     public Object[][] getJoint(SubstModel MODEL) {
+        return getJoint(MODEL, null);
+    }
 
+    /**
+     * Perform joint reconstruction across all ancestors, and all positions
+     * @param MODEL evolutionary model
+     * @param rates the position-specific relative evolutionary rates
+     * @return the states at all ancestors that assign the greatest likelihood to the observed states at extant sequences
+     */
+    public Object[][] getJoint(SubstModel MODEL, double[] rates) {
+        if (rates == null) {
+            rates = new double[getPositions()];
+            Arrays.fill(rates, PhyloBN.DEFAULT_RATE);
+        }
         this.states = new Object[getTree().getSize()][getPositions()];
         IdxTree[] trees = new IdxTree[getPositions()];              // this is how many position-specific trees we are dealing with
         // FIXME: create an index map for "inf" to enable generics <EnumDistrib>?
         TreeDecor[] inf = new TreeDecor[getPositions()];            // number of positions is also how many inferences we will carry out
         for (int pos = 0; pos < inf.length; pos++) {                // so for each position...
             trees[pos] = getTree(pos);                              //   this is the tree with indels imputed
-            inf[pos] = new MaxLhoodJoint(trees[pos], MODEL);        //   set-up the inference
+            inf[pos] = new MaxLhoodJoint(trees[pos], MODEL, rates[pos]);        //   set-up the inference
         }
         treeinstances = new TreeInstance[getPositions()];
         for (int pos = 0; pos < getPositions(); pos ++) {        // for each position...
@@ -356,9 +375,9 @@ public class Prediction {
      * @param MODEL evolutionary model
      * @return the states at the ancestor (together with all the others) that assign the greatest likelihood to the observed states at extant sequences
      */
-    public Object[] getJoint(Object ancestorID, SubstModel MODEL) {
+    public Object[] getJoint(Object ancestorID, SubstModel MODEL, double[] rates) {
         if (states == null)   // the ancestors has not yet been inferred
-            getJoint(MODEL);
+            getJoint(MODEL, rates);
         int bpidx = getBranchpointIndex(ancestorID);                            // the index of the ancestor as it appears in the phylogenetic tree
         if (bpidx == -1)
             throw new ASRRuntimeException("Invalid ancestor ID (not found in tree) " + ancestorID);

@@ -193,7 +193,6 @@ public class SubstNode implements BNode, TiedNode {
 
     /**
      *
-     * @return
      * @deprecated pog2020 -- remove all refs to model to make thread safe
      */
     public SubstModel getModel() {
@@ -207,8 +206,7 @@ public class SubstNode implements BNode, TiedNode {
 
     /**
      *
-     * @return
-     * @deprecated pog2020 -- remove all refs to model to make thread safe
+     * deprecated pog2020 -- remove all refs to model to make thread safe
      */
     /*   @Override
     public Distrib getDistrib(Object[] condition) {

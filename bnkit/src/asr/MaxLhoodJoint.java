@@ -33,6 +33,19 @@ public class MaxLhoodJoint implements TreeDecor<Object> {
      * distances as defined by the supplied tree and substitution model.
      * @param tree
      * @param model
+     * @param rate relative evolutionary rate
+     */
+    public MaxLhoodJoint(IdxTree tree, SubstModel model, double rate) {
+        this.tree = tree;
+        this.model = model;
+        this.pbn = PhyloBN.create(tree, model, rate);
+    }
+
+    /**
+     * Set-up a joint reconstruction; this creates a probabilistic graphical model with the structure and evolutionary
+     * distances as defined by the supplied tree and substitution model. Uses default rate.
+     * @param tree
+     * @param model
      */
     public MaxLhoodJoint(IdxTree tree, SubstModel model) {
         this.tree = tree;
@@ -45,6 +58,7 @@ public class MaxLhoodJoint implements TreeDecor<Object> {
      * this prepares for a probabilistic graphical model with the structure and evolutionary
      * distances as defined by the supplied tree and (later supplied) substitution model.
      * @param tree
+     * //@param rate relative evolutionary rate
      */
     public MaxLhoodJoint(IdxTree tree, SubstModel.ModelCache modelcache) {
         this.tree = tree;
@@ -62,6 +76,7 @@ public class MaxLhoodJoint implements TreeDecor<Object> {
     }
 
     public long ELAPSED_TIME = 0;
+
     /**
      * Determine the joint state that assigns the maximum likelihood to the specified observations.
      * This is the bit that will be multi-threaded usually.

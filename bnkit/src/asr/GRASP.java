@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "05-Jul-2021";
+    public static String VERSION = "15-Dec-2021";
     public static boolean VERBOSE = false;
     public static boolean TIME = false;
     public static boolean FORCELINEAR = false;
@@ -45,9 +45,10 @@ public class GRASP {
             out.println(msg + " (Error " + error + ")");
         out.println("Usage: asr.GRASP \n" +
                 "\t[-aln <alignment-file> -nwk <tree-file> -out <output-dir>]\n" +
+                "\t{-rates <rates-file>}\n" +
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|Yang>}\n" +
                 "\t{-thr <n-threads>}\n" +
-                "\t{-joint (default) | -marg <branchpoint-id>} \n" +
+                "\t{-joint (default) | -marg <branchpoint-id>}\n" +
                 "\t{-indel <BEP(default)|BEML|SICP|SICML|PSP|PSML>}\n" +
                 "\t{-gap}\n" +
                 "\t{-savetree <tree-directory>}\n" +
@@ -59,6 +60,7 @@ public class GRASP {
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
                 "\toutput-dir will be populated by inferred ancestor or ancestors, tree, etc. as specified by format\n" +
+                "\trates-file is a tabulated file with relative, position-specific rates (e.g. as produced by IQ-TREE)\n" +
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
@@ -82,6 +84,8 @@ public class GRASP {
         String ALIGNMENT = null;
         String NEWICK = null;
         String OUTPUT = null;
+        String RATESFILE = null;
+        double[] RATES = null;
 
         String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
         int MODEL_IDX = 0; // default model is that above indexed 0
@@ -112,6 +116,8 @@ public class GRASP {
                     NEWICK = args[++ a];
                 } else if (arg.equalsIgnoreCase("out") && args.length > a + 1) {
                     OUTPUT = args[++a];
+                } else if (arg.equalsIgnoreCase("rates") && args.length > a + 1) {
+                    RATESFILE = args[++a];
                 } else if (arg.equalsIgnoreCase("joint")) {
                     MODE = Inference.JOINT;
                 } else if (arg.equalsIgnoreCase("gap")) {
@@ -189,6 +195,31 @@ public class GRASP {
         if (FORMATS[FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
             GAPPY = true;
 
+        if (RATESFILE != null) {
+            try {
+                TSVFile ratesfile = new TSVFile(RATESFILE, true);
+                int rates_col = ratesfile.getColumn("Rate");
+                int index_col = ratesfile.getColumn("Site");
+                if (rates_col == -1)  // not there
+                    rates_col = 0;
+                Object[] rateobjs = ratesfile.getCol(rates_col);
+                Object[] idxobjs = null;
+                if (index_col != -1)
+                    idxobjs = ratesfile.getCol(index_col);
+                RATES = new double[rateobjs.length];
+                for (int i = 0; i < RATES.length; i++) {
+                    try {
+                        int index = index_col == -1 ? i : (Integer) idxobjs[i] - 1; // starts with 1, so subtract "1" to use as position index
+                        RATES[index] = (Double) rateobjs[i];
+                    } catch (NumberFormatException e0) {
+                        e0.printStackTrace();
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
         if (ALIGNMENT != null && NEWICK != null && OUTPUT != null) {
             try {
                 EnumSeq.Alignment aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
@@ -217,9 +248,9 @@ public class GRASP {
                 if (indelpred == null)
                     usage(3, INDELS[INDEL_IDX] + " is not implemented");
                 if (MODE == Inference.JOINT)
-                    indelpred.getJoint(MODEL);
+                    indelpred.getJoint(MODEL, RATES);
                 else if (MODE == Inference.MARGINAL)
-                    indelpred.getMarginal(MARG_NODE, MODEL);
+                    indelpred.getMarginal(MARG_NODE, MODEL, RATES);
                 Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
                 POGraph[] ancestors = new POGraph[pogs.size()];
                 int ii = 0;
@@ -258,18 +289,26 @@ public class GRASP {
                 File file = new File(OUTPUT);
                 if (file.mkdirs()) { // true if the directory was created, false otherwise
                 } else {
-                    System.err.println("Directory " + OUTPUT + " already exists");
-                    //throw new ASRException("Directory " + directory + " already exists");
+                    // System.err.println("Directory " + OUTPUT + " already exists");
+                    // throw new ASRException("Directory " + directory + " already exists");
                 }
                 switch (FORMAT_IDX) {
 
                     case 0: // FASTA
-                        FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
+                        FastaWriter fw = null;
+                        if (MODE == Inference.MARGINAL) // just one sequence
+                            fw = new FastaWriter(new File(OUTPUT, "N" + MARG_NODE + ".fasta"));
+                        else
+                            fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
                         fw.save(ancseqs);
                         fw.close();
                         break;
                     case 2: // CLUSTAL
-                        AlnWriter aw = new AlnWriter(new File (OUTPUT, "GRASP_ancestors.aln"));
+                        AlnWriter aw = null;
+                        if (MODE == Inference.MARGINAL) // just one sequence
+                            aw = new AlnWriter(new File(OUTPUT, "N" + MARG_NODE + ".aln"));
+                        else
+                            aw = new AlnWriter(new File (OUTPUT, "GRASP_ancestors.aln"));
                         aw.save(ancseqs);
                         aw.close();
                         break;
@@ -277,10 +316,13 @@ public class GRASP {
                         IdxGraph.saveToDOT(OUTPUT, ancestors);
                         break;
                     case 4: // TREE
-                        indelpred.saveTreeInstances(OUTPUT);
+                        if (MODE == Inference.JOINT)
+                            indelpred.saveTreeInstances(OUTPUT);
+                        else
+                            usage(9, "Instantiations of position specific trees not available from marginal inference");
                         break;
                     case 1: // DISTRIB
-                        EnumDistrib[] d = indelpred.getMarginal(MARG_NODE, MODEL);
+                        EnumDistrib[] d = indelpred.getMarginal(MARG_NODE, MODEL, RATES);
                         if (d != null) {
                             Object[][] m = new Object[d.length + 1][];
                             for (int j = 0; j < d.length; j++) {
@@ -306,7 +348,7 @@ public class GRASP {
                                         m[j + 1][jj + 1] = null;
                                 }
                             }
-                            TSVFile.saveObjects(OUTPUT + "/distrib.tsv", m);
+                            TSVFile.saveObjects(OUTPUT + "/N" + MARG_NODE + ".tsv", m);
                         } else
                             usage(8, "Invalid ancestor node label: " + MARG_NODE);
                         break;
