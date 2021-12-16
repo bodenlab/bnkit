@@ -46,7 +46,7 @@ public class GRASP {
         out.println("Usage: asr.GRASP \n" +
                 "\t[-aln <alignment-file> -nwk <tree-file> -out <output-dir>]\n" +
                 "\t{-rates <rates-file>}\n" +
-                "\t{-model <JTT(default)|Dayhoff|LG|WAG|Yang>}\n" +
+                "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
                 "\t{-thr <n-threads>}\n" +
                 "\t{-joint (default) | -marg <branchpoint-id>}\n" +
                 "\t{-indel <BEP(default)|BEML|SICP|SICML|PSP|PSML>}\n" +
