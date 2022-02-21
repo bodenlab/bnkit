@@ -32,7 +32,7 @@ public class GRASP {
     public enum Inference {
         JOINT,
         MARGINAL
-    };
+    }
 
     public static void usage() {
         usage(0, null);
