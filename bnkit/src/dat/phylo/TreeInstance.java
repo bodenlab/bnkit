@@ -232,7 +232,7 @@ public class TreeInstance {
      * @return string representation
      */
     public String toString() {
-        return toString(0);
+        return toString(0) + ";";
     }
 
     /**
@@ -244,7 +244,11 @@ public class TreeInstance {
         int[] children = tree.getChildren(bpidx);
         int cnt = 0;
         for (int child : children) {
-            sb.append(toString(child));
+            try {
+                sb.append(toString(child) + ":" + tree.getDistance(child));
+            } catch (TreeRuntimeException e) { // does not have distances
+                sb.append(toString(child));
+            }
             if (++ cnt < children.length)
                 sb.append(",");
         }

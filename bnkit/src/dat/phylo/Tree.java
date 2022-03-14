@@ -18,6 +18,7 @@
 package dat.phylo;
 
 import asr.Parsimony;
+import bn.prob.GammaDistrib;
 import dat.EnumSeq;
 import dat.EnumSeq.Alignment;
 import dat.Enumerable;
@@ -119,6 +120,73 @@ public class Tree extends IdxTree {
      */
     public void setInternalLabels() {
         root.setInternalLabels(0);
+    }
+
+    /**
+     * Create a random tree
+     * @param nLeaves number of leaves
+     * @param gamma_k parameter for gamma specifying distance between branchpoints ("shape" aka alpha, or "a")
+     * @param gamma_lambda parameter for gamma specifying distance between branchpoints ("scale" or "b", also referred by its inverse 1/beta, where beta is "rate")
+     * @param max_desc maximum number of descendants of an ancestor
+     * @param min_desc minimum number of descendants
+     * @return a tree where distances are drawn from a specified Gamma density and with branching factors drawn from a specified uniform distribution
+     * @throws TreeRuntimeException if something is wrong with the input labels
+     */
+    public static Tree Random(int nLeaves, long seed, double gamma_k, double gamma_lambda, int max_desc, int min_desc) {
+        String[] leaves = new String[nLeaves];
+        for (int i = 0; i < leaves.length; i ++)
+            leaves[i] = "A" + (i + 1);
+        return Random(leaves, seed, gamma_k, gamma_lambda, max_desc, min_desc);
+    }
+
+    /**
+     * Create a random tree
+     * @param leafLabels labels to be assigned to leaves
+     * @param gamma_k parameter for gamma specifying distance between branchpoints ("shape" aka alpha)
+     * @param gamma_lambda parameter for gamma specifying distance between branchpoints ("scale", also referred to as 1/beta, where beta is "rate")
+     * @param max_desc maximum number of descendants of an ancestor
+     * @param min_desc minimum number of descendants
+     * @return a tree where distances are drawn from a specified Gamma density and with branching factors drawn from a specified uniform distribution
+     * @throws TreeRuntimeException if something is wrong with the input labels
+     */
+
+    public static Tree Random(String[] leafLabels, long seed, double gamma_k, double gamma_lambda, int max_desc, int min_desc) {
+        Random rand = new Random(seed);
+        GammaDistrib gd = new GammaDistrib(gamma_k, gamma_lambda);
+        gd.setSeed(seed);
+        List<BranchPoint> nodes = new ArrayList<>(leafLabels.length);
+        // the initial, complete set of nodes that need ancestors
+        for (String label : leafLabels) {
+            BranchPoint bp = new BranchPoint(label);
+            bp.setDistance(Math.max(gd.sample(), 0.0000001));
+            nodes.add(bp);
+        }
+        // create ancestor nodes by picking two children, connecting them via a new ancestor,
+        // then updating the list of nodes yet to be allocated an ancestor
+        int M = nodes.size();
+        BranchPoint bp = M > 0 ? nodes.get(0) : null;
+        while (M > 1) {
+            bp = new BranchPoint("");
+            bp.setDistance(Math.max(gd.sample(), 0.0000001));
+            // how many nodes to pick?
+            int N = Math.min(rand.nextInt(max_desc - min_desc + 1) + min_desc, nodes.size());
+            for (int j = 0; j < N; j ++) {
+                int pick = rand.nextInt(nodes.size());
+                BranchPoint node = nodes.get(pick);
+                bp.addChild(node);
+                node.setParent(bp);
+                nodes.remove(pick);
+                M -= 1;
+            }
+            nodes.add(bp);
+            M += 1;
+        }
+        if (bp != null) {
+            Tree t = new Tree(bp);
+            t.setInternalLabels();
+            return t;
+        }
+        throw new TreeRuntimeException("Could not create tree: invalid input");
     }
 
     public static void main(String[] args) {

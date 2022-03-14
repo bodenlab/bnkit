@@ -397,8 +397,30 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
+     * Set distance to parent from the branch point.
+     * @param idx index of branch point
+     * @param dist distance
+     */
+    public void setDistance(int idx, double dist) {
+        distance[idx] = dist;
+        bpoints[idx].setDistance(dist);
+    }
+
+    /**
+     * Determine the distance to root from the branch point
+     * @param idx branchpoint index
+     * @return additive distance to root (of a subtree in which the branchpoint is located)
+     */
+    public double getDistanceToRoot(int idx) {
+        if (idx == 0)
+            return 0;
+        else
+            return getDistanceToRoot(getParent(idx)) + distance[idx];
+    }
+
+    /**
      * Retrieve the branch point for a given index
-     * @param idx
+     * @param idx branchpoint index
      * @return
      */
     public BranchPoint getBranchPoint(int idx) {
@@ -559,6 +581,43 @@ public class IdxTree implements Iterable<Integer> {
                 return i;
         }
         return -1;
+    }
+
+    /**
+     * Calculate the mean distance between all direct ancestor-child pairs.
+     * @return the mean distance between all direct ancestor-child pairs
+     */
+    public double getMeanDistance() {
+        double d = 0;
+        try {
+            for (int i = 0; i < bpoints.length; i ++)
+                d += bpoints[i].getDistance();
+        } catch (TreeRuntimeException e) {
+            throw new TreeRuntimeException("One or more branchpoints do not have distances assigned");
+        }
+        return d;
+    }
+
+    /**
+     * Calculate the mean distance for any leaf to their root
+     * @return mean distance
+     */
+    public double getMeanDistanceToRoot() {
+        double sum = 0;
+        int[] leaves = getLeaves();
+        for (int idx : leaves)
+            sum += getDistanceToRoot(idx);
+        return(sum / leaves.length);
+    }
+    /**
+     * Adjust distances from extants to root
+     * @param target2root
+     */
+    public void adjustDistances(double target2root) {
+        double mu = getMeanDistanceToRoot();
+        double multiplier = target2root / mu;
+        for (int idx = 1; idx < bpoints.length; idx ++)
+            setDistance(idx, getDistance(idx)*multiplier);
     }
 
     /**

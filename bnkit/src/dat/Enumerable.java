@@ -52,16 +52,13 @@ public class Enumerable implements Domain {
     }
     
     public boolean equals(Enumerable enumerable) {
-    	if(size() != enumerable.size()) {
+    	if (size() != enumerable.size()) {
     		return false;
     	}
-    	
-    	for(int i = 0; i < size(); i++) {
-    		if(!get(i).equals(enumerable.get(i))) {
-    			return false;
-    		}
+        for (Object sym : enumerable.getValues()) {
+            if (!this.isValid(sym))
+                return false;
     	}
-    	
     	return true;
     }
 

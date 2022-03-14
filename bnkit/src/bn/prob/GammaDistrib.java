@@ -27,9 +27,15 @@ public class GammaDistrib implements Distrib, Serializable {
     private double lambda; // same as 1 / beta; see http://en.wikipedia.org/wiki/Gamma_distribution
     private double k; // alpha = k
     private Random rand = new Random();
-    
+
+    public void setSeed(long seed) {
+        rand = new Random(seed);
+    }
+
     /**
      * Creates a new Gamma distribution with parameters k and lambda.
+     * @param k shape (same as a)
+     * @param lambda rate, which is the inverse of scale (or 1/b)
      */
     public GammaDistrib(double k, double lambda) {
         this.k = k;
@@ -70,7 +76,7 @@ public class GammaDistrib implements Distrib, Serializable {
                         accept = true;
                 }
             } while (!accept);
-            return new Double(x / lambda);
+            return (x / lambda);
         } else {
             // Weibull algorithm
             double c = (1 / k);
@@ -86,7 +92,7 @@ public class GammaDistrib implements Distrib, Serializable {
                     accept = true;
                 }
             } while (!accept);
-            return new Double(x / lambda);
+            return (x / lambda);
         }
     }
 
@@ -292,7 +298,7 @@ public class GammaDistrib implements Distrib, Serializable {
      * @param x Argument.
      * @return trigamma(x) to within 10-8 relative or absolute error whichever is smaller
      * @see <a href="http://en.wikipedia.org/wiki/Trigamma_function">Trigamma</a>
-     * @see Gamma#digamma(double)
+     * @see GammaDistrib#digamma(double)
      * @since 2.0
      */
     public static double trigamma(double x) {

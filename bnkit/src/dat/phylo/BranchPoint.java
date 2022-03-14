@@ -19,7 +19,7 @@ public class BranchPoint {
     /**
      * Construct an empty or disconnected branch point
      */
-    public BranchPoint() {
+    private BranchPoint() {
     }
 
     /**
@@ -119,6 +119,7 @@ public class BranchPoint {
 
     /**
      * Set the parent branch point pointer of the present branch point
+     * Note that this does not automatically assign the present node as a child of that specified parent
      * @param parent
      */
     public void setParent(BranchPoint parent) {
@@ -158,7 +159,7 @@ public class BranchPoint {
 
     /**
      * Add child to node.
-     *
+     * Note that this does not automatically assign a parent to that child
      * @param child
      */
     public void addChild(BranchPoint child) {

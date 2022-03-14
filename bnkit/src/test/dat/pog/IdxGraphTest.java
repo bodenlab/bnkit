@@ -37,6 +37,115 @@ class IdxGraphTest {
         }
     }
 
+    @Test
+    void getStarts() {
+        IdxGraph g0 = new IdxGraph(10, false, true);
+        for (int i = 0; i < 10; i ++)
+            g0.addNode(i, new Node());
+        g0.addEdge(-1, 0);
+        g0.addEdge(0, 1);
+        g0.addEdge(0, 2);
+        g0.addEdge(-1, 3);
+        g0.addEdge(3, 4);
+        g0.addEdge(2, 5);
+        g0.addEdge(4, 5);
+        g0.addEdge(5, 6);
+        g0.addEdge(6, 7);
+        g0.addEdge(7, 8);
+        g0.addEdge(8, 9);
+        g0.addEdge(6, 10);
+        g0.addTerminalEdge(9);
+        int[] s = g0.getStarts();
+        int[] e = g0.getEnds();
+        assertTrue(s.length == 2);
+        assertTrue(e.length == 2);
+    }
+
+
+    @Test
+    void getOrdered() {
+        IdxGraph g0 = new IdxGraph(10, false, true);
+        for (int i = 0; i < 10; i ++)
+            g0.addNode(i, new Node());
+        g0.addEdge(-1, 0);
+        g0.addEdge(0, 1);
+        g0.addEdge(0, 2);
+        g0.addEdge(1, 3);
+        g0.addEdge(3, 4);
+        g0.addEdge(2, 5);
+        g0.addEdge(4, 5);
+        g0.addEdge(5, 6);
+        g0.addEdge(6, 7);
+        g0.addEdge(7, 8);
+        g0.addEdge(8, 9);
+        g0.addTerminalEdge(9);
+        int[] ord = g0.getOrdered(1, true);
+        for (int i = 0; i < ord.length; i ++) {
+            System.out.print(ord[i] + "\t");
+            if (i > 0)
+                assertTrue(ord[i-1] < ord[i]);
+        }
+        System.out.println();
+        assertEquals(3, ord.length);
+        ord = g0.getOrdered(2, true);
+        for (int i = 0; i < ord.length; i ++) {
+            System.out.print(ord[i] + "\t");
+        }
+        System.out.println();
+        assertEquals(1, ord.length);
+        ord = g0.getOrdered(9, false);
+        for (int i = 0; i < ord.length; i ++) {
+            System.out.print(ord[i] + "\t");
+            if (i > 0)
+                assertTrue(ord[i-1] > ord[i]);
+        }
+        System.out.println();
+        assertEquals(4, ord.length);
+        ord = g0.getOrdered(1, false);
+        for (int i = 0; i < ord.length; i ++)
+            System.out.print(ord[i] + "\t");
+        System.out.println();
+        assertEquals(1, ord.length);
+        ord = g0.getOrdered(0, false);
+        for (int i = 0; i < ord.length; i ++)
+            System.out.print(ord[i] + "\t");
+        System.out.println();
+        assertEquals(0, ord.length);
+    }
+
+    @Test
+    void getOrderedWrap() {
+        IdxGraph g0 = new IdxGraph(11, false, true);
+        for (int i = 0; i < 11; i ++)
+            g0.addNode(i, new Node());
+        g0.addEdge(-1, 0);
+        g0.addEdge(0, 1);
+        g0.addEdge(0, 2);
+        g0.addEdge(-1, 6);
+        g0.addEdge(1, 3);
+        g0.addEdge(3, 4);
+        g0.addEdge(2, 5);
+        g0.addEdge(4, 5);
+        g0.addEdge(5, 6);
+        g0.addEdge(6, 7);
+        g0.addEdge(7, 8);
+        g0.addEdge(8, 9);
+        g0.addEdge(6, 10);
+        g0.addTerminalEdge(9);
+        g0.addTerminalEdge(10);
+        int idx = 0;
+        int[] wrap = g0.getOrderedWrap(idx, true); //
+        for (int i = 0; i < wrap.length; i ++)
+            System.out.println(idx + "\t+" + (i + 1) + "\t" + wrap[i]);
+        assertTrue(wrap.length == 4);
+        idx = 6;
+        wrap = g0.getOrderedWrap(idx, true); //
+        for (int i = 0; i < wrap.length; i ++)
+            System.out.println(idx + "\t+" + (i + 1) + "\t" + wrap[i]);
+        assertTrue(wrap.length == 4);
+
+    }
+
     private class MyNode extends Node {
         final String label;
         public MyNode(String label) {

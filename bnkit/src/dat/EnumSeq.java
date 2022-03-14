@@ -89,7 +89,46 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
         r.close();
         return seqs;
     }
-    
+
+    public static EnumSeq parseProtein(String sequence) {
+        EnumSeq seq = new EnumSeq(Enumerable.aacid);
+        Object[] oarr = new Object[sequence.length()];
+        char[] carr = sequence.toCharArray();
+        for (int i = 0; i < carr.length; i ++) {
+            oarr[i] = (Object) carr[i];
+            if (!Enumerable.aacid.isValid(oarr[i]))
+                return null;
+        }
+        seq.set(oarr);
+        return seq;
+    }
+
+    public static EnumSeq parseDNA(String sequence) {
+        EnumSeq seq = new EnumSeq(Enumerable.nacid);
+        Object[] oarr = new Object[sequence.length()];
+        char[] carr = sequence.toCharArray();
+        for (int i = 0; i < carr.length; i ++) {
+            oarr[i] = (Object) carr[i];
+            if (!Enumerable.nacid.isValid(oarr[i]))
+                return null;
+        }
+        seq.set(oarr);
+        return seq;
+    }
+
+    public static EnumSeq parseRNA(String sequence) {
+        EnumSeq seq = new EnumSeq(Enumerable.nacidRNA);
+        Object[] oarr = new Object[sequence.length()];
+        char[] carr = sequence.toCharArray();
+        for (int i = 0; i < carr.length; i ++) {
+            oarr[i] = (Object) carr[i];
+            if (!Enumerable.nacidRNA.isValid(oarr[i]))
+                return null;
+        }
+        seq.set(oarr);
+        return seq;
+    }
+
     public static EnumSeq<dat.Enumerable> aacid_seq = new EnumSeq<>(dat.Enumerable.aacid);
     public static EnumSeq<dat.Enumerable> nacid_seq = new EnumSeq<>(dat.Enumerable.nacid);
 

@@ -96,7 +96,7 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
      * @return the index assigned to the node, if indices are exhausted, a runtime exception is thrown
      */
     public synchronized int addNode(EnumNode node) {
-        return addNode(node);
+        return super.addNode(node);
     }
 
     public static void main(String[] args) {

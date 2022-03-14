@@ -44,7 +44,7 @@ public class GaussianDistrib implements Distrib, Serializable {
     private final double ROOT_2PI = Math.sqrt(2 * Math.PI);
     private final double LOG_ROOT_2PI = 0.5 * (Math.log(2) + Math.log(Math.PI));
 
-    private final Random rand = new Random();
+    private Random rand = new Random();
 
     /**
      * Creates a univariate Gaussian distribution with the given fixed mean and
@@ -122,7 +122,9 @@ public class GaussianDistrib implements Distrib, Serializable {
         setVariance(rand1.nextDouble());
     }
 
-    
+    public void setSeed(long seed) {
+        rand = new Random(seed);
+    }
     /**
      * Create a density resembling those in the specified samples.
      * @param samples samples

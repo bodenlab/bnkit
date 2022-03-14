@@ -110,7 +110,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 
     /**
      * Determine a topological ordering of the nodes; note that more than one topological order is likely to exist for bi- and multi-furcating POGs
+     *
      * @return an array with the indices of the POG in a topological order
+     * TODO: confirm that this implementation can be inherited from IdxGraph
      */
     public int[] getTopologicalOrder() {
         int[] ret = new int[this.size() + 1];

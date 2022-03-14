@@ -174,6 +174,7 @@ class TreeTest {
 
 
     static Tree tree = null;
+    static Tree random_tree = null;
 
     @BeforeAll
     static void setThingsUp() {
@@ -185,4 +186,29 @@ class TreeTest {
         }
     }
 
+    @Test
+    void random() {
+        for (int n = 6; n < 20; n ++) {
+            String[] leaves = new String[n];
+            for (int i = 0; i < n; i ++)
+                leaves[i] = "A" + (i + 1);
+            Tree random_tree1 = Tree.Random(leaves, n, 1, 2, 2, 2);
+            Tree random_tree2 = Tree.Random(leaves, n + 1, 1, 2, 3, 3);
+            for (String leaf : leaves) {
+                BranchPoint bp1 = random_tree1.find(leaf);
+                BranchPoint bp2 = random_tree2.find(leaf);
+                assertTrue(bp1.getLabel().equals(bp2.getLabel()));
+            }
+            int sum1 = 0, sum2 = 0;
+            for (int idx : random_tree1.getLeaves())
+                sum1 += random_tree1.getDepth(idx);
+            for (int idx : random_tree2.getLeaves())
+                sum2 += random_tree2.getDepth(idx);
+            if (!(sum1 > sum2)) {
+                System.out.println(random_tree1.toString() + "\t" + sum1);
+                System.out.println(random_tree2.toString() + "\t" + sum2);
+            }
+            assertTrue(sum1 > sum2);
+        }
+    }
 }

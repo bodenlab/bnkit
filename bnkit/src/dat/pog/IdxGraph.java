@@ -3,15 +3,9 @@ package dat.pog;
 import asr.ASRException;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.List;
+import java.util.*;
 
 public class IdxGraph {
     protected final boolean directed;
@@ -389,6 +383,282 @@ public class IdxGraph {
         }
     }
 
+    private static int[] concat(int[] array1, int[] array2) {
+        int[] result = Arrays.copyOf(array1, array1.length + array2.length);
+        System.arraycopy(array2, 0, result, array1.length, array2.length);
+        return result;
+    }
+
+    /**
+     * Determine a topological ordering of the nodes. This function can only be used on directed and terminated graphs.
+     * Note that more than one topological order can exist for bi- and multi-furcating POGs
+     * @return an array with the indices of the POG in a topological order
+     * TODO: deprecate this in favour of getTopologicalDepthFirst. Currently they differ in that this function includes -1, which seems unreasonable at first glance...
+     */
+    public int[] getTopologicalOrder() {
+        if (!(isDirected() && isTerminated()))
+            throw new RuntimeException("Topological order cannot be determined when graph is undirected");
+        int[] ret = new int[this.size() + 1];
+        boolean[] added = new boolean[this.nNodes];
+        int[] inedges = new int[this.nNodes];
+        int add_ptr = 0; // pointer to position for adding index
+        ret[add_ptr ++] = -1; // first node
+        // add all nodes with NO edges leading IN, i.e. zero backward edges
+        for (int i = 0; i < this.nNodes; i++) {
+            try {
+                if (getCardinality(i, false) == 0) {
+                    ret[add_ptr ++] = i;
+                    added[i] = true;
+                }
+            } catch (InvalidIndexRuntimeException e) {
+                ;
+            }
+        }
+        // go through all nodes, first those added above, incrementally adding those that are beyond/forward
+        int exp_ptr = 0; // pointer to position to expand
+        while (exp_ptr < add_ptr) {
+            int current = ret[exp_ptr ++];
+            int[] next = getNodeIndices(current, true);
+            // any node in the just expanded list could be the start of a linear stretch of nodes
+            for (int idx : next) {
+                if (!added[idx]) {
+                    inedges[idx] = getCardinality(idx, false) + (isStartNode(idx) ? 1 : 0); // check how many paths lead to it
+                    added[idx] = true;
+                }
+                if (inedges[idx] == 1) { // only add it, when exactly one path leads to it, or when we have expanded the last path to it
+                    ret[add_ptr++] = idx;
+                }
+                if (inedges[idx] > 1) // more paths will lead to this node index, so count down to catch it later
+                    inedges[idx] --;
+            }
+        }
+        return ret;
+    }
+
+    /**
+     * Determine a topological ordering of the nodes by depth-first search, which maximises continuity of paths.
+     * This function can only be used on directed and terminated graphs.
+     * Note that more than one topological order can exist for bi- and multi-furcating POGs
+     * @return an array with the indices of the POG in a topological order
+     */
+    public int[] getTopoSortDepthFirst() {
+        if (!(isDirected() && isTerminated()))
+            throw new RuntimeException("Topological order cannot be determined when graph is undirected");
+        TopologicalSort tsort = new TopologicalSort(this);
+        return tsort.getSorted();
+    }
+
+    /**
+     * Topological sort by depth-first search
+     * https://en.wikipedia.org/wiki/Topological_sorting
+     * Cormen, Thomas H.; Leiserson, Charles E.; Rivest, Ronald L.; Stein, Clifford (2001),
+     * "Section 22.4: Topological sort", Introduction to Algorithms (2nd ed.), MIT Press and McGraw-Hill, pp. 549–552, ISBN 0-262-03293-7
+     */
+    private static class TopologicalSort {
+        final boolean[] permanent;
+        final boolean[] temporary;
+        final LinkedList<Integer> sorted;
+        final IdxGraph graph;
+
+        TopologicalSort(IdxGraph graph) {
+            this.graph = graph;
+            permanent = new boolean[graph.nNodes];
+            temporary = new boolean[graph.nNodes];
+            sorted = new LinkedList<>();
+        }
+
+        private boolean visit(int n) {
+            if (permanent[n]) return false;
+            if (temporary[n]) throw new RuntimeException("Graph is not a valid DAG, hence topological sort not defined");
+            temporary[n] = true;
+            int[] next = graph.getNodeIndices(n, true);
+            for (int m : next) {
+                visit(m);
+            }
+            temporary[n] = false;
+            permanent[n] = true;
+            sorted.addFirst(n);
+            return true;
+        }
+
+        /**
+         * Determine the topological sort, starting at the start nodes, using depth-first search.
+         * Any nodes that are not reachable from the start nodes will not be contained in the sort.
+         * As an aside, unreachable/disconnected nodes can be included if the loop is extended to all those recorded in the graph.
+         * @return an array with the indices of nodes ordered by topological sort
+         */
+        int[] getSorted() {
+            int[] starts = graph.getStarts();
+            for (int j = 0; j < starts.length; j++) {
+                if (!permanent[starts[j]]) {
+                    visit(starts[j]);
+                }
+            }
+            int[] ret = new int[sorted.size()];
+            int i = 0;
+            for (Integer idx : sorted)
+                ret[i ++] = idx;
+            return ret;
+        }
+
+    }
+    /**
+     * Determine the linear order of nodes that start at given index, and end before cardinality exceeds one
+     * @param idx start node
+     * @param look_forward increment order going forward (true) or backward (false)
+     * @return the node indices in linear order
+     */
+    public int[] getOrdered(int idx, boolean look_forward) {
+        if (!isDirected())
+            throw new RuntimeException("Topological order undefined when graph is undirected");
+//        if (getCardinality(idx, look_forward) != 1 && getCardinality(idx, !look_forward) != 1)
+//            return new int[0];
+        List<Integer> path = new ArrayList<>();
+        while (isPath(idx)) {
+            path.add(idx);
+            idx = look_forward ? this.edgesForward[idx].nextSetBit(0) : this.edgesBackward[idx].nextSetBit(0);
+        }
+        int[] ret = new int[path.size()];
+        for (int i = 0; i < path.size(); i ++)
+            ret[i] = path.get(i);
+        return ret;
+    }
+
+    /**
+     * Get indices that can be found and linearly ordered from each of the given starting indices.
+     * @param expand_us array of starting indices
+     * @param look_forward direction of search
+     * @return one array of ordered indices for each starting index;
+     * note the last index in each array will potentially be connected to other parts in the graph
+     */
+    public int[][] getOrdered(int[] expand_us, boolean look_forward) {
+        if (!isDirected())
+            throw new RuntimeException("Topological order undefined when graph is undirected");
+        int[][] arr = new int[expand_us.length][];
+        int ntot = 0;
+        for (int i = 0; i < expand_us.length; i ++) {
+            arr[i] = getOrdered(expand_us[i], look_forward);
+            // last node here, will potentially be expanded next, save ...
+        }
+        return arr;
+    }
+
+
+    /**
+     * Determine if node is on a linear path, i.e. has only one entry edge and one exit edge.
+     * @param idx node index
+     * @return true if node is part of a linear sequence of nodes
+     */
+    public boolean isPath(int idx) {
+        if (idx == -1 || idx == nNodes) // termination does not form part of any path
+            return false;
+        int cntForward = edgesForward[idx].cardinality() + (isEndNode(idx) ? 1 : 0);
+        int cntBackward = edgesBackward[idx].cardinality() + (isStartNode(idx) ? 1 : 0);
+        return (cntForward == 1 && cntBackward == 1);
+    }
+
+    /**
+     * Retrieve all indices for nodes that start this graph
+     * @return
+     */
+    public int[] getStarts() {
+        if (!isTerminated())
+            throw new RuntimeException("Graph must be terminated to have start nodes");
+        List<Integer> list = new ArrayList<>();
+        for (int i = startNodes.nextSetBit(0); i >= 0; i = startNodes.nextSetBit(i+1)) {
+            list.add(i);
+            if (i == Integer.MAX_VALUE)
+                break; // or (i+1) would overflow
+        }
+        int[] ret = new int[list.size()];
+        for (int i = 0; i < list.size(); i ++)
+            ret[i] = list.get(i);
+        return ret;
+    }
+
+    /**
+     * Retrieve all indices for nodes that end this graph
+     * @return
+     */
+    public int[] getEnds() {
+        if (!isTerminated())
+            throw new RuntimeException("Graph must be terminated to have end nodes");
+        List<Integer> list = new ArrayList<>();
+        for (int i = endNodes.nextSetBit(0); i >= 0; i = endNodes.nextSetBit(i+1)) {
+            list.add(i);
+            if (i == Integer.MAX_VALUE)
+                break; // or (i+1) would overflow
+        }
+        int[] ret = new int[list.size()];
+        for (int i = 0; i < list.size(); i ++)
+            ret[i] = list.get(i);
+        return ret;
+    }
+
+    /**
+     * Get all indices that can be found and linearly ordered before expanding again.
+     * @param idx
+     * @param look_forward
+     * @return
+     */
+    public int[] getOrderedWrap(int idx, boolean look_forward) {
+        if (!isDirected())
+            throw new RuntimeException("Topological order undefined when graph is undirected");
+        int[] expand_us = null;
+        if (isTerminated() && idx == -1 && look_forward){
+            expand_us = getStarts();
+        } else if (isTerminated() && idx == nNodes && !look_forward) {
+            expand_us = getEnds();
+        } else {
+            expand_us = getNodeIndices(idx, look_forward);
+        }
+        int[][] arr = getOrdered(expand_us, look_forward);
+        int ntot = 0;
+        for (int i = 0; i < arr.length; i ++)
+            ntot += arr[i].length;
+        int[] ret = new int[ntot];
+        int cnt = 0;
+        for (int i = 0; i < arr.length; i ++)
+            for (int j = 0; j < arr[i].length; j ++)
+                ret[cnt ++] = arr[i][j];
+        return ret;
+    }
+
+    /**
+     * @return
+     */
+    public int[] getTopologicalOrder2() {
+        if (!isDirected() || !isTerminated())
+            throw new RuntimeException("Topological order undefined when graph is undirected");
+        int[] head = getStarts();
+        return getTopologicalOrder2(head);
+    }
+
+    private int[] getTopologicalOrder2(int[] head) {
+        int[][] arr = getOrdered(head, true);
+        Set<Integer> tail = new HashSet<>();
+        int ntot = 0;
+        for (int i = 0; i < arr.length; i ++) {
+            // last node here, will potentially be expanded next, save ...?
+            if (arr[i].length >= 1) {
+                ntot += arr[i].length;
+                tail.add(arr[i][arr[i].length - 1]);
+            }
+        }
+        int[] nexthead = new int[tail.size()];
+        int hcnt = 0;
+        for (int idx : tail)
+            nexthead[hcnt ++] = idx;
+
+        int[] ret = new int[ntot + head.length];
+        int cnt = 0;
+        for (int i = 0; i < arr.length; i ++) {
+            ret[cnt ++] = head[i];
+            for (int j = 0; j < arr[i].length; j++)
+                ret[cnt ++] = arr[i][j];
+        }
+        return ret;
+    }
 
     /**
      * Generate a text string that describes the graph.
@@ -412,7 +682,6 @@ public class IdxGraph {
         buf.append("}");
         return buf.toString();
     }
-
 
     /**
      * Generate a text string that describes the graph, following the DOT format.
