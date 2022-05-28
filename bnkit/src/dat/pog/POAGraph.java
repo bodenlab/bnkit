@@ -104,6 +104,7 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
             EnumSeq.Alignment aln = new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/dp16_poag.aln", Enumerable.aacid));
             POAGraph poag = new POAGraph(aln);
             poag.saveToDOT("/Users/mikael/simhome/ASR/dp16_poag.dot");
+            poag.saveToMatrix("/Users/mikael/simhome/ASR/dp16_poag.m");
         } catch (IOException e) {
             System.err.println(e);
         }

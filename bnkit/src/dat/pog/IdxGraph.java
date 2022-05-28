@@ -817,7 +817,6 @@ public class IdxGraph {
         FileWriter fwriter=new FileWriter(filename);
         BufferedWriter writer=new BufferedWriter(fwriter);
         writer.write(toMatrixString());
-        writer.write(toDOT());
         writer.close();
         fwriter.close();
     }
