@@ -625,42 +625,6 @@ public class IdxGraph {
     }
 
     /**
-     * @return
-     */
-    public int[] getTopologicalOrder2() {
-        if (!isDirected() || !isTerminated())
-            throw new RuntimeException("Topological order undefined when graph is undirected");
-        int[] head = getStarts();
-        return getTopologicalOrder2(head);
-    }
-
-    private int[] getTopologicalOrder2(int[] head) {
-        int[][] arr = getOrdered(head, true);
-        Set<Integer> tail = new HashSet<>();
-        int ntot = 0;
-        for (int i = 0; i < arr.length; i ++) {
-            // last node here, will potentially be expanded next, save ...?
-            if (arr[i].length >= 1) {
-                ntot += arr[i].length;
-                tail.add(arr[i][arr[i].length - 1]);
-            }
-        }
-        int[] nexthead = new int[tail.size()];
-        int hcnt = 0;
-        for (int idx : tail)
-            nexthead[hcnt ++] = idx;
-
-        int[] ret = new int[ntot + head.length];
-        int cnt = 0;
-        for (int i = 0; i < arr.length; i ++) {
-            ret[cnt ++] = head[i];
-            for (int j = 0; j < arr[i].length; j++)
-                ret[cnt ++] = arr[i][j];
-        }
-        return ret;
-    }
-
-    /**
      * Generate a text string that describes the graph.
      * @return text description
      */
@@ -740,6 +704,47 @@ public class IdxGraph {
         return buf.toString();
     }
 
+    /**
+     * Generate a matrix that describes the graph, where
+     * row means "from" index
+     * col means "to" index
+     * @return
+     */
+    public boolean[][] toMatrix() {
+        boolean[][] m = new boolean[this.nNodes+(isTerminated()?2:0)][this.nNodes + (isTerminated()?2:0)];
+        if (isTerminated()) {
+            for (int i = 0; i < startNodes.length(); i++)
+                m[0][i + 1] = startNodes.get(i);
+            for (int i = 0; i < endNodes.length(); i++)
+                m[i + 1][nNodes + 1] = endNodes.get(i);
+            for (int from = 0; from < edgesForward.length; from++) {
+                if (isNode(from)) {
+                    for (int to = isDirected() ? 0 : from; to < edgesForward[from].length(); to++)
+                        m[from + 1][to + 1] = edgesForward[from].get(to);
+                }
+            }
+        } else { // not terminated
+            for (int from = 0; from < edgesForward.length; from++) {
+                if (isNode(from)) {
+                    for (int to = isDirected() ? 0 : from; to < edgesForward[from].length(); to++)
+                        m[from][to] = edgesForward[from].get(to);
+                }
+            }
+        }
+        return m;
+    }
+
+    public String toMatrixString() {
+        StringBuilder sb = new StringBuilder();
+        boolean[][] m = toMatrix();
+        for (int r = 0; r < m.length; r++) {
+            for (int c = 0; c < m[r].length; c++)
+                sb.append(m[r][c] ? "1 " : "0 ");
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
     public static class DefaultGraph extends IdxGraph {
 
         /**
@@ -806,5 +811,31 @@ public class IdxGraph {
         readme.newLine();
         readme.close();
         freadme.close();
+    }
+
+    public void saveToMatrix(String filename) throws IOException {
+        FileWriter fwriter=new FileWriter(filename);
+        BufferedWriter writer=new BufferedWriter(fwriter);
+        writer.write(toMatrixString());
+        writer.write(toDOT());
+        writer.close();
+        fwriter.close();
+    }
+
+    public static void saveToMatrix(String directory, IdxGraph... graphs) throws IOException, ASRException {
+        StringBuilder sb = new StringBuilder();
+        FileWriter fwriter=new FileWriter(directory + "/ancestors.m");
+        int cnt = 0;
+        for (IdxGraph g : graphs) {
+            String name = "N" + Integer.toString(cnt);
+            sb.append(name + " = [\n");
+            sb.append(g.toMatrixString());
+            sb.append("];\n");
+            cnt += 1;
+        }
+        BufferedWriter writer=new BufferedWriter(fwriter);
+        writer.write(sb.toString());
+        writer.close();
+        fwriter.close();
     }
 }

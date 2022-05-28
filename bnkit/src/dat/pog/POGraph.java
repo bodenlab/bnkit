@@ -335,13 +335,34 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     public static POGraph createFromEdgeMap(int nPos, EdgeMap emap) {
         POGraph pog = null;
         pog = new POGraph(nPos);
-        for (POGEdge edge : emap.getEdges()) {
+        for (POGEdge edge : emap.getEdges()) { // go through all edges, doubling up if bi-directional
             synchronized (pog) {
                 if (edge.idx1 != -1 && !pog.isNode(edge.idx1))
                     pog.addNode(edge.idx1, new Node());
                 if (edge.idx2 != nPos && !pog.isNode(edge.idx2))
                     pog.addNode(edge.idx2, new Node());
                 pog.addEdge(edge.idx1, edge.idx2, new StatusEdge(emap.isReciprocated(edge)));
+            }
+        }
+        return pog;
+    }
+
+    /**
+     * Create a POG from a Directed
+     * @param nPos
+     * @param emap
+     * @return
+     */
+    public static POGraph createFromEdgeMap(int nPos, EdgeMap.Directed emap) {
+        POGraph pog = null;
+        pog = new POGraph(nPos);
+        for (POGEdge edge : emap.getEdges()) { // go through all edges, doubling up if bi-directional
+            synchronized (pog) {
+                if (edge.idx1 != -1 && !pog.isNode(edge.idx1))
+                    pog.addNode(edge.idx1, new Node());
+                if (edge.idx2 != nPos && !pog.isNode(edge.idx2))
+                    pog.addNode(edge.idx2, new Node());
+                pog.addEdge(edge.idx1, edge.idx2, new BidirEdge(emap.isForward(edge), emap.isBackward(edge)));
             }
         }
         return pog;
@@ -597,7 +618,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 
                 if (nextidx <= dest_idx && all_unique) {
                     visited.add(new POGEdge(pos, nextidx));
-                    visitedNode.add(new Integer(pos));
+                    visitedNode.add(pos);
                 }
             }
             for (int nextidx : nextidxs) {
@@ -735,4 +756,24 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         }
     }
 
-}
+    /**
+     * Define the standard type of edge for POGs as we use them in GRASP, with weight and support for "bi-directionality" status
+     */
+    public static class BidirEdge extends StatusEdge {
+        private boolean forward, backward;
+        public BidirEdge(boolean forward, boolean backward) {
+            super(forward && backward);
+            this.forward = forward;
+            this.backward = backward;
+        }
+
+        public boolean isForward() {
+            return forward;
+        }
+
+        public boolean isBackward() {
+            return backward;
+        }
+    }
+
+    }

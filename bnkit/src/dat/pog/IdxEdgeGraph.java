@@ -131,6 +131,7 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
      *   edge  [style=bold, fontname="Arial", weight=100]
      * @return
      */
+    @Override
     public String toDOT() {
         StringBuffer buf = new StringBuffer();
         if (!isDirected())
@@ -186,6 +187,114 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
         buf.append("}\n");
         return buf.toString();
     }
+
+    /**
+     * Generate a matrix that describes the graph, where
+     * row means "from" index
+     * col means "to" index
+     * @return matrix representation of graph
+     */
+    @Override
+    public boolean[][] toMatrix() {
+        boolean[][] m = new boolean[this.nNodes+(isTerminated()?2:0)][this.nNodes + (isTerminated()?2:0)];
+        if (isTerminated()) {
+            for (int i = 0; i < startNodes.length(); i++) {
+                if (startNodes.get(i)) {
+                    try {
+                        POGraph.BidirEdge bidir = (POGraph.BidirEdge) getEdge(-1, i);
+                        if (bidir.isForward())
+                            m[0][i + 1] = true;
+                        if (bidir.isBackward())
+                            m[i + 1][0] = true;
+                    } catch (ClassCastException e1) {
+                        try {
+                            POGraph.StatusEdge edge = (POGraph.StatusEdge) getEdge(-1, i);
+                            if (edge.getReciprocated())
+                                m[i + 1][0] = true;
+                            else
+                                m[0][i + 1] = true;
+                        } catch (ClassCastException e2) {
+                            ;
+                        }
+                    }
+                }
+            }
+            for (int i = 0; i < endNodes.length(); i++) {
+                if (endNodes.get(i)) {
+                    try {
+                        POGraph.BidirEdge bidir = (POGraph.BidirEdge) getEdge(i, nNodes);
+                        if (bidir.isForward())
+                            m[i + 1][nNodes + 1] = true;
+                        if (bidir.isBackward())
+                            m[nNodes + 1][i + 1] = true;
+                    } catch (ClassCastException e1) {
+                        try {
+                            POGraph.StatusEdge edge = (POGraph.StatusEdge) getEdge(i, nNodes);
+                            if (edge.getReciprocated())
+                                m[nNodes + 1][i + 1] = true;
+                            else
+                                m[i + 1][nNodes + 1] = true;
+                        } catch (ClassCastException e2) {
+                            ;
+                        }
+                    }
+                }
+            }
+            for (int from = 0; from < edgesForward.length; from++) {
+                if (isNode(from)) {
+                    for (int to = isDirected() ? 0 : from; to < edgesForward[from].length(); to ++) {
+                        if (edgesForward[from].get(to)) {
+                            try {
+                                POGraph.BidirEdge bidir = (POGraph.BidirEdge) getEdge(from, to);
+                                if (bidir.isForward())
+                                    m[from + 1][to + 1] = true;
+                                if (bidir.isBackward())
+                                    m[to + 1][from + 1] = true;
+                            } catch (ClassCastException e1) {
+                                try {
+                                    POGraph.StatusEdge edge = (POGraph.StatusEdge) getEdge(from, to);
+                                    if (edge.getReciprocated())
+                                        m[to + 1][from +1] = true;
+                                    else
+                                        m[from + 1][to + 1] = true;
+                                } catch (ClassCastException e2) {
+                                    ;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else { // not terminated
+            for (int from = 0; from < edgesForward.length; from++) {
+                if (isNode(from)) {
+                    for (int to = isDirected() ? 0 : from; to < edgesForward[from].length(); to ++) {
+                        if (edgesForward[from].get(to)) {
+                            try {
+                                POGraph.BidirEdge bidir = (POGraph.BidirEdge) getEdge(from, to);
+                                if (bidir.isForward())
+                                    m[from + 1][to + 1] = true;
+                                if (bidir.isBackward())
+                                    m[to + 1][from + 1] = true;
+                            } catch (ClassCastException e1) {
+                                try {
+                                    POGraph.StatusEdge edge = (POGraph.StatusEdge) getEdge(from, to);
+                                    if (edge.getReciprocated())
+                                        m[to + 1][from +1] = true;
+                                    else
+                                        m[from + 1][to + 1] = true;
+                                } catch (ClassCastException e2) {
+                                    ;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return m;
+    }
+
 
 
 }

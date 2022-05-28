@@ -72,7 +72,7 @@ public class TrAVIS {
                 "\t{-format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n");
         out.println("where \n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
-                "\toutput-dir \n" +
+                "\toutput-file-or-dir is the filename or name of directory of results\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n");
         out.println("Notes: \n" +
                 "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman; \n" +
@@ -315,7 +315,7 @@ public class TrAVIS {
         Poisson poisson = null;
         GammaDistrib gamma = null;
 
-        private final Tree tree;
+        public final Tree tree;
         private final TreeInstance ti_seqs;
         private EnumNode[][] enumNodes = null;
         private TreeInstance ti_deletions = null;
@@ -323,6 +323,7 @@ public class TrAVIS {
         private Random rand = null;
         private POAGraph poag = null;
         private EnumSeq.Gappy[] alignedseqs = null; // alignment extracted from sequences and POAG; requires POAG to have been generated
+        private int[][] alignedidxs = null;         // alignment extracted from sequences and POAG, but in the form of indices from original seq idx to alignment idx
         // private int[] order = null; // topological order of nodes in POAG; when set alignment can be extracted
         private double[] alignedrates = null;
         private double[][] rates = null; // rates in tree, reference to branchpoint specific index
@@ -494,8 +495,16 @@ public class TrAVIS {
             }
         }
 
-        public TreeInstance getTreeInstance() {
+        public TreeInstance getTreeWithSequences() {
             return ti_seqs;
+        }
+
+        public TreeInstance getTreeWithDeletions() {
+            return ti_deletions;
+        }
+
+        public TreeInstance getTreeWithInsertions() {
+            return ti_insertions;
         }
 
         public EnumSeq[] getSequences() {
@@ -553,6 +562,7 @@ public class TrAVIS {
             POAGraph poag = getPOAG();
             int[] order = poag.getTopoSortDepthFirst();
             alignedseqs = new EnumSeq.Gappy[tree.getSize()];
+            alignedidxs = new int[tree.getSize()][];
             HashMap<EnumNode, Integer> nodes = new HashMap<>();
             for (int i = 0; i < order.length; i ++) {
                 EnumNode node = (EnumNode) poag.getNode(order[i]);
@@ -565,10 +575,12 @@ public class TrAVIS {
             for (int idx : tree) {
                 alignedseqs[idx] = new EnumSeq.Gappy(myType);
                 Object[] seq = new Object[order.length];
+                EnumSeq orig = (EnumSeq)ti_seqs.getInstance(idx);
+                alignedidxs[idx] = new int[orig.length()];
                 for (int j = 0; j < enumNodes[idx].length; j ++) {
                     int pos = nodes.get(enumNodes[idx][j]);
-                    EnumSeq orig = (EnumSeq)ti_seqs.getInstance(idx);
                     seq[pos] = orig.get(j);
+                    alignedidxs[idx][j] = pos;
                     if (USERATES)
                         alignedrates[pos] = rates[idx][j];
                 }

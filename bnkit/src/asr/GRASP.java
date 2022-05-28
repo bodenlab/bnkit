@@ -21,7 +21,8 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "15-Dec-2021";
+    public static String VERSION = "28-May-2022";
+
     public static boolean VERBOSE = false;
     public static boolean TIME = false;
     public static boolean FORCELINEAR = false;
@@ -54,7 +55,7 @@ public class GRASP {
                 "\t{-savetree <tree-directory>}\n" +
                 "\t{-nibble}\n" +
 //                "\t{-forcelinear}\n" +
-                "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT|TREE>}\n" +
+                "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT|TREE|MATLAB>}\n" +
                 "\t{-time}{-verbose}{-help}");
         out.println("where \n" +
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
@@ -96,10 +97,10 @@ public class GRASP {
         String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
         boolean GAPPY = false;
-        String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE"};
+        String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "MATLAB"};
         int FORMAT_IDX = 0;
         // To compute consensus path is determined by output format
-        boolean[] CONSENSUS = new boolean[] {true, false, true, false, false};
+        boolean[] CONSENSUS = new boolean[] {true, false, true, false, false, false};
 
         Inference MODE = Inference.JOINT;
         Integer MARG_NODE = null;
@@ -253,9 +254,14 @@ public class GRASP {
                     indelpred.getMarginal(MARG_NODE, MODEL, RATES);
                 Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
                 POGraph[] ancestors = new POGraph[pogs.size()];
-                int ii = 0;
-                for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                    ancestors[ii ++] = entry.getValue();
+                try {
+                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
+                       ancestors[(Integer)entry.getKey()] = entry.getValue();
+                } catch (NumberFormatException exc) {
+                    int ii = 0;
+                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
+                        ancestors[ii ++] = entry.getValue();
+                }
 
                 // Below is being used to write out a file for each reconstruction that states for each edge between a
                 // set of partially ordered columns if these edges are present in each ancestral graph
@@ -282,9 +288,14 @@ public class GRASP {
 
                 EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
                 if (CONSENSUS[FORMAT_IDX]) {
-                    ii = 0;
-                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                        ancseqs[ii ++] = indelpred.getSequence(entry.getKey(), MODE, GAPPY);
+                    try {
+                        for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
+                            ancseqs[(Integer)entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, GAPPY);
+                    } catch (NumberFormatException exc) {
+                        int ii = 0;
+                        for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
+                            ancseqs[ii++] = indelpred.getSequence(entry.getKey(), MODE, GAPPY);
+                    }
                 }
                 File file = new File(OUTPUT);
                 if (file.mkdirs()) { // true if the directory was created, false otherwise
@@ -314,6 +325,9 @@ public class GRASP {
                         break;
                     case 3: // DOT
                         IdxGraph.saveToDOT(OUTPUT, ancestors);
+                        break;
+                    case 5: // MATLAB
+                        IdxGraph.saveToMatrix(OUTPUT, ancestors);
                         break;
                     case 4: // TREE
                         if (MODE == Inference.JOINT)

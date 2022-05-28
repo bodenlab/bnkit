@@ -197,7 +197,8 @@ public class Prediction {
      * @return branch point index, or -1 if not found
      */
     public int getBranchpointIndex(Object id) {
-        return pogTree.getTree().getIndex(id);
+        int bpidx = pogTree.getTree().getIndex(id);
+        return bpidx;
     }
 
     /**
@@ -393,8 +394,9 @@ public class Prediction {
      */
     public EnumSeq getSequence(Object ancID, GRASP.Inference mode, boolean gappy) {
         int bpidx = getBranchpointIndex(ancID);                            // the index of the ancestor as it appears in the phylogenetic tree
-        if (bpidx == -1)
+        if (bpidx == -1) {
             throw new ASRRuntimeException("Invalid ancestor ID: " + ancID);
+        }
         int[] idxs = getConsensus(bpidx);
         if (idxs == null)
             throw new ASRRuntimeException("Failed to find optimal path for ancestor ID: " + ancID);
@@ -1395,20 +1397,20 @@ public class Prediction {
                 Object ancID = tree.getBranchPoint(j).getID();
                 if (tree.getChildren(j).length > 0) { // an ancestor
                     //if (DEBUG) System.out.println("Assembling ancestor N" + ancID + " at branchpoint index " + j);
-                    EdgeMap emap = new EdgeMap();
+                    EdgeMap.Directed emap = new EdgeMap.Directed();
                     for (int i = -1; i <= nPos; i++) {
                         if (i != nPos && pif[i + 1] != null) {
                             List solutsf = (List) pif[i + 1].getDecoration(j);
                             for (Object s : solutsf) {
                                 int next = ((Integer) s).intValue();
-                                emap.add(i, next);
+                                emap.add(i, next, true);
                             }
                         }
                         if (i != -1 && pib[i + 1] != null) {
                             List solutsb = (List) pib[i + 1].getDecoration(j);
                             for (Object s : solutsb) {
                                 int prev = ((Integer) s).intValue();
-                                emap.add(prev, i);
+                                emap.add(prev, i, false);
                             }
                         }
                     }
@@ -1483,9 +1485,9 @@ public class Prediction {
                                 if (!pog.isNode(inferred) && inferred != pog.maxsize() && inferred != -1) // check if new node is needed
                                     pog.addNode(inferred, new Node());
                                 if (STATUS_FORWARD)
-                                    pog.addEdge(col, inferred, new POGraph.StatusEdge(false));
+                                    pog.addEdge(col, inferred, new POGraph.BidirEdge(true, false));
                                 else
-                                    pog.addEdge(inferred, col, new POGraph.StatusEdge(false));
+                                    pog.addEdge(inferred, col, new POGraph.BidirEdge(false, true));
                             } catch (ClassCastException e) {
                                 throw new ASRRuntimeException("Invalid inferred edge index: " + opt);
                             }
@@ -1572,20 +1574,20 @@ public class Prediction {
             for (int j = 0; j < tree.getSize(); j++) { // we look at each branchpoint, corresponding to either an extant or ancestor sequence
                 Object ancID = tree.getBranchPoint(j).getID();
                 if (tree.getChildren(j).length > 0) { // an ancestor
-                    EdgeMap emap = new EdgeMap();
+                    EdgeMap.Directed emap = new EdgeMap.Directed();
                     for (int i = -1; i <= nPos; i++) {
-                        if (i != nPos) {
+                        if (i != nPos && jif[i + 1] != null) {
                             Object solutsf = jif[i + 1].getDecoration(j);
                             if (solutsf != null) { // if this is null, it means the most probable edge (forward) is actually none at all.
                                 int next = ((Integer) solutsf).intValue();
-                                emap.add(i, next);
+                                emap.add(i, next, true);
                             }
                         }
-                        if (i != -1) {
+                        if (i != -1 && jib[i + 1] != null) {
                             Object solutsb = jib[i + 1].getDecoration(j);
                             if (solutsb != null) { // if this is null, it means the most probable edge (backward) is actually none at all.
                                 int prev = ((Integer) solutsb).intValue();
-                                emap.add(prev, i);
+                                emap.add(prev, i, false);
                             }
                         }
                     }

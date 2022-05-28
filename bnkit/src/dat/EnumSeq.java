@@ -75,6 +75,21 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
         return sb.toString();
     }
 
+    public Object[] getStripped() {
+        Object[] syms = get();
+        int empty = 0;
+        for (int i = 0; i < syms.length; i ++) {
+            if (syms[i] == null)
+                empty += 1;
+        }
+        Object[] stripped = new Object[syms.length - empty];
+        int j = 0;
+        for (int i = 0; i < syms.length; i ++) {
+            if (syms[i] != null)
+                stripped[j ++] = syms[i];
+        }
+        return stripped;
+    }
 
     public static <T extends dat.Enumerable> List<EnumSeq<T>> loadFasta(String filename, T elementType) throws IOException {
         List<EnumSeq<T>> seqs = new ArrayList<>();
@@ -234,7 +249,8 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
             r.close();
             return seqs;
         }
-        
+
+
     }
 
     public static Gappy<dat.Enumerable> aacid_gapseq = new Gappy<>(dat.Enumerable.aacid);

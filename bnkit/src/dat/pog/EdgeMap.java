@@ -31,7 +31,7 @@ public class EdgeMap {
      * @param idx1 first index
      * @param idx2 second index
      */
-    public void add(int idx1, int idx2) {
+    public POGEdge add(int idx1, int idx2) {
         POGEdge e = new POGEdge(idx1, idx2);
         if (edges.contains(e))
             recip.add(e);
@@ -49,6 +49,7 @@ public class EdgeMap {
             links.put(idx2, mylinks);
         }
         mylinks.add(idx1);
+        return e;
     }
 
     public void remove(POGEdge pe) {
@@ -122,6 +123,35 @@ public class EdgeMap {
      */
     public boolean isEdge(int idx1, int idx2) {
         return isEdge(idx1, idx2, false);
+    }
+
+    public static class Directed extends EdgeMap {
+        Set<POGEdge> forward = new HashSet<>();
+        Set<POGEdge> backward = new HashSet<>();
+        /**
+         * Add an edge to the set of edges (idx1 --> idx2) associated with the POG.
+         * When the edge is added a second time, it is automatically labeled reciprocated.
+         * @param idx1 first index
+         * @param idx2 second index
+         * @param directionForward set to true if the edge is to be flagged Forward-looking, set to false for Backward-looking
+         */
+        public POGEdge add(int idx1, int idx2, boolean directionForward) {
+            POGEdge e = add(idx1, idx2);
+            if (directionForward)
+                forward.add(e);
+            else
+                backward.add(e);
+            return e;
+        }
+
+        public boolean isForward(POGEdge e) {
+            return forward.contains(e);
+        }
+
+        public boolean isBackward(POGEdge e) {
+            return backward.contains(e);
+        }
+
     }
 }
 
