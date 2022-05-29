@@ -195,47 +195,78 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
      * @return matrix representation of graph
      */
     @Override
-    public boolean[][] toMatrix() {
-        boolean[][] m = new boolean[this.nNodes+(isTerminated()?2:0)][this.nNodes + (isTerminated()?2:0)];
+    public int[][] toMatrix() {
+        int[][] m = new int[this.nNodes+(isTerminated()?2:0)][this.nNodes + (isTerminated()?2:0)];
         if (isTerminated()) {
             for (int i = 0; i < startNodes.length(); i++) {
                 if (startNodes.get(i)) {
-                    try {
-                        POGraph.BidirEdge bidir = (POGraph.BidirEdge) getEdge(-1, i);
-                        if (bidir.isForward())
-                            m[0][i + 1] = true;
-                        if (bidir.isBackward())
-                            m[i + 1][0] = true;
-                    } catch (ClassCastException e1) {
+                    Edge e = getEdge(-1, i);
+                    if (e==null && isEdge(-1, i))
+                        m[0][i + 1] = 1;
+                    else {
                         try {
-                            POGraph.StatusEdge edge = (POGraph.StatusEdge) getEdge(-1, i);
-                            if (edge.getReciprocated())
-                                m[i + 1][0] = true;
-                            else
-                                m[0][i + 1] = true;
-                        } catch (ClassCastException e2) {
-                            ;
+                            POGraph.BidirEdge bidir = (POGraph.BidirEdge) e;
+                            if (bidir.isForward())
+                                m[0][i + 1] = 1;
+                            if (bidir.isBackward())
+                                m[i + 1][0] = 1;
+                        } catch (ClassCastException e1) {
+                            try {
+                                POGraph.StatusEdge edge = (POGraph.StatusEdge) e;
+                                if (edge.getReciprocated())
+                                    m[i + 1][0] = 1;
+                                else
+                                    m[0][i + 1] = 1;
+                            } catch (ClassCastException e2) {
+                                try {
+                                    SeqEdge edge = (SeqEdge) e;
+                                    if (edge != null) {
+                                        if (edge != null)
+                                            m[0][i + 1] = edge.getSeqs().size();
+                                    }
+                                } catch (ClassCastException e3) {
+                                    ;
+                                }
+                            }
                         }
                     }
                 }
             }
             for (int i = 0; i < endNodes.length(); i++) {
                 if (endNodes.get(i)) {
-                    try {
-                        POGraph.BidirEdge bidir = (POGraph.BidirEdge) getEdge(i, nNodes);
-                        if (bidir.isForward())
-                            m[i + 1][nNodes + 1] = true;
-                        if (bidir.isBackward())
-                            m[nNodes + 1][i + 1] = true;
-                    } catch (ClassCastException e1) {
+                    Edge e = getEdge(i, nNodes);
+                    if (e==null && isEdge(i, nNodes))
+                        m[i + 1][nNodes + 1] = 1;
+                    else {
                         try {
-                            POGraph.StatusEdge edge = (POGraph.StatusEdge) getEdge(i, nNodes);
-                            if (edge.getReciprocated())
-                                m[nNodes + 1][i + 1] = true;
-                            else
-                                m[i + 1][nNodes + 1] = true;
-                        } catch (ClassCastException e2) {
-                            ;
+                            POGraph.BidirEdge bidir = (POGraph.BidirEdge) e;
+                            if (bidir != null) {
+                                if (bidir.isForward())
+                                    m[i + 1][nNodes + 1] = 1;
+                                if (bidir.isBackward())
+                                    m[nNodes + 1][i + 1] = 1;
+                            }
+                        } catch (ClassCastException e1) {
+                            try {
+                                POGraph.StatusEdge edge = (POGraph.StatusEdge) e;
+                                if (edge != null) {
+                                    if (edge.getReciprocated())
+                                        m[nNodes + 1][i + 1] = 1;
+                                    else
+                                        m[i + 1][nNodes + 1] = 1;
+                                }
+                            } catch (ClassCastException e2) {
+                                try {
+                                    SeqEdge edge = (SeqEdge) e;
+                                    if (edge != null) {
+                                        if (edge != null)
+                                            m[i + 1][nNodes + 1] = edge.getSeqs().size();
+                                    }
+                                } catch (ClassCastException e3) {
+                                    ;
+                                }
+
+                            }
                         }
                     }
                 }
@@ -244,21 +275,38 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
                 if (isNode(from)) {
                     for (int to = isDirected() ? 0 : from; to < edgesForward[from].length(); to ++) {
                         if (edgesForward[from].get(to)) {
-                            try {
-                                POGraph.BidirEdge bidir = (POGraph.BidirEdge) getEdge(from, to);
-                                if (bidir.isForward())
-                                    m[from + 1][to + 1] = true;
-                                if (bidir.isBackward())
-                                    m[to + 1][from + 1] = true;
-                            } catch (ClassCastException e1) {
+                            Edge e = getEdge(from, to);
+                            if (e==null && isEdge(from, to))
+                                m[from + 1][to + 1] = 1;
+                            else {
                                 try {
-                                    POGraph.StatusEdge edge = (POGraph.StatusEdge) getEdge(from, to);
-                                    if (edge.getReciprocated())
-                                        m[to + 1][from +1] = true;
-                                    else
-                                        m[from + 1][to + 1] = true;
-                                } catch (ClassCastException e2) {
-                                    ;
+                                    POGraph.BidirEdge bidir = (POGraph.BidirEdge) e;
+                                    if (bidir != null) {
+                                        if (bidir.isForward())
+                                            m[from + 1][to + 1] = 1;
+                                        if (bidir.isBackward())
+                                            m[to + 1][from + 1] = 1;
+                                    }
+                                } catch (ClassCastException e1) {
+                                    try {
+                                        POGraph.StatusEdge edge = (POGraph.StatusEdge) e;
+                                        if (edge != null) {
+                                            if (edge.getReciprocated())
+                                                m[to + 1][from + 1] = 1;
+                                            else
+                                                m[from + 1][to + 1] = 1;
+                                        }
+                                    } catch (ClassCastException e2) {
+                                        try {
+                                            SeqEdge edge = (SeqEdge) e;
+                                            if (edge != null) {
+                                                if (edge != null)
+                                                    m[from + 1][to + 1] = edge.getSeqs().size();
+                                            }
+                                        } catch (ClassCastException e3) {
+                                            ;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -270,21 +318,38 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
                 if (isNode(from)) {
                     for (int to = isDirected() ? 0 : from; to < edgesForward[from].length(); to ++) {
                         if (edgesForward[from].get(to)) {
-                            try {
-                                POGraph.BidirEdge bidir = (POGraph.BidirEdge) getEdge(from, to);
-                                if (bidir.isForward())
-                                    m[from + 1][to + 1] = true;
-                                if (bidir.isBackward())
-                                    m[to + 1][from + 1] = true;
-                            } catch (ClassCastException e1) {
+                            Edge e = getEdge(from, to);
+                            if (e==null && isEdge(from, to))
+                                m[from + 1][to + 1] = 1;
+                            else {
                                 try {
-                                    POGraph.StatusEdge edge = (POGraph.StatusEdge) getEdge(from, to);
-                                    if (edge.getReciprocated())
-                                        m[to + 1][from +1] = true;
-                                    else
-                                        m[from + 1][to + 1] = true;
-                                } catch (ClassCastException e2) {
-                                    ;
+                                    POGraph.BidirEdge bidir = (POGraph.BidirEdge) e;
+                                    if (bidir != null) {
+                                        if (bidir.isForward())
+                                            m[from + 1][to + 1] = 1;
+                                        if (bidir.isBackward())
+                                            m[to + 1][from + 1] = 1;
+                                    }
+                                } catch (ClassCastException e1) {
+                                    try {
+                                        POGraph.StatusEdge edge = (POGraph.StatusEdge) e;
+                                        if (edge != null) {
+                                            if (edge.getReciprocated())
+                                                m[to + 1][from + 1] = 1;
+                                            else
+                                                m[from + 1][to + 1] = 1;
+                                        }
+                                    } catch (ClassCastException e2) {
+                                        try {
+                                            SeqEdge edge = (SeqEdge) e;
+                                            if (edge != null) {
+                                                if (edge != null)
+                                                    m[from + 1][to + 1] = edge.getSeqs().size();
+                                            }
+                                        } catch (ClassCastException e3) {
+                                            ;
+                                        }
+                                    }
                                 }
                             }
                         }

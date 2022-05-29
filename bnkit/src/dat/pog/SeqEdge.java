@@ -57,4 +57,8 @@ public class SeqEdge extends Edge implements WeightedEdge {
         else return 1.0/(double)normalise_by;
     }
 
+    public Set<EnumSeq<Enumerable>> getSeqs() {
+        return seqs;
+    }
+
 }

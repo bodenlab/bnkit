@@ -7,10 +7,14 @@ import dat.Enumerable;
 import dat.file.*;
 import dat.phylo.Tree;
 import dat.pog.IdxGraph;
+import dat.pog.POAGraph;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -327,7 +331,13 @@ public class GRASP {
                         IdxGraph.saveToDOT(OUTPUT, ancestors);
                         break;
                     case 5: // MATLAB
-                        IdxGraph.saveToMatrix(OUTPUT, ancestors);
+                        Map<Object, IdxGraph> saveme = new HashMap<>();
+                        saveme.put("Extants", new POAGraph(aln));
+                        for (Object name : aln.getNames())
+                            saveme.put(name, pogtree.getExtant(name));
+                        for (int idx = 0; idx < ancestors.length; idx ++)
+                            saveme.put("N" + idx, ancestors[idx]);
+                        IdxGraph.saveToMatrix(OUTPUT, saveme);
                         break;
                     case 4: // TREE
                         if (MODE == Inference.JOINT)

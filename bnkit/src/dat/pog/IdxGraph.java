@@ -710,24 +710,24 @@ public class IdxGraph {
      * col means "to" index
      * @return
      */
-    public boolean[][] toMatrix() {
-        boolean[][] m = new boolean[this.nNodes+(isTerminated()?2:0)][this.nNodes + (isTerminated()?2:0)];
+    public int[][] toMatrix() {
+        int[][] m = new int[this.nNodes+(isTerminated()?2:0)][this.nNodes + (isTerminated()?2:0)];
         if (isTerminated()) {
             for (int i = 0; i < startNodes.length(); i++)
-                m[0][i + 1] = startNodes.get(i);
+                m[0][i + 1] = startNodes.get(i) ? 1 : 0;
             for (int i = 0; i < endNodes.length(); i++)
-                m[i + 1][nNodes + 1] = endNodes.get(i);
+                m[i + 1][nNodes + 1] = endNodes.get(i) ? 1 : 0;
             for (int from = 0; from < edgesForward.length; from++) {
                 if (isNode(from)) {
                     for (int to = isDirected() ? 0 : from; to < edgesForward[from].length(); to++)
-                        m[from + 1][to + 1] = edgesForward[from].get(to);
+                        m[from + 1][to + 1] = edgesForward[from].get(to) ? 1 : 0;
                 }
             }
         } else { // not terminated
             for (int from = 0; from < edgesForward.length; from++) {
                 if (isNode(from)) {
                     for (int to = isDirected() ? 0 : from; to < edgesForward[from].length(); to++)
-                        m[from][to] = edgesForward[from].get(to);
+                        m[from][to] = edgesForward[from].get(to) ? 1 : 0;
                 }
             }
         }
@@ -736,10 +736,10 @@ public class IdxGraph {
 
     public String toMatrixString() {
         StringBuilder sb = new StringBuilder();
-        boolean[][] m = toMatrix();
+        int[][] m = toMatrix();
         for (int r = 0; r < m.length; r++) {
             for (int c = 0; c < m[r].length; c++)
-                sb.append(m[r][c] ? "1 " : "0 ");
+                sb.append(String.format("%4d ", m[r][c]));
             sb.append("\n");
         }
         return sb.toString();
@@ -821,7 +821,23 @@ public class IdxGraph {
         fwriter.close();
     }
 
-    public static void saveToMatrix(String directory, IdxGraph... graphs) throws IOException, ASRException {
+    public static void saveToMatrix(String directory, Map<Object, IdxGraph> graphs) throws IOException, ASRException {
+        StringBuilder sb = new StringBuilder();
+        FileWriter fwriter=new FileWriter(directory + "/ancestors.m");
+        int cnt = 0;
+        for (Map.Entry<Object, IdxGraph> entry : graphs.entrySet()) {
+            sb.append(entry.getKey() + " = [\n");
+            sb.append(entry.getValue().toMatrixString());
+            sb.append("];\n");
+            cnt += 1;
+        }
+        BufferedWriter writer=new BufferedWriter(fwriter);
+        writer.write(sb.toString());
+        writer.close();
+        fwriter.close();
+    }
+
+/*    public static void saveToMatrix(String directory, IdxGraph... graphs) throws IOException, ASRException {
         StringBuilder sb = new StringBuilder();
         FileWriter fwriter=new FileWriter(directory + "/ancestors.m");
         int cnt = 0;
@@ -836,5 +852,5 @@ public class IdxGraph {
         writer.write(sb.toString());
         writer.close();
         fwriter.close();
-    }
+    } */
 }
