@@ -154,7 +154,21 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
             buf.append("_end [label=\"E(" + getName() +")\",style=bold,fontcolor=red,fillcolor=gray,penwidth=0];\n");
             buf.append("{rank=source;_start;}\n{rank=sink;_end;}\n");
         }
+
         buf.append("edge [" + edgeDOT + "];\n");
+        // _start -> 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> _end [style=invis]
+        if (isIndexTopologicalOrder()) {
+            if (isTerminated() && isDirected())
+                buf.append("_start -> ");
+            for (int from = 0; from < edgesForward.length; from ++) {
+                if (isNode(from)  && isDirected())
+                    buf.append(from + (from < edgesForward.length - 1 ? " -> " : " "));
+            }
+            if (isTerminated())
+                buf.append("-> _end [style=invis]\n");
+            else
+                buf.append("[style=invis]\n");
+        }
         if (isTerminated() && isDirected()) {
             for (int i = 0; i < startNodes.length(); i++) {
                 if (startNodes.get(i)) {

@@ -15,9 +15,7 @@ import dat.phylo.TreeInstance;
 import dat.pog.*;
 import stats.Poisson;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
 import java.util.*;
 
 /**
@@ -75,11 +73,11 @@ public class TrAVIS {
                 "\toutput-file-or-dir is the filename or name of directory of results\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n");
         out.println("Notes: \n" +
-                "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman; \n" +
+                "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, \n\tLe-Gasquel and Whelan-Goldman; \n" +
                 "\tDNA models include Jukes-Cantor and Yang (general reversible process model).\n" +
                 "\tTree is set to have specified extants and gets distances from the Gamma distribution, with parameters:\n\t\tshape (aka a and K)\n\t\tscale (aka b, where Lambda=1/b)\n" +
-                "\tmean distance to root is used to scale distances in the tree (noting that greater number of extants indirectly amplifies the time scope of the tree).\n" +
-                "\tPosition-specific evolutionary rates from a Gamma distribution with specified parameter \"a\" and mean 1; if rate is unspecified, a uniform rate 1 is used.\n" +
+                "\tmean distance to root is used to scale distances in the tree (noting that greater number of extants \n\tindirectly amplifies the time scope of the tree).\n" +
+                "\tPosition-specific evolutionary rates from a Gamma distribution with specified parameter \"a\" and mean 1;\n\t if rate is unspecified, a uniform rate 1 is used.\n" +
                 "\t~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
         System.exit(error);
     }
@@ -156,7 +154,7 @@ public class TrAVIS {
                     }
                     if (!found_format)
                         usage(1, args[a + 1] + " is not a valid format name");
-                } else if (arg.equalsIgnoreCase("help")) {
+                } else if (arg.equalsIgnoreCase("help") && arg.equalsIgnoreCase("h")) {
                     usage();
                 }
             }
@@ -165,7 +163,25 @@ public class TrAVIS {
         Random rand = new Random(SEED);
 
         if (ANCSEQ == null) { // check standard input for sequence?
-
+            BufferedReader br = null;
+            try {
+                br = new BufferedReader(new InputStreamReader(System.in));
+                String input = br.readLine();
+                while (input != null) {
+                    ANCSEQ += input.trim();
+                    input = br.readLine();
+                }
+            } catch (IOException e) {
+                System.err.println("Error in standard input");
+            } finally {
+                if (br != null) {
+                    try {
+                        br.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
         }
 
         MODEL = SubstModel.createModel(MODELS[MODEL_IDX]);
@@ -186,6 +202,7 @@ public class TrAVIS {
             }
             if (ancseq == null)
                 usage(4, "Invalid ancestor sequence \"" + ANCSEQ + "\" for model " + MODELS[MODEL_IDX]);
+            ancseq.setName("N0");
         }
 
         if (FORMATS[FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
@@ -201,8 +218,7 @@ public class TrAVIS {
                 usage(2, "Tree file could not be saved");
             }
         }
-
-        if (ancseq != null) { // we've got an ancestor to track down the tree
+        if (ancseq != null && OUTPUT != null) { // we've got an ancestor to track down the tree
             TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED, RATESGAMMA==null?-1:RATESGAMMA);
             EnumSeq[] seqs = tracker.getSequences();
             switch (FORMAT_IDX) {
@@ -259,6 +275,7 @@ public class TrAVIS {
                         aw.save(aseqs);
                         aw.close();
                         poaGraph.saveToDOT(OUTPUT+"/travis.dot");
+                        poaGraph.saveToMatrix(OUTPUT+"/travis.m");
                         tree.save(OUTPUT+"/travis.nwk", "nwk");
                         if (RATESGAMMA != null) {
                             double[] rates = tracker.getRates();

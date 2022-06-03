@@ -71,6 +71,22 @@ public class IdxGraph {
         return cnt;
     }
 
+    /**
+     * Check if the index 0, 1, 2, ..., N is also a valid topological order
+     * @return true if index is a valid topological ordering, false if it isn't
+     */
+    public boolean isIndexTopologicalOrder() {
+        for (int i = 0; i < edgesForward.length; i ++) {
+            BitSet next = edgesForward[i];
+            if (next != null) {
+                for (int j = next.nextSetBit(0); j >= 0; j = next.nextSetBit(j + 1))
+                    if (j < i)
+                        return false;
+            }
+        }
+        return true;
+    }
+
     public synchronized int getFreeIndex() {
         for (int i = 0; i < this.nNodes; i ++)
             if (this.allnodes[i] == false)

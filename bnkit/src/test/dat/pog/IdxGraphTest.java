@@ -146,6 +146,49 @@ class IdxGraphTest {
 
     }
 
+    @Test
+    void isIndexTopologicalOrder() {
+        IdxGraph g0 = new IdxGraph(11, false, true);
+        for (int i = 0; i < 11; i ++)
+            g0.addNode(i, new Node());
+        g0.addEdge(-1, 0);
+        g0.addEdge(0, 1);
+        g0.addEdge(0, 2);
+        g0.addEdge(-1, 6);
+        g0.addEdge(1, 3);
+        g0.addEdge(3, 4);
+        g0.addEdge(2, 5);
+        g0.addEdge(4, 5);
+        g0.addEdge(5, 6);
+        g0.addEdge(6, 7);
+        g0.addEdge(7, 8);
+        g0.addEdge(8, 9);
+        g0.addEdge(6, 10);
+        g0.addTerminalEdge(9);
+        g0.addTerminalEdge(10);
+        assertTrue(g0.isIndexTopologicalOrder());
+        g0 = new IdxGraph(11, false, true);
+        for (int i = 10; i >= 0; i --)
+            g0.addNode(i, new Node());
+        g0.addEdge(-1, 0);
+        g0.addEdge(-1, 6);
+        g0.addEdge(4, 5);
+        g0.addEdge(5, 7);
+        g0.addEdge(7, 8);
+        g0.addEdge(8, 9);
+        g0.addEdge(6, 10);
+        g0.addTerminalEdge(9);
+        assertTrue(g0.isIndexTopologicalOrder());
+        g0.addTerminalEdge(10);
+        g0.addEdge(0, 1);
+        g0.addEdge(0, 2);
+        g0.addEdge(1, 3);
+        g0.addEdge(3, 4);
+        g0.addEdge(2, 5);
+        g0.addEdge(7, 6);
+        assertFalse(g0.isIndexTopologicalOrder());
+    }
+
     private class MyNode extends Node {
         final String label;
         public MyNode(String label) {
