@@ -59,7 +59,7 @@ public class GRASP {
                 "\t{-savetree <tree-directory>}\n" +
                 "\t{-nibble}\n" +
 //                "\t{-forcelinear}\n" +
-                "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT|TREE|MATLAB>}\n" +
+                "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT|TREE|MATLAB|LATEX>}\n" +
                 "\t{-time}{-verbose}{-help}");
         out.println("where \n" +
                 "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
@@ -101,10 +101,10 @@ public class GRASP {
         String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
         boolean GAPPY = false;
-        String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "MATLAB"};
+        String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "MATLAB", "LATEX"};
         int FORMAT_IDX = 0;
         // To compute consensus path is determined by output format
-        boolean[] CONSENSUS = new boolean[] {true, false, true, false, false, false};
+        boolean[] CONSENSUS = new boolean[] {true, false, true, false, false, false, false};
 
         Inference MODE = Inference.JOINT;
         Integer MARG_NODE = null;
@@ -328,7 +328,20 @@ public class GRASP {
                         aw.close();
                         break;
                     case 3: // DOT
-                        IdxGraph.saveToDOT(OUTPUT, ancestors);
+                        Map<Object, IdxGraph> saveme1 = new HashMap<>();
+                        IdxGraph g = new POAGraph(aln);
+                        g.setName("Exts");
+                        saveme1.put("*", g);
+                        for (Object name : aln.getNames()) {
+                            g = pogtree.getExtant(name);
+                            g.setName(name.toString());
+                            saveme1.put(name, g);
+                        }
+                        for (int idx = 0; idx < ancestors.length; idx ++) {
+                            ancestors[idx].setName("N" + idx);
+                            saveme1.put("N" + idx, ancestors[idx]);
+                        }
+                        IdxGraph.saveToDOT(OUTPUT, saveme1);
                         break;
                     case 5: // MATLAB
                         Map<Object, IdxGraph> saveme = new HashMap<>();
@@ -338,6 +351,15 @@ public class GRASP {
                         for (int idx = 0; idx < ancestors.length; idx ++)
                             saveme.put("N" + idx, ancestors[idx]);
                         IdxGraph.saveToMatrix(OUTPUT, saveme);
+                        break;
+                    case 6: // LATEX
+                        Map<Object, IdxGraph> saveme2 = new HashMap<>();
+                        saveme2.put("*", new POAGraph(aln));
+                        for (Object name : aln.getNames())
+                            saveme2.put(name, pogtree.getExtant(name));
+                        for (int idx = 0; idx < ancestors.length; idx ++)
+                            saveme2.put("N" + idx, ancestors[idx]);
+                        IdxGraph.saveToLaTeX(OUTPUT, saveme2);
                         break;
                     case 4: // TREE
                         if (MODE == Inference.JOINT)

@@ -761,6 +761,39 @@ public class IdxGraph {
         return sb.toString();
     }
 
+    /*
+    ${\tt\left(\begin{array}{ccccccccc}
+      0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+      1 & 0 & 1 & 1 & 1 & 0 & 0 & 0 & 0\\
+      0 & 1 & 0 & 0 & 1 & 0 & 0 & 0 & 0\\
+      0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+      0 & 1 & 1 & 1 & 0 & 1 & 0 & 0 & 0\\
+      0 & 0 & 0 & 0 & 1 & 0 & 1 & 0 & 0\\
+      0 & 0 & 0 & 0 & 0 & 1 & 0 & 1 & 0\\
+      0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 1\\
+      0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0
+    \end{array}\right)}$
+     */
+    public String toLaTeXString(String label) {
+        StringBuilder sb = new StringBuilder();
+        int[][] m = toMatrix();
+        sb.append("$"+ label + "{\\tt\\left(\\begin{array}{");
+        if (m.length>0)
+            for (int c = 0; c < m[0].length; c++)
+                sb.append("c");
+        sb.append("}\n");
+        for (int r = 0; r < m.length; r++) {
+            for (int c = 0; c < m[r].length; c++) {
+                sb.append(String.format("%4d ", m[r][c]));
+                if (c < m[r].length - 1)
+                    sb.append("& ");
+            }
+            sb.append("\\\\ \n");
+        }
+        sb.append("\\end{array}\\right)}$\n");
+        return sb.toString();
+    }
+
     public static class DefaultGraph extends IdxGraph {
 
         /**
@@ -803,31 +836,110 @@ public class IdxGraph {
         fwriter.close();
     }
 
-    public static void saveToDOT(String directory, IdxGraph... graphs) throws IOException, ASRException {
+    public static void saveToDOT(String directory, IdxGraph... graphs)  throws IOException, ASRException {
+        Map<Object, IdxGraph> saveme1 = new HashMap<>();
+        for (int idx = 0; idx < graphs.length; idx ++)
+            saveme1.put("N" + idx, graphs[idx]);
+    }
+
+    public static void saveToDOT(String directory, Map<Object, IdxGraph> graphs) throws IOException, ASRException {
         StringBuilder sb = new StringBuilder();
-        FileWriter freadme=new FileWriter(directory + "/README.txt");
+        FileWriter freadme=new FileWriter(directory + "/README_DOT.txt");
         BufferedWriter readme=new BufferedWriter(freadme);
         int cnt = 0;
-        for (IdxGraph g : graphs) {
-            String name = directory + "/" + Integer.toString(cnt) + ".dot";
-            sb.append(name + " ");
-            FileWriter fwriter=new FileWriter(name);
+        String[] names = new String[graphs.size()];
+        for (Map.Entry<Object, IdxGraph> entry : graphs.entrySet())
+            names[cnt ++] = entry.getKey().toString();
+        Arrays.sort(names);
+        for (String name : names) {
+            String filename = directory + "/" + toFilename(name) + ".dot";
+            sb.append(filename + " ");
+            FileWriter fwriter=new FileWriter(filename);
             BufferedWriter writer=new BufferedWriter(fwriter);
+            IdxGraph g = graphs.get(name);
             writer.write(g.toDOT());
             writer.newLine();
             writer.close();
             fwriter.close();
-            cnt += 1;
         }
         readme.write("Install graphviz\nRun command:\n");
-        if (cnt > 1)
-            readme.write("gvpack -u " + sb.toString() + "| dot -Tpdf -opogs.pdf");
-        else
+        if (cnt > 1) {
+            readme.write("gvpack -u " + sb.toString() + "| dot -Tpdf -o" + directory + "/pogs.pdf");
+            readme.newLine();
+            readme.write("-- OR --");
+            readme.newLine();
+            for (String name : names) {
+
+                readme.write("dot -Tpdf " + directory + "/" + toFilename(name) + ".dot -o" + directory + "/" + toFilename(name) + "_pog.pdf");
+                readme.newLine();
+            }
+        } else
             readme.write("dot -Tpdf " + sb.toString() + "-opog.pdf");
         readme.newLine();
         readme.close();
         freadme.close();
     }
+
+    public static final Character[] INVALID_FILENAME_CHARS = {'"', '*', ':', '<', '>', '?', '\\', '|', 0x7F};
+    public static final String[] REPLACE_FILENAME_CHARS = {"_dquote_", "_exts_", "_colon_", "_lt_", "_gt_", "_question_", "_backslash_", "_pipe_", "_"};
+    public static String toFilename(String proposed) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < proposed.length(); i ++) {
+            char c = proposed.charAt(i);
+            boolean valid = true;
+            for (int j = 0; j < INVALID_FILENAME_CHARS.length; j ++) {
+                if (c == INVALID_FILENAME_CHARS[j]) {
+                    sb.append(REPLACE_FILENAME_CHARS[j]);
+                    valid = false;
+                    break;
+                }
+            }
+            if (valid)
+                sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    public static void saveToLaTeX(String directory, Map<Object, IdxGraph> graphs) throws IOException, ASRException {
+        StringBuilder sb = new StringBuilder();
+        FileWriter freadme=new FileWriter(directory + "/README_LaTeX.txt");
+        BufferedWriter readme=new BufferedWriter(freadme);
+        int cnt = 0;
+        String[] names = new String[graphs.size()];
+        for (Map.Entry<Object, IdxGraph> entry : graphs.entrySet())
+            names[cnt ++] = entry.getKey().toString();
+        Arrays.sort(names);
+        for (String name : names) {
+            String filename = directory + "/" + toFilename(name) + ".tex";
+            sb.append(filename + " ");
+            FileWriter fwriter=new FileWriter(filename);
+            BufferedWriter writer=new BufferedWriter(fwriter);
+            IdxGraph g = graphs.get(name);
+            writer.write(g.toLaTeXString("E^{" + name + "} = "));
+            writer.newLine();
+            writer.close();
+            fwriter.close();
+        }
+        readme.write("Install pdflatex\nRun command:\n");
+        if (cnt > 1) {
+            readme.write("pdflatex -output-directory=" + directory + " -jobname=matrices" + " '\\documentclass[varwidth]{standalone}\\pagestyle{empty}\\begin{document}");
+            for (String name : names)
+                readme.write("\\input{" + directory + "/" + toFilename(name) + "}\\vspace{0.5in}");
+            readme.write("\\end{document}'");
+            readme.newLine();
+            readme.write("-- OR --");
+            readme.newLine();
+            for (String name : names) {
+                readme.write("pdflatex -output-directory=" + directory + " -jobname=" + toFilename(name) + "_mat '\\documentclass[varwidth]{standalone}\\pagestyle{empty}\\begin{document}\\input{" + directory + "/" + toFilename(name) + "}\\end{document}'");
+                readme.newLine();
+            }
+        } else
+            readme.write("pdflatex  -output-directory=" + directory + " -jobname=" + toFilename(names[0]) + "_mat '\\documentclass[varwidth]{standalone}\\pagestyle{empty}\\begin{document}\\input{" + directory + "/" + toFilename(names[0]) + "}\\end{document}'");
+        readme.newLine();
+        readme.close();
+        freadme.close();
+    }
+
 
     public void saveToMatrix(String filename) throws IOException {
         FileWriter fwriter=new FileWriter(filename);
