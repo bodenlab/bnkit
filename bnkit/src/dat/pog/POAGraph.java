@@ -23,8 +23,10 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
                 for (int j = 0; j < aln.getHeight(); j ++) {
                     EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(j);
                     Object sym = gseq.get(i);
-                    if (sym != null) // when a character is present, count it
+                    if (sym != null) { // when a character is present, count it
                         node.add(sym);
+                        node.setXLabel(i + 1);
+                    }
                 }
             }
         }

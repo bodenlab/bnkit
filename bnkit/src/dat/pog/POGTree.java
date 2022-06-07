@@ -59,13 +59,17 @@ public class POGTree {
                     continue;
                 else if (to == -1) {
                     to = i;
-                    pog.addNode(to, new SymNode(syms[i]));
+                    Node n = new SymNode(syms[i]);
+                    n.setXLabel(i + 1);
+                    pog.addNode(to, n);
                     pog.addEdge(from, to);
                     ivals.put(new Interval1D(from, to), bpidx);
                 } else {
                     from = to;
                     to = i;
-                    pog.addNode(to, new SymNode(syms[i]));
+                    Node n = new SymNode(syms[i]);
+                    n.setXLabel(i + 1);
+                    pog.addNode(to, n);
                     pog.addEdge(from, to);
                     ivals.put(new Interval1D(from, to), bpidx);
                 }

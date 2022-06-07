@@ -70,8 +70,10 @@ public class EnumNode extends Node {
     public static Node[] toArray(EnumDistrib[] distribs) {
         EnumNode[] arr = new EnumNode[distribs.length];
         for (int i = 0; i < arr.length; i ++) {
-            if (distribs[i] != null)
+            if (distribs[i] != null) {
                 arr[i] = new EnumNode(distribs[i]);
+                arr[i].xlabel = i + 1;
+            }
         }
         return arr;
     }

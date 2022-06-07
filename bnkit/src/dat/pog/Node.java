@@ -20,10 +20,15 @@ public class Node {
         return  ((getFillcolor() == null) ? "" : ("fillcolor=\"" + getFillcolor() + "\",")) +
                 ((shape == null) ? "" : ("shape=" + shape + ",")) +
                 ((getLabel() == null) ? "" : ("label=\"" + getLabel() + "\",")) +
+                ((xlabel == null) ? "" : ("xlabel=\"" + xlabel + "\",")) +
                 ((fixedsize == null) ? "" : ("fixedsize=" + fixedsize + ",")) +
                 ((width == null) ? "" : ("width=" + width + ",")) +
                 ((fontname == null) ? "" : ("fontname=\"" + fontname + "\",")) +
                 ((getStyle() == null) ? "" : ("style=\"" + getStyle() + "\""));
+    }
+
+    public void setXLabel(Object xlabel) {
+        this.xlabel = xlabel;
     }
 
     public String getFillcolor() {
@@ -31,6 +36,7 @@ public class Node {
     };
     public static String shape = null; // box, circle, doublecircle
     public String label = null;
+    public Object xlabel = null;
     public String getLabel() {
         return label;
     };
