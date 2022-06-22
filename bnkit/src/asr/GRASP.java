@@ -25,12 +25,12 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "28-May-2022";
+    public static String VERSION = "13-June-2022";
 
     public static boolean VERBOSE = false;
     public static boolean TIME = false;
     public static boolean FORCELINEAR = false;
-    public static int NTHREADS = 1;
+    public static int     NTHREADS = 1;
     public static boolean NIBBLE = false;
     public static boolean INDEL_CONSERVATIVE = true;
 
@@ -67,7 +67,7 @@ public class GRASP {
                 "\toutput-dir will be populated by inferred ancestor or ancestors, tree, etc. as specified by format\n" +
                 "\trates-file is a tabulated file with relative, position-specific rates (e.g. as produced by IQ-TREE)\n" +
                 "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
-                "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format, not used with DISTRIB format)\n" +
+                "\t\"-gap\" means that the gap-character is included in the resulting output \n(default for CLUSTAL format, not used with DISTRIB format)\n" +
                 "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
                 "\tThe output file is written on the specified format\n" +
                 "\t-nibble removes positions in partial order graphs that cannot form a path from start to end\n" +
@@ -75,10 +75,10 @@ public class GRASP {
                 "\t-verbose prints out information about steps undertaken, and -time the time it took to finish");
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
-                "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, Le-Gasquel and Whelan-Goldman; \n" +
+                "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, \nLe-Gasquel and Whelan-Goldman; \n" +
                 "\tDNA models include Jukes-Cantor and Yang (general reversible process model).\n" +
                 "\tIndel approaches include Bi-directional Edge Parsimony (default), Bi-directional Edge ML, \n" +
-                "\tSimple Indel Code Parsimony, Simple Indel Code ML, Position-specific Parsimony and Position-specific ML.\n" +
+                "\tSimple Indel Code Parsimony, Simple Indel Code ML, Position-specific Parsimony and \nPosition-specific ML.\n" +
                 "\tAdd '*' to indel option for less conservative setting (if available)\n" +
                 "\t~ This is version " + VERSION + " ~");
         System.exit(error);
@@ -137,7 +137,6 @@ public class GRASP {
                     NIBBLE = true;
                 } else if (arg.equalsIgnoreCase("savetree")) {
                     SAVE_TREE = true;
-
                 } else if (arg.equalsIgnoreCase("marg") && args.length > a + 1) {
                     MODE = Inference.MARGINAL;
                     String ancid = args[++a];
@@ -266,30 +265,6 @@ public class GRASP {
                     for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
                         ancestors[ii ++] = entry.getValue();
                 }
-
-                // Below is being used to write out a file for each reconstruction that states for each edge between a
-                // set of partially ordered columns if these edges are present in each ancestral graph
-                /*
-                if (FORCELINEAR && (INDEL_IDX == 2) || (INDEL_IDX == 3)) {
-
-                    FileWriter writer = new FileWriter(new File(OUTPUT, "povals.txt"));
-
-                    IntervalST<Integer> povals = pogtree.getPOVals();
-
-                    for (POGraph ancgraph : ancestors) {
-                        System.out.println(ancgraph.toString());
-
-                        for (Interval1D poval : povals) {
-//                            System.out.println(poval.toString());
-//                            System.out.println(ancgraph.isPath(poval.min, poval.max));
-                            writer.write(poval.toString() + "\n");
-                            writer.write(String.valueOf(ancgraph.isPath(poval.min, poval.max)) + "\n");
-                        }
-                    }
-                    writer.close();
-                }
-                */
-
                 EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
                 if (CONSENSUS[FORMAT_IDX]) {
                     try {
@@ -308,7 +283,6 @@ public class GRASP {
                     // throw new ASRException("Directory " + directory + " already exists");
                 }
                 switch (FORMAT_IDX) {
-
                     case 0: // FASTA
                         FastaWriter fw = null;
                         if (MODE == Inference.MARGINAL) // just one sequence
@@ -407,7 +381,6 @@ public class GRASP {
                     System.out.println(String.format("Done in %d min, %d sec", TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME),
                             TimeUnit.MILLISECONDS.toSeconds(ELAPSED_TIME) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME))));
                 }
-
             } catch (ASRException e) {
                 usage(22, "Invalid input for ASR: " + e.getMessage());
             } catch (IOException e) {

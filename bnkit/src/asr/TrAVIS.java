@@ -133,6 +133,8 @@ public class TrAVIS {
                     GAPPY = true;
                 } else if (arg.equalsIgnoreCase("verbose")) {
                     VERBOSE = true;
+                } else if (arg.equalsIgnoreCase("help")) {
+                    usage();
                 } else if (arg.equalsIgnoreCase("model") && args.length > a + 1) {
                     boolean found_model = false;
                     for (int i = 0; i < MODELS.length; i++) {
