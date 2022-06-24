@@ -160,13 +160,19 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
         if (isIndexTopologicalOrder()) {
             if (isTerminated() && isDirected())
                 buf.append("_start -> ");
+            boolean cropped = false;
             for (int from = 0; from < edgesForward.length; from ++) {
-                if (isNode(from)  && isDirected())
+                if (isNode(from)  && isDirected()) {
                     buf.append(from + (from < edgesForward.length - 1 ? " -> " : " "));
+                    cropped = false;
+                } else
+                    cropped = true;
             }
-            if (isTerminated())
-                buf.append("-> _end [style=invis]\n");
-            else
+            if (isTerminated()) {
+                if (!cropped)
+                    buf.append("-> ");
+                buf.append("_end [style=invis]\n");
+            } else
                 buf.append("[style=invis]\n");
         }
         if (isTerminated() && isDirected()) {
