@@ -201,7 +201,7 @@ public abstract class SubstModel {
     }
 
     /**
-     * Helper method. Returns the corresponding entry from an user supplied
+     * Helper method. Returns the corresponding entry from a user supplied
      * probability matrix using the model alphabet.
      */
     public double getProb(Object X, Object Y, double[][] probMatrix) {

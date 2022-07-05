@@ -35,11 +35,13 @@ import dat.Enumerable;
 import java.util.*;
 
 /**
+ * This class makes a branch point in a phylogenetic tree into a node in a Bayesian network.
+ *
+ * It has been rewritten so that an instance does not make explicit reference to the substitution model as
+ * accesses for probs are dependent on time, and since BN nodes use distinct time distances, it is better to
+ * keep probs here (and leave the model separate).
  *
  * @author mikael
- *
- * TODO: create a "final" probs matrix, remove ref to subst model (as it is shared between nodes, and therefore not thread safe)
- * This will essentially make this class into a CPT
  */
 public class SubstNode implements BNode, TiedNode {
     
@@ -50,7 +52,8 @@ public class SubstNode implements BNode, TiedNode {
     private final double[][] probs;
     private final EnumDistrib prior; // one (enumerable) probability distribution that is used if this variable is NOT conditioned
 
-    private SubstModel model;
+    //private SubstModel model;
+    private String modelname = null;
     private final Enumerable alpha;
     private final Object[] values;
     private boolean gap;
@@ -73,7 +76,8 @@ public class SubstNode implements BNode, TiedNode {
         this.parent = parent;
         this.parentAsList = Collections.singletonList(parent);
         this.time = t;
-        this.model = model;
+        //this.model = model;
+        this.modelname = model.getName();
         this.alpha = model.getDomain();
         this.values = this.alpha.getValues();
         this.table = new EnumTable<>(parent);
@@ -92,7 +96,7 @@ public class SubstNode implements BNode, TiedNode {
      */
     public SubstNode(EnumVariable var, SubstModel model) {
         this.var = var;
-        this.model = model;
+        //this.model = model;
         this.alpha = model.getDomain();
         this.values = this.alpha.getValues();
         this.table = null;
@@ -132,8 +136,8 @@ public class SubstNode implements BNode, TiedNode {
     public double getProb(Object X, Object Y) {
         int index_X = alpha.getIndex(X);
         int index_Y = alpha.getIndex(Y);
-        //return probs[index_Y][index_X];
-        return this.table.getValue(index_X).get(index_Y);
+        return probs[index_Y][index_X];
+        //return this.table.getValue(index_X).get(index_Y);
     }
 
     /**
@@ -143,7 +147,6 @@ public class SubstNode implements BNode, TiedNode {
      */
     public double getProb(Object X) {
         int index_X = alpha.getIndex(X);
-        //return f[index_X];
         return this.prior.get(index_X);
     }
 
@@ -157,10 +160,10 @@ public class SubstNode implements BNode, TiedNode {
     public Double get(Object[] key, Object value) {
         if (key != null) {
             if (key.length == 1) {
-                return table.getValue(key).get(value);
-                //Object Y = key[0];
-                //Object X = value;
-                //return getProb(X, Y);
+                //return table.getValue(key).get(value);
+                Object Y = key[0];
+                Object X = value;
+                return getProb(X, Y);
             }
         }
         throw new RuntimeException("Invalid key: " + key);
@@ -196,7 +199,7 @@ public class SubstNode implements BNode, TiedNode {
      * @deprecated pog2020 -- remove all refs to model to make thread safe
      */
     public SubstModel getModel() {
-        return model;
+        return SubstModel.createModel(modelname);
     }
     
     @Override
@@ -204,17 +207,6 @@ public class SubstNode implements BNode, TiedNode {
         throw new UnsupportedOperationException("Not supported."); 
     }
 
-    /**
-     *
-     * deprecated pog2020 -- remove all refs to model to make thread safe
-     */
-    /*   @Override
-    public Distrib getDistrib(Object[] condition) {
-        //return model.getDistrib(condition[0], time);
-        probs.
-        return getget(key[0]);
-    }
-    */
     /**
      * Retrieve the distribution for this node that applies GIVEN the parents' instantiations.
      * Requires all parent nodes to be instantiated.
@@ -232,15 +224,6 @@ public class SubstNode implements BNode, TiedNode {
         }
     }
 
-    /*
-    @Override
-    public Distrib getDistrib() {
-        EnumDistrib d = new EnumDistrib(var.getDomain()); 
-        for (Object x : d.getDomain().getValues())
-            d.set(x, getProb(x));
-        return d;
-    }
-    */
     @Override
     public EnumDistrib getDistrib() {
         return prior;
@@ -283,7 +266,7 @@ public class SubstNode implements BNode, TiedNode {
     public String getStateAsText() {
         StringBuilder sbuf = new StringBuilder("\n");
         sbuf.append(time + "; (time)\n");
-        sbuf.append(model.getName() + "; (model)\n");
+        sbuf.append(modelname + "; (model)\n");
         return sbuf.toString();
     }
 
@@ -303,16 +286,9 @@ public class SubstNode implements BNode, TiedNode {
                     }
                     break;
                 case 3:
-                    String modelName = specline[0].trim();
-                    if (modelName.equalsIgnoreCase("JTT"))
-                        this.model = new JTT();
-                    else if (modelName.equalsIgnoreCase("WAG"))
-                        this.model = new WAG();
-                    else if (modelName.equalsIgnoreCase("LG"))
-                        this.model = new LG();
-                    else if (modelName.equalsIgnoreCase("Dayhoff"))
-                        this.model = new Dayhoff();
-                    else {
+                    modelname = specline[0].trim();
+                    SubstModel model = SubstModel.createModel(modelname);
+                    if (model == null) {
                         System.err.println("Model incorrect in state for SubstNode: " + this + " ==> " + specline[0]);
                         error = true;
                     }

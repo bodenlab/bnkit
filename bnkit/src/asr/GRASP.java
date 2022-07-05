@@ -22,16 +22,16 @@ import java.util.concurrent.TimeUnit;
  * Command line version of GRASP.
  * @author mikael
  * @author ariane
+ * @author gabe
  */
 public class GRASP {
 
-    public static String VERSION = "13-June-2022";
+    public static String VERSION = "4-July-2022";
 
-    public static boolean VERBOSE = false;
-    public static boolean TIME = false;
-    public static boolean FORCELINEAR = false;
+    public static boolean VERBOSE  = false;
+    public static boolean TIME     = false;
     public static int     NTHREADS = 1;
-    public static boolean NIBBLE = false;
+    public static boolean NIBBLE   = true;
     public static boolean INDEL_CONSERVATIVE = true;
 
     public enum Inference {
@@ -46,41 +46,70 @@ public class GRASP {
         PrintStream out = System.out;
         if (error != 0)
             out = System.err;
-        if (msg != null)
-            out.println(msg + " (Error " + error + ")");
         out.println("Usage: asr.GRASP \n" +
-                "\t[-aln <alignment-file> -nwk <tree-file> -out <output-dir>]\n" +
-                "\t{-rates <rates-file>}\n" +
-                "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
-                "\t{-thr <n-threads>}\n" +
-                "\t{-joint (default) | -marg <branchpoint-id>}\n" +
-                "\t{-indel <BEP(default)|BEML|SICP|SICML|PSP|PSML>}\n" +
-                "\t{-gap}\n" +
-                "\t{-savetree <tree-directory>}\n" +
-                "\t{-nibble}\n" +
-//                "\t{-forcelinear}\n" +
-                "\t{-format <FASTA(default)|CLUSTAL|DISTRIB|DOT|TREE|MATLAB|LATEX>}\n" +
-                "\t{-time}{-verbose}{-help}");
-        out.println("where \n" +
-                "\talignment-file is a multiple-sequence alignment on FASTA or CLUSTAL format\n" +
-                "\ttree-file is a phylogenetic tree on Newick format\n" +
-                "\toutput-dir will be populated by inferred ancestor or ancestors, tree, etc. as specified by format\n" +
-                "\trates-file is a tabulated file with relative, position-specific rates (e.g. as produced by IQ-TREE)\n" +
-                "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n" +
-                "\t\"-gap\" means that the gap-character is included in the resulting output \n(default for CLUSTAL format, not used with DISTRIB format)\n" +
-                "\t\"-savetree\" re-saves the tree on Newick format with generated ancestor labels\n" +
-                "\tThe output file is written on the specified format\n" +
-                "\t-nibble removes positions in partial order graphs that cannot form a path from start to end\n" +
-//                "\t-forcelinear forces a linear ordering between neighbouring columns\n" +
-                "\t-verbose prints out information about steps undertaken, and -time the time it took to finish");
+                "\t[-a | --aln <filename>]\n" +
+                "\t[-n | --nwk <filename>]\n" +
+                "\t{-o | --output-folder <foldername>} (default is current working folder)\n" +
+                "\t{-pre | --prefix <stub>}\n" +
+                "\t{-rf | --rates-file <filename>}\n" +
+                "\t{-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
+                "\t{-t | --threads <number>}\n" +
+                "\t{-j | --joint (default)}\n" +
+                "\t{-m | --marginal <branchpoint-id>}\n" +
+                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
+                "\t{--nogap}\n" +
+                "\t{--nonibble}\n" +
+                "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB POGS DOT TREES)\n" +
+                "\t{--time}{--verbose}{--help}");
+        out.println("Inference is a two-stage process:\n" +
+                "\t(1) A history of indel events is inferred by either maximum likelihood or maximum parsimony and \n\tmapped onto the tree to determine what positions contain actual sequence content\n" +
+                "\t(2) For each ancestral position, the most probable character is assigned to each phylogenetic branch \n\tpoint when performing a joint reconstruction. Alternatively, for each \n\tposition at a nominated branch point, the probability distribution over all possible \n\tcharacters is inferred when performing a marginal reconstruction.\n" +
+                "\tFinally, edges are drawn to represent all inferred combinations of indels to form an ancestor POG \n\twith nodes that can form a valid sequence with inferred content; a preferred path\n\tthrough the POG is then inferred, nominating a single, best supported sequence.");
+        out.println("Mode of character inference:\n" +
+                "\t-j (or --joint) activates joint reconstruction (default), \n\t-m (or --marginal) activates marginal reconstruction (requires a branch-point to be nominated)\n");
+        out.println("Required arguments:\n" +
+                "\t-a (or --aln) must specify the name of a multiple-sequence alignment file on FASTA or CLUSTAL format\n" +
+                "\t-a (or --nwk) must specify the name of a phylogenetic-tree file on Newick format\n");
+        out.println("Optional arguments:\n" +
+                "\t-o (or --output-folder) specifies the folder that will be used to save output files,\n\t\te.g. inferred ancestor or ancestors, tree, etc. as specified by format\n" +
+                "\t-sa (or --save-as) lists the files and formats to be generated (see below)\n\t--save-all nominates all\n" +
+                "\t-pre (or --prefix) specifies a stub that is added to result filenames (default is the prefix of the alignment file)\n" +
+                "\t-i (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
+                "\t-s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)\n" +
+                "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific rates\n\t\te.g. as produced by IQ-TREE\n" +
+                "\t--nogap means that the gap-character is excluded in the resulting output (when the format allows)\n" +
+                "\t--nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end\n" +
+                "\t--verbose prints out information about steps undertaken, and --time the time it took to finish\n" +
+                "\t-h (or --help) will print out this screen\n");
+        out.println("Files/formats: \n" +
+                "\tFASTA: sequences (most preferred path at each ancestor, gapped or not gapped)\n" +
+                "\tCLUSTAL: sequences (most preferred path at each ancestor, gapped)\n" +
+                "\tTREE: phylogenetic tree with ancestor nodes labelled\n" +
+                "\tDISTRIB: character distributions for each position (indexed by POG, only available for marginal reconstruction)\n" +
+                "\tPOGS: partial-order graphs of ancestors\n" +
+                "\tDOT: partial-order graphs of ancestors in DOT format\n" +
+                "\tTREES: position-specific trees with ancestor states labelled\n");
+        out.println("Indel-methods: \n" +
+                "\tBEP: bi-directional edge (maximum) parsimony\n" +
+                "\tBEML: bi-directional edge maximum likelihood (uses uniform evolutionary model akin to JC)\n" +
+                "\tSICP: simple indel-coding (maximum) parsimony (based on Simmons and Ochoterena)\n" +
+                "\tSICML: simple indel-coding maximum likelihood (uses uniform evolutionary model)\n" +
+                "\tPSP: position-specific (maximum) parsimony\n" +
+                "\tPSML: position-specific maximum likelihood (uses uniform evolutionary model)\n" +
+                "\tAdd '*' to method name for less conservative setting (if available)\n");
+        out.println("Substitution-models: \n" +
+                "\tJTT: Jones-Taylor-Thornton (protein; default)\n" +
+                "\tDayhoff: Dayhoff-Schwartz-Orcutt (protein)\n" +
+                "\tLG: Le-Gasquel (protein)\n" +
+                "\tWAG: Whelan-Goldman (protein)\n" +
+                "\tJC: Jukes-Cantor (DNA)\n" +
+                "\tYang: Yang's general reversible process model (DNA)\n");
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
-                "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, \nLe-Gasquel and Whelan-Goldman; \n" +
-                "\tDNA models include Jukes-Cantor and Yang (general reversible process model).\n" +
-                "\tIndel approaches include Bi-directional Edge Parsimony (default), Bi-directional Edge ML, \n" +
-                "\tSimple Indel Code Parsimony, Simple Indel Code ML, Position-specific Parsimony and \nPosition-specific ML.\n" +
-                "\tAdd '*' to indel option for less conservative setting (if available)\n" +
+                "\tRunning GRASP requires large memory and in most cases Java needs to be run with the option -Xmx20g, \n\twhere 20g specifies that 20GB of RAM should be available.\n" +
                 "\t~ This is version " + VERSION + " ~");
+        if (msg != null)
+            out.println("\n" + msg + " (Error " + error + ")");
         System.exit(error);
     }
 
@@ -89,6 +118,7 @@ public class GRASP {
         String ALIGNMENT = null;
         String NEWICK = null;
         String OUTPUT = null;
+        String PREFIX = null;
         String RATESFILE = null;
         double[] RATES = null;
 
@@ -100,44 +130,37 @@ public class GRASP {
         // Indel approaches:
         String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
-        boolean GAPPY = false;
-        String[] FORMATS = new String[] {"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "MATLAB", "LATEX"};
-        int FORMAT_IDX = 0;
-        // To compute consensus path is determined by output format
-        boolean[] CONSENSUS = new boolean[] {true, false, true, false, false, false, false};
-
+        boolean GAPPY = true;
+        // output formats
+        boolean SAVE_AS = false;
+        String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX"};
+        // select these, default for "joint reconstruction"
+        boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
+        // select to compute consensus path for these output formats
+        boolean[] CONSENSUS = new boolean[]  {true,    false,     true,      false,  false,  false, false,   false,    false  };
+        // default inference mode
         Inference MODE = Inference.JOINT;
+        // ancestor to reconstruct if inference mode is "marginal"
         Integer MARG_NODE = null;
-        boolean SAVE_TREE = false;
 
         long START_TIME, ELAPSED_TIME;
 
         for (int a = 0; a < args.length; a ++) {
             if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
-                if (arg.equalsIgnoreCase("aln") && args.length > a + 1) {
+                if ((arg.equalsIgnoreCase("-aln") || arg.equalsIgnoreCase("a")) && args.length > a + 1) {
                     ALIGNMENT = args[++ a];
-                } else if (arg.equalsIgnoreCase("nwk") && args.length > a + 1) {
+                } else if ((arg.equalsIgnoreCase("-nwk") || arg.equalsIgnoreCase("n")) && args.length > a + 1) {
                     NEWICK = args[++ a];
-                } else if (arg.equalsIgnoreCase("out") && args.length > a + 1) {
+                } else if ((arg.equalsIgnoreCase("-output-folder") || arg.equalsIgnoreCase("o")) && args.length > a + 1) {
                     OUTPUT = args[++a];
-                } else if (arg.equalsIgnoreCase("rates") && args.length > a + 1) {
+                } else if ((arg.equalsIgnoreCase("-prefix") || arg.equalsIgnoreCase("pre")) && args.length > a + 1) {
+                    PREFIX = args[++ a];
+                } else if ((arg.equalsIgnoreCase("-rates-file") || arg.equalsIgnoreCase("rf")) && args.length > a + 1) {
                     RATESFILE = args[++a];
-                } else if (arg.equalsIgnoreCase("joint")) {
+                } else if (arg.equalsIgnoreCase("-joint") || arg.equalsIgnoreCase("j")) {
                     MODE = Inference.JOINT;
-                } else if (arg.equalsIgnoreCase("gap")) {
-                    GAPPY = true;
-                } else if (arg.equalsIgnoreCase("verbose")) {
-                    VERBOSE = true;
-                } else if (arg.equalsIgnoreCase("time")) {
-                    TIME = true;
-                } else if (arg.equalsIgnoreCase("forcelinear")) {
-                    FORCELINEAR = true;
-                } else if (arg.equalsIgnoreCase("nibble")) {
-                    NIBBLE = true;
-                } else if (arg.equalsIgnoreCase("savetree")) {
-                    SAVE_TREE = true;
-                } else if (arg.equalsIgnoreCase("marg") && args.length > a + 1) {
+                } else if ((arg.equalsIgnoreCase("-marginal") || arg.equalsIgnoreCase("m")) && args.length > a + 1) {
                     MODE = Inference.MARGINAL;
                     String ancid = args[++a];
                     if (ancid.startsWith("N"))
@@ -145,9 +168,9 @@ public class GRASP {
                     try {
                         MARG_NODE = Integer.parseInt(ancid);
                     } catch (NumberFormatException e) {
-                        usage(2, args[a] + " is not a valid ancestor name (use <number>, or \"N<number>\", where <number> increments from 0 at root)");
+                        usage(2, args[a] + " is not a valid ancestor name (use <number>, or \"N<number>\", where <number> starts with 0 at root, depth-first). Tip: perform joint reconstruction first to check branch point numbering in tree.");
                     }
-                } else if (arg.equalsIgnoreCase("model") && args.length > a + 1) {
+                } else if ((arg.equalsIgnoreCase("-substitution-model") || arg.equalsIgnoreCase("s")) && args.length > a + 1) {
                     boolean found_model = false;
                     for (int i = 0; i < MODELS.length; i++) {
                         if (args[a + 1].equalsIgnoreCase(MODELS[i])) {
@@ -156,8 +179,8 @@ public class GRASP {
                         }
                     }
                     if (!found_model)
-                        usage(1, args[a + 1] + " is not a valid model name");
-                } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
+                        usage(1, args[a + 1] + " is not a valid model name for option --substitution-model");
+                } else if ((arg.equalsIgnoreCase("-indel-method") || arg.equalsIgnoreCase("i")) && args.length > a + 1) {
                     boolean found_indel = false;
                     for (int i = 0; i < INDELS.length; i++) {
                         if (args[a + 1].startsWith(INDELS[i])) {
@@ -168,37 +191,79 @@ public class GRASP {
                         }
                     }
                     if (!found_indel)
-                        usage(3, args[a + 1] + " is not a valid indel approach");
-                } else if (arg.equalsIgnoreCase("format") && args.length > a + 1) {
-                    boolean found_format = false;
-                    for (int i = 0; i < FORMATS.length; i++) {
-                        if (args[a + 1].equalsIgnoreCase(FORMATS[i])) {
-                            FORMAT_IDX = i;
-                            found_format = true;
+                        usage(3, args[a + 1] + " is not a valid indel approach for option --indel-method");
+                } else if ((arg.equalsIgnoreCase("-save-as") || arg.equalsIgnoreCase("sa")) && args.length > a + 1) {
+                    String format = "<none given>";
+                    for (int a1 = a + 1; a1 < args.length; a1 ++) {
+                        if (args[a1].startsWith("-"))
+                            break;
+                        format = args[a1];
+                        boolean found_format = false;
+                        for (int i = 0; i < FORMATS.length; i ++) {
+                            if (format.equalsIgnoreCase(FORMATS[i])) {
+                                SAVE_AS_IDX[i] = true;
+                                found_format = true;
+                                break;
+                            }
                         }
+                        if (!found_format)
+                            usage(1, args[a + 1] + " is not a valid format name for option --save-as");
                     }
-                    if (!found_format)
-                        usage(1, args[a + 1] + " is not a valid format name");
-                } else if (arg.equalsIgnoreCase("thr") && args.length > a + 1) {
+                    SAVE_AS = true;
+                } else if (arg.equalsIgnoreCase("-save-all")) {
+                    for (int i = 0; i < FORMATS.length - 2; i ++)
+                        SAVE_AS_IDX[i] = true;
+                    SAVE_AS = true;
+                } else if ((arg.equalsIgnoreCase("-threads") || arg.equalsIgnoreCase("t")) && args.length > a + 1) {
                     try {
                         NTHREADS = Integer.parseInt(args[++a]);
                     } catch (NumberFormatException e) {
-                        System.err.println("Failed to set n-threads: " + args[a] + " is not a valid integer");
+                        System.err.println("Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
                     }
-                } else if (arg.equalsIgnoreCase("help")) {
+                } else if (arg.equalsIgnoreCase("-nogap")) {
+                    GAPPY = false;
+                } else if (arg.equalsIgnoreCase("-verbose")) {
+                    VERBOSE = true;
+                } else if (arg.equalsIgnoreCase("-time")) {
+                    TIME = true;
+                } else if (arg.equalsIgnoreCase("-nonibble")) {
+                    NIBBLE = false;
+                } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
                     usage();
+                } else {
+                    usage(5, "Unknown option: \"" + args[a] + "\"");
                 }
             }
         }
 
-        MODEL = SubstModel.createModel(MODELS[MODEL_IDX]);
-        if (MODEL == null) {
-            usage(1, "Model " + MODELS[MODEL_IDX] + " could not be created");
+        if (ALIGNMENT == null)
+            usage(3, "Must specify alignment (Clustal or FASTA file)");
+        else if (NEWICK == null)
+            usage(4, "Must specify phylogenetic tree (Newick file)");
+        else if (OUTPUT == null)
+            OUTPUT = ".";
+
+        if (PREFIX == null) { // default prefix is the (prefix of) alignment filename
+            int idx = ALIGNMENT.indexOf(".");
+            if (idx == -1)
+                idx = ALIGNMENT.length();
+            PREFIX = ALIGNMENT.substring(0, idx);
         }
-
-        if (FORMATS[FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
-            GAPPY = true;
-
+        MODEL = SubstModel.createModel(MODELS[MODEL_IDX]);
+        if (MODEL == null)
+            usage(1, "Model " + MODELS[MODEL_IDX] + " could not be created");
+        if (!SAVE_AS && MODE == Inference.JOINT) { // set default files to save for joint
+            SAVE_AS_IDX[0] = SAVE_AS_IDX[3] = true;
+        } else if (!SAVE_AS && MODE == Inference.MARGINAL) { // set default files to save for marginal
+            SAVE_AS_IDX[1] = SAVE_AS_IDX[3] = true;
+        }
+        boolean NEED_CONSENSUS = false;
+        for (int i = 0; i < SAVE_AS_IDX.length; i ++) {
+            if (SAVE_AS_IDX[i] && CONSENSUS[i]) {
+                NEED_CONSENSUS = true;
+                break;
+            }
+        }
         if (RATESFILE != null) {
             try {
                 TSVFile ratesfile = new TSVFile(RATESFILE, true);
@@ -224,178 +289,209 @@ public class GRASP {
             }
         }
 
-        if (ALIGNMENT != null && NEWICK != null && OUTPUT != null) {
+        try {
+            EnumSeq.Alignment aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
+            Tree tree = Utils.loadTree(NEWICK);
+            Utils.checkData(aln, tree);
+            if (MODE == Inference.MARGINAL) {
+                if (tree.getIndex(MARG_NODE) < 0)
+                    usage(2, MARG_NODE + " is not a valid ancestor number");
+            } else if (MODE == Inference.JOINT) {
+            }
+            // if we are past the above, we can assume that the data are good to process
+            START_TIME = System.currentTimeMillis();
+            POGTree pogtree = new POGTree(aln, tree);
+            Prediction indelpred = null;
+            switch (INDEL_IDX) {
+                case 0:
+                    indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
+                    break;
+                case 1:
+                    indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree);
+                    break;
+                case 2:
+                    indelpred = Prediction.PredictBySICP(pogtree);
+                    break;
+                case 3:
+                    indelpred = Prediction.PredictBySICML(pogtree);
+                    break;
+                case 4:
+                    indelpred = Prediction.PredictByParsimony(pogtree);
+                    break;
+                case 5:
+                    indelpred = Prediction.PredictbyMaxLhood(pogtree);
+                    break;
+                default:
+                    break;
+            }
+            if (indelpred == null)
+                usage(3, INDELS[INDEL_IDX] + " is not implemented");
+            if (MODE == Inference.JOINT)
+                indelpred.getJoint(MODEL, RATES);
+            else if (MODE == Inference.MARGINAL)
+                indelpred.getMarginal(MARG_NODE, MODEL, RATES);
+            Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
+            POGraph[] ancestors = new POGraph[pogs.size()];
             try {
-                EnumSeq.Alignment aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
-                Tree tree = Utils.loadTree(NEWICK);
-                Utils.checkData(aln, tree);
-                if (MODE == Inference.MARGINAL) {
-                    if (tree.getIndex(MARG_NODE) < 0)
-                        usage(2, MARG_NODE + " is not a valid ancestor number");
-                } else if (MODE == Inference.JOINT) {
-                    if (FORMAT_IDX == 1)
-                        usage(2, FORMATS[FORMAT_IDX] + " is not a valid format for joint reconstruction");
+                for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                    if (MODE == Inference.MARGINAL) {
+                        ancestors[0] = entry.getValue();
+                        break;
+                    }
+                    ancestors[(Integer) entry.getKey()] = entry.getValue();
                 }
-                // if we are past the above, we can assume that the data are good to process
-                START_TIME = System.currentTimeMillis();
-                POGTree pogtree = new POGTree(aln, tree);
-                Prediction indelpred = null;
-                switch (INDEL_IDX) {
-                    case 0: indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree); break;
-                    case 1: indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree); break;
-                    case 2: indelpred = Prediction.PredictBySICP(pogtree); break;
-                    case 3: indelpred = Prediction.PredictBySICML(pogtree); break;
-                    case 4: indelpred = Prediction.PredictByParsimony(pogtree); break;
-                    case 5: indelpred = Prediction.PredictbyMaxLhood(pogtree); break;
-                    default: break;
-                }
-                if (indelpred == null)
-                    usage(3, INDELS[INDEL_IDX] + " is not implemented");
-                if (MODE == Inference.JOINT)
-                    indelpred.getJoint(MODEL, RATES);
-                else if (MODE == Inference.MARGINAL)
-                    indelpred.getMarginal(MARG_NODE, MODEL, RATES);
-                Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
-                POGraph[] ancestors = new POGraph[pogs.size()];
+            } catch (NumberFormatException exc) {
+                int ii = 0;
+                for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
+                    ancestors[ii++] = entry.getValue();
+            }
+            EnumSeq[] ancseqs_gappy = null;
+            EnumSeq[] ancseqs_nogap = null;
+            if (NEED_CONSENSUS) {
+                ancseqs_gappy = new EnumSeq[pogs.size()];
+                ancseqs_nogap = new EnumSeq[pogs.size()];
                 try {
-                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                       ancestors[(Integer)entry.getKey()] = entry.getValue();
+                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                        if (MODE == Inference.MARGINAL) {
+                            ancseqs_gappy[0] = indelpred.getSequence(entry.getKey(), MODE, true);
+                            ancseqs_nogap[0] = indelpred.getSequence(entry.getKey(), MODE, false);
+                            break;
+                        }
+                        ancseqs_gappy[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, true);
+                        ancseqs_nogap[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, false);
+                    }
                 } catch (NumberFormatException exc) {
                     int ii = 0;
-                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                        ancestors[ii ++] = entry.getValue();
-                }
-                EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
-                if (CONSENSUS[FORMAT_IDX]) {
-                    try {
-                        for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                            ancseqs[(Integer)entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, GAPPY);
-                    } catch (NumberFormatException exc) {
-                        int ii = 0;
-                        for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
-                            ancseqs[ii++] = indelpred.getSequence(entry.getKey(), MODE, GAPPY);
+                    for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                        ancseqs_gappy[ii++] = indelpred.getSequence(entry.getKey(), MODE, true);
+                        ancseqs_nogap[ii++] = indelpred.getSequence(entry.getKey(), MODE, false);
                     }
                 }
-                File file = new File(OUTPUT);
-                if (file.mkdirs()) { // true if the directory was created, false otherwise
-                } else {
-                    // System.err.println("Directory " + OUTPUT + " already exists");
-                    // throw new ASRException("Directory " + directory + " already exists");
-                }
-                switch (FORMAT_IDX) {
+            }
+            File file = new File(OUTPUT);
+            if (file.mkdirs()) { // true if the directory was created, false otherwise
+            } else {
+                // System.err.println("Directory " + OUTPUT + " already exists");
+                // throw new ASRException("Directory " + directory + " already exists");
+            }
+            for (int i = 0; i < SAVE_AS_IDX.length; i++) {
+                if (!SAVE_AS_IDX[i])
+                    continue;
+                switch (i) { // {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX"};
                     case 0: // FASTA
                         FastaWriter fw = null;
                         if (MODE == Inference.MARGINAL) // just one sequence
-                            fw = new FastaWriter(new File(OUTPUT, "N" + MARG_NODE + ".fasta"));
+                            fw = new FastaWriter(new File(OUTPUT, PREFIX + "_N" + MARG_NODE + ".fa"));
                         else
-                            fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
-                        fw.save(ancseqs);
+                            fw = new FastaWriter(new File(OUTPUT, PREFIX + "_ancestors.fa"));
+                        if (GAPPY)
+                            fw.save(ancseqs_gappy);
+                        else
+                            fw.save(ancseqs_nogap);
                         fw.close();
+                        break;
+                    case 1: // DISTRIB
+                        if (MODE == Inference.MARGINAL) { // must be true for this format
+                            EnumDistrib[] d = indelpred.getMarginal(MARG_NODE, MODEL, RATES);
+                            if (d != null) {
+                                Object[][] m = new Object[d.length + 1][];
+                                for (int j = 0; j < d.length; j++) {
+                                    if (d[j] != null) {
+                                        m[j + 1] = new Object[MODEL.getDomain().size() + 1];
+                                        m[j + 1][0] = j + 1;
+                                        if (m[0] == null) {
+                                            m[0] = new Object[MODEL.getDomain().size() + 1];
+                                            m[0][0] = "Index";
+                                        }
+                                        for (int jj = 0; jj < m[j + 1].length - 1; jj++) {
+                                            m[j + 1][jj + 1] = d[j].get(jj);
+                                            if (m[0][jj + 1] == null)
+                                                m[0][jj + 1] = MODEL.getDomain().get(jj);
+                                        }
+                                    }
+                                }
+                                for (int j = 0; j < d.length; j++) {
+                                    if (d[j] == null) {
+                                        m[j + 1] = new Object[m[0].length];
+                                        m[j + 1][0] = j + 1;
+                                        for (int jj = 0; jj < m[j + 1].length - 1; jj++)
+                                            m[j + 1][jj + 1] = null;
+                                    }
+                                }
+                                TSVFile.saveObjects(OUTPUT + "/" + PREFIX + "_N" + MARG_NODE + ".tsv", m);
+                            } else
+                                usage(8, "Invalid ancestor node label: " + MARG_NODE);
+                        }
                         break;
                     case 2: // CLUSTAL
                         AlnWriter aw = null;
                         if (MODE == Inference.MARGINAL) // just one sequence
-                            aw = new AlnWriter(new File(OUTPUT, "N" + MARG_NODE + ".aln"));
+                            aw = new AlnWriter(new File(OUTPUT, PREFIX + "_N" + MARG_NODE + ".aln"));
                         else
-                            aw = new AlnWriter(new File (OUTPUT, "GRASP_ancestors.aln"));
-                        aw.save(ancseqs);
+                            aw = new AlnWriter(new File(OUTPUT, PREFIX + "_ancestors.aln"));
+                        aw.save(ancseqs_gappy);
                         aw.close();
                         break;
-                    case 3: // DOT
-                        Map<Object, IdxGraph> saveme1 = new HashMap<>();
+                    case 3: // TREE
+                        Newick.save(tree, OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
+                        break;
+                    case 4: // POGS
+                        System.out.println("POGS saving not implemented; use DOT");
+                        break;
+                    case 5: // DOT
+                        Map<Object, IdxGraph> saveme2 = new HashMap<>();
                         IdxGraph g = new POAGraph(aln);
                         g.setName("Exts");
-                        saveme1.put("*", g);
+                        saveme2.put("*", g);
                         for (Object name : aln.getNames()) {
                             g = pogtree.getExtant(name);
                             g.setName(name.toString());
-                            saveme1.put(name, g);
+                            saveme2.put(name, g);
                         }
-                        for (int idx = 0; idx < ancestors.length; idx ++) {
+                        for (int idx = 0; idx < ancestors.length; idx++) {
                             ancestors[idx].setName("N" + idx);
-                            saveme1.put("N" + idx, ancestors[idx]);
-                        }
-                        IdxGraph.saveToDOT(OUTPUT, saveme1);
-                        break;
-                    case 5: // MATLAB
-                        Map<Object, IdxGraph> saveme = new HashMap<>();
-                        saveme.put("Extants", new POAGraph(aln));
-                        for (Object name : aln.getNames())
-                            saveme.put(name, pogtree.getExtant(name));
-                        for (int idx = 0; idx < ancestors.length; idx ++)
-                            saveme.put("N" + idx, ancestors[idx]);
-                        IdxGraph.saveToMatrix(OUTPUT, saveme);
-                        break;
-                    case 6: // LATEX
-                        Map<Object, IdxGraph> saveme2 = new HashMap<>();
-                        saveme2.put("*", new POAGraph(aln));
-                        for (Object name : aln.getNames())
-                            saveme2.put(name, pogtree.getExtant(name));
-                        for (int idx = 0; idx < ancestors.length; idx ++)
                             saveme2.put("N" + idx, ancestors[idx]);
-                        IdxGraph.saveToLaTeX(OUTPUT, saveme2);
+                        }
+                        IdxGraph.saveToDOT(OUTPUT, saveme2);
                         break;
-                    case 4: // TREE
+                    case 6: // TREES
                         if (MODE == Inference.JOINT)
                             indelpred.saveTreeInstances(OUTPUT);
                         else
                             usage(9, "Instantiations of position specific trees not available from marginal inference");
                         break;
-                    case 1: // DISTRIB
-                        EnumDistrib[] d = indelpred.getMarginal(MARG_NODE, MODEL, RATES);
-                        if (d != null) {
-                            Object[][] m = new Object[d.length + 1][];
-                            for (int j = 0; j < d.length; j++) {
-                                if (d[j] != null) {
-                                    m[j + 1] = new Object[MODEL.getDomain().size() + 1];
-                                    m[j + 1][0] = j + 1;
-                                    if (m[0] == null) {
-                                        m[0] = new Object[MODEL.getDomain().size() + 1];
-                                        m[0][0] = "Index";
-                                    }
-                                    for (int jj = 0; jj < m[j + 1].length - 1; jj++) {
-                                        m[j + 1][jj + 1] = d[j].get(jj);
-                                        if (m[0][jj + 1] == null)
-                                            m[0][jj + 1] = MODEL.getDomain().get(jj);
-                                    }
-                                }
-                            }
-                            for (int j = 0; j < d.length; j++) {
-                                if (d[j] == null) {
-                                    m[j + 1] = new Object[m[0].length];
-                                    m[j + 1][0] = j + 1;
-                                    for (int jj = 0; jj < m[j + 1].length - 1; jj++)
-                                        m[j + 1][jj + 1] = null;
-                                }
-                            }
-                            TSVFile.saveObjects(OUTPUT + "/N" + MARG_NODE + ".tsv", m);
-                        } else
-                            usage(8, "Invalid ancestor node label: " + MARG_NODE);
+                    case 7: // MATLAB
+                        Map<Object, IdxGraph> saveme = new HashMap<>();
+                        saveme.put("Extants", new POAGraph(aln));
+                        for (Object name : aln.getNames())
+                            saveme.put(name, pogtree.getExtant(name));
+                        for (int idx = 0; idx < ancestors.length; idx++)
+                            saveme.put("N" + idx, ancestors[idx]);
+                        IdxGraph.saveToMatrix(OUTPUT, saveme);
+                        break;
+                    case 8: // LATEX
+                        Map<Object, IdxGraph> saveme3 = new HashMap<>();
+                        saveme3.put("*", new POAGraph(aln));
+                        for (Object name : aln.getNames())
+                            saveme3.put(name, pogtree.getExtant(name));
+                        for (int idx = 0; idx < ancestors.length; idx++)
+                            saveme3.put("N" + idx, ancestors[idx]);
+                        IdxGraph.saveToLaTeX(OUTPUT, saveme3);
                         break;
                 }
-                if (SAVE_TREE)
-                    Newick.save(tree, OUTPUT + "/GRASP_ancestors.nwk", Newick.MODE_ANCESTOR);
-
                 ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
                 if (VERBOSE || TIME) {
                     System.out.println(String.format("Done in %d min, %d sec", TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME),
                             TimeUnit.MILLISECONDS.toSeconds(ELAPSED_TIME) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME))));
                 }
-            } catch (ASRException e) {
-                usage(22, "Invalid input for ASR: " + e.getMessage());
-            } catch (IOException e) {
-                usage(2, "Failed to read or write files: " + e.getMessage());
-/*            } catch (InterruptedException e) {
-                usage(6, "Process interrupted: " + e.getMessage());
- */
             }
-
-        } else if (OUTPUT == null && NEWICK != null && SAVE_TREE) {
-        } else if (ALIGNMENT == null)
-            usage(3, "Need to specify alignment (Clustal or FASTA file)");
-        else if (NEWICK == null)
-            usage(4, "Need to specify phylogenetic tree (Newick file)");
-        else if (OUTPUT == null)
-            usage(5, "Need to specify output file");
+        } catch (ASRException e) {
+            usage(22, "Invalid input for ASR: " + e.getMessage());
+        } catch (IOException e) {
+            usage(2, "Failed to read or write files: " + e.getMessage());
+/*            } catch (InterruptedException e) {
+            usage(6, "Process interrupted: " + e.getMessage());
+*/
+        }
     }
 }

@@ -64,6 +64,14 @@ public class Prediction {
         this.distribs = new EnumDistrib[phylotree.getSize()][];
     }
 
+    public static Prediction load(String filename) {
+        throw new RuntimeException("Not implemented");
+    }
+
+    public void save(String filename) {
+        throw new RuntimeException("Not implemented");
+    }
+
     /**
      * Retrieve number of positions in reconstruction, which defines the bounds of indices that can be accessed in any of the composite POGs.
      * @return number of positions in reconstruction
