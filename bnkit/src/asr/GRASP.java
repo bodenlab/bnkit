@@ -69,7 +69,7 @@ public class GRASP {
                 "\t-j (or --joint) activates joint reconstruction (default), \n\t-m (or --marginal) activates marginal reconstruction (requires a branch-point to be nominated)\n");
         out.println("Required arguments:\n" +
                 "\t-a (or --aln) must specify the name of a multiple-sequence alignment file on FASTA or CLUSTAL format\n" +
-                "\t-a (or --nwk) must specify the name of a phylogenetic-tree file on Newick format\n");
+                "\t-n (or --nwk) must specify the name of a phylogenetic-tree file on Newick format\n");
         out.println("Optional arguments:\n" +
                 "\t-o (or --output-folder) specifies the folder that will be used to save output files,\n\t\te.g. inferred ancestor or ancestors, tree, etc. as specified by format\n" +
                 "\t-sa (or --save-as) lists the files and formats to be generated (see below)\n\t--save-all nominates all\n" +
