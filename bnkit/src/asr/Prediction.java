@@ -64,7 +64,7 @@ public class Prediction {
         this.distribs = new EnumDistrib[phylotree.getSize()][];
     }
 
-    public static Prediction load(String filename) {
+    public static Prediction load(POGTree pogTree, String filename) {
         throw new RuntimeException("Not implemented");
     }
 

@@ -425,4 +425,9 @@ class POGraphTest {
 
     }
 
+    @Test
+    void toJSON() {
+        System.out.println(pog.toJSON());
+        System.out.println(ex1.toJSON());
+    }
 }

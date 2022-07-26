@@ -1,9 +1,14 @@
 package dat.pog;
 
+import asr.ASRException;
 import asr.ASRRuntimeException;
 import bn.prob.EnumDistrib;
+import json.JSONArray;
+import json.JSONObject;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 
@@ -71,6 +76,69 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      */
     public String toString() {
         return super.toString();
+    }
+
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        json.put("Name", getName().length() == 0 ? null : getName());
+        json.put("Size", this.nNodes);
+        json.put("Starts", this.getStarts());
+        json.put("Ends", this.getEnds());
+        JSONArray narr = new JSONArray();
+        JSONArray earr = new JSONArray();
+        List<JSONObject> nodelist = new ArrayList<>();
+        List<JSONObject> edgelist = new ArrayList<>();
+        for (int idx = 0; idx < nNodes; idx ++) {
+            if (nodes[idx] != null) {
+                JSONObject node = new JSONObject();
+                narr.put(idx);
+                int[] edges = getForward(idx);
+                earr.put(edges);
+                for (int i = 0; i < edges.length; i ++) {
+                    int to = edges[i];
+                    StatusEdge e = getEdge(idx, to);
+                    if (e != null) {
+                        JSONObject edge = new JSONObject();
+                        edge.put("From", idx);
+                        edge.put("To", to);
+                        edge.put("Recip", e.getReciprocated());
+                        edge.put("Weight", e.getWeight());
+                        edgelist.add(edge);
+                    }
+                }
+                String label = nodes[idx].getLabel();
+                if (label != null) {
+                    node.put("Index", idx);
+                    node.put("Label", label);
+                    nodelist.add(node);
+                }
+            }
+        }
+        json.put("Indices", narr);
+        json.put("Pairs", earr);
+        json.put("Nodes", nodelist);
+        json.put("Edges", edgelist);
+        return json;
+    }
+
+    public static void saveToJSON(String directory, Map<Object, POGraph> graphs) throws IOException, ASRException {
+        StringBuilder sb = new StringBuilder();
+        int cnt = 0;
+        String[] names = new String[graphs.size()];
+        for (Map.Entry<Object, POGraph> entry : graphs.entrySet())
+            names[cnt ++] = entry.getKey().toString();
+        Arrays.sort(names);
+        for (String name : names) {
+            String filename = directory + "/" + toFilename(name) + ".json";
+            sb.append(filename + " ");
+            FileWriter fwriter=new FileWriter(filename);
+            BufferedWriter writer=new BufferedWriter(fwriter);
+            POGraph g = graphs.get(name);
+            writer.write(g.toJSON().toString());
+            writer.newLine();
+            writer.close();
+            fwriter.close();
+        }
     }
 
     /**
@@ -776,4 +844,4 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         }
     }
 
-    }
+}

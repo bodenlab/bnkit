@@ -60,11 +60,11 @@ public class GRASP {
                 "\t{--nogap}\n" +
                 "\t{--nonibble}\n" +
                 "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB POGS DOT TREES)\n" +
-                "\t{--time}{--verbose}{--help}");
+                "\t{--time}{--verbose}{--help}\n");
         out.println("Inference is a two-stage process:\n" +
                 "\t(1) A history of indel events is inferred by either maximum likelihood or maximum parsimony and \n\tmapped onto the tree to determine what positions contain actual sequence content\n" +
                 "\t(2) For each ancestral position, the most probable character is assigned to each phylogenetic branch \n\tpoint when performing a joint reconstruction. Alternatively, for each \n\tposition at a nominated branch point, the probability distribution over all possible \n\tcharacters is inferred when performing a marginal reconstruction.\n" +
-                "\tFinally, edges are drawn to represent all inferred combinations of indels to form an ancestor POG \n\twith nodes that can form a valid sequence with inferred content; a preferred path\n\tthrough the POG is then inferred, nominating a single, best supported sequence.");
+                "\tFinally, edges are drawn to represent all inferred combinations of indels to form an ancestor POG \n\twith nodes that can form a valid sequence with inferred content; a preferred path\n\tthrough the POG is then inferred, nominating a single, best supported sequence.\n");
         out.println("Mode of character inference:\n" +
                 "\t-j (or --joint) activates joint reconstruction (default), \n\t-m (or --marginal) activates marginal reconstruction (requires a branch-point to be nominated)\n");
         out.println("Required arguments:\n" +
@@ -231,7 +231,7 @@ public class GRASP {
                 } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
                     usage();
                 } else {
-                    usage(5, "Unknown option: \"" + args[a] + "\"");
+                    usage(5, "Unknown option or missing required argument: \"" + args[a] + "\"");
                 }
             }
         }
@@ -436,7 +436,12 @@ public class GRASP {
                         Newick.save(tree, OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
                         break;
                     case 4: // POGS
-                        System.out.println("POGS saving not implemented; use DOT");
+                        Map<Object, POGraph> saveme1 = new HashMap<>();
+                        for (int idx = 0; idx < ancestors.length; idx++) {
+                            ancestors[idx].setName("N" + idx);
+                            saveme1.put("N" + idx, ancestors[idx]);
+                        }
+                        POGraph.saveToJSON(OUTPUT, saveme1);
                         break;
                     case 5: // DOT
                         Map<Object, IdxGraph> saveme2 = new HashMap<>();
