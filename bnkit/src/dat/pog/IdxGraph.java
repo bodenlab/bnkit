@@ -1,6 +1,8 @@
 package dat.pog;
 
 import asr.ASRException;
+import json.JSONArray;
+import json.JSONObject;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -826,6 +828,85 @@ public class IdxGraph {
             return super.addNode(node);
         }
 
+    }
+
+    /**
+     * Create a JSON representation of the instance
+     * @return JSON object of this instance
+     */
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        json.put("Name", getName().length() == 0 ? null : getName());
+        json.put("Size", this.nNodes);
+        if (this.isTerminated()) {
+            json.put("Starts", this.getStarts());
+            json.put("Ends", this.getEnds());
+        }
+        JSONArray narr = new JSONArray();
+        JSONArray earr = new JSONArray();
+        List<JSONObject> nodelist = new ArrayList<>();
+        List<JSONObject> edgelist = new ArrayList<>();
+        for (int idx = 0; idx < nNodes; idx ++) {
+            if (nodes[idx] != null) {
+                JSONObject node = new JSONObject();
+                narr.put(idx);
+                int[] edges = getNodeIndices(idx, true);
+                earr.put(edges);
+                String label = nodes[idx].getLabel();
+                if (label != null) {
+                    node.put("Index", idx);
+                    node.put("Label", label);
+                    nodelist.add(node);
+                }
+            }
+        }
+        json.put("Indices", narr);
+        json.put("Adjacent", earr);
+        json.put("Nodes", nodelist);
+        return json;
+    }
+
+    public static JSONObject toJSON(Collection<IdxGraph> graphs) {
+        JSONObject json = new JSONObject();
+        JSONArray narr = new JSONArray();
+        int cnt = 0;
+        for (IdxGraph g : graphs)
+            narr.put(g.toJSON());
+        json.put("Graphs", narr);
+        return json;
+    }
+
+    public static JSONObject toJSON(Map<String, IdxGraph> graphs) {
+        JSONObject json = new JSONObject();
+        JSONArray narr = new JSONArray();
+        int cnt = 0;
+        for (Map.Entry<String, IdxGraph> entry : graphs.entrySet())
+            json.put(entry.getKey(), entry.getValue().toJSON());
+        return json;
+    }
+
+    public static void saveToJSON(String directory, Collection<IdxGraph> graphs) throws IOException, ASRException {
+        StringBuilder sb = new StringBuilder();
+        int cnt = 0;
+        String filename = directory + "/" + "pogs.json";
+        FileWriter fwriter=new FileWriter(filename);
+        BufferedWriter writer=new BufferedWriter(fwriter);
+        writer.write(IdxGraph.toJSON(graphs).toString());
+        writer.newLine();
+        writer.close();
+        fwriter.close();
+    }
+
+    public static void saveToJSON(String directory, Map<String, IdxGraph> graphs) throws IOException, ASRException {
+        StringBuilder sb = new StringBuilder();
+        int cnt = 0;
+        String filename = directory + "/" + "pogs.json";
+        FileWriter fwriter=new FileWriter(filename);
+        BufferedWriter writer=new BufferedWriter(fwriter);
+        writer.write(IdxGraph.toJSON(graphs).toString());
+        writer.newLine();
+        writer.close();
+        fwriter.close();
     }
 
     public void saveToDOT(String filename) throws IOException {

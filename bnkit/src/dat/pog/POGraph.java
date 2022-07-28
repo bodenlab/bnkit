@@ -78,6 +78,10 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         return super.toString();
     }
 
+    /**
+     * Create a JSON representation of the instance
+     * @return JSON object of this instance
+     */
     public JSONObject toJSON() {
         JSONObject json = new JSONObject();
         json.put("Name", getName().length() == 0 ? null : getName());
@@ -115,30 +119,10 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             }
         }
         json.put("Indices", narr);
-        json.put("Pairs", earr);
+        json.put("Adjacent", earr);
         json.put("Nodes", nodelist);
         json.put("Edges", edgelist);
         return json;
-    }
-
-    public static void saveToJSON(String directory, Map<Object, POGraph> graphs) throws IOException, ASRException {
-        StringBuilder sb = new StringBuilder();
-        int cnt = 0;
-        String[] names = new String[graphs.size()];
-        for (Map.Entry<Object, POGraph> entry : graphs.entrySet())
-            names[cnt ++] = entry.getKey().toString();
-        Arrays.sort(names);
-        for (String name : names) {
-            String filename = directory + "/" + toFilename(name) + ".json";
-            sb.append(filename + " ");
-            FileWriter fwriter=new FileWriter(filename);
-            BufferedWriter writer=new BufferedWriter(fwriter);
-            POGraph g = graphs.get(name);
-            writer.write(g.toJSON().toString());
-            writer.newLine();
-            writer.close();
-            fwriter.close();
-        }
     }
 
     /**

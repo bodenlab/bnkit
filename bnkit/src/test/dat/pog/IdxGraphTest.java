@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.HashSet;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -187,6 +188,19 @@ class IdxGraphTest {
         g0.addEdge(2, 5);
         g0.addEdge(7, 6);
         assertFalse(g0.isIndexTopologicalOrder());
+    }
+
+    @Test
+    void toJSON() {
+        createGraphs();
+        System.out.println(g1.toJSON().toString());
+        System.out.println(g2.toJSON().toString());
+        System.out.println(g3.toJSON().toString());
+        HashSet<IdxGraph> gs = new HashSet<>();
+        gs.add(g1);
+        gs.add(g2);
+        gs.add(g3);
+        System.out.println(IdxGraph.toJSON(gs).toString());
     }
 
     private class MyNode extends Node {

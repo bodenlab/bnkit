@@ -10,6 +10,7 @@ import dat.pog.IdxGraph;
 import dat.pog.POAGraph;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
+import json.JSONObject;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -60,6 +61,7 @@ public class GRASP {
                 "\t{--nogap}\n" +
                 "\t{--nonibble}\n" +
                 "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB POGS DOT TREES)\n" +
+                "\t{--save-extants\n" +
                 "\t{--time}{--verbose}{--help}\n");
         out.println("Inference is a two-stage process:\n" +
                 "\t(1) A history of indel events is inferred by either maximum likelihood or maximum parsimony and \n\tmapped onto the tree to determine what positions contain actual sequence content\n" +
@@ -77,6 +79,7 @@ public class GRASP {
                 "\t-i (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
                 "\t-s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)\n" +
                 "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific rates\n\t\te.g. as produced by IQ-TREE\n" +
+                "\t--include-extants means that extants are included in output files (when the format allows)\n" +
                 "\t--nogap means that the gap-character is excluded in the resulting output (when the format allows)\n" +
                 "\t--nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end\n" +
                 "\t--verbose prints out information about steps undertaken, and --time the time it took to finish\n" +
@@ -133,6 +136,7 @@ public class GRASP {
         boolean GAPPY = true;
         // output formats
         boolean SAVE_AS = false;
+        boolean INCLUDE_EXTANTS = false;
         String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX"};
         // select these, default for "joint reconstruction"
         boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
@@ -214,6 +218,8 @@ public class GRASP {
                     for (int i = 0; i < FORMATS.length - 2; i ++)
                         SAVE_AS_IDX[i] = true;
                     SAVE_AS = true;
+                } else if (arg.equalsIgnoreCase("-include-extants")) {
+                    INCLUDE_EXTANTS = true;
                 } else if ((arg.equalsIgnoreCase("-threads") || arg.equalsIgnoreCase("t")) && args.length > a + 1) {
                     try {
                         NTHREADS = Integer.parseInt(args[++a]);
@@ -348,8 +354,9 @@ public class GRASP {
             EnumSeq[] ancseqs_gappy = null;
             EnumSeq[] ancseqs_nogap = null;
             if (NEED_CONSENSUS) {
-                ancseqs_gappy = new EnumSeq[pogs.size()];
-                ancseqs_nogap = new EnumSeq[pogs.size()];
+                ancseqs_gappy = new EnumSeq[pogs.size() + (INCLUDE_EXTANTS ? aln.getHeight() : 0)];
+                ancseqs_nogap = new EnumSeq[pogs.size() + (INCLUDE_EXTANTS ? aln.getHeight() : 0)];
+                int ii = 0;
                 try {
                     for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
                         if (MODE == Inference.MARGINAL) {
@@ -359,12 +366,20 @@ public class GRASP {
                         }
                         ancseqs_gappy[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, true);
                         ancseqs_nogap[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, false);
+                        ii ++;
                     }
                 } catch (NumberFormatException exc) {
-                    int ii = 0;
                     for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
-                        ancseqs_gappy[ii++] = indelpred.getSequence(entry.getKey(), MODE, true);
-                        ancseqs_nogap[ii++] = indelpred.getSequence(entry.getKey(), MODE, false);
+                        ancseqs_gappy[ii] = indelpred.getSequence(entry.getKey(), MODE, true);
+                        ancseqs_nogap[ii ++] = indelpred.getSequence(entry.getKey(), MODE, false);
+                    }
+                }
+                if (INCLUDE_EXTANTS) {
+                    for (int iii = 0; iii < aln.getHeight(); iii++) {
+                        ancseqs_gappy[ii] = aln.getEnumSeq(iii);
+                        ancseqs_nogap[ii] = new EnumSeq(aln.getEnumSeq(iii).getType());
+                        ancseqs_nogap[ii].set(aln.getEnumSeq(iii).getStripped());
+                        ancseqs_nogap[ii ++].setName(aln.getEnumSeq(iii).getName());
                     }
                 }
             }
@@ -436,22 +451,41 @@ public class GRASP {
                         Newick.save(tree, OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
                         break;
                     case 4: // POGS
-                        Map<Object, POGraph> saveme1 = new HashMap<>();
+                        Map<String, IdxGraph> saveme1e = new HashMap<>();
+                        Map<String, IdxGraph> saveme1a = new HashMap<>();
+                        JSONObject json = new JSONObject();
+                        if (INCLUDE_EXTANTS) {
+                            for (Object name : aln.getNames()) {
+                                IdxGraph g = pogtree.getExtant(name);
+                                g.setName(name.toString());
+                                saveme1e.put(name.toString(), g);
+                            }
+                            json.put("Extants", IdxGraph.toJSON(saveme1e));
+                        }
                         for (int idx = 0; idx < ancestors.length; idx++) {
                             ancestors[idx].setName("N" + idx);
-                            saveme1.put("N" + idx, ancestors[idx]);
+                            saveme1a.put(ancestors[idx].getName(), ancestors[idx]);
                         }
-                        POGraph.saveToJSON(OUTPUT, saveme1);
+                        json.put("Ancestors", IdxGraph.toJSON(saveme1a));
+                        String filename = OUTPUT + "/" + "pogs.json";
+                        FileWriter fwriter=new FileWriter(filename);
+                        BufferedWriter writer=new BufferedWriter(fwriter);
+                        writer.write(json.toString());
+                        writer.newLine();
+                        writer.close();
+                        fwriter.close();
                         break;
                     case 5: // DOT
                         Map<Object, IdxGraph> saveme2 = new HashMap<>();
-                        IdxGraph g = new POAGraph(aln);
-                        g.setName("Exts");
-                        saveme2.put("*", g);
-                        for (Object name : aln.getNames()) {
-                            g = pogtree.getExtant(name);
-                            g.setName(name.toString());
-                            saveme2.put(name, g);
+                        if (INCLUDE_EXTANTS) {
+                            IdxGraph g = new POAGraph(aln);
+                            g.setName("Exts");
+                            saveme2.put("*", g);
+                            for (Object name : aln.getNames()) {
+                                g = pogtree.getExtant(name);
+                                g.setName(name.toString());
+                                saveme2.put(name, g);
+                            }
                         }
                         for (int idx = 0; idx < ancestors.length; idx++) {
                             ancestors[idx].setName("N" + idx);
