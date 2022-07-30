@@ -830,6 +830,7 @@ public class IdxGraph {
 
     }
 
+
     /**
      * Create a JSON representation of the instance
      * @return JSON object of this instance
@@ -878,7 +879,6 @@ public class IdxGraph {
 
     public static JSONObject toJSON(Map<String, IdxGraph> graphs) {
         JSONObject json = new JSONObject();
-        JSONArray narr = new JSONArray();
         int cnt = 0;
         for (Map.Entry<String, IdxGraph> entry : graphs.entrySet())
             json.put(entry.getKey(), entry.getValue().toJSON());
@@ -886,8 +886,6 @@ public class IdxGraph {
     }
 
     public static void saveToJSON(String directory, Collection<IdxGraph> graphs) throws IOException, ASRException {
-        StringBuilder sb = new StringBuilder();
-        int cnt = 0;
         String filename = directory + "/" + "pogs.json";
         FileWriter fwriter=new FileWriter(filename);
         BufferedWriter writer=new BufferedWriter(fwriter);
@@ -899,7 +897,6 @@ public class IdxGraph {
 
     public static void saveToJSON(String directory, Map<String, IdxGraph> graphs) throws IOException, ASRException {
         StringBuilder sb = new StringBuilder();
-        int cnt = 0;
         String filename = directory + "/" + "pogs.json";
         FileWriter fwriter=new FileWriter(filename);
         BufferedWriter writer=new BufferedWriter(fwriter);

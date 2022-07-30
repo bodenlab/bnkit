@@ -27,13 +27,15 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "4-July-2022";
+    public static String VERSION = "30-July-2022";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
     public static int     NTHREADS = 1;
     public static boolean NIBBLE   = true;
     public static boolean INDEL_CONSERVATIVE = true;
+    // Mode for BEP
+    public static boolean RECODE_NULL = true;
 
     public enum Inference {
         JOINT,
@@ -60,8 +62,10 @@ public class GRASP {
                 "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
                 "\t{--nogap}\n" +
                 "\t{--nonibble}\n" +
+                "\t{--exclude-noedge}\n" +
                 "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB POGS DOT TREES)\n" +
-                "\t{--save-extants\n" +
+                "\t{--save-all} (saves reconstruction with ALL formats)\n" +
+                "\t{--include-extants}\n" +
                 "\t{--time}{--verbose}{--help}\n");
         out.println("Inference is a two-stage process:\n" +
                 "\t(1) A history of indel events is inferred by either maximum likelihood or maximum parsimony and \n\tmapped onto the tree to determine what positions contain actual sequence content\n" +
@@ -82,6 +86,7 @@ public class GRASP {
                 "\t--include-extants means that extants are included in output files (when the format allows)\n" +
                 "\t--nogap means that the gap-character is excluded in the resulting output (when the format allows)\n" +
                 "\t--nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end\n" +
+                "\t--exclude-noedge removes non-existing edge as an option for parsimony in BEP\n" +
                 "\t--verbose prints out information about steps undertaken, and --time the time it took to finish\n" +
                 "\t-h (or --help) will print out this screen\n");
         out.println("Files/formats: \n" +
@@ -218,6 +223,8 @@ public class GRASP {
                     for (int i = 0; i < FORMATS.length - 2; i ++)
                         SAVE_AS_IDX[i] = true;
                     SAVE_AS = true;
+                } else if (arg.equalsIgnoreCase("-exclude-noedge")) {
+                    RECODE_NULL = false;
                 } else if (arg.equalsIgnoreCase("-include-extants")) {
                     INCLUDE_EXTANTS = true;
                 } else if ((arg.equalsIgnoreCase("-threads") || arg.equalsIgnoreCase("t")) && args.length > a + 1) {

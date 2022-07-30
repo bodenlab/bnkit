@@ -1357,6 +1357,7 @@ public class Prediction {
      * @return instance of IndelPrediction
      */
     public static Prediction PredictByBidirEdgeParsimony(POGTree pogTree) {
+        boolean recodeNull = GRASP.RECODE_NULL; // whether to use no-edge as an option
         int nPos = pogTree.getPositions(); //
         IdxTree tree = pogTree.getTree();
         Map<Object, POGraph> ancestors = new HashMap<>();
@@ -1379,7 +1380,7 @@ public class Prediction {
             if (possible.length < 1) { // nothing to infer, not used at all
                 pif[i + 1] = null;
             } else {
-                pif[i + 1] = new Parsimony(tif[i + 1].getTree(), true);
+                pif[i + 1] = new Parsimony(tif[i + 1].getTree(), recodeNull);
             }
         }
         for (int i = -1; i <= nPos; i++) {
@@ -1387,7 +1388,7 @@ public class Prediction {
             if (possible.length < 1) { // nothing to infer, not used at all
                 pib[i + 1] = null;
             } else {
-                pib[i + 1] = new Parsimony(tib[i + 1].getTree(), true); //
+                pib[i + 1] = new Parsimony(tib[i + 1].getTree(), recodeNull); //
             }
         }
         if (DEBUG) System.out.println("Created " + (pif.length) + " + " + (pib.length) + " inference objects to now be run with " + (GRASP.NTHREADS) + " threads");
