@@ -60,6 +60,7 @@ public class GRASP {
                 "\t{-j | --joint (default)}\n" +
                 "\t{-m | --marginal <branchpoint-id>}\n" +
                 "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
+                "\t{--supported-path <methodname>} (select one from DIJKSTRA(default) ASTAR)\n" +
                 "\t{--nogap}\n" +
                 "\t{--nonibble}\n" +
                 "\t{--exclude-noedge}\n" +
@@ -138,6 +139,8 @@ public class GRASP {
         // Indel approaches:
         String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
+        String[] SPATH = new String[] {"DIJKSTRA", "ASTAR"};
+        int SPATH_IDX = 0; // default indel approach is that above indexed 0
         boolean GAPPY = true;
         // output formats
         boolean SAVE_AS = false;
@@ -201,6 +204,16 @@ public class GRASP {
                     }
                     if (!found_indel)
                         usage(3, args[a + 1] + " is not a valid indel approach for option --indel-method");
+                } else if (arg.equalsIgnoreCase("-supported-path") && args.length > a + 1) {
+                    boolean found_spath = false;
+                    for (int i = 0; i < SPATH.length; i++) {
+                        if (args[a + 1].startsWith(SPATH[i])) {
+                            SPATH_IDX = i;
+                            found_spath = true;
+                        }
+                    }
+                    if (!found_spath)
+                        usage(6, args[a + 1] + " is not a valid method for option --supported-path");
                 } else if ((arg.equalsIgnoreCase("-save-as") || arg.equalsIgnoreCase("sa")) && args.length > a + 1) {
                     String format = "<none given>";
                     for (int a1 = a + 1; a1 < args.length; a1 ++) {
@@ -343,6 +356,7 @@ public class GRASP {
                 indelpred.getJoint(MODEL, RATES);
             else if (MODE == Inference.MARGINAL)
                 indelpred.getMarginal(MARG_NODE, MODEL, RATES);
+            POGraph.SUPPORTED_PATH_DEFAULT = SPATH_IDX;
             Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
             POGraph[] ancestors = new POGraph[pogs.size()];
             try {

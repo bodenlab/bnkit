@@ -258,13 +258,30 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 //        return ret;
     }
 
+    public static int SUPPORTED_PATH_DIJKSTRA = 0;
+    public static int SUPPORTED_PATH_ASTAR = 1;
+    public static int SUPPORTED_PATH_DEFAULT = SUPPORTED_PATH_DIJKSTRA; // can be overridden in asr.GRASP
+
     /**
      * Perform search on the POG based on currently set edge weights and status
      * @return indices to the nodes that make up the "consensus" path
      */
     public int[] getMostSupported() {
-        DijkstraSearch search = new DijkstraSearch(this);
-        return search.getOnePath();
+        return getMostSupported(SUPPORTED_PATH_DEFAULT);
+    }
+
+    /**
+     * Perform search on the POG based on currently set edge weights and status
+     * @return indices to the nodes that make up the "consensus" path
+     */
+    public int[] getMostSupported(int MODE) {
+        if (MODE == SUPPORTED_PATH_ASTAR) {
+            AStarSearch search = new AStarSearch(this);
+            return search.getOnePath();
+        } else { // SUPPORTED_PATH_DIJKSTRA
+            DijkstraSearch search = new DijkstraSearch(this);
+            return search.getOnePath();
+        }
     }
 
     /** Variable to hold search depths for getDepths */
