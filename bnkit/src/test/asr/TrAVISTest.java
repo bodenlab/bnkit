@@ -4,9 +4,7 @@ import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JTT;
 import dat.EnumSeq;
 import dat.Enumerable;
-import dat.file.AlnWriter;
 import dat.file.FastaWriter;
-import dat.file.Utils;
 import dat.phylo.Tree;
 import dat.pog.POAGraph;
 import dat.pog.POGTree;
@@ -121,7 +119,7 @@ class TrAVISTest {
                         indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
                         break;
                     case 1:
-                        indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree);
+                        indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogtree);
                         break;
                     case 2:
                         indelpred = Prediction.PredictBySICP(pogtree);
@@ -133,7 +131,7 @@ class TrAVISTest {
                         indelpred = Prediction.PredictByParsimony(pogtree);
                         break;
                     case 5:
-                        indelpred = Prediction.PredictbyMaxLhood(pogtree);
+                        indelpred = Prediction.PredictByMaxLhood(pogtree);
                         break;
                 }
                 indelpred.getJoint(model);
@@ -295,7 +293,7 @@ class TrAVISTest {
                         indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
                         break;
                     case 1:
-                        indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree);
+                        indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogtree);
                         break;
                     case 2:
                         indelpred = Prediction.PredictBySICP(pogtree);
@@ -307,7 +305,7 @@ class TrAVISTest {
                         indelpred = Prediction.PredictByParsimony(pogtree);
                         break;
                     case 5:
-                        indelpred = Prediction.PredictbyMaxLhood(pogtree);
+                        indelpred = Prediction.PredictByMaxLhood(pogtree);
                         break;
                 }
                 indelpred.getJoint(model);
@@ -434,7 +432,7 @@ class TrAVISTest {
                         indelpreds[midx] = Prediction.PredictByBidirEdgeParsimony(pogtree);
                         break;
                     case 1:
-                        indelpreds[midx] = Prediction.PredictByBidirEdgeMaxLHood(pogtree);
+                        indelpreds[midx] = Prediction.PredictByBidirEdgeMaxLhood(pogtree);
                         break;
                     case 2:
                         indelpreds[midx] = Prediction.PredictBySICP(pogtree);
@@ -446,7 +444,7 @@ class TrAVISTest {
                         indelpreds[midx] = Prediction.PredictByParsimony(pogtree);
                         break;
                     case 5:
-                        indelpreds[midx] = Prediction.PredictbyMaxLhood(pogtree);
+                        indelpreds[midx] = Prediction.PredictByMaxLhood(pogtree);
                         break;
                 }
                 Prediction indelpred = indelpreds[midx];

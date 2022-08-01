@@ -27,7 +27,6 @@ public class POGTree {
     private POGraph[] extarr;               // POGs for extant sequences, indexed by branchpoint index
     private Map<Object, Integer> id2bpidx;  // the indices of extant sequences
     private IntervalST<Integer> ivals;      // Aggregation of all indels indicated by extant sequences (refactored to map-to bpidx Dec 2020)
-    private IntervalST<Integer> povals;     // All of the neighouring columns that have partial ordering
     private Enumerable domain;              // the alphabet
     private final int nNodes;
 
@@ -49,6 +48,7 @@ public class POGTree {
         for (int j = 0; j < aln.getHeight(); j++) {
             EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(j);
             POGraph pog = new POGraph(aln.getWidth());
+            pog.setName(gseq.getName());
             int bpidx = tree.getIndex(gseq.getName());
             extarr[bpidx] = pog;
             id2bpidx.put(gseq.getName(), bpidx);
@@ -80,6 +80,8 @@ public class POGTree {
             ivals.put(new Interval1D(from, to), bpidx);
         }
 
+/*      MB removed 31 July 2022: "povals" is never used, unless some "forceLinear" option is active (and this is deprecated in Prediction)
+
         // Add an interval between each linear position at a single sequence (to force linearity for Simple Indel Coding)
 
         this.povals = new IntervalST<>();
@@ -87,7 +89,7 @@ public class POGTree {
             if (! ivals.contains(new Interval1D(i, i+1))){
                 povals.put(new Interval1D(i, i+1), 0);
             }
-        }
+        }*/
     }
 
     /**
@@ -150,6 +152,11 @@ public class POGTree {
         return bpidx != -1 ? extarr[bpidx] : null;
     }
 
+    /**
+     * Get the POG for a given extant sequence by its branchpoint index
+     * @param bpidx branchpoint index
+     * @return the POG
+     */
     public POGraph getExtant(int bpidx) {
         return extarr[bpidx];
     }
@@ -172,13 +179,14 @@ public class POGTree {
         return ivals;
     }
 
-    /**
-     * Get the data structure holding all the linear neighbours that are partially ordered
-     * @return the interval tree that contains all partially ordered neighbours (as intervals)
-     */
-    public IntervalST<Integer> getPOVals() {
-        return povals;
-    }
+// MB removed: see above
+//    /**
+//     * Get the data structure holding all the linear neighbours that are partially ordered
+//     * @return the interval tree that contains all partially ordered neighbours (as intervals)
+//     */
+//    public IntervalST<Integer> getPOVals() {
+//        return povals;
+//    }
 
     /**
      * Get the number of positions that comprise the full collection of sequences, and indicate their homology
@@ -430,15 +438,25 @@ public class POGTree {
         return new TreeInstance(phylotree, instarr);
     }
 
+    /**
+     * Retrieve the set of identifiers for all extants
+     * @return set of identifiers
+     * @see POGTree#getExtant(Object)
+     *
+     */
+    public Set<Object> getExtantIDs() {
+        return id2bpidx.keySet();
+    }
+
     public static void main(String[] args) {
         try {
             EnumSeq.Alignment aln = new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/dp16_poag5.aln", Enumerable.aacid));
             Tree tree = Tree.load("/Users/mikael/simhome/ASR/dp16_poag5.nwk", "newick");
             POGTree pogt = new POGTree(aln, tree);
-            for (Object name : pogt.id2bpidx.keySet()) {
+            for (Object name : pogt.getExtantIDs()) {
                 POGraph pog = (POGraph) pogt.getExtant(name);
                 System.out.println(name + "\t" + pog);
-                pog.saveToDOT("/Users/mikael/simhome/ASR/" + name + ".dot");
+                //pog.saveToDOT("/Users/mikael/simhome/ASR/" + name + ".dot");
             }
         } catch (IOException e) {
             System.err.println(e);

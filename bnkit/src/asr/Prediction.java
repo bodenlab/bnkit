@@ -1,7 +1,6 @@
 package asr;
 
 import bn.ctmc.SubstModel;
-import bn.ctmc.SubstNode;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
@@ -13,6 +12,8 @@ import dat.phylo.PhyloBN;
 import dat.phylo.TreeDecor;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
+import json.JSONObject;
+
 import java.io.*;
 import java.util.*;
 
@@ -70,6 +71,36 @@ public class Prediction {
 
     public void save(String filename) {
         throw new RuntimeException("Not implemented");
+    }
+
+    public JSONObject toJSON() {
+        return toJSON(false);
+    }
+
+    /**
+     * Create a JSON object from the prediction
+     * @param INCLUDE_EXTANTS if true, extants are included in the returned object
+     * @return
+     */
+    public JSONObject toJSON(boolean INCLUDE_EXTANTS) {
+        List<IdxGraph> saveme1e = new ArrayList<>();
+        List<IdxGraph> saveme1a = new ArrayList<>();
+        JSONObject json = new JSONObject();
+        for (int idx : phylotree) {
+            if (phylotree.isLeaf(idx)) {
+                if (INCLUDE_EXTANTS) {
+                    IdxGraph g = pogTree.getExtant(idx);
+                    saveme1e.add(g);
+                }
+            } else { // ancestor
+                IdxGraph g = ancarr[idx];
+                saveme1a.add(g);
+            }
+        }
+        if (INCLUDE_EXTANTS)
+            json.put("Extants", IdxGraph.toJSONArray(saveme1e));
+        json.put("Ancestors", IdxGraph.toJSONArray(saveme1a));
+        return json;
     }
 
     /**
@@ -591,7 +622,12 @@ public class Prediction {
         return new Prediction(pogTree, ancestors);
     }
 
-    public static Prediction PredictbyMaxLhood(POGTree pogTree){
+    /**
+     * Basic inference of gaps by position-specific maximum likelihood.
+     * @param pogTree POGs and phylogenetic tree
+     * @return an instance of the class, incorporating ancestor POGs, named by their phylogenetic branch point label.
+     */
+    public static Prediction PredictByMaxLhood(POGTree pogTree){
 
         int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
         IdxTree tree = pogTree.getTree();  // indexed tree (quick access to branch points, no editing)
@@ -615,176 +651,44 @@ public class Prediction {
         for (int j = 0; j < tree.getSize(); j ++) {         // for every (indexed) branch point (IdxTree defaults to depth-first order)
             if (tree.isLeaf(j))             // if leaf, ignore and
                 continue;
-
             Object ancID = tree.getBranchPoint(j).getID();  // unique ancestor ID from BranchPoint class (modifiable only before assembled into IdxTree when creating Tree)
-        POGraph pog = new POGraph(nPos);                // blank POG
-        ancestors.put(ancID, pog);                      // put blank POG in place, to be modified below
-        // each anchor-set (below) is a range of indices for the POG; the key is a position that MUST be entered, values contain admissible positions that follow
-        Map<Integer, Set<Integer>> anchorsets = new HashMap<>();
-        int current_anchor = -1; // the first jump always from the start position
-        Set<Integer> anchorset = new HashSet<>();
+            POGraph pog = new POGraph(nPos);                // blank POG
+            ancestors.put(ancID, pog);                      // put blank POG in place, to be modified below
+            // each anchor-set (below) is a range of indices for the POG; the key is a position that MUST be entered, values contain admissible positions that follow
+            Map<Integer, Set<Integer>> anchorsets = new HashMap<>();
+            int current_anchor = -1; // the first jump always from the start position
+            Set<Integer> anchorset = new HashSet<>();
 
-        for (int i = 0; i < nPos; i ++) {   // now traverse all positions, consider if GAP, not-GAP or admissible
-             if (ji[i].getDecoration(j) == Boolean.FALSE) { // ALWAYS character (i.e. not-GAP), so required position
-                anchorset.add(i);
-                anchorsets.put(current_anchor, anchorset);  // anchor set is linked to the position at which it started
-                anchorset = new HashSet<>();                // re-set anchor set
-                current_anchor = i;                         // next anchor set is headed by this, not-GAP required position
-            }
-            // else it is a GAP only (so NOT added to admissible set, NOT an anchor)
-        }
-        anchorset.add(nPos);    // finish-up last anchor set
-        anchorsets.put(current_anchor, anchorset);
-        // next, peruse anchor sets, adding Nodes for all anchored or admissible positions
-        for (Map.Entry<Integer, Set<Integer>> entry : anchorsets.entrySet()) {
-            int anchor = entry.getKey();
-            if (anchor >= 0)
-                if (pog.getNode(anchor) == null)
-                    pog.addNode(anchor, new Node());
-            for (int to : entry.getValue()) { // link anchored Node to each of the admissible nodes in the anchor set
-                if (to < nPos)
-                    if (pog.getNode(to) == null)
-                        pog.addNode(to, new Node());
-                pog.addEdge(anchor, to, new POGraph.StatusEdge(true));
-            }
-            for (int from : entry.getValue()) { // all possible pairs of admissible Nodes are linked
-                for (int to : entry.getValue()) {
-                    if (from < to)
-                        pog.addEdge(from, to, new POGraph.StatusEdge(true));
+            for (int i = 0; i < nPos; i ++) {   // now traverse all positions, consider if GAP, not-GAP or admissible
+                 if (ji[i].getDecoration(j) == Boolean.FALSE) { // ALWAYS character (i.e. not-GAP), so required position
+                    anchorset.add(i);
+                    anchorsets.put(current_anchor, anchorset);  // anchor set is linked to the position at which it started
+                    anchorset = new HashSet<>();                // re-set anchor set
+                    current_anchor = i;                         // next anchor set is headed by this, not-GAP required position
                 }
+                // else it is a GAP only (so NOT added to admissible set, NOT an anchor)
             }
-        }
-    }
-
-
-        return new Prediction(pogTree, ancestors);
-    }
-
-
-    /**
-     * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." 2000
-     *
-     * @param pogTree
-     * @return instance of IndelPrediction
-     * @deprecated
-     */
-    public static Prediction PredictByIndelParsimony(POGTree pogTree, Boolean forceLinear) {
-        int nPos = pogTree.getPositions(); //
-        IdxTree tree = pogTree.getTree();
-        Map<Object, POGraph> ancestors = new HashMap<>();
-        // Retrieve an instance for each indel across the whole alignment (ordered by interval tree)
-        // (state for each extant-indel: present, absent or permissible/neutral, as per Simmons and Ochoterena, 2000)
-        // initially "permissible/neutral" is encoded as null (the variable is uninstantiated); see POGraph.getSimpleGapCode)
-        // inference will infer true, false, or accept that both true and false can be correct
-        TreeInstance[] ti = pogTree.getIndelInstances();
-        Parsimony[] pi = new Parsimony[ti.length];
-        // Below is where the main inference occurs
-        // this stage should be multi-threaded... not so at the moment
-        for (int i = 0; i < ti.length; i++) { // for each "indel"
-            pi[i] = new Parsimony(ti[i].getTree());
-            pi[i].decorate(ti[i]);
-        }
-        if (DEBUG) {
-            // print out tables...
-            int i = 0; // interval index
-            System.out.println("Indels---------");
-            for (Interval1D ival : pogTree.getIntervalTree())
-                System.out.println(i++ + "\t" + ival);
-            // now decorate the ancestors
-            System.out.println("Sequences---------");
-            i = 0; // interval index
-            for (Interval1D ival : pogTree.getIntervalTree())
-                System.out.print("\t" + i++);
-            System.out.println();
-        }
-        // the code below
-        // (1) regardless, if an ancestor or extant, we can pull out what the INDEL states are: absent (false), present (true) or permissible (true/false)
-        // (2) if an ancestor, an ancestor POG is created, using the info from (1)
-        for (int j = 0; j < tree.getSize(); j++) { // we look at each branch point, corresponding to either an extant or ancestor sequence
-            Object ancID = tree.getBranchPoint(j).getID();
-            if (tree.getChildren(j).length == 0) { // not an ancestor
-                if (DEBUG) {
-                    POGraph pog = pogTree.getExtant(ancID);
-                    System.out.print(ancID + "\t");
-                    if (pog != null) {
-                        int i = 0;
-                        for (Interval1D ival : pogTree.getIntervalTree()) {
-                            StringBuilder sb = new StringBuilder();
-                            List calls = pi[i].getOptimal(j);
-                            for (Object b : calls) // each "b" is a Boolean
-                                sb.append(b.toString().substring(0, 1)); // this converts each value to "t" or "f"
-                            System.out.print(sb.toString() + "\t");
-                            i++;
-                        }
+            anchorset.add(nPos);    // finish-up last anchor set
+            anchorsets.put(current_anchor, anchorset);
+            // next, peruse anchor sets, adding Nodes for all anchored or admissible positions
+            for (Map.Entry<Integer, Set<Integer>> entry : anchorsets.entrySet()) {
+                int anchor = entry.getKey();
+                if (anchor >= 0)
+                    if (pog.getNode(anchor) == null)
+                        pog.addNode(anchor, new Node());
+                for (int to : entry.getValue()) { // link anchored Node to each of the admissible nodes in the anchor set
+                    if (to < nPos)
+                        if (pog.getNode(to) == null)
+                            pog.addNode(to, new Node());
+                    pog.addEdge(anchor, to, new POGraph.StatusEdge(true));
+                }
+                for (int from : entry.getValue()) { // all possible pairs of admissible Nodes are linked
+                    for (int to : entry.getValue()) {
+                        if (from < to)
+                            pog.addEdge(from, to, new POGraph.StatusEdge(true));
                     }
-                    System.out.println();
-                }
-                continue; // skip the code below, only predictions for ancestors are used to compose POGs
-            }
-            // else: ancestor branch point
-            // (1) Find ancestor STATE for each INDEL, but to resolve (2) what the POG looks like we determine...
-            // all unambiguously TRUE indels, as they will preclude "contained" indels
-            Set<Interval1D> definitively_true = new HashSet<>();
-            // all INDELs which are OPTIONAL
-            Set<Interval1D> optionally_true = new HashSet<>();
-            if (DEBUG) System.out.print(ancID + "\t");
-            int i = 0; // interval index
-            for (Interval1D ival : pogTree.getIntervalTree()) {
-                List<Boolean> calls = pi[i].getOptimal(j);
-                if (DEBUG) {
-                    StringBuilder sb = new StringBuilder();
-                    for (Boolean b : calls)
-                        sb.append(b.toString().substring(0, 1));
-                    System.out.print(sb + "\t");
-                }
-                if (calls.contains(Boolean.TRUE)) { // INDEL can be TRUE
-                    optionally_true.add(ival);
-                    if (calls.size() == 1) // the ONLY value is TRUE so DEFINITIVELY so
-                        definitively_true.add(ival);
-                }
-                i ++;
-            }
-            if (DEBUG) System.out.println();
-
-            // Second, use only indels that are not contained within an unambiguously TRUE indel
-            Set<Interval1D> discarded = new HashSet<>();
-            i = 0; // interval index
-            for (Interval1D ival : pogTree.getIntervalTree()) {
-                int count_contains = 0;
-                for (Interval1D definitive : definitively_true)
-                    count_contains += definitive.contains(ival) ? 1 : 0;
-                if (count_contains > 1)
-                    discarded.add(ival);
-                i += 1;
-            }
-
-            // Add in all of the linear neighbours that are partially ordered
-
-            if (forceLinear) {
-                for (Interval1D poval : pogTree.getPOVals()) {
-                    optionally_true.add(poval);
-                    int count_contains = 0;
-                    for (Interval1D definitive : definitively_true)
-                        count_contains += definitive.contains(poval) ? 1 : 0;
-                    if (count_contains > 1)
-                        discarded.add(poval);
                 }
             }
-
-            int[][] edges_optional = new int[optionally_true.size()][2];
-            i = 0;
-            for (Interval1D edge : optionally_true)
-                edges_optional[i++] = new int[]{edge.min, edge.max};
-
-            definitively_true.removeAll(discarded);
-            int[][] edges_definitive = new int[definitively_true.size()][];
-            i = 0;
-            for (Interval1D edge : definitively_true)
-                edges_definitive[i++] = new int[]{edge.min, edge.max};
-
-            // finally put the info into a POG
-            POGraph pog = POGraph.createFromEdgeIndicesWithoutDeadends(nPos, edges_optional, edges_definitive);
-            ancestors.put(ancID, pog);
         }
         return new Prediction(pogTree, ancestors);
     }
@@ -1199,159 +1103,6 @@ public class Prediction {
     }
 
     /**
-     * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." (2000).
-     * Inference with ML, using a gain/loss model similar to FastML (based on Cohen and Pupko 2010 M1).
-     * Note that FastML uses a mixture of two models (termed M1 and M2) but both have loss rates which dominate gain.
-     * @param pogTree
-     * @return instance of IndelPrediction
-     * @deprecated
-     */
-    public static Prediction PredictByIndelMaxLhood(POGTree pogTree, Boolean forceLinear) {
-        Object[] possible = {true, false};
-        SubstModel substmodel = new JC(1, possible);
-        return Prediction.PredictByIndelMaxLhood(pogTree, forceLinear, substmodel);
-    }
-
-    /**
-     * Simple Indel Code based on Simmons and Ochoterena "Gaps as characters..." (2000).
-     * Inference with ML.
-     * @param pogTree
-     * @param gain_loss_model model for gain and loss events
-     * @return instance of IndelPrediction
-     * @deprecated
-     */
-    public static Prediction PredictByIndelMaxLhood(POGTree pogTree, Boolean forceLinear, SubstModel gain_loss_model) {
-        int nPos = pogTree.getPositions(); // number of positions in alignment/POG
-        IdxTree tree = pogTree.getTree();  // the tree that represents phylogenetic relationships between extants
-        Map<Object, POGraph> ancestors = new HashMap<>();
-        // Retrieve an instance for each indel across the whole alignment (ordered by interval tree).
-        // This is a "deletion" as it skips positions. At the moment, zero-distance skips are also included, since when viewed
-        // across a full sequence they may correspond to "gaps". (There is a potential to resolve some of them without inference though.)
-        // State for each extant-indel: present, absent or permissible/neutral, as per Simmons and Ochoterena (2000).
-        // Initially "permissible/neutral" is encoded as null (the variable is uninstantiated); see POGraph.getSimpleGapCode.
-        // ML inference will infer the most likely combination of true and false across the full tree;
-        // that is, maximise the probability of the observed extant states GIVEN the combination of the indel states at the ancestors.
-        // We use a "joint" inference approach, which is NOT what FastML does; Ashkenazy et al (2012) reports that FastML outputs the
-        // "posterior probability for each indel site at each ancestral node of the phylogeny.
-        // Most likely character states in the ancestral nodes are reported only in positions
-        // that are inferred to be non-gapped with a probability 􏰀0.5."
-        // To do this would require a switch to marginal inference, then thresholding for 0.5.
-        TreeInstance[] ti = pogTree.getIndelInstances(); // instantiate a tree for each "indel", assigning leaf states as per extants
-        MaxLhoodJoint[] ji = new MaxLhoodJoint[ti.length];
-        for (int i = 0; i < ji.length; i++) { // for each "indel" we need to infer either gain or loss, so set-up inference
-            ji[i] = new MaxLhoodJoint(tree, gain_loss_model);
-        }
-        // Below is where the main inference occurs
-        // this stage should be multi-threaded... not so at the moment
-        for (int i = 0; i < ti.length; i++) { // for each "indel" we need to infer either gain or loss, so set-up inference
-            ji[i].decorate(ti[i]);
-        }
-        if (DEBUG) {
-            // print out tables...
-            int i = 0; // interval index
-            System.out.println("Indels---------");
-            for (Interval1D ival : pogTree.getIntervalTree())
-                System.out.println(i++ + "\t" + ival);
-            // now decorate the ancestors
-            System.out.println("Sequences---------");
-            i = 0; // interval index
-            for (Interval1D ival : pogTree.getIntervalTree())
-                System.out.print("\t" + i++);
-            System.out.println();
-        }
-        // the code below
-        // (1) regardless, if an ancestor or extant, we can pull out what the INDEL states are:
-        // gain (no "skip", encoded false) or loss ("skip", encoded true)
-        // (2) if an ancestor, an ancestor POG is created, using the info from (1)
-        for (int j = 0; j < tree.getSize(); j++) { // we look at each branchpoint, corresponding to either an extant or ancestor sequence
-            Object ancID = tree.getBranchPoint(j).getID();
-            if (tree.getChildren(j).length == 0) { // not an ancestor, so we just print out debug info below before continuing with next
-                if (DEBUG) {
-                    POGraph pog = pogTree.getExtant(ancID);
-                    System.out.print(ancID + "\t");
-                    if (pog != null) {
-                        int i = 0;
-                        for (Interval1D ival : pogTree.getIntervalTree()) {
-                            StringBuilder sb = new StringBuilder();
-                            Boolean call = (Boolean)ji[i].getDecoration(j);
-                            sb.append(call ? "L" : "G"); // Loss and Gain, respectively
-                            System.out.print(sb.toString() + "\t");
-                            i++;
-                        }
-                    }
-                    System.out.println();
-                }
-                continue; // skip the code below, only predictions for ancestors are used to compose POGs
-            }
-            // else: ancestor branch point
-            // (1) Find ancestor STATE for each INDEL, but to resolve (2) what the POG looks like we determine...
-            // all TRUE indels ("skips"), as they will preclude "contained" indels;
-            // there is provision BUT this is not needed in this implementation for OPTIONAL skips
-            // TODO: The code below is based on the code for parsimony inference may deal with situations that cannot occur
-            Set<Interval1D> definitively_true = new HashSet<>();
-            // all INDELs which are OPTIONAL
-            Set<Interval1D> optionally_true = new HashSet<>();
-            if (DEBUG) System.out.print(ancID + "\t");
-            int i = 0; // interval index
-            for (Interval1D ival : pogTree.getIntervalTree()) {
-                Boolean call = (Boolean)ji[i].getDecoration(j);
-                if (DEBUG) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(call ? "L" : "G"); // Loss and Gain, respectively
-                    System.out.print(sb.toString() + "\t");
-                }
-                if (call) {
-                    optionally_true.add(ival);
-                    definitively_true.add(ival);
-                }
-                i ++;
-            }
-            if (DEBUG) System.out.println();
-            // Second, use only indels that are not contained within an unambiguously TRUE indel
-            Set<Interval1D> discarded = new HashSet<>();
-            i = 0; // interval index
-            for (Interval1D ival : pogTree.getIntervalTree()) {
-                int count_contains = 0;
-                for (Interval1D definitive : definitively_true)
-                    count_contains += definitive.contains(ival) ? 1 : 0;
-                if (count_contains > 1)
-                    discarded.add(ival);
-                i += 1;
-            }
-
-            // Add in all of the linear neighbours that are partially ordered
-
-            if (forceLinear) {
-
-                for (Interval1D poval : pogTree.getPOVals()) {
-                    optionally_true.add(poval);
-                    int count_contains = 0;
-                    for (Interval1D definitive : definitively_true)
-                        count_contains += definitive.contains(poval) ? 1 : 0;
-                    if (count_contains > 1)
-                        discarded.add(poval);
-                }
-            }
-
-            definitively_true.removeAll(discarded);
-
-            int[][] edges_optional = new int[optionally_true.size()][2];
-            i = 0;
-            for (Interval1D edge : optionally_true)
-                edges_optional[i++] = new int[]{edge.min, edge.max};
-
-            int[][] edges_definitive = new int[definitively_true.size()][];
-            i = 0;
-            for (Interval1D edge : definitively_true)
-                edges_definitive[i++] = new int[]{edge.min, edge.max};
-            // finally put the info into a POG
-            POGraph pog = POGraph.createFromEdgeIndicesWithoutDeadends(nPos, edges_optional, edges_definitive);
-            ancestors.put(ancID, pog);
-        }
-        return new Prediction(pogTree, ancestors);
-    }
-
-    /**
      * Bi-directional edge parsimony for inference of indel states in ancestor POGs.
      * @param pogTree
      * @return instance of IndelPrediction
@@ -1524,7 +1275,7 @@ public class Prediction {
      * @param pogTree
      * @return instance of Prediction
      */
-    public static Prediction PredictByBidirEdgeMaxLHood(POGTree pogTree) {
+    public static Prediction PredictByBidirEdgeMaxLhood(POGTree pogTree) {
         int nPos = pogTree.getPositions(); //
         IdxTree tree = pogTree.getTree();
         Map<Object, POGraph> ancestors = new HashMap<>();

@@ -200,7 +200,7 @@ class IdxGraphTest {
         gs.add(g1);
         gs.add(g2);
         gs.add(g3);
-        System.out.println(IdxGraph.toJSON(gs).toString());
+        System.out.println(IdxGraph.toJSONArray(gs).toString());
     }
 
     private class MyNode extends Node {

@@ -13,9 +13,7 @@ import dat.pog.POGraph;
 import json.JSONObject;
 
 import java.io.*;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -116,7 +114,7 @@ public class GRASP {
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
                 "\tRunning GRASP requires large memory and in most cases Java needs to be run with the option -Xmx20g, \n\twhere 20g specifies that 20GB of RAM should be available.\n" +
-                "\t~ This is version " + VERSION + " ~");
+                "\n~ This is version " + VERSION + " ~");
         if (msg != null)
             out.println("\n" + msg + " (Error " + error + ")");
         System.exit(error);
@@ -333,7 +331,7 @@ public class GRASP {
                     indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
                     break;
                 case 1:
-                    indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogtree);
+                    indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogtree);
                     break;
                 case 2:
                     indelpred = Prediction.PredictBySICP(pogtree);
@@ -345,7 +343,7 @@ public class GRASP {
                     indelpred = Prediction.PredictByParsimony(pogtree);
                     break;
                 case 5:
-                    indelpred = Prediction.PredictbyMaxLhood(pogtree);
+                    indelpred = Prediction.PredictByMaxLhood(pogtree);
                     break;
                 default:
                     break;
@@ -472,22 +470,7 @@ public class GRASP {
                         Newick.save(tree, OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
                         break;
                     case 4: // POGS
-                        Map<String, IdxGraph> saveme1e = new HashMap<>();
-                        Map<String, IdxGraph> saveme1a = new HashMap<>();
-                        JSONObject json = new JSONObject();
-                        if (INCLUDE_EXTANTS) {
-                            for (Object name : aln.getNames()) {
-                                IdxGraph g = pogtree.getExtant(name);
-                                g.setName(name.toString());
-                                saveme1e.put(name.toString(), g);
-                            }
-                            json.put("Extants", IdxGraph.toJSON(saveme1e));
-                        }
-                        for (int idx = 0; idx < ancestors.length; idx++) {
-                            ancestors[idx].setName("N" + idx);
-                            saveme1a.put(ancestors[idx].getName(), ancestors[idx]);
-                        }
-                        json.put("Ancestors", IdxGraph.toJSON(saveme1a));
+                        JSONObject json = indelpred.toJSON(INCLUDE_EXTANTS);
                         String filename = OUTPUT + "/" + "pogs.json";
                         FileWriter fwriter=new FileWriter(filename);
                         BufferedWriter writer=new BufferedWriter(fwriter);

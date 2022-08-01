@@ -4,8 +4,6 @@ import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
 import dat.EnumSeq;
 import dat.Enumerable;
-import dat.Interval1D;
-import dat.IntervalST;
 import dat.file.FastaWriter;
 import dat.file.Utils;
 import dat.phylo.Tree;
@@ -44,9 +42,8 @@ class IndelTest {
      *
      * @param indelpred   Prediction to print ancestors from
      * @param pogTree     POGTree representing the tree
-     * @param printPOVals Boolean for whether to print out if an added partially ordered edge is present at an ancestor
      */
-    static void printAncestors(Prediction indelpred, POGTree pogTree, Boolean printPOVals) {
+    static void printAncestors(Prediction indelpred, POGTree pogTree) {
 
         indelpred.getJoint(jtt);
         Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
@@ -61,20 +58,6 @@ class IndelTest {
 
         for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
             ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
-        }
-
-        IntervalST<Integer> povals = pogTree.getPOVals();
-
-        if (printPOVals) {
-
-            for (POGraph ancgraph : ancestors) {
-
-
-                for (Interval1D poval : povals) {
-                    System.out.println(poval);
-                    System.out.println("This edge is present in this ancestor - " + ancgraph.isPath(poval.min, poval.max) + "\n");
-                }
-            }
         }
 
         for (EnumSeq ancseq : ancseqs) {
@@ -106,10 +89,8 @@ class IndelTest {
             EnumSeq.Alignment aln = Utils.loadAlignment("src/test/resources/indels/PSP_FAIL_6.aln", Enumerable.aacid);
             POGTree pogTree = new POGTree(aln, tree);
 
-            boolean forceLinear = false;
-
 //            Prediction indelpred = Prediction.PredictByParsimony(         pogTree);
-            Prediction indelpred = Prediction.PredictbyMaxLhood(pogTree);
+            Prediction indelpred = Prediction.PredictByMaxLhood(pogTree);
 
 //            Prediction indelpred = Prediction.PredictByIndelParsimony(pogTree, forceLinear);
 //            Prediction indelpred = Prediction.PredictByIndelMaxLhood(pogTree, forceLinear);
@@ -117,7 +98,7 @@ class IndelTest {
 //            Prediction indelpred = Prediction.PredictByBidirEdgeParsimony(pogTree);
 //            Prediction indelpred = Prediction.PredictByBidirEdgeMaxLHood(         pogTree);
 
-            printAncestors(indelpred, pogTree, forceLinear);
+            printAncestors(indelpred, pogTree);
 
         } catch (IOException | ASRException e) {
             System.err.println(e.getMessage());
@@ -137,8 +118,6 @@ class IndelTest {
             EnumSeq.Alignment aln = Utils.loadAlignment("src/test/resources/indels/SIC_FAIL_6.aln", Enumerable.aacid);
             POGTree pogTree = new POGTree(aln, tree);
 
-            Boolean forceLinear = false;
-
 //            Prediction indelpred = Prediction.PredictByParsimony(         pogTree);
 //            Prediction indelpred = Prediction.PredictbyMaxLhood(         pogTree);
             Prediction indelpred = Prediction.PredictBySICP(pogTree);
@@ -149,7 +128,7 @@ class IndelTest {
 //            Prediction indelpred = Prediction.PredictByBidirEdgeMaxLHood(         pogTree);
 
 
-            printAncestors(indelpred, pogTree, forceLinear);
+            printAncestors(indelpred, pogTree);
 
         } catch (IOException | ASRException e) {
             System.err.println(e.getMessage());
@@ -322,7 +301,7 @@ class IndelTest {
             POGTree pogTree = new POGTree(input, tree);
             System.out.println("---Loaded data");
             GRASP.VERBOSE = true;
-            Prediction indelpred = Prediction.PredictByBidirEdgeMaxLHood(pogTree);
+            Prediction indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogTree);
             if (indelpred == null) {
                 System.err.println("Failed to perform indel prediction");
                 System.exit(111);

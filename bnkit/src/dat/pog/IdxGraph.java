@@ -867,14 +867,12 @@ public class IdxGraph {
         return json;
     }
 
-    public static JSONObject toJSON(Collection<IdxGraph> graphs) {
-        JSONObject json = new JSONObject();
+    public static JSONArray toJSONArray(Collection<IdxGraph> graphs) {
         JSONArray narr = new JSONArray();
         int cnt = 0;
         for (IdxGraph g : graphs)
             narr.put(g.toJSON());
-        json.put("Graphs", narr);
-        return json;
+        return narr;
     }
 
     public static JSONObject toJSON(Map<String, IdxGraph> graphs) {
@@ -889,7 +887,7 @@ public class IdxGraph {
         String filename = directory + "/" + "pogs.json";
         FileWriter fwriter=new FileWriter(filename);
         BufferedWriter writer=new BufferedWriter(fwriter);
-        writer.write(IdxGraph.toJSON(graphs).toString());
+        writer.write(IdxGraph.toJSONArray(graphs).toString());
         writer.newLine();
         writer.close();
         fwriter.close();
