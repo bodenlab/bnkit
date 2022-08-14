@@ -93,12 +93,12 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         List<JSONObject> nodelist = new ArrayList<>();
         List<JSONObject> edgelist = new ArrayList<>();
         for (int idx = 0; idx < nNodes; idx ++) {
-            if (nodes[idx] != null) {
+            if (nodes[idx] != null) { // the index is used in the POG, so add it to the list of indices
                 JSONObject node = new JSONObject();
                 narr.put(idx);
                 int[] edges = getForward(idx);
                 earr.put(edges);
-                for (int i = 0; i < edges.length; i ++) {
+                for (int i = 0; i < edges.length; i ++) { // for the index, include all the indices that are linked "forward"
                     int to = edges[i];
                     StatusEdge e = getEdge(idx, to);
                     if (e != null) {
