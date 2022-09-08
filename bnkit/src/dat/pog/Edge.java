@@ -1,5 +1,7 @@
 package dat.pog;
 
+import json.JSONObject;
+
 /**
  * Default, place-holder implementation of an edge
  */
@@ -32,4 +34,10 @@ public class Edge {
     public String fontname = null; // "Arial";
     public String style = null; // "bold", "dotted";
 
+    public JSONObject toJSON() {
+        JSONObject edge = new JSONObject();
+        if (getLabel() != null)
+            edge.put("Label", this.getLabel());
+        return edge;
+    }
 }

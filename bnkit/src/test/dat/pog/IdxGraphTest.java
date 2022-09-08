@@ -203,6 +203,14 @@ class IdxGraphTest {
         System.out.println(IdxGraph.toJSONArray(gs).toString());
     }
 
+    @Test
+    void fromJSON() {
+        createGraphs();
+        assertTrue(g1.equals(IdxGraph.fromJSON(g1.toJSON())));
+        assertTrue(g2.equals(IdxGraph.fromJSON(g2.toJSON())));
+        assertTrue(g3.equals(IdxGraph.fromJSON(g3.toJSON())));
+    }
+
     private class MyNode extends Node {
         final String label;
         public MyNode(String label) {

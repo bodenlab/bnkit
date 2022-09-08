@@ -52,7 +52,7 @@ class IndelTest {
         int i = 0;
         for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
             ancestors[i++] = entry.getValue();
-        EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
+        Object[][] ancseqs = new Object[pogs.size()][];
 
         int ii = 0;
 
@@ -60,14 +60,13 @@ class IndelTest {
             ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
         }
 
-        for (EnumSeq ancseq : ancseqs) {
-            Object[] str = ancseq.get();
+        for (Object[] ancseq : ancseqs) {
 
             String anc_str = "";
 
-            for (i = 0; i < str.length; i++) {
+            for (i = 0; i < ancseq.length; i++) {
                 try {
-                    anc_str += str[i].toString();
+                    anc_str += ancseq[i].toString();
                 } catch (NullPointerException npe) {
                     anc_str += "-";
                 }
@@ -201,14 +200,16 @@ class IndelTest {
             indelpred.getJoint(jtt);
             Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
             POGraph[] ancestors = new POGraph[pogs.size()];
-            EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
+            Object[][] ancseqs = new Object[pogs.size()][];
+            String[] ancnames = new String[pogs.size()];
             int ii = 0;
             for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
                 ancestors[ii] = entry.getValue();
+                ancnames[ii] = entry.getKey().toString();
                 ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
             }
             FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
-            fw.save(ancseqs);
+            fw.save(ancnames, ancseqs);
             fw.close();
             IdxGraph.saveToDOT(OUTPUT, ancestors);
             assertEquals(0, logerr.size());
@@ -274,14 +275,16 @@ class IndelTest {
             indelpred.getJoint(jtt);
             Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
             POGraph[] ancestors = new POGraph[pogs.size()];
-            EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
+            Object[][] ancseqs = new Object[pogs.size()][];
+            String[] ancnames = new String[pogs.size()];
             int ii = 0;
             for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
                 ancestors[ii] = entry.getValue();
+                ancnames[ii] = entry.getKey().toString();
                 ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
             }
             FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
-            fw.save(ancseqs);
+            fw.save(ancnames, ancseqs);
             fw.close();
             IdxGraph.saveToDOT(OUTPUT, ancestors);
         } catch (IOException | ASRException e) {
@@ -311,9 +314,11 @@ class IndelTest {
             Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
             System.out.println("---Completed character inference");
             POGraph[] ancestors = new POGraph[pogs.size()];
-            EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
+            Object[][] ancseqs = new Object[pogs.size()][];
+            String[] ancnames = new String[pogs.size()];
             int ii = 0;
             for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                ancnames[ii] = entry.getKey().toString();
                 ancestors[ii++] = entry.getValue();
             }
             IdxGraph.saveToDOT(OUTPUT, ancestors);
@@ -322,7 +327,7 @@ class IndelTest {
                 ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
             }
             FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
-            fw.save(ancseqs);
+            fw.save(ancnames, ancseqs);
             fw.close();
         } catch (IOException | ASRException e) {
             System.err.println(e.getMessage());
@@ -350,9 +355,11 @@ class IndelTest {
             Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
             System.out.println("---Completed character inference");
             POGraph[] ancestors = new POGraph[pogs.size()];
-            EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
+            Object[][] ancseqs = new Object[pogs.size()][];
+            String[] ancnames = new String[pogs.size()];
             int ii = 0;
             for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                ancnames[ii] = entry.getKey().toString();
                 ancestors[ii++] = entry.getValue();
             }
             IdxGraph.saveToDOT(OUTPUT, ancestors);
@@ -361,7 +368,7 @@ class IndelTest {
                 ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
             }
             FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
-            fw.save(ancseqs);
+            fw.save(ancnames, ancseqs);
             fw.close();
         } catch (IOException | ASRException e) {
             System.err.println(e.getMessage());
@@ -388,9 +395,11 @@ class IndelTest {
             Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
             System.out.println("---Completed character inference");
             POGraph[] ancestors = new POGraph[pogs.size()];
-            EnumSeq[] ancseqs = new EnumSeq[pogs.size()];
+            Object[][] ancseqs = new Object[pogs.size()][];
+            String[] ancnames = new String[pogs.size()];
             int ii = 0;
             for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                ancnames[ii] = entry.getKey().toString();
                 ancestors[ii++] = entry.getValue();
             }
             IdxGraph.saveToDOT(OUTPUT, ancestors);
@@ -399,7 +408,7 @@ class IndelTest {
                 ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
             }
             FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
-            fw.save(ancseqs);
+            fw.save(ancnames, ancseqs);
             fw.close();
         } catch (IOException | ASRException e) {
             System.err.println(e.getMessage());

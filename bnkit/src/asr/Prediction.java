@@ -12,6 +12,7 @@ import dat.phylo.PhyloBN;
 import dat.phylo.TreeDecor;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
+import json.JSONArray;
 import json.JSONObject;
 
 import java.io.*;
@@ -39,6 +40,7 @@ public class Prediction {
     private int[] ancidxs = null;                   // store the sub-set of indices that are used for internal nodes (ancestors)
     //private final Map<Object, POGraph> ancestors; // named ancestors
     private final POGraph[] ancarr;                 // ancestors by branchpoint index
+    //
     private final IdxTree[] positrees;              // position-specific tree, or an edited form of the original tree for the purpose of inferring content
     private TreeInstance[]  treeinstances;          // position-specific tree instances, which contain instantiated (by extants) and inferred content (duplicating the content in POGs)
     // Indexing of ancestors by ID to branch point index in phylogenetic tree and position-specific trees
@@ -65,22 +67,72 @@ public class Prediction {
         this.distribs = new EnumDistrib[phylotree.getSize()][];
     }
 
-    public static Prediction load(POGTree pogTree, String filename) {
-        throw new RuntimeException("Not implemented");
+    public static Prediction load(String filename) throws IOException {
+        FileReader freader=new FileReader(filename);
+        BufferedReader reader=new BufferedReader(freader);
+        StringBuilder sb = new StringBuilder();
+        String line = reader.readLine();
+        while (line != null) {
+            sb.append(line);
+            line = reader.readLine();
+        }
+        JSONObject json = new JSONObject(sb.toString());
+        String datatype = json.optString("Datatype");
+        if (datatype != null) { // can only check if provided
+            if (!datatype.equals(Prediction.class.getSimpleName()))
+                throw new ASRRuntimeException("Invalid input file: Wrong datatype " + datatype + " should be " + Prediction.class.getSimpleName());
+        }
+        JSONObject jinput = json.optJSONObject("Input");
+        if (jinput == null)
+            throw new ASRRuntimeException("Invalid input file: Missing \"Input\" field in JSON file");
+        POGTree pogtree = POGTree.fromJSON(jinput);
+        JSONArray jancs = json.optJSONArray("Ancestors");
+        if (jancs == null)
+            throw new ASRRuntimeException("Invalid input file: Missing \"Ancestors\" field in JSON file");
+        if (jancs.length() != pogtree.getTree().getNParents())
+            throw new ASRRuntimeException("Invalid input file: Number of ancestors " + jancs.length() + " does not match tree " + pogtree.getTree().getNParents());
+        Map<Object, POGraph> ancestors = new HashMap<>();
+        for (int i = 0; i < jancs.length(); i ++) {
+            JSONObject obj = jancs.getJSONObject(i);
+            POGraph pog = POGraph.fromJSON(obj);
+            ancestors.put(pog.getName(), pog);
+        }
+        return new Prediction(pogtree, ancestors);
     }
 
-    public void save(String filename) {
-        throw new RuntimeException("Not implemented");
+    public void save(String filename) throws IOException {
+        FileWriter fwriter=new FileWriter(filename);
+        BufferedWriter writer=new BufferedWriter(fwriter);
+        writer.write(toJSON().toString());
+        writer.newLine();
+        writer.close();
+        fwriter.close();
     }
 
+    /**
+     *
+     * @return
+     */
     public JSONObject toJSON() {
-        return toJSON(false);
+        JSONObject json = new JSONObject();
+        // To enable the confirmation of what software generated the data
+        json.put("GRASP_version", GRASP.VERSION);
+        json.put("Datatype", this.getClass().getSimpleName());
+        // to enable the confirmation of what input data was used, the input will also contain a hashcode
+        json.put("Input", pogTree.toJSON());
+        // finally, put the predicted POGs in there
+        List<POGraph> pogs = new ArrayList<>();
+        for (int i : pogTree.getTree().getAncestors())
+            pogs.add(ancarr[i]);
+        json.put("Ancestors", POGraph.toJSONArray(pogs));
+        return json;
     }
 
     /**
      * Create a JSON object from the prediction
      * @param INCLUDE_EXTANTS if true, extants are included in the returned object
      * @return
+     * @deprecated
      */
     public JSONObject toJSON(boolean INCLUDE_EXTANTS) {
         List<IdxGraph> saveme1e = new ArrayList<>();
@@ -311,7 +363,7 @@ public class Prediction {
     /**
      * Get the marginal distributions for a specified ancestor and substitution model.
      * Note that distributions are null for positions that are not part of the ancestor (i.e. the result of a deletion in an earlier ancestor,
-     * or parts that precede an insertion in a later ancestor)
+     * or parts that precede an insertion in a descendant)
      * @param ancestorID the ancestor ID
      * @param MODEL the substitution model
      * @return
@@ -431,7 +483,7 @@ public class Prediction {
      * @param gappy whether gaps should be included (as they appear from the POG index)
      * @return the sequence
      */
-    public EnumSeq getSequence(Object ancID, GRASP.Inference mode, boolean gappy) {
+    public Object[] getSequence(Object ancID, GRASP.Inference mode, boolean gappy) {
         int bpidx = getBranchpointIndex(ancID);                            // the index of the ancestor as it appears in the phylogenetic tree
         if (bpidx == -1) {
             throw new ASRRuntimeException("Invalid ancestor ID: " + ancID);
@@ -441,7 +493,7 @@ public class Prediction {
             throw new ASRRuntimeException("Failed to find optimal path for ancestor ID: " + ancID);
         int N = getPositions();
         Object[] elems = new Object[gappy ? N : idxs.length];
-        EnumSeq seq = gappy ? new EnumSeq.Gappy(pogTree.getDomain()) : new EnumSeq(pogTree.getDomain());
+        //EnumSeq seq = gappy ? new EnumSeq.Gappy(pogTree.getDomain()) : new EnumSeq(pogTree.getDomain());
         if (mode == GRASP.Inference.JOINT) {
             if (states == null) // not inferred yet
                 throw new ASRRuntimeException("Joint inference has not been performed: " + ancID);
@@ -453,10 +505,10 @@ public class Prediction {
             for (int i = 0; i < idxs.length; i ++)
                 elems[gappy ? idxs[i] : i] = distribs[bpidx][idxs[i]].getMax();
         }
-        seq.set(elems);
+//        seq.set(elems);
         String name = ancID.toString().startsWith("N") ? ancID.toString() : "N" + ancID.toString();
-        seq.setName(name); // FIXME: internal label is here re-named to have an "N" in-front: make naming strategy more principled?
-        return seq;
+//        seq.setName(name); // FIXME: internal label is here re-named to have an "N" in-front: make naming strategy more principled?
+        return elems;
     }
 
     /**

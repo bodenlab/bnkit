@@ -334,11 +334,11 @@ public class Newick {
         }
     }
 
-    public static void save(Tree tree, String filename) throws IOException {
+    public static void save(IdxTree tree, String filename) throws IOException {
         save(tree, filename, MODE_DEFAULT);
     }
 
-    public static void save(Tree tree, String filename, int MODE) throws IOException {
+    public static void save(IdxTree tree, String filename, int MODE) throws IOException {
         BufferedWriter bw = new BufferedWriter(new FileWriter(filename));
         String s = sprint(tree.getRoot(), MODE);
         bw.write(s + ";\n");

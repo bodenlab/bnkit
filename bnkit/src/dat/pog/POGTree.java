@@ -1,5 +1,6 @@
 package dat.pog;
 
+import asr.ASRRuntimeException;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.Interval1D;
@@ -7,6 +8,8 @@ import dat.IntervalST;
 import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
+import json.JSONArray;
+import json.JSONObject;
 
 import java.io.IOException;
 import java.util.*;
@@ -17,6 +20,7 @@ import java.util.*;
  * to present information necessary for analysis and inference.
  * The class TreeInstance is the vehicle for a unit of information to be transferred
  * to inference algorithms.
+ * @author mikael
  */
 public class POGTree {
 
@@ -27,7 +31,6 @@ public class POGTree {
     private POGraph[] extarr;               // POGs for extant sequences, indexed by branchpoint index
     private Map<Object, Integer> id2bpidx;  // the indices of extant sequences
     private IntervalST<Integer> ivals;      // Aggregation of all indels indicated by extant sequences (refactored to map-to bpidx Dec 2020)
-    private Enumerable domain;              // the alphabet
     private final int nNodes;
 
     /**
@@ -42,7 +45,7 @@ public class POGTree {
         this.phylotree = tree;
         this.id2bpidx = new HashMap<>();
         this.extarr = new POGraph[tree.getSize()]; // store extant POGs in array, indexed by branchpoint index
-        this.domain = aln.getDomain();
+//        this.domain = aln.getDomain();
         this.nNodes = aln.getWidth();
         this.ivals = new IntervalST<>();
         for (int j = 0; j < aln.getHeight(); j++) {
@@ -79,17 +82,6 @@ public class POGTree {
             pog.addEdge(from, to);
             ivals.put(new Interval1D(from, to), bpidx);
         }
-
-/*      MB removed 31 July 2022: "povals" is never used, unless some "forceLinear" option is active (and this is deprecated in Prediction)
-
-        // Add an interval between each linear position at a single sequence (to force linearity for Simple Indel Coding)
-
-        this.povals = new IntervalST<>();
-        for (int i = 0; i < aln.getWidth(); i++) {
-            if (! ivals.contains(new Interval1D(i, i+1))){
-                povals.put(new Interval1D(i, i+1), 0);
-            }
-        }*/
     }
 
     /**
@@ -101,18 +93,95 @@ public class POGTree {
      */
     public POGTree(Map<String, POGraph> extants, IdxTree tree) {
         this.phylotree = tree;
-
-        throw new RuntimeException("Not implemented");
+        this.id2bpidx = new HashMap<>();
+        if (extants.size() != tree.getNLeaves())
+            throw new ASRRuntimeException("Invalid combination of extant POGs and tree");
+        this.extarr = new POGraph[tree.getSize()]; // store extant POGs in array, indexed by branchpoint index
+        Enumerable mydomain = null;
+        int mynNodes = -1;
+        this.ivals = new IntervalST<>();
+        int j = 0;
+        for (Map.Entry<String, POGraph> entry : extants.entrySet()) {
+            String name = entry.getKey();
+            POGraph pog = entry.getValue();
+            if (mynNodes == -1 || mynNodes == pog.nNodes)
+                mynNodes = pog.nNodes;
+            else
+                throw new ASRRuntimeException("Invalid POG size: " + pog.nNodes + " should be " + mynNodes);
+            int bpidx = tree.getIndex(name);
+            extarr[bpidx] = pog;
+            id2bpidx.put(name, bpidx);
+            for (int i = 0; i < pog.nNodes; i ++) {
+                if (pog.nodes[i] == null)
+                    continue;
+                else {
+                    Node n = pog.getNode(i);
+                    //new SymNode();
+//                    n.setXLabel(i + 1);
+//                    pog.addNode(to, n);
+//                    pog.addEdge(from, to);
+//                    ivals.put(new Interval1D(from, to), bpidx);
+                }
+            }
+            j += 1;
+        }
+        this.nNodes = mynNodes;
     }
+
+
+//    @Override
+//    public boolean equals(Object o) {
+//        if (this == o) return true;
+//        if (!(o instanceof POGTree)) return false;
+//        POGTree pogTree = (POGTree) o;
+//        return nNodes == pogTree.nNodes && Objects.equals(phylotree, pogTree.phylotree) && Arrays.equals(leafidxs, pogTree.leafidxs) && Arrays.equals(extarr, pogTree.extarr) && Objects.equals(domain, pogTree.domain);
+//    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(phylotree, nNodes);
+        result = 31 * result + Arrays.hashCode(leafidxs);
+        result = 31 * result + Arrays.hashCode(extarr);
+        return result;
+    }
+
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        json.put("Hashcode", hashCode());
+        json.put("Tree", phylotree.toJSON());
+        List<POGraph> pogs = new ArrayList<>();
+        for (int i : phylotree.getLeaves())
+            pogs.add(extarr[i]);
+        json.put("Extants", POGraph.toJSONArray(pogs));
+        return json;
+    }
+
+    public static POGTree fromJSON(JSONObject json) {
+        JSONArray jexts = json.optJSONArray("Extants");
+        if (jexts == null)
+            throw new ASRRuntimeException("Failed to load extants: no field \"Extants\" in JSON.");
+        Map<String, POGraph> extmap = new HashMap<>();
+        for (int i = 0; i < jexts.length(); i ++) {
+            JSONObject obj = jexts.getJSONObject(i);
+            POGraph pog = POGraph.fromJSON(obj);
+            extmap.put(pog.getName(), pog);
+        }
+        JSONObject jtree = json.optJSONObject("Tree");
+        if (jtree == null)
+            throw new ASRRuntimeException("Failed to load tree: no field \"Extants\" in JSON.");
+        IdxTree tree = IdxTree.fromJSON(jtree);
+        return new POGTree(extmap, tree);
+    }
+
 
     /**
      * Retrieve the data type (domain) of the characters on the alignment,
      * nodes in the POG and target states of the phylogenetic inference.
      * @return the domain
      */
-    public Enumerable getDomain() {
-        return domain;
-    }
+//    public Enumerable getDomain() {
+//        return domain;
+//    }
 
     /**
      * Retrieve the phylogenetic tree, as an index tree

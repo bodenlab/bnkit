@@ -2,6 +2,7 @@ package dat.pog;
 
 import dat.EnumSeq;
 import dat.Enumerable;
+import json.JSONObject;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -59,6 +60,13 @@ public class SeqEdge extends Edge implements WeightedEdge {
 
     public Set<EnumSeq<Enumerable>> getSeqs() {
         return seqs;
+    }
+
+    @Override
+    public JSONObject toJSON() {
+        JSONObject json = super.toJSON();
+        // TODO: look into what info should go here (remember sequences should not be stored here)
+        return json;
     }
 
 }

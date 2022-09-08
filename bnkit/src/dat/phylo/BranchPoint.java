@@ -71,6 +71,14 @@ public class BranchPoint {
     }
 
     /**
+     * Check if this branch point is a parent, i.e. has children of its own
+     * @return
+     */
+    public boolean isParent() {
+        return !children.isEmpty();
+    }
+
+    /**
      * Retrieve identifier for branch point.
      * This is the label (leaf) or ancestor counter (internal).
      * Should be unique to be used in a tree.

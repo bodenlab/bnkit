@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "30-July-2022";
+    public static String VERSION = "28-Aug-2022";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -51,6 +51,7 @@ public class GRASP {
                 "\t[-a | --aln <filename>]\n" +
                 "\t[-n | --nwk <filename>]\n" +
                 "\t{-o | --output-folder <foldername>} (default is current working folder)\n" +
+                "\t{-i | --input-folder <foldername>]\n" +
                 "\t{-pre | --prefix <stub>}\n" +
                 "\t{-rf | --rates-file <filename>}\n" +
                 "\t{-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
@@ -79,7 +80,7 @@ public class GRASP {
                 "\t-o (or --output-folder) specifies the folder that will be used to save output files,\n\t\te.g. inferred ancestor or ancestors, tree, etc. as specified by format\n" +
                 "\t-sa (or --save-as) lists the files and formats to be generated (see below)\n\t--save-all nominates all\n" +
                 "\t-pre (or --prefix) specifies a stub that is added to result filenames (default is the prefix of the alignment file)\n" +
-                "\t-i (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
+                "\t-indel (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
                 "\t-s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)\n" +
                 "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific rates\n\t\te.g. as produced by IQ-TREE\n" +
                 "\t--include-extants means that extants are included in output files (when the format allows)\n" +
@@ -122,9 +123,11 @@ public class GRASP {
 
     public static void main(String[] args) {
 
+        String ASRFILE = "ASR.json";
         String ALIGNMENT = null;
         String NEWICK = null;
         String OUTPUT = null;
+        String INPUT = null;
         String PREFIX = null;
         String RATESFILE = null;
         double[] RATES = null;
@@ -164,6 +167,8 @@ public class GRASP {
                     NEWICK = args[++ a];
                 } else if ((arg.equalsIgnoreCase("-output-folder") || arg.equalsIgnoreCase("o")) && args.length > a + 1) {
                     OUTPUT = args[++a];
+                } else if ((arg.equalsIgnoreCase("-input-folder") || arg.equalsIgnoreCase("i")) && args.length > a + 1) {
+                    INPUT = args[++a];
                 } else if ((arg.equalsIgnoreCase("-prefix") || arg.equalsIgnoreCase("pre")) && args.length > a + 1) {
                     PREFIX = args[++ a];
                 } else if ((arg.equalsIgnoreCase("-rates-file") || arg.equalsIgnoreCase("rf")) && args.length > a + 1) {
@@ -190,7 +195,7 @@ public class GRASP {
                     }
                     if (!found_model)
                         usage(1, args[a + 1] + " is not a valid model name for option --substitution-model");
-                } else if ((arg.equalsIgnoreCase("-indel-method") || arg.equalsIgnoreCase("i")) && args.length > a + 1) {
+                } else if ((arg.equalsIgnoreCase("-indel-method") || arg.equalsIgnoreCase("indel")) && args.length > a + 1) {
                     boolean found_indel = false;
                     for (int i = 0; i < INDELS.length; i++) {
                         if (args[a + 1].startsWith(INDELS[i])) {
@@ -260,18 +265,18 @@ public class GRASP {
             }
         }
 
-        if (ALIGNMENT == null)
-            usage(3, "Must specify alignment (Clustal or FASTA file)");
-        else if (NEWICK == null)
-            usage(4, "Must specify phylogenetic tree (Newick file)");
+        if (ALIGNMENT == null && INPUT == null)
+            usage(3, "Must specify alignment (--aln <Clustal or FASTA file>) or previously saved folder (--input-folder <folder>");
+        else if (NEWICK == null && INPUT == null)
+            usage(4, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>");
         else if (OUTPUT == null)
             OUTPUT = ".";
 
         if (PREFIX == null) { // default prefix is the (prefix of) alignment filename
-            int idx = ALIGNMENT.indexOf(".");
+            int idx = ALIGNMENT == null ? 0 : ALIGNMENT.indexOf(".");
             if (idx == -1)
                 idx = ALIGNMENT.length();
-            PREFIX = ALIGNMENT.substring(0, idx);
+            PREFIX = ALIGNMENT == null ? "" : ALIGNMENT.substring(0, idx);
         }
         MODEL = SubstModel.createModel(MODELS[MODEL_IDX]);
         if (MODEL == null)
@@ -314,46 +319,55 @@ public class GRASP {
         }
 
         try {
-            EnumSeq.Alignment aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
-            Tree tree = Utils.loadTree(NEWICK);
-            Utils.checkData(aln, tree);
-            if (MODE == Inference.MARGINAL) {
-                if (tree.getIndex(MARG_NODE) < 0)
-                    usage(2, MARG_NODE + " is not a valid ancestor number");
-            } else if (MODE == Inference.JOINT) {
-            }
-            // if we are past the above, we can assume that the data are good to process
-            START_TIME = System.currentTimeMillis();
-            POGTree pogtree = new POGTree(aln, tree);
             Prediction indelpred = null;
-            switch (INDEL_IDX) {
-                case 0:
-                    indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
-                    break;
-                case 1:
-                    indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogtree);
-                    break;
-                case 2:
-                    indelpred = Prediction.PredictBySICP(pogtree);
-                    break;
-                case 3:
-                    indelpred = Prediction.PredictBySICML(pogtree);
-                    break;
-                case 4:
-                    indelpred = Prediction.PredictByParsimony(pogtree);
-                    break;
-                case 5:
-                    indelpred = Prediction.PredictByMaxLhood(pogtree);
-                    break;
-                default:
-                    break;
+            if (INPUT != null) {
+                try {
+                    indelpred = Prediction.load(INPUT + "/" + ASRFILE);
+                } catch (ASRRuntimeException e) {
+                    usage(7, "Prediction failed to load: " + e.getMessage());
+                }
+            }
+            START_TIME = System.currentTimeMillis();
+            if (indelpred == null) {
+                EnumSeq.Alignment aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
+                Tree tree = Utils.loadTree(NEWICK);
+                Utils.checkData(aln, tree);
+                if (MODE == Inference.MARGINAL) {
+                }
+                // if we are past the above, we can assume that the data are good to process
+                POGTree pogtree = new POGTree(aln, tree);
+                switch (INDEL_IDX) {
+                    case 0:
+                        indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
+                        break;
+                    case 1:
+                        indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogtree);
+                        break;
+                    case 2:
+                        indelpred = Prediction.PredictBySICP(pogtree);
+                        break;
+                    case 3:
+                        indelpred = Prediction.PredictBySICML(pogtree);
+                        break;
+                    case 4:
+                        indelpred = Prediction.PredictByParsimony(pogtree);
+                        break;
+                    case 5:
+                        indelpred = Prediction.PredictByMaxLhood(pogtree);
+                        break;
+                    default:
+                        break;
+                }
             }
             if (indelpred == null)
                 usage(3, INDELS[INDEL_IDX] + " is not implemented");
             if (MODE == Inference.JOINT)
                 indelpred.getJoint(MODEL, RATES);
-            else if (MODE == Inference.MARGINAL)
+            else if (MODE == Inference.MARGINAL) {
+                if (indelpred.getTree().getIndex(MARG_NODE) < 0)
+                    usage(2, MARG_NODE + " is not a valid ancestor number");
                 indelpred.getMarginal(MARG_NODE, MODEL, RATES);
+            }
             POGraph.SUPPORTED_PATH_DEFAULT = SPATH_IDX;
             Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
             POGraph[] ancestors = new POGraph[pogs.size()];
@@ -370,35 +384,31 @@ public class GRASP {
                 for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
                     ancestors[ii++] = entry.getValue();
             }
-            EnumSeq[] ancseqs_gappy = null;
-            EnumSeq[] ancseqs_nogap = null;
+            Object[][] ancseqs_gappy = null;
+            Object[][] ancseqs_nogap = null;
+            String[] ancnames = new String[pogs.size()];
             if (NEED_CONSENSUS) {
-                ancseqs_gappy = new EnumSeq[pogs.size() + (INCLUDE_EXTANTS ? aln.getHeight() : 0)];
-                ancseqs_nogap = new EnumSeq[pogs.size() + (INCLUDE_EXTANTS ? aln.getHeight() : 0)];
+                ancseqs_gappy = new Object[pogs.size()][];
+                ancseqs_nogap = new Object[pogs.size()][];
                 int ii = 0;
                 try {
                     for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
                         if (MODE == Inference.MARGINAL) {
+                            ancnames[0] = "N" + entry.getKey().toString();
                             ancseqs_gappy[0] = indelpred.getSequence(entry.getKey(), MODE, true);
                             ancseqs_nogap[0] = indelpred.getSequence(entry.getKey(), MODE, false);
                             break;
                         }
+                        ancnames[(Integer) entry.getKey()] = "N" + entry.getKey().toString();
                         ancseqs_gappy[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, true);
                         ancseqs_nogap[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, false);
                         ii ++;
                     }
                 } catch (NumberFormatException exc) {
                     for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                        ancnames[ii] = "N" + entry.getKey().toString();
                         ancseqs_gappy[ii] = indelpred.getSequence(entry.getKey(), MODE, true);
                         ancseqs_nogap[ii ++] = indelpred.getSequence(entry.getKey(), MODE, false);
-                    }
-                }
-                if (INCLUDE_EXTANTS) {
-                    for (int iii = 0; iii < aln.getHeight(); iii++) {
-                        ancseqs_gappy[ii] = aln.getEnumSeq(iii);
-                        ancseqs_nogap[ii] = new EnumSeq(aln.getEnumSeq(iii).getType());
-                        ancseqs_nogap[ii].set(aln.getEnumSeq(iii).getStripped());
-                        ancseqs_nogap[ii ++].setName(aln.getEnumSeq(iii).getName());
                     }
                 }
             }
@@ -419,9 +429,9 @@ public class GRASP {
                         else
                             fw = new FastaWriter(new File(OUTPUT, PREFIX + "_ancestors.fa"));
                         if (GAPPY)
-                            fw.save(ancseqs_gappy);
+                            fw.save(ancnames, ancseqs_gappy);
                         else
-                            fw.save(ancseqs_nogap);
+                            fw.save(ancnames, ancseqs_nogap);
                         fw.close();
                         break;
                     case 1: // DISTRIB
@@ -463,24 +473,19 @@ public class GRASP {
                             aw = new AlnWriter(new File(OUTPUT, PREFIX + "_N" + MARG_NODE + ".aln"));
                         else
                             aw = new AlnWriter(new File(OUTPUT, PREFIX + "_ancestors.aln"));
-                        aw.save(ancseqs_gappy);
+                        aw.save(ancnames, ancseqs_gappy);
                         aw.close();
                         break;
                     case 3: // TREE
-                        Newick.save(tree, OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
+                        Newick.save(indelpred.getTree(), OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
                         break;
                     case 4: // POGS
-                        JSONObject json = indelpred.toJSON(INCLUDE_EXTANTS);
-                        String filename = OUTPUT + "/" + "pogs.json";
-                        FileWriter fwriter=new FileWriter(filename);
-                        BufferedWriter writer=new BufferedWriter(fwriter);
-                        writer.write(json.toString());
-                        writer.newLine();
-                        writer.close();
-                        fwriter.close();
+                        String filename = OUTPUT + "/" + ASRFILE;
+                        indelpred.save(filename);
                         break;
                     case 5: // DOT
                         Map<Object, IdxGraph> saveme2 = new HashMap<>();
+/*
                         if (INCLUDE_EXTANTS) {
                             IdxGraph g = new POAGraph(aln);
                             g.setName("Exts");
@@ -491,6 +496,7 @@ public class GRASP {
                                 saveme2.put(name, g);
                             }
                         }
+ */
                         for (int idx = 0; idx < ancestors.length; idx++) {
                             ancestors[idx].setName("N" + idx);
                             saveme2.put("N" + idx, ancestors[idx]);
@@ -503,6 +509,7 @@ public class GRASP {
                         else
                             usage(9, "Instantiations of position specific trees not available from marginal inference");
                         break;
+/*
                     case 7: // MATLAB
                         Map<Object, IdxGraph> saveme = new HashMap<>();
                         saveme.put("Extants", new POAGraph(aln));
@@ -521,6 +528,7 @@ public class GRASP {
                             saveme3.put("N" + idx, ancestors[idx]);
                         IdxGraph.saveToLaTeX(OUTPUT, saveme3);
                         break;
+ */
                 }
                 ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
                 if (VERBOSE || TIME) {

@@ -62,14 +62,14 @@ public class FastaWriter {
     public boolean exists() {
         return fileExists;
     }
-    
+
     /**
      * Writes the sequence name on FASTA format to a string.
      * @return the defline string (FASTA)
      */
-    public static String defline(EnumSeq seq) {
+    public static String defline(String name) {
         StringBuffer sbuf=new StringBuffer();
-        sbuf.append(">"+seq.getName()+" ");
+        sbuf.append(">"+name+" ");
         return sbuf.toString().trim();
     }
 
@@ -88,8 +88,8 @@ public class FastaWriter {
                 System.err.println("No sequence for " + collection[s].getName());
                 continue;
             }
-            try { 
-                writer.write(defline(collection[s]));
+            try {
+                writer.write(defline(collection[s].getName()));
                 for (int i=0; i<str.length; i++) {
                     if (i % LINE_WIDTH == 0)
                         writer.newLine();
@@ -105,7 +105,42 @@ public class FastaWriter {
             }
         }
     }
-    
+
+    /**
+     * Saves the sequences to the file.
+     * It uses the Sequence.write method to generate the String[] to write to the file
+     * So if you want to make your own version of the FASTA entry, extend Sequence and overwrite "write".
+     * Don't forget to {@see close} the file after all sequences have been stored.
+     * @param collection the collection of sequences
+     * @throws IOException if the write operation fails
+     */
+    public void save(String[] names, Object[][] collection) throws IOException {
+        if (names.length != collection.length)
+            throw new RuntimeException("Invalid arguments for saving to FASTA");
+        for (int s=0; s<collection.length; s++) {
+            Object[] str=collection[s];
+            if (str == null) {
+                System.err.println("No sequence for " + names[s]);
+                continue;
+            }
+            try {
+                writer.write(defline(names[s]));
+                for (int i=0; i<str.length; i++) {
+                    if (i % LINE_WIDTH == 0)
+                        writer.newLine();
+                    try {
+                        writer.write(str[i].toString());
+                    } catch (NullPointerException npe) {
+                        writer.write("-"); //to catch gaps not stored in EnumSeq arr
+                    }
+                }
+                writer.newLine();
+            } catch (IOException e) {
+                throw new IOException("Error in writing sequence "+names[s]+" (index "+s+")");
+            }
+        }
+    }
+
     /**
      * Closes the file so that it can be read by others.
      * @throws IOException if the close operation fails

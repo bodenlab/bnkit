@@ -1,5 +1,9 @@
 package dat.phylo;
 
+import json.JSONArray;
+import json.JSONException;
+import json.JSONObject;
+
 import java.util.*;
 
 /**
@@ -26,6 +30,100 @@ public class IdxTree implements Iterable<Integer> {
         children = new int[bpoints.length][];
         index = new HashMap<>();
         distance = (usedistances ? new double[bpoints.length] : null);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        IdxTree integers = (IdxTree) o;
+        return Objects.equals(index, integers.index) && Arrays.equals(parent, integers.parent) && Arrays.equals(distance, integers.distance);
+    }
+
+    @Override
+    public int hashCode() {
+        String[] labels = new String[this.getNLeaves()];
+        int cnt = 0;
+        for (int i : this.getLeaves())
+            labels[cnt ++] = getLabel(i).toString();
+        int result = Objects.hash(labels);
+        result = 31 * result + Arrays.hashCode(parent);
+        result = 31 * result + Arrays.hashCode(distance);
+        return result;
+    }
+
+    public static IdxTree fromJSON(JSONObject json) {
+        int n = json.getInt("Branchpoints");
+        JSONArray jdists = json.getJSONArray("Distances");
+        IdxTree tree = new IdxTree(n, jdists != null);
+        JSONArray jlabs = json.getJSONArray("Labels");
+        JSONArray jpars = json.getJSONArray("Parents");
+        for (int p = 0; p < n; p ++) {
+            try {
+                tree.parent[p] = jpars.getInt(p);
+                if (jdists != null)
+                    tree.distance[p] = jdists.getDouble(p);
+                tree.index.put(jlabs.getString(p), p);
+            } catch (JSONException e) {
+                throw new TreeRuntimeException("Invalid JSON format: " + e.getMessage());
+            }
+        }
+        for (int p = 0; p < n; p ++) {
+            // check through all children if they have p as parent
+            List<Integer> ch = new ArrayList<>();
+            for (int c = 0; c < n; c ++) {
+                if (tree.parent[c] == p) // if c has p as parent add it to list
+                    ch.add(c);
+            }
+            // convert list to array
+            tree.children[p] = new int[ch.size()];
+            for (int i = 0; i < ch.size(); i ++)
+                tree.children[p][i] = ch.get(i);
+        }
+        // finally fix the branchpoints
+        for (int p = 0; p < n; p ++) {
+            BranchPoint bp = new BranchPoint(jlabs.getString(p));
+            if (tree.distance != null)
+                bp.setDistance(tree.distance[p]);
+            tree.bpoints[p] = bp;
+        }
+        Integer ancid = 0;
+        for (int p = 0; p < n; p ++) {
+            BranchPoint bp = tree.bpoints[p];
+            if (tree.parent[p] >= 0)
+                bp.setParent(tree.bpoints[tree.parent[p]]);
+            for (int c = 0; c < tree.children[p].length; c ++)
+                bp.addChild(tree.bpoints[tree.children[p][c]]);
+            if (bp.isParent())
+                bp.setAncestor(ancid ++);
+        }
+        return tree;
+    }
+
+    /**
+     * Convert instance to JSON
+     * @return
+     */
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        json.put("Branchpoints", bpoints.length);
+        String[] labels = new String[bpoints.length];
+        for (Map.Entry<Object, Integer> entry : index.entrySet())
+            labels[entry.getValue()] = entry.getKey().toString();
+        JSONArray labarr = new JSONArray();
+        JSONArray pararr = new JSONArray();
+        JSONArray distarr = new JSONArray();
+        for (int i = 0; i < bpoints.length; i ++) {
+            labarr.put(labels[i]);
+            pararr.put(parent[i]);
+            if (distance != null)
+                distarr.put(distance[i]);
+        }
+        json.put("Labels", labarr);
+        json.put("Parents", pararr);
+        if (distance != null)
+            json.put("Distances", distarr);
+        return json;
     }
 
     /**

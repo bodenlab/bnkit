@@ -1,6 +1,11 @@
 package dat.phylo;
 
+import asr.TrAVIS;
+import dat.EnumSeq;
+import dat.Enumerable;
+import dat.file.Newick;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -87,4 +92,29 @@ class IdxTreeTest {
         }
     }
 
+    int nSEEDS = 10;
+    int[] nextants      = new int[] {5, 25, 100};               // number of extants
+    Tree[] trees = new Tree[nextants.length * nSEEDS];
+
+    void setUp() {
+        double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
+        double GAMMA_SCALE = 0.2;
+        for (int i = 0; i < nextants.length; i ++) {
+            int N = nextants[i]; // number of leaves
+            for (int SEED = 0; SEED < nSEEDS; SEED ++)
+                trees[nSEEDS * i + SEED] = Tree.Random(N, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2);
+        }
+        int z = 2;
+    }
+
+    @Test
+    void toJSON() {
+        setUp();
+        assertTrue(defaultTree.toJSON().toString().equals(IdxTree.fromJSON(defaultTree.toJSON()).toJSON().toString()));
+        assertEquals(defaultTree.hashCode(), IdxTree.fromJSON(defaultTree.toJSON()).hashCode());
+        for (IdxTree t : trees)
+            assertTrue(t.toJSON().toString().equals(IdxTree.fromJSON(t.toJSON()).toJSON().toString()));
+        for (IdxTree t : trees)
+            assertEquals(t.hashCode(), IdxTree.fromJSON(t.toJSON()).hashCode());
+    }
 }

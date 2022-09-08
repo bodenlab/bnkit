@@ -1,5 +1,9 @@
 package dat.pog;
 
+import asr.GRASP;
+import json.JSONArray;
+import json.JSONObject;
+
 import java.util.*;
 
 /**
@@ -20,6 +24,68 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
     public IdxEdgeGraph(int nNodes, boolean undirected, boolean terminated) {
         super(nNodes, undirected, terminated);
         this.edges = new HashMap<>();
+    }
+
+    @Override
+    public int hashCode() {
+        int result = super.hashCode();
+        Integer[] edgeidxs = new Integer[edges.keySet().size()];
+        edges.keySet().toArray(edgeidxs);
+        Arrays.sort(edgeidxs);
+        result = 31 * result + Arrays.hashCode(edgeidxs);
+        return result;
+    }
+
+    /**
+     * Create a JSON representation of the instance
+     * FIXME: currently a lot of duplicated code from IdxGraph#toJSON, which should be inherited
+     * @return JSON object of this instance
+     */
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        json.put("Datatype", this.getClass().getSimpleName());
+        json.put("GRASP_version", GRASP.VERSION);
+        json.put("Name", getName().length() == 0 ? null : getName());
+        json.put("Size", this.nNodes);
+        json.put("Terminated", isTerminated());
+        json.put("Directed", isDirected());
+        if (this.isTerminated()) {
+            json.put("Starts", this.getStarts());
+            json.put("Ends", this.getEnds());
+        }
+        JSONArray narr = new JSONArray();
+        JSONArray earr = new JSONArray();
+        List<JSONObject> nodelist = new ArrayList<>();
+        List<JSONObject> edgelist = new ArrayList<>();
+        for (int idx = 0; idx < nNodes; idx ++) {
+            if (nodes[idx] != null) { // the index is used in the POG, so add it to the list of indices
+                JSONObject node = new JSONObject();
+                narr.put(idx);
+                int[] edges = getNodeIndices(idx, true); // getForward
+                earr.put(edges);
+                for (int i = 0; i < edges.length; i ++) { // for the index, include all the indices that are linked "forward"
+                    int to = edges[i];
+                    E e = getEdge(idx, to);
+                    if (e != null) {
+                        JSONObject edge = e.toJSON();
+                        edge.put("From", idx);
+                        edge.put("To", to);
+                        edgelist.add(edge);
+                    }
+                }
+                String label = nodes[idx].getLabel();
+                if (label != null) {
+                    node.put("Index", idx);
+                    node.put("Label", label);
+                    nodelist.add(node);
+                }
+            }
+        }
+        json.put("Indices", narr);
+        json.put("Adjacent", earr);
+        json.put("Nodes", nodelist);
+        json.put("Edges", edgelist);
+        return json;
     }
 
     /**

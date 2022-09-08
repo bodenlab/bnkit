@@ -2,14 +2,13 @@ package dat.pog;
 
 import asr.ASRException;
 import asr.ASRRuntimeException;
+import asr.GRASP;
 import bn.prob.EnumDistrib;
 import json.JSONArray;
+import json.JSONException;
 import json.JSONObject;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 /**
@@ -70,6 +69,12 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         }
         return pog;
     }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode();
+    }
+
     /**
      * Get string representation of instance
      * @return
@@ -83,47 +88,63 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      * @return JSON object of this instance
      */
     public JSONObject toJSON() {
-        JSONObject json = new JSONObject();
-        json.put("Name", getName().length() == 0 ? null : getName());
-        json.put("Size", this.nNodes);
-        json.put("Starts", this.getStarts());
-        json.put("Ends", this.getEnds());
-        JSONArray narr = new JSONArray();
-        JSONArray earr = new JSONArray();
-        List<JSONObject> nodelist = new ArrayList<>();
-        List<JSONObject> edgelist = new ArrayList<>();
-        for (int idx = 0; idx < nNodes; idx ++) {
-            if (nodes[idx] != null) { // the index is used in the POG, so add it to the list of indices
-                JSONObject node = new JSONObject();
-                narr.put(idx);
-                int[] edges = getForward(idx);
-                earr.put(edges);
-                for (int i = 0; i < edges.length; i ++) { // for the index, include all the indices that are linked "forward"
-                    int to = edges[i];
-                    StatusEdge e = getEdge(idx, to);
-                    if (e != null) {
-                        JSONObject edge = new JSONObject();
-                        edge.put("From", idx);
-                        edge.put("To", to);
-                        edge.put("Recip", e.getReciprocated());
-                        edge.put("Weight", e.getWeight());
-                        edgelist.add(edge);
-                    }
-                }
-                String label = nodes[idx].getLabel();
-                if (label != null) {
-                    node.put("Index", idx);
-                    node.put("Label", label);
-                    nodelist.add(node);
-                }
-            }
-        }
-        json.put("Indices", narr);
-        json.put("Adjacent", earr);
-        json.put("Nodes", nodelist);
-        json.put("Edges", edgelist);
+        JSONObject json = super.toJSON();
+        // consider if anything needs to be added
         return json;
     }
+
+    /**
+     * Decode JSON object into an instance of POGraph
+     * @param json
+     * @return
+     * @throws RuntimeException if there is a formatting problem
+     */
+    public static POGraph fromJSON(JSONObject json) {
+        try {
+            String version = json.optString("GRASP_version", null);
+            String datatype = json.optString("Datatype", null);
+            if (version != null)
+                if (!(version.equals(GRASP.VERSION) || version.equals("30-July-2022")))
+                    throw new ASRRuntimeException("Invalid version: " + version);
+            if (datatype != null)
+                if (!(datatype.equals("POGraph")))
+                    throw new ASRRuntimeException("Invalid datatype: " + datatype);
+            int n = json.getInt("Size");
+            boolean terminated = json.getBoolean("Terminated");
+            boolean directed = json.getBoolean("Directed");
+            if (terminated && directed) {
+                POGraph g = new POGraph(n);
+                g.useJSON(json);
+                return g;
+            } else
+                throw new ASRRuntimeException("POGraph format is wrong in JSON object: is not terminated or not directed");
+        } catch (JSONException e) {
+            throw new ASRRuntimeException("POGraph format is wrong in JSON object: " + e.getMessage());
+        }
+    }
+
+    public static List<POGraph> loadFromJSON(String directory) throws IOException {
+        FileReader freader=new FileReader(directory);
+        BufferedReader reader=new BufferedReader(freader);
+        String line = reader.readLine();
+        StringBuilder sb = new StringBuilder();
+        while (line != null) {
+            String myline = line.trim();
+            sb.append(myline);
+            line = reader.readLine();
+        }
+        reader.close();
+        freader.close();
+        // expect an array of JSON objects
+        JSONArray arr = new JSONArray(sb.toString());
+        List<POGraph> ret = new ArrayList<>();
+        for (int i = 0; i < arr.length(); i ++) {
+            JSONObject obj = arr.getJSONObject(i);
+            ret.add(POGraph.fromJSON(obj));
+        }
+        return ret;
+    }
+
 
     /**
      * Determine the node indices that are ahead (forward direction). Note that it terminates at last node, so will not return the end marker.
@@ -822,6 +843,13 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                     ("penwidth=" + (getWeight() + 1) + ",") +
                     ((fontname == null) ? "" : ("fontname=\"" + fontname + "\",")) +
                     (reciprocated ? "" : ("style=\"dashed\""));
+        }
+        @Override
+        public JSONObject toJSON() {
+            JSONObject edge = super.toJSON();
+            edge.put("Recip", getReciprocated());
+            edge.put("Weight", getWeight());
+            return edge;
         }
     }
 

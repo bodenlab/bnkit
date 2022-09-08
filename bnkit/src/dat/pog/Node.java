@@ -16,6 +16,18 @@ public class Node {
 
     }
 
+    @Override
+    public boolean equals(Object other) {
+        if (! (other instanceof Node))
+            return false;
+        String otherlabel = ((Node) other).getLabel();
+        if (label == null)
+            return otherlabel == null;
+        else if (otherlabel != null)
+            return (label.equalsIgnoreCase(((Node) other).getLabel()));
+        return false;
+    }
+
     public String toDOT() {
         return  ((getFillcolor() == null) ? "" : ("fillcolor=\"" + getFillcolor() + "\",")) +
                 ((shape == null) ? "" : ("shape=" + shape + ",")) +

@@ -148,7 +148,10 @@ class TrAVISTest {
                             System.err.println("Could not find index for label " + name.toString());
                         }
                     }
-                    ancseqs[idx] = indelpred.getSequence(name, GRASP.Inference.JOINT, true);
+                    Object[] oseq = indelpred.getSequence(name, GRASP.Inference.JOINT, true);
+                    ancseqs[idx] = new EnumSeq(aln.getDomain());
+                    ancseqs[idx].setName(name.toString());
+                    ancseqs[idx].set(oseq);
                 }
                 for (int idx = 0; idx < ancseqs.length; idx++) {
                     EnumSeq predict = ancseqs[idx];

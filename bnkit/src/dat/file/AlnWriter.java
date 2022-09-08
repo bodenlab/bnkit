@@ -87,6 +87,35 @@ public class AlnWriter {
     }
 
     /**
+     * Saves the sequences to the file.
+     *
+     * @param collection the collection of sequences
+     * @throws IOException if the write operation fails
+     */
+    public void save(String[] names, Object[][] collection) throws IOException {
+        try {
+            writer.write("CLUSTAL");
+            writer.newLine();
+            writer.newLine();
+            int line = 0;
+            while (line < collection[0].length) {
+                for (int s = 0; s < collection.length; s++) {
+                    Object[] seq = collection[s];
+                    writer.write(names[s] + "\t");
+                    for (int i = line; i < line + LINE_WIDTH && i < seq.length; i++)
+                        writer.write(seq[i].toString());
+                    writer.newLine();
+                }
+                line += LINE_WIDTH;
+                writer.newLine();
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            throw new IOException("Error writing sequences.");
+        }
+    }
+
+    /**
      * Closes the file so that it can be read by others.
      *
      * @throws IOException if the close operation fails

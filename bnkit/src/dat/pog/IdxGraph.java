@@ -1,12 +1,13 @@
 package dat.pog;
 
 import asr.ASRException;
+import asr.ASRRuntimeException;
+import asr.GRASP;
 import json.JSONArray;
+import json.JSONException;
 import json.JSONObject;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 public class IdxGraph {
@@ -34,6 +35,71 @@ public class IdxGraph {
             this.startNodes = new BitSet(nNodes);
             this.endNodes = new BitSet(nNodes);
         }
+    }
+
+    /**
+     * Compare two graphs logically
+     * Implemented so that two graphs can be compared "logically"
+     * @param obj
+     * @return
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null)
+            return false;
+        if (!(obj instanceof IdxGraph))
+            return false;
+        IdxGraph other = (IdxGraph) obj;
+        if ((name == null && other.name != null) || (name != null && other.name == null))
+            return false;
+        if (name != null && other.name != null) {
+            if (!name.equals(other.name))
+                return false;
+        }
+        if (directed != other.isDirected())
+            return false;
+        if (nNodes != other.nNodes)
+            return false;
+        for (int i = 0; i < nNodes; i ++) {
+            if (nodes[i] != null)
+                if (!nodes[i].equals(other.nodes[i]))
+                    return false;
+        }
+        if (isTerminated()) {
+            if (!startNodes.equals(other.startNodes))
+                return false;
+            if (!endNodes.equals(other.endNodes))
+                return false;
+        }
+        if (edgesForward.length != other.edgesForward.length)
+            return false;
+        for (int i = 0; i < edgesForward.length; i ++) {
+            if (edgesForward[i] == null && other.edgesForward[i] == null)
+                continue;
+            if (edgesForward[i] != null)
+                if (!edgesForward[i].equals(other.edgesForward[i]))
+                    return false;
+        }
+        if (isDirected()) {
+            if (edgesBackward.length != other.edgesBackward.length)
+                return false;
+            for (int i = 0; i < edgesBackward.length; i ++) {
+                if (edgesBackward[i] == null && other.edgesBackward[i] == null)
+                    continue;
+                if (edgesBackward[i] != null)
+                    if (!edgesBackward[i].equals(other.edgesBackward[i]))
+                        return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(directed, nNodes, startNodes, endNodes, name);
+        result = 31 * result + Arrays.hashCode(edgesForward);
+        result = 31 * result + Arrays.hashCode(edgesBackward);
+        return result;
     }
 
     public static IdxGraph makeTerminatedDAG(int nNodes) {
@@ -827,9 +893,88 @@ public class IdxGraph {
             Node node = new Node();
             return super.addNode(node);
         }
-
     }
 
+    /**
+     * Put the class specific info from JSON into instance
+     * @param json
+     */
+    protected void useJSON(JSONObject json) {
+        try {
+            String name = json.optString("Name", null);
+            if (name != null) this.setName(name);
+            JSONArray narr = json.getJSONArray("Indices");
+            JSONArray earr = json.getJSONArray("Adjacent");
+            if (narr.length() != earr.length())
+                throw new RuntimeException("IdxGraph format is wrong in JSON object: mismatch in number of Indices and Adjacent");
+            // first, retrieve information attached to nodes; there may be one for each index, there may be none
+            JSONArray nodelist = json.getJSONArray("Nodes");
+            Node[] nodes = new Node[this.nNodes];
+            for (int i = 0; i < nodelist.length(); i ++) {
+                JSONObject node = nodelist.getJSONObject(i);
+                int idx = node.getInt("Index");
+                String label = node.getString("Label");
+                nodes[idx] = new Node();
+                nodes[idx].setLabel(label);
+            }
+            // second, retrieve indices for nodes, make sure the original index (idx) is kept
+            int[] indices = new int[narr.length()];
+            for (int i = 0; i < narr.length(); i ++) {
+                int idx = narr.getInt(i);
+                // g.addNode(idx, new Node());
+                indices[i] = idx;
+                if (nodes[i] != null)
+                    this.addNode(idx, nodes[idx]);
+                else
+                    this.addNode(idx, new Node());
+            }
+            // add edges next; connected nodes need to have been added previously
+            for (int i = 0; i < narr.length(); i ++) {
+                int idx = indices[i];
+                JSONArray edgelist = earr.getJSONArray(i);
+                for (int j = 0; j < edgelist.length(); j ++)
+                    this.addEdge(idx, edgelist.getInt(j));
+            }
+            if (isTerminated()) {
+                // add edges that start [from -1] and end [to n] graph
+                JSONArray starts = json.getJSONArray("Starts");
+                for (int i = 0; i < starts.length(); i ++)
+                    addEdge(-1, starts.getInt(i));
+                JSONArray ends = json.getJSONArray("Ends");
+                for (int i = 0; i < ends.length(); i ++)
+                    addTerminalEdge(ends.getInt(i));
+            }
+        } catch (JSONException e) {
+            throw new ASRRuntimeException("IdxGraph format is wrong in JSON object: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Decode JSON object into an instance of IdxGraph
+     * @param json
+     * @return
+     * @throws RuntimeException if there is a formatting problem
+     */
+    public static IdxGraph fromJSON(JSONObject json) {
+        try {
+            String version = json.optString("GRASP_version", null);
+            String datatype = json.optString("Datatype", null);
+            if (version != null)
+                if (!(version.equals(GRASP.VERSION) || version.equals("30-July-2022")))
+                    throw new ASRRuntimeException("Invalid version: " + version);
+            if (datatype != null)
+                if (!(datatype.equals("IdxGraph")))
+                    throw new ASRRuntimeException("Invalid datatype: " + datatype);
+            int n = json.getInt("Size");
+            boolean terminated = json.getBoolean("Terminated");
+            boolean directed = json.getBoolean("Directed");
+            IdxGraph g = new IdxGraph(n, !directed, terminated);
+            g.useJSON(json);
+            return g;
+        } catch (JSONException e) {
+            throw new ASRRuntimeException("IdxGraph format is wrong in JSON object: " + e.getMessage());
+        }
+    }
 
     /**
      * Create a JSON representation of the instance
@@ -837,8 +982,12 @@ public class IdxGraph {
      */
     public JSONObject toJSON() {
         JSONObject json = new JSONObject();
+        json.put("Datatype", this.getClass().getSimpleName());
+        json.put("GRASP_version", GRASP.VERSION);
         json.put("Name", getName().length() == 0 ? null : getName());
         json.put("Size", this.nNodes);
+        json.put("Terminated", isTerminated());
+        json.put("Directed", isDirected());
         if (this.isTerminated()) {
             json.put("Starts", this.getStarts());
             json.put("Ends", this.getEnds());
@@ -846,7 +995,6 @@ public class IdxGraph {
         JSONArray narr = new JSONArray();
         JSONArray earr = new JSONArray();
         List<JSONObject> nodelist = new ArrayList<>();
-        List<JSONObject> edgelist = new ArrayList<>();
         for (int idx = 0; idx < nNodes; idx ++) {
             if (nodes[idx] != null) {
                 JSONObject node = new JSONObject();
@@ -867,7 +1015,12 @@ public class IdxGraph {
         return json;
     }
 
-    public static JSONArray toJSONArray(Collection<IdxGraph> graphs) {
+    /**
+     * Create a JSON array from a collection of graphs, each a IdxGraph or a sub-class thereof.
+     * @param graphs
+     * @return a series of JSON objects, forming a JSONArray (which is also a JSON object)
+     */
+    public static <E extends IdxGraph> JSONArray toJSONArray(Collection<E> graphs) {
         JSONArray narr = new JSONArray();
         int cnt = 0;
         for (IdxGraph g : graphs)
@@ -875,15 +1028,29 @@ public class IdxGraph {
         return narr;
     }
 
-    public static JSONObject toJSON(Map<String, IdxGraph> graphs) {
+    public static <E extends IdxGraph> JSONArray toJSONArray(E[] graphs) {
+        JSONArray narr = new JSONArray();
+        int cnt = 0;
+        for (IdxGraph g : graphs)
+            narr.put(g.toJSON());
+        return narr;
+    }
+
+    /**
+     * Save a map of graphs, where each entry has as key a string "labeL, then the graph as value.
+     * The label will then be used to tag each graph.
+     * @param graphs
+     * @return
+     */
+    public static <E extends IdxGraph> JSONObject toJSON(Map<String, E> graphs) {
         JSONObject json = new JSONObject();
         int cnt = 0;
-        for (Map.Entry<String, IdxGraph> entry : graphs.entrySet())
+        for (Map.Entry<String, E> entry : graphs.entrySet())
             json.put(entry.getKey(), entry.getValue().toJSON());
         return json;
     }
 
-    public static void saveToJSON(String directory, Collection<IdxGraph> graphs) throws IOException, ASRException {
+    public static <E extends IdxGraph> void saveToJSON(String directory, Collection<E> graphs) throws IOException, ASRException {
         String filename = directory + "/" + "pogs.json";
         FileWriter fwriter=new FileWriter(filename);
         BufferedWriter writer=new BufferedWriter(fwriter);
@@ -893,7 +1060,7 @@ public class IdxGraph {
         fwriter.close();
     }
 
-    public static void saveToJSON(String directory, Map<String, IdxGraph> graphs) throws IOException, ASRException {
+    public static <E extends IdxGraph> void saveToJSON(String directory, Map<String, E> graphs) throws IOException, ASRException {
         StringBuilder sb = new StringBuilder();
         String filename = directory + "/" + "pogs.json";
         FileWriter fwriter=new FileWriter(filename);

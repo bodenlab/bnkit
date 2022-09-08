@@ -427,7 +427,19 @@ class POGraphTest {
 
     @Test
     void toJSON() {
-        System.out.println(pog.toJSON());
-        System.out.println(ex1.toJSON());
+        setupPOGS();
+        try {
+            POGraph.saveToJSON("/tmp", Arrays.asList(pogs));
+            List<POGraph> pogs_loaded = POGraph.loadFromJSON("/tmp/pogs.json");
+            assertEquals(pogs.length, pogs_loaded.size());
+            for (int i = 0; i < pogs.length; i ++) {
+                System.out.println(pogs[i].toJSON());
+                System.out.println(pogs_loaded.get(i).toJSON());
+                assertTrue(pogs[i].equals(pogs_loaded.get(i)));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 }
