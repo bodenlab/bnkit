@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -209,6 +210,34 @@ class IdxGraphTest {
         assertTrue(g1.equals(IdxGraph.fromJSON(g1.toJSON())));
         assertTrue(g2.equals(IdxGraph.fromJSON(g2.toJSON())));
         assertTrue(g3.equals(IdxGraph.fromJSON(g3.toJSON())));
+    }
+
+    @Test
+    void getEdgeIndex() {
+        createGraphs();
+        IdxGraph[] gs = {g1, g2, g3};
+        for (IdxGraph g : gs) {
+            System.out.println("Graph maxsize: " + g.maxsize() + "\tDirected: " + g.isDirected() + "\tTerminated: " + g.isTerminated());
+            Set<Integer> used = new HashSet<>();
+            for (int from = -1; from <= g.maxsize(); from += 1) {
+                for (int to = -1; to <= g.maxsize(); to += 1) {
+                    if (g.isEdge(from, to)) {
+                        int idx = g.getEdgeIndex(from, to);
+                        if (g.isDirected())
+                            assertFalse(used.contains(idx)); // indices MUST be unique if edges are directed (e.g. 0 -> 1 is different from 1 -> 0)
+                        used.add(idx);
+                        System.out.println("Edge index: " + idx + "\tFrom: " + from + "\tTo: " + to);
+                        if (g.isDirected()) {
+                            assertEquals(from, g.getFrom(idx));
+                            assertEquals(to, g.getTo(idx));
+                        } else {
+                            assertEquals(Math.min(from, to), g.getFrom(idx));
+                            assertEquals(Math.max(from, to), g.getTo(idx));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private class MyNode extends Node {

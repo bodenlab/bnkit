@@ -40,4 +40,27 @@ public class Edge {
             edge.put("Label", this.getLabel());
         return edge;
     }
+
+    public static Edge fromJSON(JSONObject json) {
+        Edge e = new Edge();
+        String label = json.optString("Label", null);
+        if (label != null)
+            e.setLabel(label);
+        return e;
+    }
+
+    public Object[] toObjectArray() {
+        if (label != null)
+            return new Object[] {label};
+        else
+            return new Object[] {};
+    }
+    public static Edge fromObjectArray(Object[] input) {
+        Edge e = new Edge();
+        if (input != null)
+            if (input.length > 0)
+                if (input[0] != null)
+                    e.setLabel(input[0].toString());
+        return e;
+    }
 }

@@ -422,9 +422,14 @@ public class POGTree {
         for (int i : leaves) {
             POGraph pog = extarr[i];
             if (pog != null) {
-                SymNode node = (SymNode) pog.getNode(index);
-                if (node != null)
-                    instarr[idxmap[i]] = node.get();
+                try {
+                    SymNode node = (SymNode) pog.getNode(index);
+                    if (node != null)
+                        // FIXME: below is a hack, ensuring that a string is converted into a character (one of the Enumerable values)
+                        // FIXME continued: it could be a string if it has been loaded from JSON...
+                        instarr[idxmap[i]] = node.get().toString().charAt(0);
+                } catch (ClassCastException e) {
+                }
             }
         }
         return new TreeInstance(tree, instarr);

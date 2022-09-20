@@ -60,7 +60,10 @@ public class Prediction {
         this.ancarr = new POGraph[pogTree.getTree().getSize()];
         for (Map.Entry<Object, POGraph> entry : ancestors.entrySet()) { // make sure names are set
             entry.getValue().setName(entry.getKey().toString());
-            this.ancarr[getBranchpointIndex(entry.getKey())] = entry.getValue();
+            int bpidx = getBranchpointIndex(entry.getKey());
+            if (bpidx < 0)
+                throw new ASRRuntimeException("Invalid branchpoint " + entry.getKey());
+            this.ancarr[bpidx] = entry.getValue();
         }
         this.positrees = new IdxTree[pogTree.getPositions()]; // by default there's one tree for each index in the alignment/POG
         this.positidxs = new int[pogTree.getPositions()][];   // by default there's one tree for each index in the alignment/POG

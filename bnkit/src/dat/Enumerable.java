@@ -17,6 +17,9 @@
  */
 package dat;
 
+import json.JSONArray;
+import json.JSONObject;
+
 /**
  * This class represents a (countable) domain of values that discrete variables
  * can take.
@@ -27,6 +30,7 @@ public class Enumerable implements Domain {
 
     final int order;
     final Object[] values;
+    final Class datatype;
 
     public Enumerable(int order) {
         if (order < 2) {
@@ -37,7 +41,14 @@ public class Enumerable implements Domain {
         for (int i = 0; i < order; i++) {
             this.values[i] = i;
         }
+        this.datatype = Integer.class;
     }
+
+    /**
+         * Check values to what class they all belong
+     * @return the class to which all values belong
+     * @throws RuntimeException if values contain more than one class
+     * */
 
     public Enumerable(Object[] values) {
         this.values = values;
@@ -45,6 +56,20 @@ public class Enumerable implements Domain {
         if (order < 2) {
             throw new RuntimeException("An Enumerable must have at least two values");
         }
+        Class c = null;
+        for (Object v : values) {
+            if (c == null)
+                c = v.getClass();
+            else if (c != v.getClass())
+                throw new RuntimeException("Invalid mix of values " + c.toString() + " and " + v.getClass().toString());
+        }
+        this.datatype = c;
+    }
+
+    /**
+     */
+    private Class getDatatype() {
+        return this.datatype;
     }
 
     public int size() {
@@ -200,5 +225,22 @@ public class Enumerable implements Domain {
     public static Enumerable aacid_alt = new Enumerable(new Character[]{'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V'});
     public static Enumerable gap_character = new Enumerable(new Character[]{'G','C'});
     public static Enumerable gap_ext = new Enumerable(new Character[]{'G','C','?'});
+
+    public JSONObject toJSON() {
+        JSONObject jobj = new JSONObject();
+        jobj.put("Size", order);
+        jobj.put("Values", new JSONArray(values));
+        jobj.put("Datatype", datatype);
+        return jobj;
+    }
+
+    public static Enumerable fromJSON(JSONObject jobj) {
+        JSONArray varr = jobj.getJSONArray("Values");
+        Class dtype = (Class)jobj.get("Datatype");
+        Object[] vals = new Object[varr.length()];
+        for (int i = 0; i < varr.length(); i ++)
+            vals[i] = varr.get(i);
+        return new Enumerable(vals);
+    }
 
 }

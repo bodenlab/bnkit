@@ -20,6 +20,10 @@ package bn.prob;
 import bn.Distrib;
 import dat.Domain;
 import dat.Enumerable;
+import json.JSONArray;
+import json.JSONException;
+import json.JSONObject;
+
 import java.util.Map;
 import java.util.Random;
 
@@ -152,6 +156,27 @@ public class EnumDistrib implements Distrib, Domain {
      */
     public void setSeed(long seed) {
         rand = new Random(seed);
+    }
+
+    /**
+     * Create a JSON representation of distribution
+     * @return
+     */
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        json.put("Domain", domain.toJSON());
+        json.put("Pr", new JSONArray(this.get()));
+        return json;
+    }
+
+    public static EnumDistrib fromJSON(JSONObject json) {
+        Enumerable domain = Enumerable.fromJSON(json.getJSONObject("Domain"));
+        double[] pr = new double[domain.size()];
+        JSONArray prarr = json.getJSONArray("Pr");
+        assert(pr.length == prarr.length());
+        for (int i = 0; i < prarr.length(); i ++)
+            pr[i] = prarr.getDouble(i);
+        return new EnumDistrib(domain, pr);
     }
 
     public String toString() {

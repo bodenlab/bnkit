@@ -674,9 +674,16 @@ public class IdxTree implements Iterable<Integer> {
      * @return index of tree node, or -1 if not found
      */
     public int getIndex(Object label) {
-        for (int i : this) {
-            if (this.getLabel(i).equals(label))
-                return i;
+        if (label instanceof String) {
+            for (int i : this) {
+                if (this.getLabel(i).toString().equals(label))
+                    return i;
+            }
+        } else {
+            for (int i : this) {
+                if (this.getLabel(i).equals(label))
+                    return i;
+            }
         }
         return -1;
     }

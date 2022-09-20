@@ -4,6 +4,8 @@ import asr.ASRException;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.phylo.Tree;
+import dat.pog.Edge;
+import dat.pog.POGraph;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -16,6 +18,10 @@ import java.util.Set;
  * File utilities intended for GRASP in particular.
  */
 public class Utils {
+
+    public static <E extends Edge> E toEdge(String edgetype, Object[] input) {
+        return null;
+    }
 
     /**
      * Check out stuff about a file that can be read

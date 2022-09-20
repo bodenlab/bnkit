@@ -1,7 +1,9 @@
 package dat.pog;
 
+import asr.ASRRuntimeException;
 import asr.GRASP;
 import json.JSONArray;
+import json.JSONException;
 import json.JSONObject;
 
 import java.util.*;
@@ -38,54 +40,43 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
 
     /**
      * Create a JSON representation of the instance
-     * FIXME: currently a lot of duplicated code from IdxGraph#toJSON, which should be inherited
+     * See {@link IdxGraph#toJSON}.
      * @return JSON object of this instance
      */
     public JSONObject toJSON() {
-        JSONObject json = new JSONObject();
-        json.put("Datatype", this.getClass().getSimpleName());
-        json.put("GRASP_version", GRASP.VERSION);
-        json.put("Name", getName().length() == 0 ? null : getName());
-        json.put("Size", this.nNodes);
-        json.put("Terminated", isTerminated());
-        json.put("Directed", isDirected());
-        if (this.isTerminated()) {
-            json.put("Starts", this.getStarts());
-            json.put("Ends", this.getEnds());
-        }
-        JSONArray narr = new JSONArray();
-        JSONArray earr = new JSONArray();
-        List<JSONObject> nodelist = new ArrayList<>();
+        JSONObject json = super.toJSON();
         List<JSONObject> edgelist = new ArrayList<>();
-        for (int idx = 0; idx < nNodes; idx ++) {
-            if (nodes[idx] != null) { // the index is used in the POG, so add it to the list of indices
-                JSONObject node = new JSONObject();
-                narr.put(idx);
-                int[] edges = getNodeIndices(idx, true); // getForward
-                earr.put(edges);
-                for (int i = 0; i < edges.length; i ++) { // for the index, include all the indices that are linked "forward"
-                    int to = edges[i];
-                    E e = getEdge(idx, to);
-                    if (e != null) {
-                        JSONObject edge = e.toJSON();
-                        edge.put("From", idx);
-                        edge.put("To", to);
-                        edgelist.add(edge);
-                    }
-                }
-                String label = nodes[idx].getLabel();
-                if (label != null) {
-                    node.put("Index", idx);
-                    node.put("Label", label);
-                    nodelist.add(node);
-                }
-            }
+        JSONArray edgeidxs = new JSONArray();
+        JSONArray edgeinst = new JSONArray();
+        Map<Integer, E> edgemap = getEdges();
+        Class edgeclass = null;
+        for (Map.Entry<Integer, E> entry : edgemap.entrySet()) { //
+            int edgeidx = entry.getKey();
+            int from = getFrom(edgeidx);
+            int to = getTo(edgeidx);
+            edgeidxs.put(new JSONArray(new int[] {from, to}));
+            E e = entry.getValue();
+            if (edgeclass == null)
+                edgeclass = e.getClass();
+            else if (e.getClass() != edgeclass)
+                throw new ASRRuntimeException("Mixing edges");
+            edgeinst.put(e.toJSON());
         }
-        json.put("Indices", narr);
-        json.put("Adjacent", earr);
-        json.put("Nodes", nodelist);
-        json.put("Edges", edgelist);
+        if (edgeclass != null) {
+            json.put("Edgeindices", edgeidxs);
+            json.put("Edges", edgeinst);
+            json.put("Edgetype", edgeclass);
+        }
         return json;
+    }
+
+
+    /**
+     * Retrieve all the edges by ref to index; these include disabled edges
+     * @return all edges
+     */
+    public Map<Integer, E> getEdges() {
+        return edges;
     }
 
     /**
@@ -113,14 +104,6 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
     }
 
     /**
-     * Retrieve a collection of all the edges with no ref to index; these include disabled edges
-     * @return all edges
-     */
-    public Collection<E> getEdges() {
-        return edges.values();
-    }
-
-    /**
      * Modify the graph by adding an instance of an edge between two existing nodes.
      * If the graph is terminated, an edge can be added from a virtual start, or to a virtual end node.
      * @param from the source node index of the edge, -1 for a terminal start edge
@@ -137,6 +120,7 @@ public class IdxEdgeGraph<E extends Edge> extends IdxGraph {
     /**
      * Modify the graph by disabling an edge between two existing nodes.
      * If there is an edge, it will be stashed to be enabled at a later stage.
+     * Exercise some caution with this functionality since edges are enabled at the level of IdxGraph, but their instances are stored in IdxEdgeGraph.
      *
      * @param from the source node index of the edge, -1 for a terminal start edge
      * @param to the destination node index of the edge, N for a terminal end edge, where N is the number of possible/valid nodes

@@ -274,7 +274,7 @@ class AStarSearch extends GraphSearch {
         Arrays.fill(actual, -1);
         closed = new Set[N + 1]; // space to store linkages leading-to a node index
         double saveW = Double.MAX_VALUE;
-        for (POGraph.StatusEdge e : pog.getEdges()) {
+        for (POGraph.StatusEdge e : pog.getEdges().values()) {
             if (e.getWeight() < saveW)
                 saveW = e.getWeight();
         }

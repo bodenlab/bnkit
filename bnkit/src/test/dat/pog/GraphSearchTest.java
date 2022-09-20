@@ -89,7 +89,7 @@ class GraphSearchTest {
     }
     @Test
     void dijkstra2() {
-        for (POGraph.StatusEdge e : dijk.getEdges())
+        for (POGraph.StatusEdge e : dijk.getEdges().values())
             e.setWeight(e.getWeight() <=7 ? 1 : 2);
     /*
        /-B-1--E-\

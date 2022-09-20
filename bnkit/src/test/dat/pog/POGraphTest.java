@@ -430,13 +430,20 @@ class POGraphTest {
         setupPOGS();
         try {
             POGraph.saveToJSON("/tmp", Arrays.asList(pogs));
+            for (int i = 0; i < pogs.length; i ++) {
+                //System.out.println(pogs[i].toJSON());
+                //System.out.println(POGraph.fromJSON(pogs[i].toJSON()));
+                assertTrue(pogs[i].equals(POGraph.fromJSON(pogs[i].toJSON())));
+            }
+
             List<POGraph> pogs_loaded = POGraph.loadFromJSON("/tmp/pogs.json");
             assertEquals(pogs.length, pogs_loaded.size());
             for (int i = 0; i < pogs.length; i ++) {
-                System.out.println(pogs[i].toJSON());
-                System.out.println(pogs_loaded.get(i).toJSON());
+                //System.out.println(pogs[i].toJSON());
+                //System.out.println(pogs_loaded.get(i).toJSON());
                 assertTrue(pogs[i].equals(pogs_loaded.get(i)));
             }
+            
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "28-Aug-2022";
+    public static String VERSION = "20-Sep-2022";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -50,8 +50,8 @@ public class GRASP {
         out.println("Usage: asr.GRASP \n" +
                 "\t[-a | --aln <filename>]\n" +
                 "\t[-n | --nwk <filename>]\n" +
-                "\t{-o | --output-folder <foldername>} (default is current working folder)\n" +
-                "\t{-i | --input-folder <foldername>]\n" +
+                "\t{-o | --output-folder <foldername>} (default is current working folder, or input folder if available)\n" +
+                "\t{-i | --input-folder <foldername>}\n" +
                 "\t{-pre | --prefix <stub>}\n" +
                 "\t{-rf | --rates-file <filename>}\n" +
                 "\t{-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
@@ -63,7 +63,7 @@ public class GRASP {
                 "\t{--nogap}\n" +
                 "\t{--nonibble}\n" +
                 "\t{--exclude-noedge}\n" +
-                "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB POGS DOT TREES)\n" +
+                "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES)\n" +
                 "\t{--save-all} (saves reconstruction with ALL formats)\n" +
                 "\t{--include-extants}\n" +
                 "\t{--time}{--verbose}{--help}\n");
@@ -78,6 +78,7 @@ public class GRASP {
                 "\t-n (or --nwk) must specify the name of a phylogenetic-tree file on Newick format\n");
         out.println("Optional arguments:\n" +
                 "\t-o (or --output-folder) specifies the folder that will be used to save output files,\n\t\te.g. inferred ancestor or ancestors, tree, etc. as specified by format\n" +
+                "\t-i (or --input-folder) skips indel inference, and loads a previous reconstruction from specified folder\n" +
                 "\t-sa (or --save-as) lists the files and formats to be generated (see below)\n\t--save-all nominates all\n" +
                 "\t-pre (or --prefix) specifies a stub that is added to result filenames (default is the prefix of the alignment file)\n" +
                 "\t-indel (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
@@ -94,7 +95,7 @@ public class GRASP {
                 "\tCLUSTAL: sequences (most preferred path at each ancestor, gapped)\n" +
                 "\tTREE: phylogenetic tree with ancestor nodes labelled\n" +
                 "\tDISTRIB: character distributions for each position (indexed by POG, only available for marginal reconstruction)\n" +
-                "\tPOGS: partial-order graphs of ancestors\n" +
+                "\tASR: complete reconstruction as JSON, incl. POGs of ancestors and extants, and tree (ASR.json)\n" +
                 "\tDOT: partial-order graphs of ancestors in DOT format\n" +
                 "\tTREES: position-specific trees with ancestor states labelled\n");
         out.println("Indel-methods: \n" +
@@ -146,7 +147,7 @@ public class GRASP {
         // output formats
         boolean SAVE_AS = false;
         boolean INCLUDE_EXTANTS = false;
-        String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX"};
+        String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "MATLAB", "LATEX"};
         // select these, default for "joint reconstruction"
         boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
         // select to compute consensus path for these output formats
@@ -270,7 +271,7 @@ public class GRASP {
         else if (NEWICK == null && INPUT == null)
             usage(4, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>");
         else if (OUTPUT == null)
-            OUTPUT = ".";
+            OUTPUT = INPUT == null ? "." : INPUT;
 
         if (PREFIX == null) { // default prefix is the (prefix of) alignment filename
             int idx = ALIGNMENT == null ? 0 : ALIGNMENT.indexOf(".");

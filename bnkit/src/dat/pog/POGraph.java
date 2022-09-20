@@ -4,11 +4,17 @@ import asr.ASRException;
 import asr.ASRRuntimeException;
 import asr.GRASP;
 import bn.prob.EnumDistrib;
+import dat.file.Utils;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
+import json.JSONTokener;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 /**
@@ -102,19 +108,39 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     public static POGraph fromJSON(JSONObject json) {
         try {
             String version = json.optString("GRASP_version", null);
-            String datatype = json.optString("Datatype", null);
+            Class datatype = null; //(Class)json.get("Datatype");
             if (version != null)
-                if (!(version.equals(GRASP.VERSION) || version.equals("30-July-2022")))
+                if (!(version.equals(GRASP.VERSION) || version.equals("28-Aug-2022")))
                     throw new ASRRuntimeException("Invalid version: " + version);
             if (datatype != null)
-                if (!(datatype.equals("POGraph")))
+                if (!(dat.pog.POGraph.class.isAssignableFrom(datatype)))
                     throw new ASRRuntimeException("Invalid datatype: " + datatype);
             int n = json.getInt("Size");
             boolean terminated = json.getBoolean("Terminated");
             boolean directed = json.getBoolean("Directed");
             if (terminated && directed) {
                 POGraph g = new POGraph(n);
-                g.useJSON(json);
+                g.useJSON(json); // from IdxGraph
+                // POGraph specific fields...
+                String edgetype = json.optString("Edgetype", null); // FIXME: could try to cast as Class first
+                if (edgetype != null) {
+                    JSONArray iarr = json.getJSONArray("Edgeindices");
+                    int[][] idxs = new int[iarr.length()][];
+                    for (int i = 0; i < iarr.length(); i++) {
+                        JSONArray from_to = iarr.getJSONArray(i);
+                        idxs[i] = new int[]{from_to.getInt(0), from_to.getInt(1)};
+                    }
+                    JSONArray earr = json.getJSONArray("Edges");
+                    for (int i = 0; i < earr.length(); i++) {
+                        JSONObject edge = earr.getJSONObject(i);
+                        if (edgetype.equals(dat.pog.POGraph.StatusEdge.class.toString()))
+                            g.addEdge(idxs[i][0], idxs[i][1], POGraph.StatusEdge.fromJSON(edge)); // StatusEdge goes here
+                        else if (edgetype.equals(dat.pog.POGraph.BidirEdge.class.toString()))
+                            g.addEdge(idxs[i][0], idxs[i][1], POGraph.BidirEdge.fromJSON(edge)); // BidirEdge goes here
+                        else
+                            g.addEdge(idxs[i][0], idxs[i][1]); // Other edges go here
+                    }
+                }
                 return g;
             } else
                 throw new ASRRuntimeException("POGraph format is wrong in JSON object: is not terminated or not directed");
@@ -124,8 +150,10 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
     public static List<POGraph> loadFromJSON(String directory) throws IOException {
-        FileReader freader=new FileReader(directory);
-        BufferedReader reader=new BufferedReader(freader);
+        Path filename = Paths.get(directory);
+        BufferedReader reader = Files.newBufferedReader(filename, StandardCharsets.UTF_8);
+        JSONTokener jtok = new JSONTokener(reader);
+        /*
         String line = reader.readLine();
         StringBuilder sb = new StringBuilder();
         while (line != null) {
@@ -133,15 +161,16 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             sb.append(myline);
             line = reader.readLine();
         }
-        reader.close();
-        freader.close();
+        */
+        JSONArray arr = new JSONArray(jtok);
         // expect an array of JSON objects
-        JSONArray arr = new JSONArray(sb.toString());
+//        JSONArray arr = new JSONArray(sb.toString());
         List<POGraph> ret = new ArrayList<>();
         for (int i = 0; i < arr.length(); i ++) {
             JSONObject obj = arr.getJSONObject(i);
             ret.add(POGraph.fromJSON(obj));
         }
+        reader.close();
         return ret;
     }
 
@@ -844,12 +873,60 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                     ((fontname == null) ? "" : ("fontname=\"" + fontname + "\",")) +
                     (reciprocated ? "" : ("style=\"dashed\""));
         }
+
+        /**
+         * Convert instance to JSON
+         * @return
+         */
         @Override
         public JSONObject toJSON() {
             JSONObject edge = super.toJSON();
             edge.put("Recip", getReciprocated());
             edge.put("Weight", getWeight());
             return edge;
+        }
+
+        /**
+         * Convert JSON to instance
+         * @param json
+         * @return
+         */
+        public static StatusEdge fromJSON(JSONObject json) {
+            String label = json.optString("Label", null);
+            Boolean recip = json.optBoolean("Recip", false);
+            Double weight = json.optDouble("Weight", 0);
+            StatusEdge e = new StatusEdge(recip, weight);
+            if (label != null)
+                e.setLabel(label);
+            return e;
+        }
+
+        @Override
+        public Object[] toObjectArray() {
+            if (label != null)
+                return new Object[] {getReciprocated(), getWeight(), getLabel()};
+            else
+                return new Object[] {getReciprocated(), getWeight()};
+        }
+        public static StatusEdge fromObjectArray(Object[] input) {
+            if (input.length >= 1) {
+                try {
+                    StatusEdge e = new StatusEdge((Boolean) input[0]);
+                    if (input.length > 1) {
+                        try {
+                            e.setWeight((Double) input[1]);
+                        } catch (ClassCastException e1) {
+                            e.setWeight((Integer) input[1]);
+                        }
+                    }
+                    if (input.length > 2)
+                        e.setLabel(input[2].toString());
+                    return e;
+                } catch (ClassCastException e2) {
+                    throw new RuntimeException("Invalid format for StatusEdge: " + e2.getMessage());
+                }
+            }
+            return null;
         }
     }
 
@@ -871,6 +948,64 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         public boolean isBackward() {
             return backward;
         }
+
+        /**
+         * Convert instance to JSON
+         * @return
+         */
+        @Override
+        public JSONObject toJSON() {
+            JSONObject edge = super.toJSON();
+            edge.put("Forward", isForward());
+            edge.put("Backward", isBackward());
+            return edge;
+        }
+
+        /**
+         * Convert JSON to instance
+         * @param json
+         * @return
+         */
+        public static StatusEdge fromJSON(JSONObject json) {
+            String label = json.optString("Label", null);
+            Boolean forward = json.optBoolean("Forward", false);
+            Boolean backward = json.optBoolean("Backward", false);
+            Double weight = json.optDouble("Weight", 0);
+            BidirEdge e = new BidirEdge(forward, backward);
+            e.setWeight(weight);
+            if (label != null)
+                e.setLabel(label);
+            return e;
+        }
+
+        @Override
+        public Object[] toObjectArray() {
+            if (label != null)
+                return new Object[] {forward, backward, getWeight(), getLabel()};
+            else
+                return new Object[] {forward, backward, getWeight()};
+        }
+        public static BidirEdge fromObjectArray(Object[] input) {
+            if (input.length >= 2) {
+                try {
+                    BidirEdge e = new BidirEdge((Boolean) input[0], (Boolean) input[1]);
+                    if (input.length > 2) {
+                        try {
+                            e.setWeight((Double) input[2]);
+                        } catch (ClassCastException e1) {
+                            e.setWeight((Integer) input[2]);
+                        }
+                    }
+                    if (input.length > 3)
+                        e.setLabel(input[3].toString());
+                    return e;
+                } catch (ClassCastException e2) {
+                    throw new RuntimeException("Invalid format for BidirEdge: " + e2.getMessage());
+                }
+            }
+            return null;
+        }
+
     }
 
 }

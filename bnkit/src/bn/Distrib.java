@@ -40,5 +40,6 @@ public interface Distrib {
      * probability
      */
     public Object sample();
-    
+
+
 }

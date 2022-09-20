@@ -3,14 +3,23 @@ package dat.pog;
 import bn.prob.EnumDistrib;
 import dat.Enumerable;
 import dat.colourschemes.Clustal;
+import json.JSONObject;
 
-public class EnumNode extends Node {
+import java.io.Serializable;
 
-    Enumerable domain;
-    EnumDistrib distrib;
-    int[] counts;
-    int tot = 0;
-    boolean needs_update = true;
+public class EnumNode extends Node implements Serializable {
+
+    private Enumerable domain;
+    private EnumDistrib distrib;
+    private int[] counts;
+    private int tot = 0;
+
+
+    private boolean notUpdated = true;
+
+    public EnumNode() {
+
+    }
 
     public EnumNode(Enumerable domain) {
         this.domain = domain;
@@ -22,21 +31,21 @@ public class EnumNode extends Node {
         this.distrib = distrib;
         this.domain = distrib.getDomain();
         this.counts = null;
-        this.needs_update = false;
+        this.notUpdated = false;
     }
 
     public void add(Object sym) {
         if (counts == null)
             return;
-        this.needs_update = true;
+        this.notUpdated = true;
         counts[domain.getIndex(sym)] += 1;
         tot += 1;
     }
 
     public EnumDistrib getDistrib() {
-        if (needs_update)
+        if (notUpdated)
             distrib = new EnumDistrib(domain, counts);
-        needs_update = false;
+        notUpdated = false;
         return distrib;
     }
 
@@ -52,9 +61,9 @@ public class EnumNode extends Node {
     }
 
     public String getLabel() {
-        if (needs_update)
+        if (notUpdated)
             distrib = new EnumDistrib(domain, counts);
-        needs_update = false;
+        notUpdated = false;
         if (tot == 0 && counts != null)
             return null;
         Object consensus = distrib.getMax();
@@ -66,6 +75,41 @@ public class EnumNode extends Node {
             return "bold,rounded,filled";
         return "rounded,filled";
     }
+    public Enumerable getDomain() {
+        return domain;
+    }
+
+    public void setDomain(Enumerable domain) {
+        this.domain = domain;
+    }
+
+    public void setDistrib(EnumDistrib distrib) {
+        this.distrib = distrib;
+    }
+
+    public int[] getCounts() {
+        return counts;
+    }
+
+    public void setCounts(int[] counts) {
+        this.counts = counts;
+    }
+
+    public int getTot() {
+        return tot;
+    }
+
+    public void setTot(int tot) {
+        this.tot = tot;
+    }
+
+    public boolean isNotUpdated() {
+        return notUpdated;
+    }
+
+    public void setNotUpdated(boolean notUpdated) {
+        this.notUpdated = notUpdated;
+    }
 
     public static Node[] toArray(EnumDistrib[] distribs) {
         EnumNode[] arr = new EnumNode[distribs.length];
@@ -76,6 +120,35 @@ public class EnumNode extends Node {
             }
         }
         return arr;
+    }
+    /**
+     * Save the instance as a JSON object
+     * @return
+     */
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        if (label != null)
+            json.put("Label", label);
+        EnumDistrib d = getDistrib();
+        if (d != null) {
+            for (String key : d.toJSON().keySet())
+                json.put(key, d.toJSON().getJSONObject(key));
+        }
+        return json;
+    }
+
+    /**
+     * Convert a JSONObject into an instance of this class
+     * @param json
+     * @return
+     */
+    public static EnumNode fromJSON(JSONObject json) {
+        String label = json.optString("Label", null);
+        EnumDistrib d = EnumDistrib.fromJSON(json);
+        EnumNode n = new EnumNode(d);
+        if (label != null)
+            n.setLabel(label);
+        return n;
     }
 
 }
