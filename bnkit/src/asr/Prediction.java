@@ -440,25 +440,30 @@ public class Prediction {
         // FIXME: create an index map for "inf" to enable generics <EnumDistrib>?
         TreeDecor[] inf = new TreeDecor[getPositions()];            // number of positions is also how many inferences we will carry out
         for (int pos = 0; pos < inf.length; pos++) {                // so for each position...
-            trees[pos] = getTree(pos);                              //   this is the tree with indels imputed
-            inf[pos] = new MaxLhoodJoint(trees[pos], MODEL, rates[pos]);        //   set-up the inference
+            trees[pos] = getTree(pos);                                          //   this is the tree with indels imputed
+            inf[pos] = new MaxLhoodJoint(trees[pos], MODEL, rates[pos]);        //   configure inference
         }
         treeinstances = new TreeInstance[getPositions()];
-        for (int pos = 0; pos < getPositions(); pos ++) {        // for each position...
+        for (int pos = 0; pos < getPositions(); pos ++) {           // for each position...
             treeinstances[pos] = pogTree.getNodeInstance(pos, trees[pos], positidxs[pos]); // get the instances at the leaves at that position, and...
         }
         ThreadedDecorators threadpool = new ThreadedDecorators(inf, treeinstances, GRASP.NTHREADS);
         try {
             Map<Integer, TreeDecor> ret = threadpool.runBatch();
-            for (int pos = 0; pos < getPositions(); pos ++) {       // for each position...
-                for (int idx : getAncestorIndices()) {
-                    int ancidx = positidxs[pos][idx];               //   index for sought ancestor in the position-specific tree
-                    if (ancidx >= 0)                                //   which may not exist, i.e. part of an indel, but if it is real...
-                        states[idx][pos] = ret.get(pos).getDecoration(ancidx);          //     extract state
+            for (int pos = 0; pos < getPositions(); pos ++) {           // for each position...
+                for (int idx : getAncestorIndices()) {                      // for each ancestor...
+                    int ancidx = positidxs[pos][idx];                           //   index for sought ancestor in the position-specific tree
+                    if (ancidx >= 0)                                            //   which may not exist, i.e. part of an indel, but if it is real...
+                        states[idx][pos] = ret.get(pos).getDecoration(ancidx);  //     extract state
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+        if (GRASP.TIME) {
+            for (int pos = 0; pos < inf.length; pos++) {                // so for each position...
+                System.out.println("Pos " + pos + "\t" + ((MaxLhoodJoint)inf[pos]).toElapsedTime());
+            }
         }
         return states;
     }
@@ -1210,6 +1215,7 @@ public class Prediction {
             // inference done, now assemble... TODO: use threads here too
             for (int j = 0; j < tree.getSize(); j++) { // we look at each branchpoint, corresponding to either an extant or ancestor sequence
                 Object ancID = tree.getBranchPoint(j).getID();
+                ancID = ancID;
                 if (tree.getChildren(j).length > 0) { // an ancestor
                     //if (DEBUG) System.out.println("Assembling ancestor N" + ancID + " at branchpoint index " + j);
                     EdgeMap.Directed emap = new EdgeMap.Directed();

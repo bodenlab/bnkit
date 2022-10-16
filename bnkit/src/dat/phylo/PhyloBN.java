@@ -16,7 +16,6 @@ import dat.EnumVariable;
 public class PhyloBN {
 
     private final BNet bn;
-    private final SubstModel model;
     /** Default relative rate */
     public static double DEFAULT_RATE = 1.0;
     private BNode[] bp2node = null; // branchpoint index to BN node
@@ -24,11 +23,9 @@ public class PhyloBN {
     /**
      * Private constructor so that instances are created for a particular end.
      *
-     * @param model substitution model
      */
-    private PhyloBN(SubstModel model) {
+    private PhyloBN() {
         bn = new BNet();
-        this.model = model;
     }
 
     /**
@@ -82,7 +79,7 @@ public class PhyloBN {
      * @return the phylogenetic Bayesian network
      */
     public static PhyloBN create(IdxTree tree, SubstModel model, double rate) {
-        PhyloBN pbn = new PhyloBN(model);
+        PhyloBN pbn = new PhyloBN();
         pbn.bp2node = new BNode[tree.getSize()];
         //  create variables and nodes
         for (int idx : tree) { // iterate through tree depth-first
@@ -100,6 +97,16 @@ public class PhyloBN {
             }
 
         }
+        return pbn;
+    }
+
+    public static PhyloBN createBarebone(SubstNode[] nodes) {
+        PhyloBN pbn = new PhyloBN();
+        pbn.bp2node = new BNode[nodes.length];
+        for (int i = 0; i < nodes.length; i ++) {
+            pbn.bp2node[i] = nodes[i];
+        }
+        pbn.bn.add(pbn.bp2node);
         return pbn;
     }
 

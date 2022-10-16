@@ -141,6 +141,16 @@ public class SubstNode implements BNode, TiedNode {
     }
 
     /**
+     * Get conditional probability P(X=x|Y=y,time) by index to value
+     * @param index_X
+     * @param index_Y
+     * @return
+     */
+    private double getProb(int index_X, int index_Y) {
+        return probs[index_Y][index_X];
+    }
+
+    /**
      * Get probability P(X=x)
      * @param X
      * @return
@@ -457,19 +467,22 @@ public class SubstNode implements BNode, TiedNode {
             boolean parent_is_relevant = relevant.containsKey(mypar);
             // get value of the parent node, if any assigned
             Object parinstance = relevant.get(mypar);
+            // Consider what defines this factor:
+            // - parinstance value (null or value from mypar.getDomain()) AND the domain (but NOT the variable name, so use domain hash-code)
+            // - varinstance value (null or value from myvar.getDomain()) AND the domain (but NOT the variable name, so use domain hash-code)
+            // - the probabilities that are used to set factor
             // option 1
             if (varinstance == null && parinstance == null) { 
                 if (parent_is_relevant) {
                     AbstractFactor ft = new DenseFactor(new Variable[] {mypar, myvar});
                     EnumVariable[] evars = ft.getEnumVars();
                     boolean cond_first = mypar.equals(evars[0]); // check if the condition is listed as first variable in factor
-                    // F(X, Y) from P(X | Y)
-                    for (Object X : values) {
-                        for (Object Y : values) {
-                            if (cond_first)
-                                ft.setValue(new Object[] {Y, X}, getProb(X, Y));
-                            else
-                                ft.setValue(new Object[] {X, Y}, getProb(X, Y));
+                    for (int index_X = 0; index_X < values.length; index_X ++) {
+                        for (int index_Y = 0; index_Y < values.length; index_Y ++) {
+                            if (cond_first)         // F(Y, X) from P(X | Y)
+                                ft.setValue(new Object[] {values[index_Y], values[index_X]}, getProb(index_X, index_Y));
+                            else                    // F(X, Y) from P(X | Y)
+                                ft.setValue(new Object[] {values[index_X], values[index_Y]}, getProb(index_X, index_Y));
                         }
                     }
                     return ft;

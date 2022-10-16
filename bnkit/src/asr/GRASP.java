@@ -83,7 +83,7 @@ public class GRASP {
                 "\t-pre (or --prefix) specifies a stub that is added to result filenames (default is the prefix of the alignment file)\n" +
                 "\t-indel (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
                 "\t-s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)\n" +
-                "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific rates\n\t\te.g. as produced by IQ-TREE\n" +
+                "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific rates\n\t\tWe recommend the use of this generally, but specifically for trees with great distances, and with biologically diverse entries\n\t\tAs an example, IQ-TREE produces rates on the accepted format\n" +
                 "\t--include-extants means that extants are included in output files (when the format allows)\n" +
                 "\t--nogap means that the gap-character is excluded in the resulting output (when the format allows)\n" +
                 "\t--nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end\n" +
@@ -333,8 +333,6 @@ public class GRASP {
                 EnumSeq.Alignment aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
                 Tree tree = Utils.loadTree(NEWICK);
                 Utils.checkData(aln, tree);
-                if (MODE == Inference.MARGINAL) {
-                }
                 // if we are past the above, we can assume that the data are good to process
                 POGTree pogtree = new POGTree(aln, tree);
                 switch (INDEL_IDX) {

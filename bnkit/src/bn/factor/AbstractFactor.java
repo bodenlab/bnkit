@@ -66,6 +66,8 @@ public abstract class AbstractFactor implements Iterable<Integer> {
     
     public boolean evidenced = false;
 
+    protected long cacheID = 0L; // 0L means not possible to cache
+
     /**
      * Construct a new table without any variables.
      * This type of factor is used when all variables are summed out. 
@@ -166,8 +168,15 @@ public abstract class AbstractFactor implements Iterable<Integer> {
             sb.append("=" + this.getValue());
         return sb.toString();
     }
-    
 
+    /**
+     * Set the ID used to cache factors, intended to conserve memory and time when factors are essentially the same
+     * (and do not require separate storage and calculation when used as part of repeated operations between them)
+     * @param id
+     */
+    protected void setCacheID(long id) {
+        cacheID = id;
+    }
 
     /**
      * Get a key from a partial assignment of variables defined for the table.

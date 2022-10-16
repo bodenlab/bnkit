@@ -87,6 +87,14 @@ public class Enumerable implements Domain {
     	return true;
     }
 
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        for (int i = 0; i < order; i++)
+            hash = 31 * hash + this.values[i].hashCode();
+        return hash;
+    }
+
     /**
      * Retrieve the index of the value in the domain.
      * TODO: Improve speed for domains with many values.

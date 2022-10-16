@@ -17,6 +17,7 @@
  */
 package bn.alg;
 
+import asr.GRASP;
 import bn.BNet;
 import bn.BNode;
 import bn.ctmc.SubstNode;
@@ -27,6 +28,7 @@ import dat.Variable;
 import bn.factor.AbstractFactor;
 import bn.factor.Factorize;
 import bn.factor.Factorize.FactorProductTree;
+import util.MilliTimer;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -177,7 +179,9 @@ public class VarElim implements Inference {
     @SuppressWarnings("rawtypes")
     @Override
     public QueryResult infer(Query query) {
-	// All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
+//        MilliTimer timer = new MilliTimer();
+        int[] nprods = new int[3];
+	    // All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
         // Assignment will be incorporated into the factor when it is constructed.
         // Create list of buckets: first one has query variables, then all sum-outs in topological ordering (as sorted by the constructor)
         CGQuery q = (CGQuery) query;
@@ -198,6 +202,7 @@ public class VarElim implements Inference {
         int nBuckets = buckets.size();
 
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
+//        timer.start("factors");
         Map<Variable, Object> relmap = q.getRelevant();
         for (Variable var : relmap.keySet()) {
             BNode node = bn.getNode(var);
@@ -210,7 +215,6 @@ public class VarElim implements Inference {
                 continue;
             }
             // go through buckets in reverse order, choosing the first (from end) which "matches" the variables of the FT
-            long START_TIME2 = System.currentTimeMillis();
             for (int i = nBuckets - 1; i >= 0 && !added; i--) {
                 Bucket b = buckets.get(i);
                 if (b.match(ft)) {
@@ -224,9 +228,11 @@ public class VarElim implements Inference {
                 throw new VarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
             }
         }
+//        timer.stop("factors");
         // Purge buckets, merge sum-out variables
 //        System.out.println(buckets.size());
         List<Integer> remove = new ArrayList<>();
+//        timer.start("merge");
         for (int i = 1; i < nBuckets; i++) { // ignore query bucket
 //        	try {
 //        		Bucket b = buckets.get(i);
@@ -254,8 +260,10 @@ public class VarElim implements Inference {
             }
         }
         buckets.removeAll(remove);
+//        timer.stop("merge");
         nBuckets = buckets.size(); // update bucket number
         // Create a factor of each bucket, by performing factor products and marginalisation as appropriate
+//        timer.start("products");
         for (int i = nBuckets - 1; i >= 0; i--) {
             Bucket b = buckets.get(i);
 //            boolean ignore = true; //  It is safe to ignore buckets with no evidence and no newly computed factor (function of other factors)
@@ -270,16 +278,22 @@ public class VarElim implements Inference {
             if (nFactors > 0) {
                 // Perform product of all factors in bucket
                 AbstractFactor result = null;
+//                timer.start("product");
                 if (nFactors == 1) {
+                    nprods[0] += 1;
                     result = b.factors.get(0);
-                } else if (nFactors == 2) { 
+                } else if (nFactors == 2) {
+                    nprods[1] += 1;
                     result = Factorize.getProduct(b.factors.get(0), b.factors.get(1));
                 } else {
+                    nprods[2] += 1;
                     AbstractFactor[] fs = new AbstractFactor[b.factors.size()];
                     b.factors.toArray(fs);
                     result = Factorize.getProduct(fs);
                 }
-                if (i > 0) { // not the last bucket, so normal operation 
+//                timer.stop("product");
+                if (i > 0) { // not the last bucket, so normal operation
+//                    timer.start("margin");
                     // The code below assumes that all buckets except the first have only enumerable variables to be summed out
                     // If continuous variables are unspecified (X) they should have been placed in the first bucket.
                     // If they need summing out, it needs to be done later.
@@ -306,11 +320,15 @@ public class VarElim implements Inference {
                     } catch (ClassCastException e) {
                         throw new VarElimRuntimeException("Cannot marginalize or maximize-out continuous variables");
                     }
+//                    timer.stop("margin");
                 } else {    
                     // This is the final (first) bucket so we should not marginalize/maximize out query variables (and non-enumerables), 
                     // instead we should extract query results from the final factor, including a JPT.
                     // If Q is only a non-enumerable variable or list there-of, we will not be able to create a JPT.
                     // The first section below is just making sure that the variables are presented in the same order as that in the query
+//                    timer.stop("products");
+//                    System.out.println("Products 1x " + nprods[0] + " 2x " + nprods[1] + " nx " + nprods[2]);
+//                    timer.report(true);
                     return new CGTable(result, q.Q);
                 }
             }
