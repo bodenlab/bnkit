@@ -25,11 +25,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "20-Sep-2022";
+    public static String VERSION = "17-Oct-2022";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
-    public static int     NTHREADS = 1;
+    public static int     NTHREADS = 4;
     public static boolean NIBBLE   = true;
     public static boolean INDEL_CONSERVATIVE = true;
     // Mode for BEP
@@ -114,7 +114,7 @@ public class GRASP {
                 "\tJC: Jukes-Cantor (DNA)\n" +
                 "\tYang: Yang's general reversible process model (DNA)\n");
         out.println("Notes: \n" +
-                "\tGreater number of threads may improve processing time, but implies greater memory requirement (default is 1).\n" +
+                "\tGreater number of threads may improve processing time up to a point when coordination chokes performance; default is 4 threads.\n" +
                 "\tRunning GRASP requires large memory and in most cases Java needs to be run with the option -Xmx20g, \n\twhere 20g specifies that 20GB of RAM should be available.\n" +
                 "\n~ This is version " + VERSION + " ~");
         if (msg != null)

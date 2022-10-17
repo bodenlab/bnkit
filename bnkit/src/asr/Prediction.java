@@ -461,9 +461,8 @@ public class Prediction {
             e.printStackTrace();
         }
         if (GRASP.TIME) {
-            for (int pos = 0; pos < inf.length; pos++) {                // so for each position...
-                System.out.println("Pos " + pos + "\t" + ((MaxLhoodJoint)inf[pos]).toElapsedTime());
-            }
+//            for (int pos = 0; pos < inf.length; pos++)                 // so for each position...
+//                System.out.println("Pos " + pos + "\t" + ((MaxLhoodJoint)inf[pos]).toElapsedTime());
         }
         return states;
     }
