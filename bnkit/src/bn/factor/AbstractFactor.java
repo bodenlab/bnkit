@@ -101,7 +101,7 @@ public abstract class AbstractFactor implements Iterable<Integer> {
         // sort and weed out duplicates
         Variable[] uniqueVars = Factorize.getNonredundantSorted(useVariables);
         // count the number of enumerable and non-enumerable variables
-        int cnt_evars = 0, cnt_nvars = 0; 
+        int cnt_evars = 0, cnt_nvars = 0;
         for (Variable var : uniqueVars) {
             try {
                 EnumVariable evar = (EnumVariable) var;
@@ -111,7 +111,7 @@ public abstract class AbstractFactor implements Iterable<Integer> {
             }
         }
         // hybrid table: both enumerable and non-enumerable variables
-        if (cnt_nvars > 0 && cnt_evars > 0) { 
+        if (cnt_nvars > 0 && cnt_evars > 0) {
             this.evars = new EnumVariable[cnt_evars];
             this.nvars = new Variable[cnt_nvars];
             cnt_evars = 0; cnt_nvars = 0;
@@ -143,6 +143,36 @@ public abstract class AbstractFactor implements Iterable<Integer> {
             this.nvars = null;
             this.nNVars = 0;
         }
+        // now determine the indexing for quick access to entries based on enumerable variables
+        this.step = new int[this.nEVars];
+        this.period = new int[this.nEVars];
+        this.domsize = new int[this.nEVars];
+        int prod = 1;
+        for (int i = 0; i < nEVars; i++) {
+            int parent = nEVars - i - 1;
+            this.domsize[parent] = evars[parent].size();
+            this.step[parent] = prod;
+            prod *= this.domsize[parent];
+            this.period[parent] = prod;
+        }
+    }
+
+    /**
+     * Construct a new table with the specified enumerable variables, which will form keys to index the entries,
+     * The order of variables will be sorted by their creation.
+     * That internal order between enumerable variables is maintained, and can
+     * impact on the efficiency of various operations including product.
+     *
+     * @param useVariables variables, here enumerable only,
+     * potentially unsorted and redundant
+     */
+    protected AbstractFactor(EnumVariable... useVariables) {
+        // sort and weed out duplicates
+        evars = Factorize.getNonredundantSorted(useVariables);
+        // count the number of enumerable and non-enumerable variables
+        this.nNVars = 0;
+        this.nvars = null;
+        this.nEVars = evars.length;
         // now determine the indexing for quick access to entries based on enumerable variables
         this.step = new int[this.nEVars];
         this.period = new int[this.nEVars];
@@ -384,16 +414,15 @@ public abstract class AbstractFactor implements Iterable<Integer> {
      */
     public int getIndex(Object[] key) {
         if (getSize() == 1) {
-            throw new AbstractFactorRuntimeException("Invalid key: no variables");
+            throw new AbstractFactorRuntimeException("Invalid key: factor has no variables");
         }
         if (key.length != nEVars) {
-            throw new AbstractFactorRuntimeException("Invalid key: length is " + key.length + " not " + nEVars);
+            throw new AbstractFactorRuntimeException("Invalid key: length is " + key.length + " but should be " + nEVars);
         }
         int sum = 0;
         for (int i = 0; i < nEVars; i++) {
-            if (key[i] == null) {
-                throw new AbstractFactorRuntimeException("Null in key");
-            }
+            if (key[i] == null)
+                throw new AbstractFactorRuntimeException("Null in key not allowed");
             sum += (evars[i].getIndex(key[i]) * step[i]);
         }
         return sum;
@@ -407,9 +436,8 @@ public abstract class AbstractFactor implements Iterable<Integer> {
      * @return the values of the key corresponding to the entry with the index
      */
     public Object[] getKey(int index) {
-        if (index >= getSize() || index < 0 || this.getSize() == 1) {
-            throw new AbstractFactorRuntimeException("Invalid index");
-        }
+        if (index >= getSize() || index < 0 || this.getSize() == 1)
+            throw new AbstractFactorRuntimeException("Invalid index for factor");
         int remain = index;
         Object[] key = new Object[nEVars];
         for (int i = 0; i < nEVars; i++) {
@@ -429,9 +457,8 @@ public abstract class AbstractFactor implements Iterable<Integer> {
      * @return true if the key instance maps to the index
      */
     public boolean isMatch(Object[] key, int index) {
-        if (key.length != nEVars || index < 0 || index >= getSize()) {
-            throw new AbstractFactorRuntimeException("Invalid index or key");
-        }
+        if (key.length != nEVars || index < 0 || index >= getSize())
+            throw new AbstractFactorRuntimeException("Invalid index or key for factor");
         int remain = index;
         for (int i = 0; i < nEVars; i++) {
             if (key[i] != null) {
@@ -449,44 +476,46 @@ public abstract class AbstractFactor implements Iterable<Integer> {
         return true;
     }
 
-    /**
-     * Takes an entry index of the current table and a revised ordering of variables,
-     * to determine the index in the re-ordered table.
-     * Note that the number of variables is expected to be the same.
-     *
-     * @param origindex the index in this table
-     * @param newvars new ordering, same variables
-     * @return index in other, re-ordered table
-     */
-    public int reIndex(int origindex, EnumVariable[] newvars) {
-        if (newvars.length != this.nEVars)
-            throw new AbstractFactorRuntimeException("Invalid variable list");
-        EnumVariable[] x = this.evars;
-        EnumVariable[] y = newvars;
-        int[] xcross2y = new int[x.length];
-        int[] ycross2x = new int[y.length];
-        Factorize.getCrossref(x, xcross2y, y, ycross2x);
-        Object[] xkey = this.getKey(origindex);
-        Object[] ykey = new Object[y.length];
-        for (int i = 0; i < xkey.length; i ++)
-            ykey[xcross2y[i]] = xkey[i];
-        return EnumTable.getIndex(ykey, y);
-    }
-    
-    /**
-     * Takes an entry index of the current table and a revised ordering of variables,
-     * to determine the index in the re-ordered table.
-     * Note that the number of variables is expected to be the same.
-     *
-     * @param origindex the index in this table
-     * @param newvars new ordering, same variables
-     * @return index in other, re-ordered table
-     */
-    public int reIndex(int origindex, List<EnumVariable> newvars) {
-        EnumVariable[] arr = new EnumVariable[newvars.size()];
-        newvars.toArray(arr);
-        return reIndex(origindex, arr);
-    }
+//    Next two methods are removed because they are never used AND because they modify the factor structurally, contrary to post-2022 inference design
+//
+//    /**
+//     * Takes an entry index of the current table and a revised ordering of variables,
+//     * to determine the index in the re-ordered table.
+//     * Note that the number of variables is expected to be the same.
+//     *
+//     * @param origindex the index in this table
+//     * @param newvars new ordering, same variables
+//     * @return index in other, re-ordered table
+//     */
+//    public int reIndex(int origindex, EnumVariable[] newvars) {
+//        if (newvars.length != this.nEVars)
+//            throw new AbstractFactorRuntimeException("Invalid variable list");
+//        EnumVariable[] x = this.evars;
+//        EnumVariable[] y = newvars;
+//        int[] xcross2y = new int[x.length];
+//        int[] ycross2x = new int[y.length];
+//        Factorize.getCrossref(x, xcross2y, y, ycross2x);
+//        Object[] xkey = this.getKey(origindex);
+//        Object[] ykey = new Object[y.length];
+//        for (int i = 0; i < xkey.length; i ++)
+//            ykey[xcross2y[i]] = xkey[i];
+//        return EnumTable.getIndex(ykey, y);
+//    }
+//
+//    /**
+//     * Takes an entry index of the current table and a revised ordering of variables,
+//     * to determine the index in the re-ordered table.
+//     * Note that the number of variables is expected to be the same.
+//     *
+//     * @param origindex the index in this table
+//     * @param newvars new ordering, same variables
+//     * @return index in other, re-ordered table
+//     */
+//    public int reIndex(int origindex, List<EnumVariable> newvars) {
+//        EnumVariable[] arr = new EnumVariable[newvars.size()];
+//        newvars.toArray(arr);
+//        return reIndex(origindex, arr);
+//    }
     
     /**
      * Takes an entry index of the current table and "masks" out a subset of
@@ -508,9 +537,8 @@ public abstract class AbstractFactor implements Iterable<Integer> {
         int[] newstep = new int[nEVars - maskMe.size()];
         int[] newvale = new int[nEVars - maskMe.size()];
         for (int i = 0; i < nEVars; i++) {
-            if (!maskMe.contains(evars[i])) {
+            if (!maskMe.contains(evars[i]))
                 newvale[jn++] = domsize[i];
-            }
         }
         jn = newstep.length - 1;
         int prod = 1;
@@ -525,9 +553,8 @@ public abstract class AbstractFactor implements Iterable<Integer> {
         for (int i = 0; i < nEVars; i++) {
             int key = origremain / step[i];
             origremain -= key * step[i];
-            if (!maskMe.contains(evars[i])) {
+            if (!maskMe.contains(evars[i]))
                 sum += (key * newstep[jn++]);
-            }
         }
         return sum;
     }
@@ -663,6 +690,8 @@ public abstract class AbstractFactor implements Iterable<Integer> {
     }
 
 
+    // Setters of cells in factor ---------------------------------------------------------
+
     /**
      * Set the only value associated with a table without enumerable variables.
      * @param value
@@ -764,6 +793,8 @@ public abstract class AbstractFactor implements Iterable<Integer> {
         int index = getIndex(key);
         return setJDF(index, value);
     }
+
+    // Other setters...
 
     /**
      * Activate tracing of implied assignments.

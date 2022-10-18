@@ -472,7 +472,7 @@ public class SubstNode implements BNode, TiedNode {
             // - varinstance value (null or value from myvar.getDomain()) AND the domain (but NOT the variable name, so use domain hash-code)
             // - the probabilities that are used to set factor
             // option 1
-            if (varinstance == null && parinstance == null) { 
+            if (varinstance == null && parinstance == null) {
                 if (parent_is_relevant) {
                     AbstractFactor ft = new DenseFactor(new Variable[] {mypar, myvar});
                     EnumVariable[] evars = ft.getEnumVars();
@@ -498,7 +498,7 @@ public class SubstNode implements BNode, TiedNode {
                     }
                     return ft;
                 }
-            } 
+            }
             // option 2
             else if (varinstance != null && parinstance == null) {
                 if (parent_is_relevant) {
@@ -522,7 +522,7 @@ public class SubstNode implements BNode, TiedNode {
                     ft.setValue(sum);
                     return ft;
                 }
-            } 
+            }
             // option 3
             else if (varinstance == null && parinstance != null) {
                 AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
@@ -549,6 +549,109 @@ public class SubstNode implements BNode, TiedNode {
             }
         }
     }
+
+//    @Override
+//    public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
+//        EnumVariable myvar = var;
+//        EnumVariable mypar = parent; // parent variable, if any
+//        // get value of this node, if any assigned
+//        Object varinstance = relevant.get(myvar);
+//        if (mypar != null) { // there is a parent variable
+//            // three possibilities:
+//            // 1. neither node variable or parent variable are instantiated, in which case, the parent is either
+//            //      a. relevant to the query, or
+//            //      b. irrelevant and needs to be marginalised subsequently
+//            // 2. node variable is instantiated, not parent, in which case, the parent is either
+//            //      a. relevant to the query, or
+//            //      b. irrelevant and needs to be marginalised subsequently
+//            // 3. parent variable is instantiated, not node variable
+//
+//            // Check if parent variable is relevant
+//            boolean parent_is_relevant = relevant.containsKey(mypar);
+//            // get value of the parent node, if any assigned
+//            Object parinstance = relevant.get(mypar);
+//            // Consider what defines this factor:
+//            // - parinstance value (null or value from mypar.getDomain()) AND the domain (but NOT the variable name, so use domain hash-code)
+//            // - varinstance value (null or value from myvar.getDomain()) AND the domain (but NOT the variable name, so use domain hash-code)
+//            // - the probabilities that are used to set factor
+//            // option 1
+//            if (varinstance == null && parinstance == null) {
+//                if (parent_is_relevant) {
+//                    AbstractFactor ft = new DenseFactor(new Variable[] {mypar, myvar});
+//                    EnumVariable[] evars = ft.getEnumVars();
+//                    boolean cond_first = mypar.equals(evars[0]); // check if the condition is listed as first variable in factor
+//                    for (int index_X = 0; index_X < values.length; index_X ++) {
+//                        for (int index_Y = 0; index_Y < values.length; index_Y ++) {
+//                            if (cond_first)         // F(Y, X) from P(X | Y)
+//                                ft.setValue(new Object[] {values[index_Y], values[index_X]}, getProb(index_X, index_Y));
+//                            else                    // F(X, Y) from P(X | Y)
+//                                ft.setValue(new Object[] {values[index_X], values[index_Y]}, getProb(index_X, index_Y));
+//                        }
+//                    }
+//                    return ft;
+//                } else { // parent is NOT relevant
+//                    AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
+//                    // F(X) from P(X | Y)
+//                    for (Object X : values) {
+//                        double sum = 0;
+//                        for (Object Y : values) {
+//                            sum += getProb(X, Y);
+//                        }
+//                        ft.setValue(new Object[] {X}, sum);
+//                    }
+//                    return ft;
+//                }
+//            }
+//            // option 2
+//            else if (varinstance != null && parinstance == null) {
+//                if (parent_is_relevant) {
+//                    AbstractFactor ft = new DenseFactor(new Variable[] {mypar});
+//                    ft.evidenced = true;
+//                    // F(Y) from P(X = x| Y)
+//                    Object X = varinstance;
+//                    for (Object Y : values) {
+//                        ft.setValue(new Object[] {Y}, getProb(X, Y));
+//                    }
+//                    return ft;
+//                } else { // parent is NOT relevant
+//                    AbstractFactor ft = new DenseFactor();
+//                    ft.evidenced = true;
+//                    // F() from P(X = x| Y) and Y is irrelevant to query
+//                    Object X = varinstance;
+//                    double sum = 0;
+//                    for (Object Y : values) {
+//                        sum += getProb(X, Y);
+//                    }
+//                    ft.setValue(sum);
+//                    return ft;
+//                }
+//            }
+//            // option 3
+//            else if (varinstance == null && parinstance != null) {
+//                AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
+//                ft.evidenced = true;
+//                // F(X) from P(X | Y)
+//                Object Y = parinstance;
+//                for (Object X : values) {
+//                    ft.setValue(new Object[] {X}, getProb(X, Y));
+//                }
+//                return ft;
+//            }
+//            throw new RuntimeException("Invalid setting");
+//        } else { // no parents, just a prior
+//            if (varinstance != null) { // instantiated prior
+//                AbstractFactor ft = new DenseFactor();
+//                ft.setValue(getProb(varinstance));
+//                return ft;
+//            } else { // not instantiated
+//                AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
+//                for (Object X : values) {
+//                    ft.setValue(new Object[] {X}, getProb(X));
+//                }
+//                return ft;
+//            }
+//        }
+//    }
 
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {

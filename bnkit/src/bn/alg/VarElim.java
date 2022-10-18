@@ -180,7 +180,7 @@ public class VarElim implements Inference {
     @Override
     public QueryResult infer(Query query) {
 //        MilliTimer timer = new MilliTimer();
-        int[] nprods = new int[3];
+//        int[] nprods = new int[3];
 	    // All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
         // Assignment will be incorporated into the factor when it is constructed.
         // Create list of buckets: first one has query variables, then all sum-outs in topological ordering (as sorted by the constructor)
@@ -280,13 +280,13 @@ public class VarElim implements Inference {
                 AbstractFactor result = null;
 //                timer.start("product");
                 if (nFactors == 1) {
-                    nprods[0] += 1;
+//                    nprods[0] += 1;
                     result = b.factors.get(0);
                 } else if (nFactors == 2) {
-                    nprods[1] += 1;
+//                    nprods[1] += 1;
                     result = Factorize.getProduct(b.factors.get(0), b.factors.get(1));
                 } else {
-                    nprods[2] += 1;
+//                    nprods[2] += 1;
                     AbstractFactor[] fs = new AbstractFactor[b.factors.size()];
                     b.factors.toArray(fs);
                     result = Factorize.getProduct(fs);
@@ -409,7 +409,7 @@ public class VarElim implements Inference {
             }
         }
         // Purge buckets, merge sum-out variables
-        //FIXME error same as above
+        // FIXME error same as above
         for (int i = 1; i < nBuckets; i++) { // do not re-organise penultimate bucket
             Bucket b = buckets.get(i);
             if (b.factors.isEmpty()) { // no factors, put sum-out variables in other bucket(s)

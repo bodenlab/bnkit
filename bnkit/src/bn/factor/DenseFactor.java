@@ -64,13 +64,13 @@ public class DenseFactor extends AbstractFactor {
         // this.map[0] = 1.0; // log(0) = 1
     }
 
-    
+
     /**
      * Construct a new table with the specified variables.
      * Enumerable variables will form keys to index the entries, 
      * non-enumerables will be associated in the form of their densities with
      * each entry. 
-     * 
+     *
      * @param useVariables variables, either enumerable or non-enumerable, 
      * potentially unsorted and redundant
      */
@@ -88,12 +88,31 @@ public class DenseFactor extends AbstractFactor {
         // if one or more non-enumerable variables, we allocate a matching map for JDFs
         if (this.nNVars > 0) {
             this.jdf = new JDF[this.map.length];
-            for (int i = 0; i < this.jdf.length; i ++) 
+            for (int i = 0; i < this.jdf.length; i ++)
                 this.jdf[i] = new JDF(nvars);
         }
     }
 
-    
+    /**
+     * Construct a new table with the specified enumerable variables, which will
+     * form keys to index the entries.
+     *
+     * @param useVariables enumerable variables, potentially unsorted and redundant
+     */
+    public DenseFactor(EnumVariable... useVariables) {
+        super(useVariables);
+        // most of the time, there would be one or more enumerable variables so allocate a map
+        // for all factor values
+        if (this.nEVars > 0) {
+            this.map = new double[getSize()];
+            Arrays.fill(map, LOG0);
+        } else { // sometimes there are no enumerable variables, so need only one entry
+            this.map = new double[1];
+            // this.map[0] = 1.0; // log(0) = 1
+        }
+    }
+
+
     /**
      * Retrieve the log value of the factor, if table is without enumerable variables.
      * @return the only value of the factor

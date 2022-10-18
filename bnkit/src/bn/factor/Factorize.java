@@ -120,6 +120,35 @@ public class Factorize {
         return Arrays.copyOf(A, j + 1);
     }
 
+    /**
+     * Construct an array of variables sorted according to their canonical index,
+     * that contains all of the unique variables in the provided array.
+     * @param A potentially unsorted array of variables, potentially with duplicates
+     * @return array of the same variables, but sorted and unique
+     */
+    protected static EnumVariable[] getNonredundantSorted(EnumVariable[] A) {
+        if (A.length < 2) {
+            return A;
+        }
+        int j = 0;
+        int i = 1;
+        try {
+            Arrays.sort(A);
+        } catch (NullPointerException e) {
+            System.out.println();
+        }
+        while (i < A.length) {
+            if (A[i] == A[j]) {
+                i++;
+            } else {
+                j++;
+                A[j] = A[i];
+                i++;
+            }
+        }
+        return Arrays.copyOf(A, j + 1);
+    }
+
     public static EnumVariable[] getEnumVars(Variable[] A) {
         int cnt_evars = 0;
         for (Variable var : A) {
@@ -483,6 +512,10 @@ public class Factorize {
      *
      * TODO: Make informed choices as to what implementation of AbstractFactor should be used.
      * Currently only DenseFactor is used.
+     *
+     * To the programmer: yes, this is a monster function, with some redundancy. BUT...
+     * it separates-out special cases to make it easier to address efficiency gains that are
+     * only applicable in each case.
      *
      * @param X one table
      * @param Y other table
