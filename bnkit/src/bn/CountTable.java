@@ -80,15 +80,6 @@ public class CountTable implements Serializable {
         return (table != null);
     }
 
-    public AbstractFactor getFactor() {
-        double total = getTotal();
-        for (int idx : table) {
-            Object[] key = table.getKey(idx);
-            ftable.setValue(key, table.getValue(idx) / total);
-        }
-        return ftable;
-    }
-
     public void put(Object[] key, double count) {
         table.setValue(key, count);
         this.totalNeedsUpdate = true;

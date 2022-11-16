@@ -183,9 +183,9 @@ public class CGTable implements QueryResult {
                     densityTable.setValue(key_index, cg_jdf);
                 }
                 if (f.isTraced()) {
-                    Set<Variable.Assignment> a = f.getAssign(i);
+                    Map<Variable, Object> a = f.getAssign(i);
                     if (a != null)
-                        assignTable.setValue(key_index, a);
+                        assignTable.setValue(key_index, Variable.Assignment.toSet(a));
                 }
             }
         } else { // no enumerable variables
@@ -209,9 +209,9 @@ public class CGTable implements QueryResult {
             } else 
                 atomicDensity = null;
             if (f.isTraced()) {
-                Set<Variable.Assignment> a = f.getAssign();
+                Map<Variable, Object> a = f.getAssign();
                 if (a != null)
-                    atomicAssign = a;
+                    atomicAssign = Variable.Assignment.toSet(a);
                 else
                     atomicAssign = null;
             } else

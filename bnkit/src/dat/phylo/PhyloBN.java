@@ -4,6 +4,7 @@ import bn.BNet;
 import bn.BNode;
 import bn.ctmc.SubstModel;
 import bn.ctmc.SubstNode;
+import bn.factor.FactorCache;
 import dat.EnumVariable;
 
 /**
@@ -95,11 +96,15 @@ public class PhyloBN {
                 }
                 pbn.bn.add(pbn.bp2node[idx]);
             }
-
         }
         return pbn;
     }
 
+    /**
+     * Construct a BN from a list of substitution nodes, assuming that they have been organised into a tree-like structure.
+     * @param nodes
+     * @return
+     */
     public static PhyloBN createBarebone(SubstNode[] nodes) {
         PhyloBN pbn = new PhyloBN();
         pbn.bp2node = new BNode[nodes.length];
@@ -119,4 +124,21 @@ public class PhyloBN {
         return this.getBN().getNodes().size() > 0;
     }
 
+    /**
+     * Enable cache for all nodes that can be cached.
+     * @return number of nodes cache-enabled
+     */
+    public int setCache(FactorCache cache) {
+        int cnt = 0;
+        for (int i = 0; i < bp2node.length; i ++) {
+            try { // presently, only SubstNode can be cached
+                ((SubstNode)bp2node[i]).setCache(cache);
+                if (((SubstNode)bp2node[i]).isCache())
+                    cnt += 1;
+            } catch (ClassCastException e) {
+                // a node that is NOT cached
+            }
+        }
+        return cnt;
+    }
 }

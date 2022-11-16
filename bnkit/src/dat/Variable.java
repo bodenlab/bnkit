@@ -17,12 +17,7 @@
  */
 package dat;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Class that defines the term (random) variable as it is used for Bayesian networks.
@@ -108,6 +103,7 @@ public class Variable<E extends Domain> implements Comparable {
      * @param var
      * @return true of the same (in the current namespace)
      */
+    @Override
     public boolean equals(Object var) {
         synchronized (pool) {
             return (this.canonicalIndex == Variable.pool.get(var));
@@ -217,6 +213,18 @@ public class Variable<E extends Domain> implements Comparable {
             this.var = var; 
             this.val = val;
         }
+        @Override
+        public boolean equals(Object other) {
+            try {
+                Variable.Assignment othass = (Variable.Assignment) other;
+                boolean value_same = othass.val.equals(this.val);
+                boolean var_same = othass.var.equals(this.var);
+                return (value_same && var_same);
+            } catch (ClassCastException e) {
+                return false;
+            }
+        }
+
         public static Assignment[] array(Variable[] vars, Object[] vals) {
             Assignment[] ret = new Assignment[vars.length];
             for (int i = 0; i < vars.length && i < vals.length; i ++)
@@ -229,6 +237,20 @@ public class Variable<E extends Domain> implements Comparable {
                 ret[i] = new Assignment(vars.get(i), vals[i]);
             return ret;
         }
+        public static <T extends Variable> Assignment[] array(Map<T, Object> varvals) {
+            Assignment[] ret = new Assignment[varvals.size()];
+            int i = 0;
+            for (Map.Entry<T, Object> entry : varvals.entrySet())
+                ret[i++] = new Assignment(entry.getKey(), entry.getValue());
+            return ret;
+        }
+        public static <T extends Variable> Set<Assignment> toSet(Map<T, Object> varvals) {
+            Set<Assignment> ret = new HashSet<>();
+            for (Map.Entry<T, Object> entry : varvals.entrySet())
+                ret.add(new Assignment(entry.getKey(), entry.getValue()));
+            return ret;
+        }
+
         public static Map<Variable, Object> toMap(Assignment[] assign_array) {
             Map<Variable, Object> map = new HashMap<>();
             for (Assignment assign : assign_array)

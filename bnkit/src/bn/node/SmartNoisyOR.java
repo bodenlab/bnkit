@@ -506,6 +506,7 @@ public class SmartNoisyOR implements BNode, Serializable{
             //if (Factorize.exitIfInvalid2(ft, this.toString())){
             //	System.out.println("invalid");
             //}
+            AbstractFactor.FactorFiller ff = ft.getFiller();
             int[] indices = table.getIndices(searchcpt);
             Object[] fkey = new Object[evars.length];
             for (int index : indices) {
@@ -533,7 +534,7 @@ public class SmartNoisyOR implements BNode, Serializable{
                         if (fkey.length == 0) // atomic factor
                             ft.setValue(d.get(varinstance));
                         else
-                            ft.setValue(fkey, d.get(varinstance));
+                            ff.setValue(fkey, d.get(varinstance));
                         //if (Factorize.exitIfInvalid2(ft, this.toString())){
                         //	System.out.println("invalid");
                         //}
@@ -541,11 +542,12 @@ public class SmartNoisyOR implements BNode, Serializable{
                         for (int j = 0; j < dom.size(); j++) {
                             fkey[missing] = dom.get(j);
                             Double p = d.get(j);
-                            ft.setValue(fkey, p);
+                            ff.setValue(fkey, p);
                         }
                     }
                 } 
             }
+            ft.setValuesByFiller(ff);
             if (!sumout.isEmpty()) {
                 Variable[] sumout_arr = new Variable[sumout.size()];
                 sumout.toArray(sumout_arr);
@@ -563,13 +565,15 @@ public class SmartNoisyOR implements BNode, Serializable{
                 return ft;
             }
             AbstractFactor ft = new DenseFactor(myvar);
+            AbstractFactor.FactorFiller ff = ft.getFiller();
             Object[] newkey = new Object[1];
             EnumDistrib d = this.prior;
             for (int j = 0; j < dom.size(); j++) {
                 newkey[0] = dom.get(j);
                 Double p = d.get(j);
-                ft.setValue(newkey, p);
+                ff.setValue(newkey, p);
             }
+            ft.setValuesByFiller(ff);
             Factorize.exitIfInvalid(ft, this.toString());
             return ft;
         }
@@ -776,7 +780,6 @@ public class SmartNoisyOR implements BNode, Serializable{
      * Method for inserting non-OR values into the table
      * when executing makeFactor.
      * @param key
-     * @param prob
      */
     public void insert(Object [] key) {
         int nkey = 0;
@@ -986,13 +989,13 @@ public class SmartNoisyOR implements BNode, Serializable{
 
     /**
      * Count this observation. Note that for it (E-step in EM) to affect the
-     * SmartNoisyOR, {@link bn.SmartNoisyOR#maximizeInstance()} must be called.
+     * SmartNoisyOR, {@link bn.node.SmartNoisyOR#maximizeInstance()} must be called.
      *
      * @param key the setting of the parent variables in the observation
      * @param value the setting of the SmartNoisyOR variable
      * @param prob the expectation of seeing this observation (1 if we actually
      * see it, otherwise the probability)
-     * @see bn.SmartNoisyOR#maximizeInstance()
+     * @see bn.node.SmartNoisyOR#maximizeInstance()
      */
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
@@ -1021,11 +1024,11 @@ public class SmartNoisyOR implements BNode, Serializable{
     /**
      * Prob can be set to 1.0 because when counted the value is being observed??
      * Count this observation. Note that for it (E-step in EM) to affect the
-     * SmartNoisyOR, {@link bn.SmartNoisyOR#maximizeInstance()} must be called.
+     * SmartNoisyOR, {@link bn.node.SmartNoisyOR#maximizeInstance()} must be called.
      *
      * @param key the setting of the parent variables in the observation
      * @param value the setting of the SmartNoisyOR variable
-     * @see bn.SmartNoisyOR#maximizeInstance()
+     * @see bn.node.SmartNoisyOR#maximizeInstance()
      */
     @Override
     public void countInstance(Object[] key, Object value) {
@@ -1051,7 +1054,7 @@ public class SmartNoisyOR implements BNode, Serializable{
 
     /**
      * Take stock of all observations counted via
-     * {@link bn.SmartNoisyOR#countInstance(Object[], Object, Double)}, ie implement the
+     * {@link bn.node.SmartNoisyOR#countInstance(Object[], Object, Double)}, ie implement the
      * M-step locally.
      * Similar to CPT, but only consider observations that match the SmartNoisyOR assumption
      */

@@ -287,6 +287,7 @@ public class GDT implements BNode, Serializable {
             Variable[] vars_arr = new Variable[fvars.size()];
             fvars.toArray(vars_arr);
             AbstractFactor ft = new DenseFactor(vars_arr);
+            AbstractFactor.FactorFiller ff = ft.getFiller();
             EnumVariable[] evars = ft.getEnumVars(); // the order may have changed
             int[] xcross = new int[parents.size()];
             int[] ycross = new int[evars.length];
@@ -316,18 +317,19 @@ public class GDT implements BNode, Serializable {
                         if (fkey.length == 0) // and the parents are too
                             ft.setValue(d.get(varinstance));
                         else
-                            ft.setValue(fkey, d.get(varinstance));
+                            ff.setValue(fkey, d.get(varinstance));
                     } else { // the variable for this CPT is NOT instantiated so we put it in the JDF
                         if (fkey.length == 0) { // but the parents are instantiated
                             ft.setValue(1.0);
                             ft.setDistrib(myvar, d);
                         } else {
-                            ft.setValue(fkey, 1.0);
+                            ff.setValue(fkey, 1.0);
                             ft.setDistrib(fkey, myvar, d);
                         }
                     }
                 } 
             }
+            ft.setValuesByFiller(ff);
             if (!sumout.isEmpty()) {
                 Variable[] sumout_arr = new Variable[sumout.size()];
                 sumout.toArray(sumout_arr);

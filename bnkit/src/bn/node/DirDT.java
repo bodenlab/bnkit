@@ -246,6 +246,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
             }
             int[] indices = table.getIndices(searchcpt);
             Object[] fkey = new Object[evars.length];
+            double[] map = new double[ft.getSize()];
+            boolean isLog = true;
             for (int index : indices) {
                 DirichletDistrib d = table.getValue(index);
                 if (d != null) { // there is a distribution associated with this entry in the CPT
@@ -261,25 +263,31 @@ public class DirDT implements BNode, TiedNode, Serializable {
                             if (fkey.length == 0) // and the parents are too
                                 ft.setLogValue(d.logLikelihood(counts)); // these probs can be very small, stay in log-space...
                             else
-                                ft.setLogValue(fkey, d.logLikelihood(counts));
+                                map[ft.getIndex(fkey)] = d.logLikelihood(counts);
                         } catch (ClassCastException e) {
+                            isLog = false;
                             // Assume the instance is an EnumDistrib
                             if (fkey.length == 0) // and the parents are too
                                 ft.setValue(d.get(varinstance));
                             else
-                                ft.setValue(fkey, d.get(varinstance));
+                                map[ft.getIndex(fkey)] = d.get(varinstance);
                         }
                     } else { // the variable for this DirDT is NOT instantiated so we put it in the JDF
                         if (fkey.length == 0) { // but the parents are instantiated
                             ft.setLogValue(0.0); 
                             ft.setDistrib(myvar, d);
                         } else {
-                            ft.setLogValue(fkey, 0.0);
+                            map[ft.getIndex(fkey)] = 0.0;
+                            // ft.setLogValue(fkey, 0.0);
                             ft.setDistrib(fkey, myvar, d);
                         }
                     }
                 } 
             }
+            if (isLog)
+                ft.setLogValues(map);
+            else
+                ft.setValues(map);
             //ft = Factorize.getNormal(ft);
             if (!sumout.isEmpty()) {
                 Variable[] sumout_arr = new Variable[sumout.size()];

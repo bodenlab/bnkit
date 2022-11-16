@@ -20,6 +20,11 @@ package dat;
 import json.JSONArray;
 import json.JSONObject;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * This class represents a (countable) domain of values that discrete variables
  * can take.
@@ -250,5 +255,56 @@ public class Enumerable implements Domain {
             vals[i] = varr.get(i);
         return new Enumerable(vals);
     }
+
+    /**
+     * A class to associate an enumerable with a value.
+     * Useful for passing enumerable/value pairs to methods where multiples of these are required.
+     */
+    public static class Designation {
+        public final Enumerable enumerable;
+        public final Object val;
+        public Designation(Enumerable enumerable, Object val) {
+            this.enumerable = enumerable;
+            this.val = val;
+        }
+        public static Designation[] array(Enumerable[] enumerables, Object[] vals) {
+            Designation[] ret = new Designation[enumerables.length];
+            for (int i = 0; i < enumerables.length && i < vals.length; i ++)
+                ret[i] = new Designation(enumerables[i], vals[i]);
+            return ret;
+        }
+        public static <T extends Enumerable> Designation[] array(List<T> enumerables, Object[] vals) {
+            Designation[] ret = new Designation[enumerables.size()];
+            for (int i = 0; i < ret.length && i < vals.length; i ++)
+                ret[i] = new Designation(enumerables.get(i), vals[i]);
+            return ret;
+        }
+        public static Map<Enumerable, Object> toMap(Designation[] assign_array) {
+            Map<Enumerable, Object> map = new HashMap<>();
+            for (Designation assign : assign_array)
+                map.put(assign.enumerable, assign.val);
+            return map;
+        }
+        public static Map<Enumerable, Object> toMap(Collection<Designation> assign_list) {
+            Map<Enumerable, Object> map = new HashMap<>();
+            for (Designation assign : assign_list)
+                map.put(assign.enumerable, assign.val);
+            return map;
+        }
+        public String toString() {
+            return enumerable.toString() + "=" + val.toString();
+        }
+    }
+
+    /**
+     * A factory method for creating a single variable/value pair.
+     * @param enumerable
+     * @param val
+     * @return the variable paired with a value
+     */
+    public static Designation assign(Enumerable enumerable, Object val) {
+        return new Designation(enumerable, val);
+    }
+
 
 }

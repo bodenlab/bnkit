@@ -17,9 +17,8 @@
  */
 package bn.ctmc;
 
-import bn.factor.Factorize;
+import bn.factor.*;
 import bn.prob.EnumDistrib;
-import bn.factor.Factor;
 import dat.EnumVariable;
 import dat.Variable;
 import dat.EnumTable;
@@ -28,8 +27,6 @@ import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.matrix.*;
-import bn.factor.AbstractFactor;
-import bn.factor.DenseFactor;
 import dat.Enumerable;
 
 import java.util.*;
@@ -44,7 +41,7 @@ import java.util.*;
  * @author mikael
  */
 public class SubstNode implements BNode, TiedNode {
-    
+
     private final EnumVariable var;
     private final EnumVariable parent;
     private final List<EnumVariable> parentAsList;
@@ -61,6 +58,7 @@ public class SubstNode implements BNode, TiedNode {
     private double time;
     private Object instance = null;
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
+    private FactorCache cache = null;
 
     /**
      * Create a conditional "substitution node" for an enumerable variable. 
@@ -106,7 +104,15 @@ public class SubstNode implements BNode, TiedNode {
         this.parentAsList = null;
         this.time = 0;
     }
-    
+
+    public boolean isCache() {
+        return cache != null;
+    }
+
+    public void setCache(FactorCache cache) {
+        this.cache = cache;
+    }
+
     @Override
     public String getName() {
         return getVariable().toString();
@@ -447,6 +453,12 @@ public class SubstNode implements BNode, TiedNode {
         }
     }
 
+    /**
+     * Create a factor table from the node (conditional probability table).
+     * TODO: convert calls to setters to use indices and not values, to speed up processing
+     * @param relevant relevant variables with evidence if available
+     * @return factor table, typically a {@see bn.factor.CachedFactor} or {@see bn.factor.DenseFactor} depending on whether this node is set to use a cache or not
+     */
     @Override
     public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
         EnumVariable myvar = var;
@@ -474,27 +486,40 @@ public class SubstNode implements BNode, TiedNode {
             // option 1
             if (varinstance == null && parinstance == null) {
                 if (parent_is_relevant) {
-                    AbstractFactor ft = new DenseFactor(new Variable[] {mypar, myvar});
-                    EnumVariable[] evars = ft.getEnumVars();
-                    boolean cond_first = mypar.equals(evars[0]); // check if the condition is listed as first variable in factor
-                    for (int index_X = 0; index_X < values.length; index_X ++) {
-                        for (int index_Y = 0; index_Y < values.length; index_Y ++) {
-                            if (cond_first)         // F(Y, X) from P(X | Y)
-                                ft.setValue(new Object[] {values[index_Y], values[index_X]}, getProb(index_X, index_Y));
-                            else                    // F(X, Y) from P(X | Y)
-                                ft.setValue(new Object[] {values[index_X], values[index_Y]}, getProb(index_X, index_Y));
+                    // AbstractFactor ft = new DenseFactor(new Variable[] {mypar, myvar});
+                    AbstractFactor ft = isCache() ? CachedFactor.getByDistance(cache, time, myvar, mypar) : new DenseFactor(new Variable[] {mypar, myvar});
+                    if (!ft.isSet()) {
+                        AbstractFactor.FactorFiller ff = ft.getFiller();
+                        EnumVariable[] evars = ft.getEnumVars();
+                        boolean cond_first = mypar.equals(evars[0]); // check if the condition is listed as first variable in factor
+                        if (cond_first) {        // F(Y, X) from P(X | Y)
+                            for (int index_X = 0; index_X < values.length; index_X++) {
+                                for (int index_Y = 0; index_Y < values.length; index_Y++) {
+                                    ff.setValue(new Object[]{values[index_Y], values[index_X]}, getProb(index_X, index_Y));
+                                }
+                            }
+                        } else {                   // F(X, Y) from P(X | Y)
+                            for (int index_X = 0; index_X < values.length; index_X++) {
+                                for (int index_Y = 0; index_Y < values.length; index_Y++) {
+                                    ff.setValue(new Object[]{values[index_X], values[index_Y]}, getProb(index_X, index_Y));
+                                }
+                            }
                         }
+                        ft.setValuesByFiller(ff);
                     }
                     return ft;
                 } else { // parent is NOT relevant
-                    AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
-                    // F(X) from P(X | Y)
-                    for (Object X : values) {
-                        double sum = 0;
-                        for (Object Y : values) {
-                            sum += getProb(X, Y);
+                    AbstractFactor ft = isCache() ? CachedFactor.getByDistance(cache, time, myvar, null) : new DenseFactor(new Variable[] {myvar});
+                    if (!ft.isSet()) {
+                        AbstractFactor.FactorFiller ff = ft.getFiller();
+                        // F(X) from P(X | Y)
+                        for (Object X : values) {
+                            double sum = 0;
+                            for (Object Y : values) // we don't care about the value of Y
+                                sum += getProb(X, Y);
+                            ff.setValue(new Object[]{X}, sum);
                         }
-                        ft.setValue(new Object[] {X}, sum);
+                        ft.setValuesByFiller(ff);
                     }
                     return ft;
                 }
@@ -502,36 +527,42 @@ public class SubstNode implements BNode, TiedNode {
             // option 2
             else if (varinstance != null && parinstance == null) {
                 if (parent_is_relevant) {
+                    // Need to consider varinstance for hash key; below works but slows overall inference in tests thus disabled
+//                    AbstractFactor ft = isCache() ? CachedFactor.getByDistanceAndDesignation(cache, time, null, mypar, varinstance) : new DenseFactor(new Variable[] {mypar});
                     AbstractFactor ft = new DenseFactor(new Variable[] {mypar});
-                    ft.evidenced = true;
-                    // F(Y) from P(X = x| Y)
-                    Object X = varinstance;
-                    for (Object Y : values) {
-                        ft.setValue(new Object[] {Y}, getProb(X, Y));
+                    if (!ft.isSet()) {
+                        AbstractFactor.FactorFiller ff = ft.getFiller();
+                        ft.evidenced = true;
+                        // F(Y) from P(X = x| Y)
+                        Object X = varinstance; // we know what value X has
+                        for (Object Y : values) // so we tabulate by values in Y
+                            ff.setValue(new Object[]{Y}, getProb(X, Y));
+                        ft.setValuesByFiller(ff);
                     }
                     return ft;
                 } else { // parent is NOT relevant
-                    AbstractFactor ft = new DenseFactor();
+                    AbstractFactor ft = new DenseFactor(); // TODO: investigate if there could be a CachedFactor option here
                     ft.evidenced = true;
                     // F() from P(X = x| Y) and Y is irrelevant to query
                     Object X = varinstance;
                     double sum = 0;
-                    for (Object Y : values) {
+                    for (Object Y : values)
                         sum += getProb(X, Y);
-                    }
                     ft.setValue(sum);
                     return ft;
                 }
             }
             // option 3
             else if (varinstance == null && parinstance != null) {
+                // TODO: this factor can be cached but not by the current factory methods; note the parent variable is instantiated...
                 AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
+                AbstractFactor.FactorFiller ff = ft.getFiller();
                 ft.evidenced = true;
                 // F(X) from P(X | Y)
                 Object Y = parinstance;
-                for (Object X : values) {
-                    ft.setValue(new Object[] {X}, getProb(X, Y));
-                }
+                for (Object X : values)
+                    ff.setValue(new Object[]{X}, getProb(X, Y));
+                ft.setValuesByFiller(ff);
                 return ft;
             }
             throw new RuntimeException("Invalid setting");
@@ -541,131 +572,33 @@ public class SubstNode implements BNode, TiedNode {
                 ft.setValue(getProb(varinstance));
                 return ft;
             } else { // not instantiated
-                AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
-                for (Object X : values) {
-                    ft.setValue(new Object[] {X}, getProb(X));
+                //AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
+                AbstractFactor ft = isCache() ? CachedFactor.getByDistance(cache, 0, myvar, null) : new DenseFactor(new Variable[] {myvar});
+                if (!ft.isSet()) {
+                    AbstractFactor.FactorFiller ff = ft.getFiller();
+                    for (Object X : values)
+                        ff.setValue(new Object[]{X}, getProb(X));
+                    ft.setValuesByFiller(ff);
                 }
                 return ft;
             }
         }
     }
 
-//    @Override
-//    public AbstractFactor makeDenseFactor(Map<Variable, Object> relevant) {
-//        EnumVariable myvar = var;
-//        EnumVariable mypar = parent; // parent variable, if any
-//        // get value of this node, if any assigned
-//        Object varinstance = relevant.get(myvar);
-//        if (mypar != null) { // there is a parent variable
-//            // three possibilities:
-//            // 1. neither node variable or parent variable are instantiated, in which case, the parent is either
-//            //      a. relevant to the query, or
-//            //      b. irrelevant and needs to be marginalised subsequently
-//            // 2. node variable is instantiated, not parent, in which case, the parent is either
-//            //      a. relevant to the query, or
-//            //      b. irrelevant and needs to be marginalised subsequently
-//            // 3. parent variable is instantiated, not node variable
-//
-//            // Check if parent variable is relevant
-//            boolean parent_is_relevant = relevant.containsKey(mypar);
-//            // get value of the parent node, if any assigned
-//            Object parinstance = relevant.get(mypar);
-//            // Consider what defines this factor:
-//            // - parinstance value (null or value from mypar.getDomain()) AND the domain (but NOT the variable name, so use domain hash-code)
-//            // - varinstance value (null or value from myvar.getDomain()) AND the domain (but NOT the variable name, so use domain hash-code)
-//            // - the probabilities that are used to set factor
-//            // option 1
-//            if (varinstance == null && parinstance == null) {
-//                if (parent_is_relevant) {
-//                    AbstractFactor ft = new DenseFactor(new Variable[] {mypar, myvar});
-//                    EnumVariable[] evars = ft.getEnumVars();
-//                    boolean cond_first = mypar.equals(evars[0]); // check if the condition is listed as first variable in factor
-//                    for (int index_X = 0; index_X < values.length; index_X ++) {
-//                        for (int index_Y = 0; index_Y < values.length; index_Y ++) {
-//                            if (cond_first)         // F(Y, X) from P(X | Y)
-//                                ft.setValue(new Object[] {values[index_Y], values[index_X]}, getProb(index_X, index_Y));
-//                            else                    // F(X, Y) from P(X | Y)
-//                                ft.setValue(new Object[] {values[index_X], values[index_Y]}, getProb(index_X, index_Y));
-//                        }
-//                    }
-//                    return ft;
-//                } else { // parent is NOT relevant
-//                    AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
-//                    // F(X) from P(X | Y)
-//                    for (Object X : values) {
-//                        double sum = 0;
-//                        for (Object Y : values) {
-//                            sum += getProb(X, Y);
-//                        }
-//                        ft.setValue(new Object[] {X}, sum);
-//                    }
-//                    return ft;
-//                }
-//            }
-//            // option 2
-//            else if (varinstance != null && parinstance == null) {
-//                if (parent_is_relevant) {
-//                    AbstractFactor ft = new DenseFactor(new Variable[] {mypar});
-//                    ft.evidenced = true;
-//                    // F(Y) from P(X = x| Y)
-//                    Object X = varinstance;
-//                    for (Object Y : values) {
-//                        ft.setValue(new Object[] {Y}, getProb(X, Y));
-//                    }
-//                    return ft;
-//                } else { // parent is NOT relevant
-//                    AbstractFactor ft = new DenseFactor();
-//                    ft.evidenced = true;
-//                    // F() from P(X = x| Y) and Y is irrelevant to query
-//                    Object X = varinstance;
-//                    double sum = 0;
-//                    for (Object Y : values) {
-//                        sum += getProb(X, Y);
-//                    }
-//                    ft.setValue(sum);
-//                    return ft;
-//                }
-//            }
-//            // option 3
-//            else if (varinstance == null && parinstance != null) {
-//                AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
-//                ft.evidenced = true;
-//                // F(X) from P(X | Y)
-//                Object Y = parinstance;
-//                for (Object X : values) {
-//                    ft.setValue(new Object[] {X}, getProb(X, Y));
-//                }
-//                return ft;
-//            }
-//            throw new RuntimeException("Invalid setting");
-//        } else { // no parents, just a prior
-//            if (varinstance != null) { // instantiated prior
-//                AbstractFactor ft = new DenseFactor();
-//                ft.setValue(getProb(varinstance));
-//                return ft;
-//            } else { // not instantiated
-//                AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
-//                for (Object X : values) {
-//                    ft.setValue(new Object[] {X}, getProb(X));
-//                }
-//                return ft;
-//            }
-//        }
-//    }
 
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        throw new UnsupportedOperationException("Not supported; no learning for this node type."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
     public void countInstance(Object[] key, Object value) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        throw new UnsupportedOperationException("Not supported; no learning for this node type."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
     public void maximizeInstance() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        throw new UnsupportedOperationException("Not supported; no learning for this node type."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
@@ -718,25 +651,21 @@ public class SubstNode implements BNode, TiedNode {
 	@Override
 	public void put(Object[] key, Distrib distr) {
 		// TODO Auto-generated method stub
-		
 	}
 
 	@Override
 	public void put(Distrib prob) {
 		// TODO Auto-generated method stub
-		
 	}
 
 	@Override
 	public void put(Distrib prob, Object... key) {
 		// TODO Auto-generated method stub
-		
 	}
 
 	@Override
 	public void put(int index, Distrib distr) {
 		// TODO Auto-generated method stub
-		
 	}
 
     public static void main0(String[] args) {

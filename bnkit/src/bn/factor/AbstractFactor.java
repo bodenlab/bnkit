@@ -21,6 +21,7 @@ import bn.Distrib;
 import bn.JDF;
 import dat.EnumTable;
 import dat.EnumVariable;
+import dat.Enumerable;
 import dat.Variable;
 
 import java.util.*;
@@ -59,6 +60,8 @@ public abstract class AbstractFactor implements Iterable<Integer> {
     protected final int nNVars; // number of non-enumerable variables
 
     protected final EnumVariable[] evars; // enumerable variables, which form the "keys" to entries in the map
+    protected final Enumerable[] enums; // enumerable domains
+
     protected final Variable[] nvars; // non-enumerable variables, which densities are attached to the entries via JDF
     protected final int[] period;
     protected final int[] step;
@@ -66,7 +69,13 @@ public abstract class AbstractFactor implements Iterable<Integer> {
     
     public boolean evidenced = false;
 
-    protected long cacheID = 0L; // 0L means not possible to cache
+    public static int
+            TYPE_UNKNOWN = 1,
+            TYPE_DENSE = 2,
+            TYPE_SPARSE = 3,
+            TYPE_CACHED = 4;
+
+    private int FACTOR_TYPE = TYPE_UNKNOWN;
 
     /**
      * Construct a new table without any variables.
@@ -76,6 +85,7 @@ public abstract class AbstractFactor implements Iterable<Integer> {
     protected AbstractFactor() {
         this.evars = null;
         this.nEVars = 0;
+        this.enums = null;
         this.nvars = null;
         this.nNVars = 0;
         this.step = null;
@@ -148,7 +158,9 @@ public abstract class AbstractFactor implements Iterable<Integer> {
         this.period = new int[this.nEVars];
         this.domsize = new int[this.nEVars];
         int prod = 1;
+        this.enums = new Enumerable[nEVars];
         for (int i = 0; i < nEVars; i++) {
+            this.enums[i] = evars[i].getDomain();
             int parent = nEVars - i - 1;
             this.domsize[parent] = evars[parent].size();
             this.step[parent] = prod;
@@ -178,7 +190,9 @@ public abstract class AbstractFactor implements Iterable<Integer> {
         this.period = new int[this.nEVars];
         this.domsize = new int[this.nEVars];
         int prod = 1;
+        this.enums = new Enumerable[nEVars];
         for (int i = 0; i < nEVars; i++) {
+            this.enums[i] = evars[i].getDomain();
             int parent = nEVars - i - 1;
             this.domsize[parent] = evars[parent].size();
             this.step[parent] = prod;
@@ -200,13 +214,21 @@ public abstract class AbstractFactor implements Iterable<Integer> {
     }
 
     /**
-     * Set the ID used to cache factors, intended to conserve memory and time when factors are essentially the same
-     * (and do not require separate storage and calculation when used as part of repeated operations between them)
-     * @param id
+     * Set the type of factor this is
+     *             TYPE_UNKNOWN = 1,
+     *             TYPE_DENSE = 2,
+     *             TYPE_SPARSE = 3,
+     *             TYPE_CACHED = 4;
+     * @param type any of the above values defined in {@link bn.factor.AbstractFactor#FACTOR_TYPE}
      */
-    protected void setCacheID(long id) {
-        cacheID = id;
+    protected void setFactorType(int type) {
+        this.FACTOR_TYPE = type;
     }
+
+    public int getFactorType() {
+        return this.FACTOR_TYPE;
+    }
+
 
     /**
      * Get a key from a partial assignment of variables defined for the table.
@@ -348,14 +370,6 @@ public abstract class AbstractFactor implements Iterable<Integer> {
         return 1;
     }
 
-    /**
-     * Find out how full the table is.
-     * @return the percentage of table that is occupied with non-zero values
-     */
-    public double getCapacity() {
-        return getOccupied() / getSize();
-    }
-    
     /**
      * Get the enumerable variables of the table.
      * @return the variables in original order.
@@ -590,7 +604,7 @@ public abstract class AbstractFactor implements Iterable<Integer> {
                     System.out.print(String.format(" %s ", d == null ? "-" : d.toString()));
                 }
                 if (this.isTraced()) {
-                    for (Variable.Assignment a : this.getAssign()) {
+                    for (Variable.Assignment a : Variable.Assignment.array(this.getAssign())) {
                         System.out.print(a + ";");
                     }
                 }
@@ -605,7 +619,7 @@ public abstract class AbstractFactor implements Iterable<Integer> {
                     System.out.print(String.format(" %s ", d == null ? "-" : d.toString()));
                 }
                 if (this.isTraced()) {
-                    for (Variable.Assignment a : this.getAssign(i)) {
+                    for (Variable.Assignment a : Variable.Assignment.array(this.getAssign(i))) {
                         System.out.print(a + ";");
                     }
                 }
@@ -690,79 +704,35 @@ public abstract class AbstractFactor implements Iterable<Integer> {
     }
 
 
+    /**
+     * Flag if all factor values have been set.
+     * @return true if no further calculation is required (e.g. when a cache has been used, or values have been assigned); false otherwise
+     */
+    abstract public boolean isSet();
+
     // Setters of cells in factor ---------------------------------------------------------
 
-    /**
-     * Set the only value associated with a table without enumerable variables.
-     * @param value
-     * @return 
-     */
-    public int setValue(double value) {
-        if (value == 0)
-            return setLogValue(LOG0);
-        return setLogValue(Math.log(value));
-    }
-    
-    /**
-     * Set the only value associated with a table without enumerable variables.
-     * @param value
-     * @return 
-     */
-    public abstract int setLogValue(double value);
-    
-    /**
-     * Associate the specified key-index with the given value. Note that using
-     * getValue and setValue with index is quicker than with key, if more than
-     * one operation is done.
-     *
-     * @param key_index
-     * @param value
-     * @return the index at which the value was stored
-     */
-    public int setValue(int key_index, double value) {
-        if (value == 0)
-            return setLogValue(key_index, LOG0);
-        return setLogValue(key_index, Math.log(value));
+    public abstract void setLogValues(double[] logmap);
+
+    public void setValues(double[] map) {
+        double[] lmap = new double[map.length];
+        for (int i = 0; i < map.length; i ++)
+            lmap[i] = (map[i] == 0 ? LOG0 : Math.log(map[i]));
+        this.setLogValues(lmap);
     }
 
-    /**
-     * Associate the specified key-index with the given log value. Note that using
-     * getValue and setValue with index is quicker than with key, if more than
-     * one operation is done.
-     *
-     * @param key_index
-     * @param value
-     * @return the index at which the value was stored
-     */
-    public abstract int setLogValue(int key_index, double value);
+    public abstract void setLogValue(double log_single);
 
-
-    /**
-     * Associate the specified key with the given value.
-     * @param key
-     * @param value
-     * @return the index at which the value was stored
-     */
-    public int setValue(Object[] key, double value) {
-        if (getSize() == 1)
-            throw new AbstractFactorRuntimeException("Invalid key: no variables");
-        int index = getIndex(key);
-        return setValue(index, value);
+    public void setValuesByFiller(FactorFiller ff) {
+        if (ff.isUpdated)
+            setLogValues(ff.fmap);
     }
 
-    /**
-     * Associate the specified key with the given log value.
-     * @param key
-     * @param value
-     * @return the index at which the value was stored
-     */
-    public int setLogValue(Object[] key, double value) {
-        if (getSize() == 1)
-            throw new AbstractFactorRuntimeException("Invalid key: no variables");
-        int index = getIndex(key);
-        return setLogValue(index, value);
+    public void setValue(double single) {
+        if (Double.isNaN(single))
+            throw new AbstractFactorRuntimeException("Invalid log value for atomic factor");
+        setLogValue(single == 0 ? LOG0 : Math.log(single));
     }
-
 
     /**
      * Set the JDF for a table without enumerable variables.
@@ -831,27 +801,47 @@ public abstract class AbstractFactor implements Iterable<Integer> {
     public int setAssign(Object[] key, Collection<Variable.Assignment> assign) {
         return addAssign(getIndex(key), assign);
     }
-    
-    
+
+    /**
+     * Record trace back, enabling the use of pointers in place of explicit assignments.
+     * Preferred method to replace {@see bn.factor.AbstractFactor#addAssign(int key_index, bn.dat#Variable.Assignment)}.
+     *
+     * @param key_index index to row in present factor
+     * @param from_factor trace-back reference to factor
+     * @param from_index index to row for trace-back factor
+     * @return
+     */
+    public abstract int addAssign(int key_index, AbstractFactor from_factor, int from_index);
+
+    /**
+     * Record trace back, enabling the use of pointers in place of explicit assignments.
+     * Preferred method to replace {@see bn.factor.AbstractFactor#addAssign(bn.dat#Variable.Assignment)}.
+     *
+     * @param from_factor trace-back reference to factor
+     * @param from_index index to row for trace-back factor
+     * @return
+     */
+    public abstract int addAssign(AbstractFactor from_factor, int from_index);
+
     /**
      * Retrieve a collection of assignments from the single entry.
      * @return set of assignments
      */
-    public abstract Set<Variable.Assignment> getAssign();
+    public abstract Map<Variable, Object>  getAssign();
 
     /**
      * Retrieve a collection of assignments from entry.
      * @param key_index index of entry
      * @return set of assignments
      */
-    public abstract Set<Variable.Assignment> getAssign(int key_index);
+    public abstract Map<Variable, Object>  getAssign(int key_index);
     
     /**
      * Retrieve a collection of assignments from the specified entry.
      * @param key the entry
      * @return set of assignments
      */
-    public Set<Variable.Assignment> getAssign(Object[] key) {
+    public Map<Variable, Object>  getAssign(Object[] key) {
         return getAssign(getIndex(key));
     }
     
@@ -940,17 +930,6 @@ public abstract class AbstractFactor implements Iterable<Integer> {
      * @return the index of the entry, always 0
      */
     public abstract int setDistrib(Variable nvar, Distrib d);
-    
-    /**
-     * Find out how many entries that are occupied.
-     * @return  number of entries that are instantiated
-     */
-    public abstract int getOccupied();
-    
-    /**
-     * Set all entries to 0.
-     */
-    public abstract void setEmpty();
 
     /**
      * Identify each index that is linked to the specified key (which may
@@ -961,7 +940,144 @@ public abstract class AbstractFactor implements Iterable<Integer> {
      * @return an array with all matching indices
      */
     public abstract int[] getIndices(Object[] key);
-        
+
+    public FactorFiller getFiller() {
+        return new FactorFiller();
+    }
+
+    /**
+     * Function to determine the key by which the factor can be retrieved if in existence already
+     * @param evars the enumerable variables in order (in each case defining possible values)
+     * @return the key
+     */
+    public static int getFactorMapKey(EnumVariable[] evars) {
+        int hash = 7;
+        for (int i = 0; i < evars.length; i++)
+            hash = 31 * hash + evars[i].getDomain().hashCode();
+        return hash;
+    }
+
+    /**
+     * Function to determine the key by which the factor can be retrieved if in existence already
+     * @param enums the types of enumerable variables in order (in each case defining possible values)
+     * @return the key
+     */
+    public static int getFactorMapKey(Enumerable[] enums) {
+        int hash = 7;
+        for (int i = 0; i < enums.length; i++)
+            hash = 31 * hash + enums[i].hashCode();
+        return hash;
+    }
+
+    /**
+     * Function to determine the key by which the factor can be retrieved if in existence already
+     * @param enums the types of enumerable variables in order (in each case defining possible values)
+     * @param fmap the values of the factor, indexed by the variable types
+     * @return the key
+     */
+    public static int getFactorMapKey(Enumerable[] enums, double[] fmap) {
+        int hash = getFactorMapKey(enums);
+        for (int i = 0; i < fmap.length; i++)
+            hash = 31 * hash + ((Double)fmap[i]).hashCode();
+        return hash;
+    }
+
+    /**
+     * Special version to hash factors by distance, in addition to the child and parent domains; this is useful for SubstNode
+     * @param enums
+     * @param dist
+     * @return
+     */
+    public static int getFactorMapKey(Enumerable[] enums, double dist) {
+        int hash = getFactorMapKey(enums);
+        hash = 31 * hash + ((Double)dist).hashCode();
+        return hash;
+    }
+
+    public static int getFactorMapKey(Enumerable[] enums, double dist, Object value) {
+        int hash = getFactorMapKey(enums);
+        hash = 31 * hash + ((Double)dist).hashCode();
+        hash = 31 * hash + value.hashCode();
+        return hash;
+    }
+
+    public static int getFactorMapKey(int ... keys) {
+        int hash = 7;
+        for (int i = 0; i < keys.length; i++)
+            hash = 31 * hash + ((Integer)keys[i]).hashCode();
+        return hash;
+    }
+
+    public class FactorMap {
+        private final double[] map;
+        private final double single;
+
+        public FactorMap(double[] map) {
+            this.map = map;
+            this.single = Double.NEGATIVE_INFINITY;
+        }
+
+        public FactorMap(double single) {
+            this.map = null;
+            this.single = single;
+        }
+
+        public int size() {
+            return (map == null ? 1 : map.length);
+        }
+
+        public boolean isAtomic() {
+            return map == null;
+        }
+
+        public double[] getMap() {
+            return map;
+        }
+
+        public double get(int index) {
+            return map[index];
+        }
+
+        public double get() {
+            if (!isAtomic())
+                throw new AbstractFactorRuntimeException("Factor is not atomic");
+            return single;
+        }
+    }
+
+    public class FactorFiller {
+        private double[] fmap;
+        private boolean isUpdated = false;
+
+        public FactorFiller() {
+            fmap = new double[getSize()];
+        }
+
+        public void setLogValue(int index, double logValue) {
+            fmap[index] = logValue;
+            isUpdated = true;
+        }
+
+        public void setLogValue(Object[] key, double logValue) {
+            setLogValue(getIndex(key), logValue);
+        }
+
+        public void setValue(int index, double value) {
+            if (Double.isNaN(value))
+                throw new AbstractFactorRuntimeException("Invalid value: " + value);
+            setLogValue(index, value == 0 ? LOG0 : Math.log(value));
+        }
+
+        public void setValue(Object[] key, double value) {
+            setValue(getIndex(key), value);
+        }
+
+        public boolean isUpdated() {
+            return isUpdated;
+        }
+
+    }
+
 }
 
 class AbstractFactorRuntimeException extends RuntimeException {

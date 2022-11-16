@@ -22,10 +22,7 @@ import bn.JDF;
 import dat.EnumTable;
 import dat.Variable;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Table for storing and retrieving doubles based on Enumerable keys.
@@ -63,6 +60,7 @@ public class SparseFactor extends AbstractFactor {
     public SparseFactor() {
         super();
         this.fac = new EnumTable<>();
+        setFactorType(AbstractFactor.TYPE_SPARSE);
     }
 
     
@@ -90,8 +88,16 @@ public class SparseFactor extends AbstractFactor {
             this.jdf = new EnumTable<>();
         else if (this.nNVars > 0) 
             this.jdf_atomic = new JDF(this.nvars);
+        setFactorType(AbstractFactor.TYPE_SPARSE);
     }
 
+    /**
+     * Flag if all factor values have been set.
+     * @return true if no further calculation is required (e.g. when a cache has been used, or values have been assigned); false otherwise
+     */
+    public boolean isSet() {
+        throw new SparseFactorRuntimeException("Not implemented");
+    }
 
     @Override
     public double getLogValue() {
@@ -129,24 +135,17 @@ public class SparseFactor extends AbstractFactor {
         return y;
     }
 
+    /**
+     * @param logmap
+     */
     @Override
-    public int setLogValue(double value) {
-        if (this.getSize() == 1) {
-            fac_atomic = value;
-            return 0;
-        }
-        throw new SparseFactorRuntimeException("This table must be accessed with a enumerable variable key");
+    public void setLogValues(double[] logmap) {
+        throw new SparseFactorRuntimeException("Not implemented");
     }
 
     @Override
-    public int setLogValue(int key_index, double value) {
-        if (key_index >= getSize() || key_index < 0 || this.getSize() == 1)
-            throw new SparseFactorRuntimeException("Invalid index");
-        if (value == LOG0)
-            fac.removeValue(key_index);
-        else 
-            fac.setValue(key_index, value);
-        return key_index;
+    public void setLogValue(double value) {
+        throw new SparseFactorRuntimeException("Not implemented");
     }
 
     @Override
@@ -205,18 +204,40 @@ public class SparseFactor extends AbstractFactor {
         return key_index;
     }
 
+    /**
+     * @param key_index   index to row in present factor
+     * @param from_factor trace-back reference to factor
+     * @param from_index  index to row for trace-back factor
+     * @return
+     */
     @Override
-    public Set<Variable.Assignment> getAssign() {
+    public int addAssign(int key_index, AbstractFactor from_factor, int from_index) {
+        throw new DenseFactorRuntimeException("Not implemented");
+    }
+
+    /**
+     * @param from_factor trace-back reference to factor
+     * @param from_index  index to row for trace-back factor
+     * @return
+     */
+    @Override
+    public int addAssign(AbstractFactor from_factor, int from_index) {
+        throw new DenseFactorRuntimeException("Not implemented");
+    }
+
+
+    @Override
+    public Map<Variable, Object> getAssign() {
         if (this.getSize() == 1)
-            return ass_atomic;
+            return Variable.Assignment.toMap(ass_atomic);
         throw new SparseFactorRuntimeException("Table has variables that must be used to index access");
     }
 
     @Override
-    public Set<Variable.Assignment> getAssign(int key_index) {
+    public Map<Variable, Object>  getAssign(int key_index) {
         if (key_index >= getSize() || key_index < 0 || getSize() == 1)
             throw new SparseFactorRuntimeException("Invalid key index: outside map");
-        return ass.getValue(key_index);
+        return Variable.Assignment.toMap(ass.getValue(key_index));
     }
 
     @Override
@@ -280,16 +301,6 @@ public class SparseFactor extends AbstractFactor {
         return 0;
     }
 
-    @Override
-    public void setEmpty() {
-        if (fac != null)
-            fac.setEmpty();
-        if (jdf != null)
-            jdf.setEmpty();
-        if (ass != null)
-            ass.setEmpty();
-    }
-
     /**
      * Get indices for all non-null entries.
      * @return the indices
@@ -311,11 +322,6 @@ public class SparseFactor extends AbstractFactor {
         return fac.getIndices(key);
     }
 
-    @Override
-    public int getOccupied() {
-        return fac.getSize();
-    }
-    
 }
 
 class SparseFactorRuntimeException extends RuntimeException {

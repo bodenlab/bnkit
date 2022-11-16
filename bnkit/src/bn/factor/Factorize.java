@@ -21,6 +21,7 @@ import bn.JDF;
 import bn.Predef;
 import bn.prob.GaussianDistrib;
 import dat.EnumVariable;
+import dat.Enumerable;
 import dat.Variable;
 
 import java.util.*;
@@ -41,6 +42,8 @@ public class Factorize {
     protected static boolean VERBOSE = false;
 
     protected static int PRODUCT_OPTION = -1; // choose strategy for complex cases by timing ("-1") or by fixed option (currently "0" and "1")
+    protected static boolean CACHE_PRODUCTS = false;
+    protected static boolean CACHE_MARGINS = false;
 
     /**
      * Empty constructor.
@@ -69,6 +72,31 @@ public class Factorize {
             }
         }
         Variable[] C = new Variable[accept.size()];
+        accept.toArray(C);
+        return C;
+    }
+
+    /**
+     * Determine the difference between two arrays of enumerable variables.
+     * @param A the primary array
+     * @param B the secondary array
+     * @return the array which contain all elements of A except those in B
+     */
+    public static EnumVariable[] getDifference(EnumVariable[] A, EnumVariable[] B) {
+        List<EnumVariable> accept = new ArrayList<>();
+        for (int i = 0; i < A.length; i++) {
+            boolean present_in_B = false;
+            for (int j = 0; j < B.length; j++) {
+                if (A[i].equals(B[j])) {
+                    present_in_B = true;
+                    break;
+                }
+            }
+            if (!present_in_B) {
+                accept.add(A[i]);
+            }
+        }
+        EnumVariable[] C = new EnumVariable[accept.size()];
         accept.toArray(C);
         return C;
     }
@@ -427,6 +455,32 @@ public class Factorize {
     }
 
     /**
+     * Concatenate two arrays of variables into one.
+     * Does not consider order or duplicates.
+     * @param one
+     * @param two
+     * @return
+     */
+    protected static EnumVariable[] getConcat(EnumVariable[] one, EnumVariable[] two) {
+        if (one == null && two == null) {
+            return new EnumVariable[0];
+        } else if (one == null) {
+            EnumVariable[] arr = new EnumVariable[two.length];
+            System.arraycopy(two, 0, arr, 0, two.length);
+            return arr;
+        } else if (two == null) {
+            EnumVariable[] arr = new EnumVariable[one.length];
+            System.arraycopy(one, 0, arr, 0, one.length);
+            return arr;
+        } else {
+            EnumVariable[] arr = new EnumVariable[one.length + two.length];
+            System.arraycopy(one, 0, arr, 0, one.length);
+            System.arraycopy(two, 0, arr, one.length, two.length);
+            return arr;
+        }
+    }
+
+    /**
      * Create indices that allow quick cross-referencing between two lists of variables.
      * @param xvars variables in a table X
      * @param xcross indices to go from X to Y, i.e. at [x] you find y (or -1 if no mapping)
@@ -501,6 +555,61 @@ public class Factorize {
     }
 
     /**
+     * Create a new factor of a suitable kind, based on the information available
+     * @param f factor that is marginalised
+     * @param enumvars enumerable variables that should appear in the new factor
+     * @return new factor (of appropriate kind)
+     */
+    private static AbstractFactor customFactor(AbstractFactor f, EnumVariable... enumvars) {
+        if (f.getFactorType() == AbstractFactor.TYPE_CACHED && CACHE_MARGINS)
+            return CachedFactor.getMargin((CachedFactor) f, enumvars);
+        else
+            return new DenseFactor(enumvars);
+    }
+
+    /**
+     * Create a new factor of a suitable kind, based on the information available
+     * @param f factor that is marginalised
+     * @param anyvars variables that should appear in the new factor
+     * @return new factor (of appropriate kind)
+     */
+    private static AbstractFactor customFactor(AbstractFactor f, Variable... anyvars) {
+        try {
+            EnumVariable[] enumvars = new EnumVariable[anyvars.length];
+            for (int i = 0; i < enumvars.length; i++)
+                enumvars[i] = (EnumVariable) anyvars[i];
+            return customFactor(f, enumvars);
+        } catch (ClassCastException e) {
+            return new DenseFactor(anyvars);
+        }
+    }
+
+    /**
+     * Create a new factor of a suitable kind, based on that the resulting factor is a product of two specified factors
+     * @param f1 first factor in product
+     * @param f2 second factor in product
+     * @param enumvars variables that should appear in the new factor
+     * @return new factor (of appropriate kind)
+     */
+    private static AbstractFactor customFactor(AbstractFactor f1, AbstractFactor f2, EnumVariable... enumvars) {
+        if (f1.getFactorType() == AbstractFactor.TYPE_CACHED && f2.getFactorType() == AbstractFactor.TYPE_CACHED && CACHE_PRODUCTS)
+            return CachedFactor.getProduct((CachedFactor) f1, (CachedFactor) f2);
+        else
+            return new DenseFactor(enumvars);
+    }
+
+    private static AbstractFactor customFactor(AbstractFactor f1, AbstractFactor f2, Variable... anyvars) {
+        try {
+            EnumVariable[] enumvars = new EnumVariable[anyvars.length];
+            for (int i = 0; i < enumvars.length; i++)
+                enumvars[i] = (EnumVariable) anyvars[i];
+            return customFactor(f1, f2, enumvars);
+        } catch (ClassCastException e) {
+            return new DenseFactor(anyvars);
+        }
+    }
+
+    /**
      * Construct a new table that is the result of a factor product of the two specified tables.
      * Works in the general case but there are significant efficiency gains if joint variables are ordered.
      * The implementation currently identifies different cases some of which can be run efficiently,
@@ -510,8 +619,7 @@ public class Factorize {
      * The product is performed entirely in log space. Underflow issues will only arise in extreme 
      * situations.
      *
-     * TODO: Make informed choices as to what implementation of AbstractFactor should be used.
-     * Currently only DenseFactor is used.
+     * TODO: Make more informed choices as to what implementation of AbstractFactor should be used, including SparseFactor.
      *
      * To the programmer: yes, this is a monster function, with some redundancy. BUT...
      * it separates-out special cases to make it easier to address efficiency gains that are
@@ -522,11 +630,11 @@ public class Factorize {
      * @return the product of one and the other table
      */
     public static AbstractFactor getProduct(AbstractFactor X, AbstractFactor Y) {
-        // System.err.println("Factor product " + X.toString() + " x " + Y.toString());
-        // First resolve cases with tables without enumerable variables
+        // First resolve cases with tables without enumerable variables;
+        // it is easy to perform products when none, or only-one of the factors has enumerables
         if (X.nEVars == 0 && Y.nEVars == 0) {
             // both tables lack enumerable variables
-            AbstractFactor dt = new DenseFactor(getConcat(X.nvars, Y.nvars));
+            AbstractFactor dt = customFactor(X, Y, getConcat(X.nvars, Y.nvars));
             if (X.isTraced() || Y.isTraced()) {
                 dt.setTraced(true);
             }
@@ -539,20 +647,23 @@ public class Factorize {
                 dt.setJDF(Y.getJDF());
             }
             if (X.isTraced()) {
-                dt.addAssign(X.getAssign());
+//                dt.addAssign(X.getAssign());
+                dt.addAssign(X, 0);
             }
             if (Y.isTraced()) {
-                dt.addAssign(Y.getAssign());
+//                dt.addAssign(Y.getAssign());
+                dt.addAssign(Y, 0);
             }
             return dt;
         } else if (X.nEVars == 0) {
             // only X is without enumerables
-            AbstractFactor dt = new DenseFactor(getConcat(Y.evars, getConcat(X.nvars, Y.nvars)));
+            AbstractFactor dt = customFactor(X, Y, getConcat(Y.evars, getConcat(X.nvars, Y.nvars)));
             if (X.isTraced() || Y.isTraced()) {
                 dt.setTraced(true);
             }
+            double[] map = new double[Y.getSize()];
             for (int j = 0; j < Y.getSize(); j++) {
-                dt.setLogValue(j, Y.getLogValue(j) + X.getLogValue());
+                map[j] = Y.getLogValue(j) + X.getLogValue();
                 if (X.isJDF() && Y.isJDF()) {
                     dt.setJDF(j, JDF.combine(X.getJDF(), Y.getJDF(j)));
                 } else if (X.isJDF()) {
@@ -561,21 +672,25 @@ public class Factorize {
                     dt.setJDF(j, Y.getJDF(j));
                 }
                 if (X.isTraced()) {
-                    dt.addAssign(j, X.getAssign());
+//                    dt.addAssign(j, X.getAssign());
+                    dt.addAssign(j, X, 0);
                 }
                 if (Y.isTraced()) {
-                    dt.addAssign(j, Y.getAssign(j));
+//                    dt.addAssign(j, Y.getAssign(j));
+                    dt.addAssign(j, Y, j);
                 }
             }
+            dt.setLogValues(map);
             return dt;
         } else if (Y.nEVars == 0) {
             // only Y is without enumerables
-            AbstractFactor dt = new DenseFactor(getConcat(X.evars, getConcat(X.nvars, Y.nvars)));
+            AbstractFactor dt = customFactor(X, Y, getConcat(X.evars, getConcat(X.nvars, Y.nvars)));
             if (X.isTraced() || Y.isTraced()) {
                 dt.setTraced(true);
             }
+            double[] map = new double[X.getSize()];
             for (int j = 0; j < X.getSize(); j++) {
-                dt.setLogValue(j, X.getLogValue(j) + Y.getLogValue());
+                map[j] = X.getLogValue(j) + Y.getLogValue();
                 if (X.isJDF() && Y.isJDF()) {
                     dt.setJDF(j, JDF.combine(X.getJDF(j), Y.getJDF()));
                 } else if (X.isJDF()) {
@@ -584,23 +699,27 @@ public class Factorize {
                     dt.setJDF(j, Y.getJDF());
                 }
                 if (X.isTraced()) {
-                    dt.addAssign(j, X.getAssign(j));
+//                    dt.addAssign(j, X.getAssign(j));
+                    dt.addAssign(j, X, j);
                 }
                 if (Y.isTraced()) {
-                    dt.addAssign(j, Y.getAssign());
+//                    dt.addAssign(j, Y.getAssign());
+                    dt.addAssign(j, Y, 0);
                 }
             }
+            dt.setLogValues(map);
             return dt;
         }
-        // Both tables have enumerable variables, so let's work out how they relate
+        // So it is not trivial...
+        // If we end up here, we deal with that both tables have enumerable variables;
+        // let's work out how enumerables relate...
         int[] xcross2y = new int[X.nEVars]; // map from X to Y indices [x] = y
         int[] ycross2x = new int[Y.nEVars]; // map from Y to X indices [y] = x
-        int noverlap = 0; // number of overlapping variables
-        noverlap = getCrossref(X.evars, xcross2y, Y.evars, ycross2x);
+        int noverlap = getCrossref(X.evars, xcross2y, Y.evars, ycross2x); // number of overlapping variables
         if (VERBOSE) {
             System.err.println("#overlap = " + noverlap);
         }
-        // check if ordered
+        // check if enumerables are ordered
         boolean ordered = true; // true if *all* overlapping variables are in the same order
         int prev = -1;
         for (int i = 0; i < xcross2y.length && ordered; i++) {
@@ -612,51 +731,72 @@ public class Factorize {
                 prev = xcross2y[i];
             }
         }
-        // Before handling complex scenarios, consider some special, simpler cases
+        // Before handling more complex scenarios, consider some special, simpler cases
         // 1. two tables with the same variables in the same order
         if (noverlap == Math.min(X.nEVars, Y.nEVars)) {
             // at least one table is "contained" by the other
             if (X.nEVars == Y.nEVars) {
                 Object[] ykey = new Object[Y.nEVars];
-                AbstractFactor dt = new DenseFactor(getConcat(X.evars, getConcat(X.nvars, Y.nvars)));
+                AbstractFactor dt = customFactor(X, Y, getConcat(X.evars, getConcat(X.nvars, Y.nvars)));
                 if (X.isTraced() || Y.isTraced()) {
                     dt.setTraced(true);
                 }
-                for (int x = 0; x < X.getSize(); x++) {
-                    int y = x; // if ordered the indices in the tables are identical
-                    if (!ordered) {
-                        // re-index since the variables are listed in a different order
-                        Object[] xkey = X.getKey(x);
-                        for (int i = 0; i < xkey.length; i++) {
-                            ykey[xcross2y[i]] = xkey[i];
+                // next section can be avoided if factor is in cache, which is indicated by a pre-calc map
+                if (!dt.isSet()) {
+                    double[] map = new double[dt.getSize()];
+                    for (int x = 0; x < X.getSize(); x++) {
+                        int y = x; // if ordered the indices in the tables are identical
+                        if (!ordered) {
+                            // re-index since the variables are listed in a different order
+                            Object[] xkey = X.getKey(x);
+                            for (int i = 0; i < xkey.length; i++) {
+                                ykey[xcross2y[i]] = xkey[i];
+                            }
+                            y = Y.getIndex(ykey);
                         }
-                        y = Y.getIndex(ykey);
+                        double xval = X.getLogValue(x);
+                        double yval = Y.getLogValue(y);
+                        double XY = xval + yval;  // <=== Factor product in log space
+                        map[x] = XY;
                     }
-                    double xval = X.getLogValue(x);
-                    double yval = Y.getLogValue(y);
-                    double XY = xval + yval;  // <=== Factor product in log space
-                    dt.setLogValue(x, XY);
-                    if (X.isJDF() && Y.isJDF()) {
-                        dt.setJDF(x, JDF.combine(X.getJDF(x), Y.getJDF(y)));
-                    } else if (X.isJDF()) {
-                        dt.setJDF(x, X.getJDF(x));
-                    } else if (Y.isJDF()) {
-                        dt.setJDF(x, Y.getJDF(y));
-                    }
-                    if (X.isTraced()) {
-                        dt.addAssign(x, X.getAssign(x));
-                    }
-                    if (Y.isTraced()) {
-                        dt.addAssign(x, Y.getAssign(y));
+                    dt.setLogValues(map);
+                }
+
+                if (X.isJDF() || Y.isJDF() || X.isTraced() || Y.isTraced()) {
+                    for (int x = 0; x < X.getSize(); x++) {
+                        int y = x; // if ordered the indices in the tables are identical
+                        if (!ordered) {
+                            // re-index since the variables are listed in a different order
+                            Object[] xkey = X.getKey(x);
+                            for (int i = 0; i < xkey.length; i++) {
+                                ykey[xcross2y[i]] = xkey[i];
+                            }
+                            y = Y.getIndex(ykey);
+                        }
+                        if (X.isJDF() && Y.isJDF()) {
+                            dt.setJDF(x, JDF.combine(X.getJDF(x), Y.getJDF(y)));
+                        } else if (X.isJDF()) {
+                            dt.setJDF(x, X.getJDF(x));
+                        } else if (Y.isJDF()) {
+                            dt.setJDF(x, Y.getJDF(y));
+                        }
+                        if (X.isTraced()) {
+//                            dt.addAssign(x, X.getAssign(x));
+                            dt.addAssign(x, X, x);
+                        }
+                        if (Y.isTraced()) {
+//                            dt.addAssign(x, Y.getAssign(y));
+                            dt.addAssign(x, Y, y);
+                        }
                     }
                 }
                 if (VERBOSE) {
                     System.err.println("DT: Complete overlap, ordered = " + ordered + " : " + X.toString() + " x " + Y.toString());
                 }
                 return dt;
-            } else if (X.nEVars > Y.nEVars) {
+            } else if (X.nEVars > Y.nEVars) { // This is a common entry point for phylogenetic branchpoint products
                 // Y is more compact than X
-                // some variables in X are not in Y
+                // some variables in X are not in Y, but all variables in Y are in X
                 Set<EnumVariable> notInY = new HashSet<>();
                 for (int i = 0; i < xcross2y.length; i++) {
                     if (xcross2y[i] == -1) {
@@ -664,59 +804,99 @@ public class Factorize {
                     }
                 }
                 Object[] ykey = new Object[Y.nEVars];
-                AbstractFactor dt = new DenseFactor(getConcat(X.evars, getConcat(X.nvars, Y.nvars)));
+                AbstractFactor dt = customFactor(X, Y, getConcat(X.evars, getConcat(X.nvars, Y.nvars)));
                 if (X.isTraced() || Y.isTraced()) {
                     dt.setTraced(true);
                 }
-                for (int x = 0; x < X.getSize(); x++) {
-                    double xval = X.getLogValue(x);
-                    if (isLOG0(xval)) {
-                        continue; // no point in continuing since product will always be log-zero for entries with this x-value
-                        // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
-                    }
-                    int y; // there can only be one index in Y (if it is contained in X)
-                    if (!ordered) {
-                        // re-index considering that variables are listed in a different order
-                        Object[] xkey = X.getKey(x);
-                        for (int i = 0; i < xkey.length; i++) {
-                            if (xcross2y[i] != -1) {
-                                ykey[xcross2y[i]] = xkey[i];
-                            }
+
+                // next section can be avoided if factor is in cache, which is indicated by a pre-calc map
+                if (!dt.isSet()) {
+                    double[] map = new double[dt.getSize()];
+                    for (int x = 0; x < X.getSize(); x++) {
+                        double xval = X.getLogValue(x);
+                        if (isLOG0(xval)) {
+                            continue; // no point in continuing since product will always be log-zero for entries with this x-value
+                            // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                         }
-                        y = Y.getIndex(ykey);
-                    } else {
-                        // re-index but ordered, not sure if this is quicker than above... TODO: test
-                        y = X.maskIndex(x, notInY);
+                        int y; // there can only be one index in Y (if it is contained in X)
+                        if (!ordered) {
+                            // re-index considering that variables are listed in a different order
+                            Object[] xkey = X.getKey(x);
+                            for (int i = 0; i < xkey.length; i++) {
+                                if (xcross2y[i] != -1) {
+                                    ykey[xcross2y[i]] = xkey[i];
+                                }
+                            }
+                            y = Y.getIndex(ykey);
+                        } else {
+                            // re-index but ordered, not sure if this is quicker than above... TODO: test
+                            y = X.maskIndex(x, notInY);
+                        }
+                        double yval = Y.getLogValue(y);
+                        if (isLOG0(yval)) { // <=== Factor check
+                            continue; // the product will be zero no what
+                            // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
+                        }
+                        double XY = xval + yval; // <=== Factor product in log space
+                        map[x] = XY;
+                        if (X.isJDF() && Y.isJDF()) {
+                            dt.setJDF(x, JDF.combine(X.getJDF(x), Y.getJDF(y)));
+                        } else if (X.isJDF()) {
+                            dt.setJDF(x, X.getJDF(x));
+                        } else if (Y.isJDF()) {
+                            dt.setJDF(x, Y.getJDF(y));
+                        }
+                        if (X.isTraced()) {
+//                            dt.addAssign(x, X.getAssign(x));
+                            dt.addAssign(x, X, x);
+                        }
+                        if (Y.isTraced()) {
+//                            dt.addAssign(x, Y.getAssign(y));
+                            dt.addAssign(x, Y, y);
+                        }
                     }
-                    double yval = Y.getLogValue(y);
-                    if (isLOG0(yval)) { // <=== Factor check
-                        continue; // the product will be zero no what
-                        // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
-                    }
-                    int idx = x;
-                    double XY = xval + yval; // <=== Factor product in log space
-                    dt.setLogValue(idx, XY);
-                    if (X.isJDF() && Y.isJDF()) {
-                        dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
-                    } else if (X.isJDF()) {
-                        dt.setJDF(idx, X.getJDF(x));
-                    } else if (Y.isJDF()) {
-                        dt.setJDF(idx, Y.getJDF(y));
-                    }
-                    if (X.isTraced()) {
-                        dt.addAssign(idx, X.getAssign(x));
-                    }
-                    if (Y.isTraced()) {
-                        dt.addAssign(idx, Y.getAssign(y));
+                    dt.setLogValues(map);
+                } else { // cached, so no need to perform product between enumerables
+                    for (int x = 0; x < X.getSize(); x++) {
+                        int idx = x;
+                        int y; // there can only be one index in Y (if it is contained in X)
+                        if (!ordered) {
+                            // re-index considering that variables are listed in a different order
+                            Object[] xkey = X.getKey(x);
+                            for (int i = 0; i < xkey.length; i++) {
+                                if (xcross2y[i] != -1) {
+                                    ykey[xcross2y[i]] = xkey[i];
+                                }
+                            }
+                            y = Y.getIndex(ykey);
+                        } else {
+                            // re-index but ordered, not sure if this is quicker than above... TODO: test
+                            y = X.maskIndex(x, notInY);
+                        }
+                        if (X.isJDF() && Y.isJDF()) {
+                            dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
+                        } else if (X.isJDF()) {
+                            dt.setJDF(idx, X.getJDF(x));
+                        } else if (Y.isJDF()) {
+                            dt.setJDF(idx, Y.getJDF(y));
+                        }
+                        if (X.isTraced()) {
+//                            dt.addAssign(idx, X.getAssign(x));
+                            dt.addAssign(idx, X, x);
+                        }
+                        if (Y.isTraced()) {
+//                            dt.addAssign(idx, Y.getAssign(y));
+                            dt.addAssign(idx, Y, y);
+                        }
                     }
                 }
                 if (VERBOSE) {
                     System.err.println("DT: Partial overlap (X>Y), ordered = " + ordered + " : " + X.toString() + " x " + Y.toString());
                 }
                 return dt;
-            } else if (Y.nEVars > X.nEVars) {
+            } else if (Y.nEVars > X.nEVars) { // This is (also) a common entry point for phylogenetic branchpoint products
                 // X is more compact than Y
-                // some variables in Y are not in X
+                // some variables in Y are not in X, but all variables in X are in Y
                 Set<EnumVariable> notInX = new HashSet<>();
                 for (int i = 0; i < ycross2x.length; i++) {
                     if (ycross2x[i] == -1) {
@@ -724,50 +904,92 @@ public class Factorize {
                     }
                 }
                 Object[] xkey = new Object[X.nEVars];
-                AbstractFactor dt = new DenseFactor(getConcat(Y.evars, getConcat(X.nvars, Y.nvars)));
+                AbstractFactor dt = customFactor(X, Y, getConcat(Y.evars, getConcat(X.nvars, Y.nvars)));
                 if (X.isTraced() || Y.isTraced()) {
                     dt.setTraced(true);
                 }
-                for (int y = 0; y < Y.getSize(); y++) {
-                    double yval = Y.getLogValue(y);
-                    if (isLOG0(yval)) { // <=== Factor check
-                        continue; // no point in continuing since product will always be zero for entries with this x-value
-                        // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
-                    }
-                    int x; // there can only be one index in X (if it is contained in Y)
-                    if (!ordered) {
-                        // re-index considering that variables are listed in a different order
-                        Object[] ykey = Y.getKey(y);
-                        for (int i = 0; i < ykey.length; i++) {
-                            if (ycross2x[i] != -1) {
-                                xkey[ycross2x[i]] = ykey[i];
-                            }
+
+                // next section can be avoided if factor is in cache, which is indicated by a pre-calc map
+                if (!dt.isSet()) {
+                    double[] map = new double[dt.getSize()];
+                    for (int y = 0; y < Y.getSize(); y++) {
+                        double yval = Y.getLogValue(y);
+                        if (isLOG0(yval)) { // <=== Factor check
+                            continue; // no point in continuing since product will always be zero for entries with this x-value
+                            // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                         }
-                        x = X.getIndex(xkey);
-                    } else {
-                        // re-index but ordered, not sure if this is quicker than above... TODO: test
-                        x = Y.maskIndex(y, notInX);
+                        int x; // there can only be one index in X (if it is contained in Y)
+                        if (!ordered) {
+                            // re-index considering that variables are listed in a different order
+                            Object[] ykey = Y.getKey(y);
+                            for (int i = 0; i < ykey.length; i++) {
+                                if (ycross2x[i] != -1) {
+                                    xkey[ycross2x[i]] = ykey[i];
+                                }
+                            }
+                            x = X.getIndex(xkey);
+                        } else {
+                            // re-index but ordered, not sure if this is quicker than above... TODO: test
+                            x = Y.maskIndex(y, notInX);
+                        }
+                        double xval = X.getLogValue(x);
+                        if (isLOG0(xval)) { // <=== Factor check
+                            continue; // the product will be zero no what
+                            // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
+                        }
+                        int idx = y;
+                        double XY = xval + yval; // <=== Factor product in log space
+                        map[idx] = XY;
+                        // dt.setLogValue(idx, XY);
+                        if (X.isJDF() && Y.isJDF()) {
+                            dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
+                        } else if (X.isJDF()) {
+                            dt.setJDF(idx, X.getJDF(x));
+                        } else if (Y.isJDF()) {
+                            dt.setJDF(idx, Y.getJDF(y));
+                        }
+                        if (X.isTraced()) {
+//                            dt.addAssign(idx, X.getAssign(x));
+                            dt.addAssign(idx, X, x);
+                        }
+                        if (Y.isTraced()) {
+//                            dt.addAssign(idx, Y.getAssign(y));
+                            dt.addAssign(idx, Y, y);
+                        }
                     }
-                    double xval = X.getLogValue(x);
-                    if (isLOG0(xval)) { // <=== Factor check
-                        continue; // the product will be zero no what
-                        // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
-                    }
-                    int idx = y;
-                    double XY = xval + yval; // <=== Factor product in log space
-                    dt.setLogValue(idx, XY);
-                    if (X.isJDF() && Y.isJDF()) {
-                        dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
-                    } else if (X.isJDF()) {
-                        dt.setJDF(idx, X.getJDF(x));
-                    } else if (Y.isJDF()) {
-                        dt.setJDF(idx, Y.getJDF(y));
-                    }
-                    if (X.isTraced()) {
-                        dt.addAssign(idx, X.getAssign(x));
-                    }
-                    if (Y.isTraced()) {
-                        dt.addAssign(idx, Y.getAssign(y));
+                    dt.setLogValues(map);
+                } else { // is in cache....
+                    for (int y = 0; y < Y.getSize(); y++) {
+                        int x; // there can only be one index in X (if it is contained in Y)
+                        if (!ordered) {
+                            // re-index considering that variables are listed in a different order
+                            Object[] ykey = Y.getKey(y);
+                            for (int i = 0; i < ykey.length; i++) {
+                                if (ycross2x[i] != -1) {
+                                    xkey[ycross2x[i]] = ykey[i];
+                                }
+                            }
+                            x = X.getIndex(xkey);
+                        } else {
+                            // re-index but ordered, not sure if this is quicker than above... TODO: test
+                            x = Y.maskIndex(y, notInX);
+                        }
+                        int idx = y;
+                        if (X.isJDF() && Y.isJDF()) {
+                            dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
+                        } else if (X.isJDF()) {
+                            dt.setJDF(idx, X.getJDF(x));
+                        } else if (Y.isJDF()) {
+                            dt.setJDF(idx, Y.getJDF(y));
+                        }
+                        if (X.isTraced()) {
+//                            dt.addAssign(idx, X.getAssign(x));
+                            dt.addAssign(idx, X, x);
+                        }
+                        if (Y.isTraced()) {
+//                            dt.addAssign(idx, Y.getAssign(y));
+                            dt.addAssign(idx, Y, y);
+                        }
                     }
                 }
                 if (VERBOSE) {
@@ -777,17 +999,78 @@ public class Factorize {
             }
         }
         // Failing the above, we must construct a table which is an amalgamate of the two.
-        AbstractFactor dt = new DenseFactor(getConcat(getConcat(X.evars, Y.evars), getConcat(X.nvars, Y.nvars)));
+        AbstractFactor dt = customFactor(X, Y, getConcat(getConcat(X.evars, Y.evars), getConcat(X.nvars, Y.nvars)));
         if (X.isTraced() || Y.isTraced()) {
             dt.setTraced(true);
         }
-        Object[] reskey = new Object[dt.nEVars]; // this will initialise all elements to null
-        int[] xcross2dt = new int[X.nEVars]; // map from X index to dt index
-        int[] ycross2dt = new int[Y.nEVars]; // map from Y index to dt index
-        getCrossref(X.evars, xcross2dt, dt.evars, null);
-        getCrossref(Y.evars, ycross2dt, dt.evars, null);
-        // 2. two tables have nothing in common
-        if (noverlap == 0) {
+        // next loooong section can partly be avoided if factor is in cache, which is indicated by a pre-calc map
+        // FIXME: needs to disentangle the tracing from the product
+//        if (!dt.isSet()) {
+            double[] map = new double[dt.getSize()];
+            Object[] reskey = new Object[dt.nEVars]; // this will initialise all elements to null
+            int[] xcross2dt = new int[X.nEVars]; // map from X index to dt index
+            int[] ycross2dt = new int[Y.nEVars]; // map from Y index to dt index
+            getCrossref(X.evars, xcross2dt, dt.evars, null);
+            getCrossref(Y.evars, ycross2dt, dt.evars, null);
+            // 2. two tables have nothing in common
+            if (noverlap == 0) {
+                for (int x = 0; x < X.getSize(); x++) {
+                    double xval = X.getLogValue(x);
+                    if (isLOG0(xval)) { // <=== Factor check
+                        continue; // no point in continuing since product will always be zero for entries with this x-value
+                        // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
+                    }
+                    Object[] xkey = X.getKey(x);
+                    for (int y = 0; y < Y.getSize(); y++) {
+                        double yval = Y.getLogValue(y);
+                        if (isLOG0(yval)) { // <=== Factor check
+                            continue; // the product will be zero no what
+                            // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
+                        }
+                        Object[] ykey = Y.getKey(y);
+                        for (int i = 0; i < xkey.length; i++) {
+                            reskey[xcross2dt[i]] = xkey[i];
+                        }
+                        for (int i = 0; i < ykey.length; i++) {
+                            reskey[ycross2dt[i]] = ykey[i];
+                        }
+                        int idx = dt.getIndex(reskey);
+                        // **************************
+                        //     This does NOT work??
+                        // **************************
+                        double XY = xval + yval; // <=== Factor product in log space
+                        map[idx] = XY;
+                        // dt.setLogValue(idx, XY);
+                        if (X.isJDF() && Y.isJDF()) {
+                            dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
+                        } else if (X.isJDF()) {
+                            dt.setJDF(idx, X.getJDF(x));
+                        } else if (Y.isJDF()) {
+                            dt.setJDF(idx, Y.getJDF(y));
+                        }
+                        if (X.isTraced()) {
+//                            dt.addAssign(idx, X.getAssign(x));
+                            dt.addAssign(idx, X, x);
+                        }
+                        if (Y.isTraced()) {
+//                            dt.addAssign(idx, Y.getAssign(y));
+                            dt.addAssign(idx, Y, y);
+                        }
+                    }
+                }
+                dt.setLogValues(map);
+                if (VERBOSE) {
+                    System.err.println("DT: No overlap : " + X.toString() + " x " + Y.toString());
+                }
+                return dt;
+            }
+            // 3. General case, if none of those implemented above has worked
+            Object[] searchkey = new Object[Y.nEVars]; // this will initialise all elements to null
+            int option = PRODUCT_OPTION;
+            long start0 = 0;
+            long start1 = 0;
+            long total0 = 0;
+            long total1 = 0;
             for (int x = 0; x < X.getSize(); x++) {
                 double xval = X.getLogValue(x);
                 if (isLOG0(xval)) { // <=== Factor check
@@ -795,109 +1078,23 @@ public class Factorize {
                     // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                 }
                 Object[] xkey = X.getKey(x);
-                for (int y = 0; y < Y.getSize(); y++) {
-                    double yval = Y.getLogValue(y);
-                    if (isLOG0(yval)) { // <=== Factor check
-                        continue; // the product will be zero no what
-                        // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
+                for (int i = 0; i < xcross2y.length; i++) {
+                    if (xcross2y[i] > -1) {
+                        searchkey[xcross2y[i]] = xkey[i];
                     }
-                    Object[] ykey = Y.getKey(y);
-                    for (int i = 0; i < xkey.length; i++) {
-                        reskey[xcross2dt[i]] = xkey[i];
-                    }
-                    for (int i = 0; i < ykey.length; i++) {
-                        reskey[ycross2dt[i]] = ykey[i];
-                    }
-                    int idx = dt.getIndex(reskey);
-                    // **************************
-                    //     This does NOT work??
-                    // **************************
-                    double XY = xval + yval; // <=== Factor product in log space
-                    dt.setLogValue(idx, XY);
-                    if (X.isJDF() && Y.isJDF()) {
-                        dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
-                    } else if (X.isJDF()) {
-                        dt.setJDF(idx, X.getJDF(x));
-                    } else if (Y.isJDF()) {
-                        dt.setJDF(idx, Y.getJDF(y));
-                    }
-                    if (X.isTraced()) {
-                        dt.addAssign(idx, X.getAssign(x));
-                    }
-                    if (Y.isTraced()) {
-                        dt.addAssign(idx, Y.getAssign(y));
-                    }
+                    reskey[xcross2dt[i]] = xkey[i];
                 }
-            }
-            if (VERBOSE) {
-                System.err.println("DT: No overlap : " + X.toString() + " x " + Y.toString());
-            }
-            return dt;
-        }
-        // 3. General case, if none of those implemented above has worked
-        Object[] searchkey = new Object[Y.nEVars]; // this will initialise all elements to null
-        int option = PRODUCT_OPTION;
-        long start0 = 0;
-        long start1 = 0;
-        long total0 = 0;
-        long total1 = 0;
-        for (int x = 0; x < X.getSize(); x++) {
-            double xval = X.getLogValue(x);
-            if (isLOG0(xval)) { // <=== Factor check
-                continue; // no point in continuing since product will always be zero for entries with this x-value
-                // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
-            }
-            Object[] xkey = X.getKey(x);
-            for (int i = 0; i < xcross2y.length; i++) {
-                if (xcross2y[i] > - 1) {
-                    searchkey[xcross2y[i]] = xkey[i];
+                if (start0 == 0 && option == -1) {
+                    start0 = System.nanoTime();
+                    option = 0;
+                } else if (start1 == 0 && option == -1) {
+                    start1 = System.nanoTime();
+                    option = 1;
                 }
-                reskey[xcross2dt[i]] = xkey[i];
-            }
-            if (start0 == 0 && option == -1) {
-                start0 = System.nanoTime();
-                option = 0;
-            } else if (start1 == 0 && option == -1) {
-                start1 = System.nanoTime();
-                option = 1;
-            }
-            // before computing all *matching* indices in Y, weigh the cost of traversing all indices instead, to subsequently check for match
-            if (option == 0) {
-                int[] yindices = Y.getIndices(searchkey);
-                for (int y : yindices) {
-                    double yval = Y.getLogValue(y);
-                    if (isLOG0(yval)) { // <=== Factor check
-                        continue; // the product will be zero no what
-                        // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
-                    }
-                    Object[] ykey = Y.getKey(y);
-                    for (int i = 0; i < ykey.length; i++) {
-                        reskey[ycross2dt[i]] = ykey[i];
-                    }
-                    int idx = dt.getIndex(reskey);
-                    double XY = xval + yval; // <=== Factor product in log space
-                    dt.setLogValue(idx, XY);
-                    if (X.isJDF() && Y.isJDF()) {
-                        dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
-                    } else if (X.isJDF()) {
-                        dt.setJDF(idx, X.getJDF(x));
-                    } else if (Y.isJDF()) {
-                        dt.setJDF(idx, Y.getJDF(y));
-                    }
-                    if (X.isTraced()) {
-                        dt.addAssign(idx, X.getAssign(x));
-                    }
-                    if (Y.isTraced()) {
-                        dt.addAssign(idx, Y.getAssign(y));
-                    }
-                }
-                if (start0 != 0) {
-                    total0 = System.nanoTime() - start0;
-                    option = -1;
-                }
-            } else if (option == 1) {
-                for (int y = 0; y < Y.getSize(); y++) {
-                    if (Y.isMatch(searchkey, y)) {
+                // before computing all *matching* indices in Y, weigh the cost of traversing all indices instead, to subsequently check for match
+                if (option == 0) {
+                    int[] yindices = Y.getIndices(searchkey);
+                    for (int y : yindices) {
                         double yval = Y.getLogValue(y);
                         if (isLOG0(yval)) { // <=== Factor check
                             continue; // the product will be zero no what
@@ -909,7 +1106,8 @@ public class Factorize {
                         }
                         int idx = dt.getIndex(reskey);
                         double XY = xval + yval; // <=== Factor product in log space
-                        dt.setLogValue(idx, XY);
+                        map[idx] = XY;
+                        // dt.setLogValue(idx, XY);
                         if (X.isJDF() && Y.isJDF()) {
                             dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
                         } else if (X.isJDF()) {
@@ -918,27 +1116,67 @@ public class Factorize {
                             dt.setJDF(idx, Y.getJDF(y));
                         }
                         if (X.isTraced()) {
-                            dt.addAssign(idx, X.getAssign(x));
+//                            dt.addAssign(idx, X.getAssign(x));
+                            dt.addAssign(idx, X, x);
                         }
                         if (Y.isTraced()) {
-                            dt.addAssign(idx, Y.getAssign(y));
+//                            dt.addAssign(idx, Y.getAssign(y));
+                            dt.addAssign(idx, Y, y);
                         }
+                    }
+                    if (start0 != 0) {
+                        total0 = System.nanoTime() - start0;
+                        option = -1;
+                    }
+                } else if (option == 1) {
+                    for (int y = 0; y < Y.getSize(); y++) {
+                        if (Y.isMatch(searchkey, y)) {
+                            double yval = Y.getLogValue(y);
+                            if (isLOG0(yval)) { // <=== Factor check
+                                continue; // the product will be zero no what
+                                // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
+                            }
+                            Object[] ykey = Y.getKey(y);
+                            for (int i = 0; i < ykey.length; i++) {
+                                reskey[ycross2dt[i]] = ykey[i];
+                            }
+                            int idx = dt.getIndex(reskey);
+                            double XY = xval + yval; // <=== Factor product in log space
+                            map[idx] = XY;
+                            // dt.setLogValue(idx, XY);
+                            if (X.isJDF() && Y.isJDF()) {
+                                dt.setJDF(idx, JDF.combine(X.getJDF(x), Y.getJDF(y)));
+                            } else if (X.isJDF()) {
+                                dt.setJDF(idx, X.getJDF(x));
+                            } else if (Y.isJDF()) {
+                                dt.setJDF(idx, Y.getJDF(y));
+                            }
+                            if (X.isTraced()) {
+//                            dt.addAssign(idx, X.getAssign(x));
+                                dt.addAssign(idx, X, x);
+                            }
+                            if (Y.isTraced()) {
+//                            dt.addAssign(idx, Y.getAssign(y));
+                                dt.addAssign(idx, Y, y);
+                            }
+                        }
+                    }
+                    if (start1 != 0) {
+                        total1 = System.nanoTime() - start1;
+                        option = -1;
                     }
                 }
                 if (start1 != 0) {
-                    total1 = System.nanoTime() - start1;
-                    option = -1;
+                    // done with timing
+                    if (total0 > total1) {
+                        option = 1;
+                    } else {
+                        option = 0;
+                    }
                 }
             }
-            if (start1 != 0) {
-                // done with timing
-                if (total0 > total1) {
-                    option = 1;
-                } else {
-                    option = 0;
-                }
-            }
-        }
+            dt.setLogValues(map);
+//        }
         if (VERBOSE) {
             System.err.println("DT: Generic case: " + X.toString() + " x " + Y.toString() + " Option = " + option + " (Option 0 took " + total0 + "ns. Option 1 took " + total1 + "ns.)");
         }
@@ -977,6 +1215,9 @@ public class Factorize {
      * @return the resulting "margin" of the table
      */
     public static AbstractFactor getMargin(AbstractFactor X, Variable... anyvars) {
+        boolean CACHED_PRODUCT = false;
+        if (X.getFactorType() == AbstractFactor.TYPE_CACHED)
+            CACHED_PRODUCT = true;
         // sort and weed out duplicates
         Variable[] uniqueVars = getNonredundantSorted(anyvars);
         // first check that X has enumerable variables, because that would be required
@@ -984,11 +1225,9 @@ public class Factorize {
             return X;
         }
         // if X is ok, get rid of non-enumerables
-        EnumVariable[] evars = getEnumVars(uniqueVars);
-        // now, resolve the relationships between X's variables and those to be summed-out
-        Variable[] yvars = getDifference(getConcat(X.evars, X.nvars), evars);
+        EnumVariable[] evars = getEnumVars(uniqueVars); // this is the set of enumerables that we need to sum-out
         // construct new table
-        AbstractFactor Y = new DenseFactor(yvars);
+        AbstractFactor Y = CACHED_PRODUCT ? CachedFactor.getMargin((CachedFactor) X, evars) : customFactor(X, getDifference(getConcat(X.evars, X.nvars), evars));
         if (Y.getSize() == 1) {
             // we are creating a factor with no enumerable variables)
             double logsum = 1; // cumulative in log space
@@ -1037,59 +1276,116 @@ public class Factorize {
                 }
             }
         } else {
-            // work out how variables in Y map to X so that we can search X from each index in Y
-            int[] ycross2x = new int[Y.nEVars];
-            getCrossref(Y.evars, ycross2x, X.evars, null);
-            Object[] xkey_search = new Object[X.nEVars];
-            for (int y = 0; y < Y.getSize(); y++) {
-                // FIXME: loop's not efficient for sparse factors, start with X, be selective about Y?
-                Object[] ykey = Y.getKey(y);
-                for (int i = 0; i < ykey.length; i++) {
-                    xkey_search[ycross2x[i]] = ykey[i];
-                }
-                double logsum = 1; // cumulative in log space
-                int[] indices = X.getIndices(xkey_search);
-                JDF first = null;
-                JDF subsequent = null;
-                JDF mixture = null;
-                double prev_weight = 0;
-                for (int x : indices) {
-                    double xval = X.getLogValue(x);
-                    if (logsum > 0)
-                        logsum = xval;
-                    else
-                        logsum = logSumOfLogs(logsum, xval); // <=== Factor addition in log space
-                }
-                Y.setLogValue(y, logsum);
-                if (X.isJDF()) {
+
+            // the section below can be partly avoided
+            if (!Y.isSet()) {
+                double[] map = new double[Y.getSize()];
+                // work out how variables in Y map to X so that we can search X from each index in Y
+                int[] ycross2x = new int[Y.nEVars];
+                getCrossref(Y.evars, ycross2x, X.evars, null);
+                Object[] xkey_search = new Object[X.nEVars];
+                for (int y = 0; y < Y.getSize(); y++) {
+                    // FIXME: loop's not efficient for sparse factors, start with X, be selective about Y?
+                    Object[] ykey = Y.getKey(y);
+                    for (int i = 0; i < ykey.length; i++) {
+                        xkey_search[ycross2x[i]] = ykey[i];
+                    }
+                    double logsum = 1; // cumulative in log space
+                    int[] indices = X.getIndices(xkey_search);
+                    JDF first = null;
+                    JDF subsequent = null;
+                    JDF mixture = null;
+                    double prev_weight = 0;
                     for (int x : indices) {
-                        double lognxval = X.getLogValue(x) - logsum;
-                        if (!isLOG0(lognxval)) {
-                            double nxval = Math.exp(lognxval); // normalization in log space
-                            if (first == null) {
-                                // this will be true only once, for the first entry that will be collapsed
-                                first = X.getJDF(x); // save the JDF for later
-                                prev_weight = nxval; // save the value associated with this entry to weight the distributions
-                            } else if (mixture == null) {
-                                // for the subsequent entry, the mixture is created, both JDF weighted
-                                subsequent = X.getJDF(x);
-                                if (subsequent != null) {
-                                    mixture = JDF.mix(first, prev_weight, subsequent, nxval);
-                                }
-                            } else {
-                                // for all subsequent entries, the mixture is mixed unchanged with the new entry's JDF weighted
-                                subsequent = X.getJDF(x);
-                                if (subsequent != null) {
-                                    mixture = JDF.mix(mixture, subsequent, nxval);
+                        double xval = X.getLogValue(x);
+                        if (logsum > 0)
+                            logsum = xval;
+                        else
+                            logsum = logSumOfLogs(logsum, xval); // <=== Factor addition in log space
+                    }
+                    map[y] = logsum;
+                    // Y.setLogValue(y, logsum);
+                    if (X.isJDF()) {
+                        for (int x : indices) {
+                            double lognxval = X.getLogValue(x) - logsum;
+                            if (!isLOG0(lognxval)) {
+                                double nxval = Math.exp(lognxval); // normalization in log space
+                                if (first == null) {
+                                    // this will be true only once, for the first entry that will be collapsed
+                                    first = X.getJDF(x); // save the JDF for later
+                                    prev_weight = nxval; // save the value associated with this entry to weight the distributions
+                                } else if (mixture == null) {
+                                    // for the subsequent entry, the mixture is created, both JDF weighted
+                                    subsequent = X.getJDF(x);
+                                    if (subsequent != null) {
+                                        mixture = JDF.mix(first, prev_weight, subsequent, nxval);
+                                    }
+                                } else {
+                                    // for all subsequent entries, the mixture is mixed unchanged with the new entry's JDF weighted
+                                    subsequent = X.getJDF(x);
+                                    if (subsequent != null) {
+                                        mixture = JDF.mix(mixture, subsequent, nxval);
+                                    }
                                 }
                             }
                         }
+                        if (first != null) {
+                            if (mixture != null) {
+                                Y.setJDF(y, mixture);
+                            } else {
+                                Y.setJDF(y, first);
+                            }
+                        }
                     }
-                    if (first != null) {
-                        if (mixture != null) {
-                            Y.setJDF(y, mixture);
-                        } else {
-                            Y.setJDF(y, first);
+                }
+                Y.setLogValues(map);
+            } else {
+                if (X.isJDF()) {
+                    // work out how variables in Y map to X so that we can search X from each index in Y
+                    int[] ycross2x = new int[Y.nEVars];
+                    getCrossref(Y.evars, ycross2x, X.evars, null);
+                    Object[] xkey_search = new Object[X.nEVars];
+                    for (int y = 0; y < Y.getSize(); y++) {
+                        // FIXME: loop's not efficient for sparse factors, start with X, be selective about Y?
+                        Object[] ykey = Y.getKey(y);
+                        for (int i = 0; i < ykey.length; i++) {
+                            xkey_search[ycross2x[i]] = ykey[i];
+                        }
+                        double logsum = 1; // cumulative in log space
+                        int[] indices = X.getIndices(xkey_search);
+                        JDF first = null;
+                        JDF subsequent = null;
+                        JDF mixture = null;
+                        double prev_weight = 0;
+                        for (int x : indices) {
+                            double lognxval = X.getLogValue(x) - logsum;
+                            if (!isLOG0(lognxval)) {
+                                double nxval = Math.exp(lognxval); // normalization in log space
+                                if (first == null) {
+                                    // this will be true only once, for the first entry that will be collapsed
+                                    first = X.getJDF(x); // save the JDF for later
+                                    prev_weight = nxval; // save the value associated with this entry to weight the distributions
+                                } else if (mixture == null) {
+                                    // for the subsequent entry, the mixture is created, both JDF weighted
+                                    subsequent = X.getJDF(x);
+                                    if (subsequent != null) {
+                                        mixture = JDF.mix(first, prev_weight, subsequent, nxval);
+                                    }
+                                } else {
+                                    // for all subsequent entries, the mixture is mixed unchanged with the new entry's JDF weighted
+                                    subsequent = X.getJDF(x);
+                                    if (subsequent != null) {
+                                        mixture = JDF.mix(mixture, subsequent, nxval);
+                                    }
+                                }
+                            }
+                        }
+                        if (first != null) {
+                            if (mixture != null) {
+                                Y.setJDF(y, mixture);
+                            } else {
+                                Y.setJDF(y, first);
+                            }
                         }
                     }
                 }
@@ -1110,6 +1406,9 @@ public class Factorize {
      * @return the resulting factor
      */
     public static AbstractFactor getMaxMargin(AbstractFactor X, Variable... anyvars) {
+        boolean CACHED_PRODUCT = false;
+        if (X.getFactorType() == AbstractFactor.TYPE_CACHED)
+            CACHED_PRODUCT = true;
         // sort and weed out duplicates
         Variable[] uniqueVars = getNonredundantSorted(anyvars);
         // first check that X has enumerable variables, because that would be required
@@ -1120,10 +1419,8 @@ public class Factorize {
         EnumVariable[] evars = getEnumVars(uniqueVars);
         int[] ecross2x = new int[evars.length];
         getCrossref(evars, ecross2x, X.evars, null); // so we can map maxed-out vars to the original table
-        // now, resolve the relationships between X's variables and those to be summed-out
-        Variable[] yvars = getDifference(getConcat(X.evars, X.nvars), evars);
         // construct new table
-        AbstractFactor Y = new DenseFactor(yvars);
+        AbstractFactor Y = CACHED_PRODUCT ? CachedFactor.getMargin((CachedFactor) X, evars) : customFactor(X, getDifference(getConcat(X.evars, X.nvars), evars));
         Y.setTraced(true); // make sure we save assignments made in max-outs
         if (!Y.hasEnumVars()) {
             double max = Double.NEGATIVE_INFINITY;
@@ -1140,49 +1437,98 @@ public class Factorize {
                 Y.setJDF(X.getJDF(maxidx));
             }
             // transfer old assignments
-            if (X.isTraced())
-                Y.addAssign(X.getAssign(maxidx));
+            if (X.isTraced()) {
+//                Y.addAssign(X.getAssign(maxidx));
+                Y.addAssign(X, maxidx);
+            }
             // Trace implied assignments
+            // TODO: remove the code below (no need to generate key and assignment)
             Object[] xkey = X.getKey(maxidx);
             for (int i = 0; i < evars.length; i++) {
                 Variable.Assignment a = new Variable.Assignment(evars[i], xkey[ecross2x[i]]);
-                Y.addAssign(a);
+//                Y.addAssign(a);
+                Y.addAssign(X, maxidx);
             }
         } else {
-            // work out how variables in Y map to X so that we can search X from each index in Y
-            int[] ycross2x = new int[Y.nEVars];
-            int[] xcross2y = new int[X.nEVars];
-            getCrossref(Y.evars, ycross2x, X.evars, xcross2y);
-            Object[] xkey_search = new Object[X.nEVars];
-            for (int y = 0; y < Y.getSize(); y++) {
-                // FIXME: loop's not efficient for sparse factors
-                Object[] ykey = Y.getKey(y);
-                for (int i = 0; i < ykey.length; i++) {
-                    xkey_search[ycross2x[i]] = ykey[i];
-                }
-                double max = Double.NEGATIVE_INFINITY;
-                int maxidx = 0;
-                int[] indices = X.getIndices(xkey_search);
-                for (int x : indices) {
-                    double xval = X.getLogValue(x);
-                    if (xval > max) {
-                        max = xval;
-                        maxidx = x;
+            if (!Y.isSet()) {
+                double[] map = new double[Y.getSize()];
+                // work out how variables in Y map to X so that we can search X from each index in Y
+                int[] ycross2x = new int[Y.nEVars];
+                int[] xcross2y = new int[X.nEVars];
+                getCrossref(Y.evars, ycross2x, X.evars, xcross2y);
+                Object[] xkey_search = new Object[X.nEVars];
+                for (int y = 0; y < Y.getSize(); y++) {
+                    // FIXME: loop's not efficient for sparse factors
+                    Object[] ykey = Y.getKey(y);
+                    for (int i = 0; i < ykey.length; i++) {
+                        xkey_search[ycross2x[i]] = ykey[i];
+                    }
+                    double max = Double.NEGATIVE_INFINITY;
+                    int maxidx = 0;
+                    int[] indices = X.getIndices(xkey_search);
+                    for (int x : indices) {
+                        double xval = X.getLogValue(x);
+                        if (xval > max) {
+                            max = xval;
+                            maxidx = x;
+                        }
+                    }
+                    map[y] = max;
+                    // Y.setLogValue(y, max);
+                    if (Y.isJDF()) {
+                        Y.setJDF(y, X.getJDF(maxidx));
+                    }
+                    // transfer old assignments
+                    if (X.isTraced()) {
+//                        Y.addAssign(y, X.getAssign(maxidx));
+                        Y.addAssign(y, X, maxidx);
+                    }
+                    // Trace implied assignments
+                    // TODO: remove the code below (no need to generate key and assignment)
+                    Object[] xkey = X.getKey(maxidx);
+                    for (int i = 0; i < evars.length; i++) {    // now the value of each enumerable variable in the input factor X will be determined...
+                        if (ecross2x[i] >= 0) {                 // first check so that the variable can be assigned from X (should always be true)
+                            Variable.Assignment a = new Variable.Assignment(evars[i], xkey[ecross2x[i]]); // here's the variable value pair
+                            // Y.addAssign(y, a);
+                            Y.addAssign(y, X, maxidx);
+                        }
                     }
                 }
-                Y.setLogValue(y, max);
-                if (Y.isJDF()) {
-                    Y.setJDF(y, X.getJDF(maxidx));
-                }
-                // transfer old assignments
-                if (X.isTraced())
-                    Y.addAssign(y, X.getAssign(maxidx));
-                // Trace implied assignments
-                Object[] xkey = X.getKey(maxidx);
-                for (int i = 0; i < evars.length; i++) {
-                    if (ecross2x[i] >= 0) { // check so that the enumerable variable can be assigned by X
-                        Variable.Assignment a = new Variable.Assignment(evars[i], xkey[ecross2x[i]]);
-                        Y.addAssign(y, a);
+                Y.setLogValues(map);
+            } else { // factor has been taken from cache
+                // work out how variables in Y map to X so that we can search X from each index in Y
+                int[] ycross2x = new int[Y.nEVars];
+                int[] xcross2y = new int[X.nEVars];
+                getCrossref(Y.evars, ycross2x, X.evars, xcross2y);
+                Object[] xkey_search = new Object[X.nEVars];
+                for (int y = 0; y < Y.getSize(); y++) { // for each row in new (marginalised) factor Y...
+                    double max = Double.NEGATIVE_INFINITY;
+                    int maxidx = 0;
+                    int[] indices = X.getIndices(xkey_search);
+                    for (int x : indices) {
+                        double xval = X.getLogValue(x);
+                        if (xval > max) {
+                            max = xval;
+                            maxidx = x;
+                        }
+                    }
+                    if (Y.isJDF()) {
+                        Y.setJDF(y, X.getJDF(maxidx));
+                    }
+                    // transfer old assignments
+                    if (X.isTraced()) {
+//                        Y.addAssign(y, X.getAssign(maxidx));
+                        Y.addAssign(y, X, maxidx);
+                    }
+                    // Trace implied assignments
+                    // TODO: remove the code below (no need to generate key and assignment)
+                    Object[] xkey = X.getKey(maxidx);
+                    for (int i = 0; i < evars.length; i++) {    // now the value of each enumerable variable in the input factor X will be determined...
+                        if (ecross2x[i] >= 0) {                 // first check so that the variable can be assigned from X (should always be true)
+                            Variable.Assignment a = new Variable.Assignment(evars[i], xkey[ecross2x[i]]); // here's the variable value pair
+                            // Y.addAssign(y, a);
+                            Y.addAssign(y, X, maxidx);
+                        }
                     }
                 }
             }
@@ -1338,23 +1684,27 @@ public class Factorize {
             }
             if (isLOG0(sum))
                 System.err.println("getNormal fails");
-
+            double[] map = new double[X.getSize()];
             for (int i = 0; i < X.getSize(); i++) {
-                Y.setLogValue(i, yvals[i] - sum);
+                map[i] = yvals[i] - sum;
+                // Y.setLogValue(i, yvals[i] - sum);
                 if (X.isJDF()) {
                     Y.setJDF(i, X.getJDF(i));
                 }
                 if (X.isTraced()) {
-                    Y.addAssign(i, X.getAssign(i));
+//                    Y.addAssign(i, X.getAssign(i));
+                    Y.addAssign(i, X, i);
                 }
             }
+            Y.setLogValues(map);
         } else {
             Y.setLogValue(X.getLogValue());
             if (X.isJDF()) {
                 Y.setJDF(X.getJDF());
             }
             if (X.isTraced()) {
-                Y.addAssign(X.getAssign());
+//                Y.addAssign(X.getAssign());
+                Y.addAssign(X, 0);
             }
         }
         return Y;

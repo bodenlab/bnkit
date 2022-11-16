@@ -74,6 +74,7 @@ class FactorizeTest {
                 dfs[i] = new DenseFactor();
             }
             int npop = dfs[i].getSize(); //random.nextInt(dfs[i].getSize()); // number of entries to populate
+            AbstractFactor.FactorFiller ff = dfs[i].getFiller();
             for (int j = 0; j < npop; j++) {
                 if (dfs[i].getSize() == 1) {
                     dfs[i].setValue(Math.abs(random.nextGaussian()) / npop);
@@ -84,7 +85,7 @@ class FactorizeTest {
                     }
                 } else {
                     int index = random.nextInt(npop);
-                    dfs[i].setValue(index, Math.abs(random.nextGaussian()) / npop);
+                    ff.setValue(index, Math.abs(random.nextGaussian()) / npop);
                     if (dfs[i].isJDF()) {
                         for (Variable nvar : dfs[i].getNonEnumVars()) {
                             dfs[i].setDistrib(index, nvar, new GaussianDistrib(random.nextGaussian() * random.nextInt(100), Math.abs(random.nextGaussian() * (random.nextInt(10) + 1))));
@@ -92,6 +93,7 @@ class FactorizeTest {
                     }
                 }
             }
+            dfs[i].setValuesByFiller(ff);
         }
         return dfs;
     }

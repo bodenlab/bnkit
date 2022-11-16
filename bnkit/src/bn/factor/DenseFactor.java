@@ -48,11 +48,14 @@ import java.util.*;
  */
 public class DenseFactor extends AbstractFactor {
 
-    protected final double[] map; // the factors
+    protected FactorMap map = null; // the factor values
     protected Set<Variable.Assignment>[] assigned = null; // the latent assignments associated with each factor, disabled by default
+
+    // trace-back pointers for each (parent) factor, disabled by default;
+    // can work out latent assignments from this--so will eventually replace "assigned" above
+    protected Map<AbstractFactor, int[]> traceback = null;
     protected JDF[] jdf = null; // the Joint Density Function associated with each factor, disabled by default
-    protected int occupied = 0; // number of entries that are occupied
-    
+
     /**
      * Construct a new table without any variables.
      * This type of factor is used when all variables are summed out. 
@@ -60,8 +63,7 @@ public class DenseFactor extends AbstractFactor {
      */
     public DenseFactor() {
         super();
-        this.map = new double[1];
-        // this.map[0] = 1.0; // log(0) = 1
+        setFactorType(AbstractFactor.TYPE_DENSE);
     }
 
 
@@ -79,18 +81,19 @@ public class DenseFactor extends AbstractFactor {
         // most of the time, there would be one or more enumerable variables so allocate a map
         // for all factor values
         if (this.nEVars > 0) {
-            this.map = new double[getSize()];
-            Arrays.fill(map, LOG0);
+//            this.map = new double[getSize()];
+//            Arrays.fill(map, LOG0);
         } else { // sometimes there are no enumerable variables, so need only one entry
-            this.map = new double[1];
+//            this.map = new double[1];
             // this.map[0] = 1.0; // log(0) = 1
         }
         // if one or more non-enumerable variables, we allocate a matching map for JDFs
         if (this.nNVars > 0) {
-            this.jdf = new JDF[this.map.length];
+            this.jdf = new JDF[this.getSize()];
             for (int i = 0; i < this.jdf.length; i ++)
                 this.jdf[i] = new JDF(nvars);
         }
+        setFactorType(AbstractFactor.TYPE_DENSE);
     }
 
     /**
@@ -104,14 +107,22 @@ public class DenseFactor extends AbstractFactor {
         // most of the time, there would be one or more enumerable variables so allocate a map
         // for all factor values
         if (this.nEVars > 0) {
-            this.map = new double[getSize()];
-            Arrays.fill(map, LOG0);
+//            this.map = new double[getSize()];
+//            Arrays.fill(map, LOG0);
         } else { // sometimes there are no enumerable variables, so need only one entry
-            this.map = new double[1];
+//            this.map = new double[1];
             // this.map[0] = 1.0; // log(0) = 1
         }
+        setFactorType(AbstractFactor.TYPE_DENSE);
     }
 
+    /**
+     * Flag if all factor values have been set.
+     * @return true if no further calculation is required (e.g. when a cache has been used, or values have been assigned); false otherwise
+     */
+    public boolean isSet() {
+        return (map != null);
+    }
 
     /**
      * Retrieve the log value of the factor, if table is without enumerable variables.
@@ -120,7 +131,7 @@ public class DenseFactor extends AbstractFactor {
     @Override
     public double getLogValue() {
         if (this.getSize() == 1)
-            return this.map[0];
+            return this.map.get();
         throw new DenseFactorRuntimeException("This table must be accessed with a enumerable variable key");
     }
     
@@ -145,7 +156,7 @@ public class DenseFactor extends AbstractFactor {
     public double getLogValue(int index) {
         if (index >= getSize() || index < 0 || getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid index: " + index + " in factor with " + getSize() + " entries");
-        double value = map[index];
+        double value = map.get(index);
         return value;
     }
 
@@ -161,61 +172,24 @@ public class DenseFactor extends AbstractFactor {
             throw new DenseFactorRuntimeException("Invalid index");
         return this.jdf[index];
     }
-    
+
+    /**
+     * @param logmap
+     */
+    @Override
+    public void setLogValues(double[] logmap) {
+        this.map = new FactorMap(logmap);
+    }
+
     /**
      * Set the (only) log value associated with a table without enumerable variables.
      * @param value
-     * @return 
+     * @return
      */
-    @Override
-    public int setLogValue(double value) {
-        if (this.getSize() != 1)
-            throw new DenseFactorRuntimeException("Table has variables that must be used to index access");
-        if (Double.isNaN(value) || value == LOG0) { // trying to set cell to NaN (should not happen) or to LOG0 (does happen)
-            if (map[0] != LOG0) // there was a value previously
-                occupied --;    // so table is now smaller
-            map[0] = LOG0;      // revert to LOG0 even if NaN
-            return 0;
-        }
-        if (value != LOG0 && map[0] == LOG0)
-            occupied ++;
-        map[0] = value;
-        return 0;
-    }
-    
-    /**
-     * Associate the specified key-index with the given log value. Note that using
-     * getValue and setValue with index is quicker than with key, if more than
-     * one operation is done.
-     *
-     * @param key_index
-     * @param value
-     * @return the index at which the value was stored
-     */
-    @Override
-    public int setLogValue(int key_index, double value) {
-        if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
-            throw new DenseFactorRuntimeException("Invalid key index: outside map");
-        if (Double.isNaN(value) || value == LOG0) { // trying to set cell to NaN (should not happen) or to LOG0 (does happen)
-            if (map[key_index] != LOG0) // there was a value previously
-                occupied --;    // so table is now smaller
-            map[key_index] = LOG0;      // revert to LOG0 even if NaN
-            return key_index;
-        }
-        if (value != LOG0 && map[key_index] == LOG0)
-            occupied ++;
-        map[key_index] = value;
-        return key_index;
-    }
-
-
-    /**
-     * Find out how many entries that occupied.
-     * @return how many non-zero entries the factor table holds
-     */
-    @Override
-    public int getOccupied() {
-        return occupied;
+    public void setLogValue(double value) {
+        if (Double.isNaN(value))
+            throw new DenseFactorRuntimeException("Invalid log value for atomic factor");
+        this.map = new FactorMap(value);
     }
     
     /**
@@ -240,7 +214,7 @@ public class DenseFactor extends AbstractFactor {
      */
     @Override
     public int setJDF(int key_index, JDF value) {
-        if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
+        if (key_index >= this.getSize() || key_index < 0 || this.getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
         jdf[key_index] = value;
         return key_index;
@@ -254,11 +228,13 @@ public class DenseFactor extends AbstractFactor {
     @Override
     public void setTraced(boolean status) {
         if (status) {
-            this.assigned = new Set[this.getSize()];
-            for (int i = 0; i < this.assigned.length; i ++) 
-                this.assigned[i] = new HashSet();
+            this.traceback = new HashMap<>();
+//            this.assigned = new Set[this.getSize()];
+//            for (int i = 0; i < this.assigned.length; i ++)
+//                this.assigned[i] = new HashSet();
         } else {
             this.assigned = null;
+            this.traceback = null;
         }
     }
 
@@ -268,7 +244,7 @@ public class DenseFactor extends AbstractFactor {
      */
     @Override
     public boolean isTraced() {
-        return this.assigned != null;
+        return this.assigned != null || this.traceback != null;
     }
 
      /**
@@ -277,10 +253,26 @@ public class DenseFactor extends AbstractFactor {
      * @return set of assignments
      */
     @Override
-    public Set<Variable.Assignment> getAssign(int key_index) {
-        if (key_index >= assigned.length || key_index < 0 || this.getSize() == 1)
+    public Map<Variable, Object> getAssign(int key_index) {
+        if (key_index < 0)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
-        return assigned[key_index];
+        Map<Variable, Object> collect = new HashMap<>();
+        if (nEVars > 0) {
+            Object[] key = this.getKey(key_index);
+            for (int i = 0; i < key.length; i++) {
+                collect.put(evars[i], key[i]);
+            }
+        }
+        if (traceback != null) {
+            for (Map.Entry<AbstractFactor, int[]> entry : traceback.entrySet()) {
+                AbstractFactor f = entry.getKey();
+                int[] row = entry.getValue();
+                Map<Variable, Object> back = f.getAssign(row[key_index]);
+                collect.putAll(back);
+            }
+        } else if (assigned != null)
+            return Variable.Assignment.toMap(assigned[key_index]);
+        return collect;
     }
 
     /**
@@ -288,9 +280,11 @@ public class DenseFactor extends AbstractFactor {
      * @return set of assignments
      */
     @Override
-    public Set<Variable.Assignment> getAssign() {
-        if (this.getSize() == 1)
-            return assigned[0];
+    public Map<Variable, Object> getAssign() {
+        if (this.getSize() == 1 && traceback != null)
+            return getAssign(0);
+        if (this.getSize() == 1 && assigned != null)
+            return Variable.Assignment.toMap(assigned[0]);
         throw new DenseFactorRuntimeException("Table has variables that must be used to index access");
     }
 
@@ -321,14 +315,70 @@ public class DenseFactor extends AbstractFactor {
     public int addAssign(int key_index, Collection<Variable.Assignment> assign) {
         if (!isTraced()) 
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
-        if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
+        if (key_index >= getSize() || key_index < 0 || getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
         if (assigned[key_index] == null)
             assigned[key_index] = new HashSet<>();
         assigned[key_index].addAll(assign);
         return key_index;
     }
-    
+
+    /**
+     * @param key_index   index to row in present factor
+     * @param from_factor trace-back reference to factor
+     * @param from_index  index to row for trace-back factor
+     * @return
+     */
+    @Override
+    public int addAssign(int key_index, AbstractFactor from_factor, int from_index) {
+        if (!isTraced())
+            throw new DenseFactorRuntimeException("Invalid key index: outside map");
+        if (key_index >= getSize() || key_index < 0 || getSize() == 1)
+            throw new DenseFactorRuntimeException("Invalid key index: outside map");
+        int[] indices;
+        if (traceback == null) {
+            traceback = new HashMap<>();
+            indices = new int[this.getSize()];
+            traceback.put(from_factor, indices);
+        } else {
+            indices = traceback.get(from_factor);
+            if (indices == null) {
+                indices = new int[this.getSize()];
+                traceback.put(from_factor, indices);
+            }
+        }
+        indices[key_index] = from_index;
+        // note that if from_factor is "atomic" from_index = 0 is moot
+        return key_index;
+    }
+
+    /**
+     * @param from_factor trace-back reference to factor
+     * @param from_index  index to row for trace-back factor
+     * @return
+     */
+    @Override
+    public int addAssign(AbstractFactor from_factor, int from_index) {
+        if (!isTraced())
+            throw new DenseFactorRuntimeException("Invalid key index: outside map");
+        if (getSize() != 1)
+            throw new DenseFactorRuntimeException("This table must be accessed with a enumerable variable key");
+        int[] indices;
+        if (traceback == null) {
+            traceback = new HashMap<>();
+            indices = new int[this.getSize()];
+            traceback.put(from_factor, indices);
+        } else {
+            indices = traceback.get(from_factor);
+            if (indices == null) {
+                indices = new int[this.getSize()];
+                traceback.put(from_factor, indices);
+            }
+        }
+        indices[0] = from_index;
+        return 0;
+    }
+
     /**
      * Tag the sole entry with an assignment.
      * @param assign assignment
@@ -356,7 +406,7 @@ public class DenseFactor extends AbstractFactor {
     public int addAssign(int key_index, Variable.Assignment assign) {
         if (!isTraced()) 
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
-        if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
+        if (key_index >= getSize() || key_index < 0 || getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
         if (assigned[key_index] == null)
             assigned[key_index] = new HashSet<>();
@@ -400,7 +450,7 @@ public class DenseFactor extends AbstractFactor {
      */
     @Override
     public int setDistrib(int key_index, Variable nonenum, Distrib d) {
-        if (key_index >= map.length || key_index < 0 || this.getSize() == 1)
+        if (key_index >= getSize() || key_index < 0 || getSize() == 1)
             throw new DenseFactorRuntimeException("Invalid key index: outside map");
         this.jdf[key_index].setDistrib(d, nonenum);
         return key_index; // 
@@ -419,20 +469,6 @@ public class DenseFactor extends AbstractFactor {
         this.jdf[0].setDistrib(d, nvar);
         return 0;
     }
-
-    /**
-     * Set all entries to log(0) to indicate that they are empty (represent a probability 0).
-     */
-    @Override
-    public void setEmpty() {
-        Arrays.fill(map, LOG0);
-        if (isJDF()) {
-            for (int i = 0; i < jdf.length; i ++) 
-                this.jdf[i] = new JDF(nvars);
-        }
-        occupied = 0;
-    }
-    
 
     /**
      * Identify each "theoretical" index that is linked to the specified key (which may
@@ -499,7 +535,7 @@ public class DenseFactor extends AbstractFactor {
             int size = getSize();
             if (index < size) {
                 do {
-                    if (map[index] != LOG0)
+                    if (map.get(index) != LOG0)
                         return true;
                     index ++;
                 } while (index < size);
@@ -529,22 +565,26 @@ public class DenseFactor extends AbstractFactor {
         Variable r1 = Predef.Real("R1");
         Variable r2 = Predef.Real("R2");
         AbstractFactor dt0 = new DenseFactor(x1,y1,r1,y2);
+        double[] map0 = new double[dt0.getSize()];
         for (int key_index = 0; key_index < dt0.getSize(); key_index ++) {
             if (random.nextInt(100) > 20)
-                dt0.setValue(key_index, random.nextDouble());
+                map0[key_index] = random.nextDouble();
             
             dt0.setDistrib(key_index, r1, new GaussianDistrib(random.nextGaussian(), random.nextDouble()));
         }
+        dt0.setValues(map0);
         dt0.display();
     
         AbstractFactor mt0 = Factorize.getMargin(dt0, y1, x1);
         mt0.display();
         
         AbstractFactor dt1 = new DenseFactor(y1,x1, r2);
+        double[] map1 = new double[dt1.getSize()];
         for (int key_index = 0; key_index < dt1.getSize(); key_index ++) {
-            dt1.setValue(key_index, random.nextDouble());
+            map1[key_index] = random.nextDouble();
             dt1.setDistrib(key_index, r2, new GaussianDistrib(random.nextGaussian(), random.nextDouble()));
         }
+        dt1.setValues(map1);
         dt1.display();
         
         AbstractFactor mt1 = Factorize.getMargin(dt1, x1);
@@ -556,17 +596,21 @@ public class DenseFactor extends AbstractFactor {
         Factorize.getProduct(dt0, dt1);
         
         AbstractFactor dt2 = new DenseFactor(x2,y2,z1,x1);
+        double[] map2 = new double[dt2.getSize()];
         for (int key_index = 0; key_index < dt2.getSize(); key_index ++)
             if (random.nextInt(100) > 20)
-                dt2.setValue(key_index, random.nextDouble());
+                map2[key_index] = random.nextDouble();
+        dt2.setValues(map2);
         AbstractFactor mt2 = Factorize.getMargin(dt2, x2, y2);
         mt2.display();
         
         Factorize.getProduct(mt2, mt0);
 
         AbstractFactor dt3 = new DenseFactor(z1,x2,z2);
+        double[] map3 = new double[dt3.getSize()];
         for (int key_index = 0; key_index < dt3.getSize(); key_index ++)
-            dt3.setValue(key_index, random.nextDouble());
+            map3[key_index] = random.nextDouble();
+        dt3.setValues(map3);
         AbstractFactor dt4 = Factorize.getProduct(dt2, dt1);
         AbstractFactor dt5 = Factorize.getProduct(dt4, mt0);
         AbstractFactor dt6 = Factorize.getProduct(dt3, dt5);

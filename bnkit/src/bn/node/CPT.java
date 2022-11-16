@@ -409,6 +409,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             Variable[] vars_arr = new Variable[fvars.size()];
             fvars.toArray(vars_arr);
             AbstractFactor ft = new DenseFactor(vars_arr);
+            AbstractFactor.FactorFiller ff = ft.getFiller();
             EnumVariable[] evars = ft.getEnumVars(); // the order may have changed
             int[] xcross = new int[parents.size()];
             int[] ycross = new int[evars.length];
@@ -435,17 +436,19 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
             if (indices.length == 0) { // The are no entries in CPT that match the search key (which itself indicates the state of parents)
                 // create a new, reduced FT with only myvar, since there is no relationship with parents evident from the entries
                 ft = new DenseFactor(new Variable[] {myvar});
+                ff = ft.getFiller();
                 fkey = new Object[1];
                 if (varinstance != null) { // the variable for this CPT is instantiated
                     fkey[0] = varinstance;
-                    ft.setValue(fkey, 1.0 / dom.size());
+                    ff.setValue(fkey, 1.0 / dom.size());
                 } else {
                     for (int j = 0; j < dom.size(); j++) {
                         fkey[0] = dom.get(j);
                         Double p = 1.0 / dom.size();
-                        ft.setValue(fkey, p); //add one entry for each possible instantiation to create uniform outcome
+                        ff.setValue(fkey, p); //add one entry for each possible instantiation to create uniform outcome
                     }
                 }
+                ft.setValuesByFiller(ff);
                 return ft;
             }
             for (int index : indices) {
@@ -460,16 +463,17 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                         if (fkey.length == 0) // atomic factor
                             ft.setValue(d.get(varinstance));
                         else
-                            ft.setValue(fkey, d.get(varinstance));
+                            ff.setValue(fkey, d.get(varinstance));
                     } else { // the variable for this CPT is NOT instantiated so we add one entry for each possible instantiation
                         for (int j = 0; j < dom.size(); j++) {
                             fkey[missing] = dom.get(j);
                             Double p = d.get(j);
-                            ft.setValue(fkey, p);
+                            ff.setValue(fkey, p);
                         }
                     }
                 } 
             }
+            ft.setValuesByFiller(ff);
             if (!sumout.isEmpty()) {
                 Variable[] sumout_arr = new Variable[sumout.size()];
                 sumout.toArray(sumout_arr);
@@ -487,14 +491,16 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
                 return ft;
             }
             AbstractFactor ft = new DenseFactor(myvar);
+            AbstractFactor.FactorFiller ff = ft.getFiller();
             Object[] newkey = new Object[1];
             for (int j = 0; j < dom.size(); j++) {
                 newkey[0] = dom.get(j);
                 if (d == null)
-                    ft.setValue(newkey, 1.0/dom.size());
+                    ff.setValue(newkey, 1.0/dom.size());
                 else
-                    ft.setValue(newkey, d.get(j));
+                    ff.setValue(newkey, d.get(j));
             }
+            ft.setValuesByFiller(ff);
             return ft;
         }
     }
