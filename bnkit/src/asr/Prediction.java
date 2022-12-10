@@ -70,6 +70,12 @@ public class Prediction {
         this.distribs = new EnumDistrib[phylotree.getSize()][];
     }
 
+    /**
+     * Load instance from a JSON file.
+     * @param filename
+     * @return
+     * @throws IOException
+     */
     public static Prediction load(String filename) throws IOException {
         FileReader freader=new FileReader(filename);
         BufferedReader reader=new BufferedReader(freader);
@@ -103,6 +109,11 @@ public class Prediction {
         return new Prediction(pogtree, ancestors);
     }
 
+    /**
+     * Save this instance as a JSON file
+     * @param filename
+     * @throws IOException
+     */
     public void save(String filename) throws IOException {
         FileWriter fwriter=new FileWriter(filename);
         BufferedWriter writer=new BufferedWriter(fwriter);
@@ -113,7 +124,7 @@ public class Prediction {
     }
 
     /**
-     *
+     * Convert this instance to a JSON object, for saving or messaging.
      * @return
      */
     public JSONObject toJSON() {
@@ -132,10 +143,10 @@ public class Prediction {
     }
 
     /**
-     * Create a JSON object from the prediction
+     * Create a JSON object from the prediction with an option to include extants. Do not use.
      * @param INCLUDE_EXTANTS if true, extants are included in the returned object
      * @return
-     * @deprecated
+     * @deprecated Used in an earlier version hence kept. Extants is an external part so should be stored separately.
      */
     public JSONObject toJSON(boolean INCLUDE_EXTANTS) {
         List<IdxGraph> saveme1e = new ArrayList<>();

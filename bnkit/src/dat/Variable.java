@@ -24,13 +24,14 @@ import java.util.*;
  * @author mikael
  * @param <E>
  *
+ * TODO: review variable name space; specifically, not use "static" but implement "session-wide scope" or something...
  */
 public class Variable<E extends Domain> implements Comparable {
 
     // A domain is a type checking entity (e.g. to check if a value is valid)
     private final E domain;
     // Variables are associated with a unique counter (to impose a canonical ordering amongst variables)
-    final static Map<Variable<?>, Integer> pool = new HashMap<Variable<?>, Integer>();
+    final static Map<Variable<?>, Integer> pool = new HashMap<>();
     // counter of variables used in the current namespace
     private final int canonicalIndex;
     // default name of variable

@@ -17,12 +17,8 @@
  */
 package bn.node;
 
-import bn.BNode;
-import bn.Distrib;
+import bn.*;
 import bn.factor.Factor;
-import bn.Predef;
-import bn.Sample;
-import bn.SampleTable;
 import dat.Continuous;
 import dat.EnumVariable;
 import dat.Variable;
@@ -41,7 +37,7 @@ import java.util.*;
  *
  * @author m.boden
  */
-public class GDT implements BNode, Serializable {
+public class GDT implements BNode, TiedNode<GDT>, Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -66,10 +62,11 @@ public class GDT implements BNode, Serializable {
     private int[] row = new int[0];           // identifies to which "row" the observation belongs
     
     final private double[] means;       // save the means 
-    final private double[] vars; 	// save the variances
+    final private double[] vars; 	    // save the variances
     final private double[] n;           // save the numbers of samples
     
     private boolean relevant = false;
+    private GDT tiedMaster = null;
 
     /**
      * Create a Gaussian density table for a variable. The variable is
@@ -329,6 +326,7 @@ public class GDT implements BNode, Serializable {
                     }
                 } 
             }
+            ff.setNormalised(); // normalise Gaussian factors, ensuring that they sum to 1
             ft.setValuesByFiller(ff);
             if (!sumout.isEmpty()) {
                 Variable[] sumout_arr = new Variable[sumout.size()];
@@ -514,21 +512,40 @@ public class GDT implements BNode, Serializable {
     public Double getInstance() {
         return instance;
     }
-    
+
+    /**
+     * Store the continuous observation, which is associated with a specific condition, and a probability.
+     * @param key the boolean key (how conditioning variables are set)
+     * @param value the value of the conditioned, continuous variable
+     * @param prob the expectation
+     */
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
         if (this.isRoot()) {
             throw new RuntimeException("GDT can not be trained as root");
             // same process as for entries with parents, just a single queue of observations...
         } else {
-            if (countDouble == null) // create countDouble table if none exists
-                countDouble = new SampleTable<>(this.getParents());
-            if (countDistrib == null)
-                countDistrib = new SampleTable<>(this.getParents());
-            try {
-                countDouble.count(key, (Double)value, prob);
-            } catch (ClassCastException e) {
-                countDistrib.count(key, (Distrib)value, prob);
+            GDT master = getMaster();
+            if (master == null) { // this GDT is a master
+                if (countDouble == null) // create countDouble table if none exists
+                    countDouble = new SampleTable<>(this.getParents());
+                if (countDistrib == null)
+                    countDistrib = new SampleTable<>(this.getParents());
+                try {
+                    countDouble.count(key, (Double) value, prob);
+                } catch (ClassCastException e) {
+                    countDistrib.count(key, (Distrib) value, prob);
+                }
+            } else { // this GDT is slave to a master
+                if (master.countDouble == null) // create countDouble table if none exists
+                    master.countDouble = new SampleTable<>(this.getParents());
+                if (master.countDistrib == null)
+                    master.countDistrib = new SampleTable<>(this.getParents());
+                try {
+                    master.countDouble.count(key, (Double) value, prob);
+                } catch (ClassCastException e) {
+                    master.countDistrib.count(key, (Distrib) value, prob);
+                }
             }
         }
     }
@@ -572,9 +589,9 @@ public class GDT implements BNode, Serializable {
             int nrows = table.getSize();
             for (int i = 0; i < nrows; i++) {
                 if (!table.hasValue(i))
-                    table.setValue(i, new GaussianDistrib(rand.nextGaussian()*10+10, rand.nextDouble()*5));
+                    table.setValue(i, new GaussianDistrib(rand.nextGaussian(), rand.nextDouble()));
             }
-            table.display();
+            // table.display();
         }
     }
 
@@ -654,116 +671,122 @@ public class GDT implements BNode, Serializable {
      */
     @Override
     public void maximizeInstance() {
-        int maxrows = table.getSize();
-        int nSample = 20;                        // how many samples that should be generated for observed distributions
-        double maxVar = 0;                      // the largest variance of any class  
-        double middleMean = 0; 			// the mean of all values
-        double middleVar = 0;			// the variance of all values
-        double middleTot = 0;			// the sum of counts for all parent configs
+        GDT master = getMaster();
+        if (master == null) {
+            int maxrows = table.getSize();
+            int nSample = 20;                        // how many samples that should be generated for observed distributions
+            double maxVar = 0;                      // the largest variance of any class
+            double middleMean = 0; 			// the mean of all values
+            double middleVar = 0;			// the variance of all values
+            double middleTot = 0;			// the sum of counts for all parent configs
 
-        int nObservedDouble = getNumberObservedSample();
-        int nObservedDistrib = getNumberObservedDistrib();
-        int nTotal = nObservedDouble + nObservedDistrib * nSample;
-        
-        if (observed.length != nTotal) {
-            observed = new double[nTotal];
-            prob = new double[nTotal];
-            row = new int[nTotal]; // the row in the table to which the observation belong
-        }
-        // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
-        int j = 0;                  // sample count
-        for (int index = 0; index < maxrows; index ++) {
+            int nObservedDouble = getNumberObservedSample();
+            int nObservedDistrib = getNumberObservedDistrib();
+            int nTotal = nObservedDouble + nObservedDistrib * nSample;
 
-            List<Sample<Distrib>> samplesDistrib = null;
-            if (countDistrib != null)
-                samplesDistrib = countDistrib.get(index);
-            List<Sample<Double>> samplesDouble = null;
-            if (countDouble != null)        
-                samplesDouble = countDouble.get(index);
-            double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ... 
-            double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
-            int jStart = j;             // start index for samples in the row
-            if (samplesDistrib == null && samplesDouble == null) 
-                continue;                 // no samples of any kind
-            // go through observed distributions... if any
-            if (samplesDistrib != null) {
-                for (Sample<Distrib> sample : samplesDistrib) {// look at each distribution
-                    for (int s = 0; s < nSample; s ++) {
-                        observed[j] = (Double)sample.instance.sample();        // actual value (or score)
-                        prob[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config  
-                        sum += observed[j] * prob[j];				// update the numerator of the mean calc
-                        tot += prob[j];					// update the denominator of the mean calc
-                        row[j] = index;
-                        j++; 
+            if (observed.length != nTotal) {
+                observed = new double[nTotal];
+                prob = new double[nTotal];
+                row = new int[nTotal]; // the row in the table to which the observation belong
+            }
+            // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
+            int j = 0;                  // sample count
+            for (int index = 0; index < maxrows; index ++) {
+
+                List<Sample<Distrib>> samplesDistrib = null;
+                if (countDistrib != null)
+                    samplesDistrib = countDistrib.get(index);
+                List<Sample<Double>> samplesDouble = null;
+                if (countDouble != null)
+                    samplesDouble = countDouble.get(index);
+                double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ...
+                double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
+                int jStart = j;             // start index for samples in the row
+                if (samplesDistrib == null && samplesDouble == null)
+                    continue;                 // no samples of any kind
+                // go through observed distributions... if any
+                if (samplesDistrib != null) {
+                    for (Sample<Distrib> sample : samplesDistrib) {// look at each distribution
+                        for (int s = 0; s < nSample; s ++) {
+                            observed[j] = (Double)sample.instance.sample();        // actual value (or score)
+                            prob[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config
+                            sum += observed[j] * prob[j];				// update the numerator of the mean calc
+                            tot += prob[j];					// update the denominator of the mean calc
+                            row[j] = index;
+                            j++;
+                        }
                     }
                 }
-            }
-            // go through actual values...
-            if (samplesDouble != null) {
-                for (Sample<Double> sample : samplesDouble) {// look at each entry
-                    observed[j] = sample.instance;        // actual value (or score)
-                    prob[j] = sample.prob;            // p(class=key) i.e. the height of the density for this parent config  
-                    sum += observed[j] * prob[j];            // update the numerator of the mean calc
-                    tot += prob[j];                   // update the denominator of the mean calc
-                    row[j] = index;
-                    j++; 
+                // go through actual values...
+                if (samplesDouble != null) {
+                    for (Sample<Double> sample : samplesDouble) {// look at each entry
+                        observed[j] = sample.instance;        // actual value (or score)
+                        prob[j] = sample.prob;            // p(class=key) i.e. the height of the density for this parent config
+                        sum += observed[j] * prob[j];            // update the numerator of the mean calc
+                        tot += prob[j];                   // update the denominator of the mean calc
+                        row[j] = index;
+                        j++;
+                    }
                 }
+                n[index] = tot; // save the number of possibly fractional samples on which the estimates were based
+                // calculate mean
+                means[index] = sum / tot;
+                // now for calculating the variance
+                double diff = 0;
+                for (int jj = 0; jj < j - jStart; jj++) {
+                    diff += (means[index] - observed[jStart + jj]) * (means[index] - observed[jStart + jj]) * prob[jStart + jj];
+                }
+                vars[index] = diff / tot;
+                if (vars[index] < 0.01) {
+                    vars[index] = 0.01;
+                }
+                if (vars[index] > maxVar) {
+                    maxVar = vars[index];
+                }
+                // note the same key/index for both the CPT and the Sample table
+                middleTot += tot;
+                middleMean += sum;
             }
-            n[index] = tot; // save the number of possibly fractional samples on which the estimates were based
-            // calculate mean
-            means[index] = sum / tot;
-            // now for calculating the variance
-            double diff = 0;
-            for (int jj = 0; jj < j - jStart; jj++) {
-                diff += (means[index] - observed[jStart + jj]) * (means[index] - observed[jStart + jj]) * prob[jStart + jj];
-            }
-            vars[index] = diff / tot;
-            if (vars[index] < 0.01) {
-                vars[index] = 0.01;
-            }
-            if (vars[index] > maxVar) {
-                maxVar = vars[index];
-            }
-            // note the same key/index for both the CPT and the Sample table
-            middleTot += tot;
-            middleMean += sum;
-        }
-        middleMean /= middleTot;
-        countDistrib = null;    // reset counts
-        countDouble = null;     // reset counts
+            middleMean /= middleTot;
+            countDistrib = null;    // reset counts
+            countDouble = null;     // reset counts
 
-        if (tieVariances == VARIANCE_UNTIED) { // if we use the individual variances
-            for (int i = 0; i < maxrows; i ++) {
-                if (n[i] > 0)
-                    this.put(i, new GaussianDistrib(means[i], vars[i]));
-            }
-        } else { // re-compute variances if they need to be tied
-            // there are different ways of dealing with this
-            if (tieVariances == VARIANCE_TIED_MAX) {
-                // (1) simply use the max of the existing variances
+            if (tieVariances == VARIANCE_UNTIED) { // if we use the individual variances
                 for (int i = 0; i < maxrows; i ++) {
                     if (n[i] > 0)
-                        this.put(i, new GaussianDistrib(means[i], maxVar));
+                        this.put(i, new GaussianDistrib(means[i], vars[i]));
                 }
-            } else if (tieVariances == VARIANCE_TIED_POOLED) { 
-                // (2) use the pooled existing variances (http://en.wikipedia.org/wiki/Pooled_variance)
-                double num = 0.0;
-                double denom = 0.0;
-                for (int i = 0; i < maxrows; i ++) {
-                    if (n[i] >= 1) {
-                        num += (n[i] - 1) * vars[i];
-                        denom += (n[i] - 1);
+            } else { // re-compute variances if they need to be tied
+                // there are different ways of dealing with this
+                if (tieVariances == VARIANCE_TIED_MAX) {
+                    // (1) simply use the max of the existing variances
+                    for (int i = 0; i < maxrows; i ++) {
+                        if (n[i] > 0)
+                            this.put(i, new GaussianDistrib(means[i], maxVar));
                     }
+                } else if (tieVariances == VARIANCE_TIED_POOLED) {
+                    // (2) use the pooled existing variances (http://en.wikipedia.org/wiki/Pooled_variance)
+                    double num = 0.0;
+                    double denom = 0.0;
+                    for (int i = 0; i < maxrows; i ++) {
+                        if (n[i] >= 1) {
+                            num += (n[i] - 1) * vars[i];
+                            denom += (n[i] - 1);
+                        }
+                    }
+                    for (int i = 0; i < maxrows; i ++) {
+                        if (n[i] > 0)
+                            this.put(i, new GaussianDistrib(means[i], num / denom));
+                    }
+                } else {
+                    // (3) compute the variance of all the values (Hastie and Tibshirani did this--but I have not had great success with this /MB)
+                    throw new RuntimeException("This variant of tied variance is not yet implemented");
+                    // ...
                 }
-                for (int i = 0; i < maxrows; i ++) {
-                    if (n[i] > 0) 
-                        this.put(i, new GaussianDistrib(means[i], num / denom));
-                }
-            } else {
-                // (3) compute the variance of all the values (Hastie and Tibshirani did this--but I have not had great success with this /MB)
-                throw new RuntimeException("This variant of tied variance is not yet implemented");
-                // ...
             }
+        } else { // there is a master
+            master.maximizeInstance();
+            // the alternative is to wait for the master, but that may not happen if not in the update set
         }
     }
 
@@ -937,4 +960,47 @@ public class GDT implements BNode, Serializable {
 		return new GaussianDistrib(0.0, 1.0);
 	}
 
+    public GDT getMaster(){
+        return this.tiedMaster;
+    }
+
+
+    /**
+     * Tie parameters from training for this CPT to those of another CPT.
+     * Variables should be separate, but they are required to (1) be of the same type/domain, and (2) be listed in the same order.
+     * @param master the CPT from which parameters will be copied and held fixed.
+     * @return true if successful, false otherwise
+     */
+    @Override
+    public boolean tieTo(GDT master) {
+        if (master.getMaster() != null)
+            return false;
+        if (!this.var.getDomain().equals(master.getVariable().getDomain()))
+            throw new RuntimeException("Invalid sharing: " + var.getName() + " does not share domain with " + master.getVariable().getName());
+        if (this.getParents() != null && master.getParents() != null) {
+            if (this.getParents().size() != master.getParents().size())
+                throw new RuntimeException("Invalid sharing: " + var.getName() + " has different number of parents from " + master.getVariable().getName());
+            for (int i = 0; i < this.getParents().size(); i++) {
+                Variable p1 = this.getParents().get(i);
+                Variable p2 = master.getParents().get(i);
+                if (!p1.getDomain().equals(p2.getDomain()))
+                    throw new RuntimeException("Invalid sharing: " + p1.getName() + " does not share domain with " + p2.getName());
+            }
+        }
+        this.tiedMaster = master;
+        // need to tie:
+        // - prior (if applicable)
+        // - table (if applicable)
+        this.prior = master.prior; // copy the reference to the value
+        if (this.getParents() != null) {
+            // we assume that parents are in the same order, belong to the same domains etc (as checked above)
+            this.table.setMapRef(master.table.getMapRef()); // copy the reference to the actual "master" table (not a copy of)
+//            this.table = master.table; // copy the reference to the actual "master" table (not a copy of)
+            // removed "retro-fitted" table as this makes a shallow copy of the master table
+            // this.table = src.table.retrofit(this.getParents());
+        }
+        // also need to tie:
+        // - count (used during learning, i.e. when "counting", so this happens in countInstance, not here
+        return true;
+    }
 }

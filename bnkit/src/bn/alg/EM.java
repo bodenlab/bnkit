@@ -139,7 +139,7 @@ public class EM extends LearningAlg {
     /**
      * Train the BN using EM.
      *
-     * @see bn.alg.LearningAlg#train(java.lang.Object[][], bn.Variable[], long)
+     * {@see bn.alg.LearningAlg#train(java.lang.Object[][], bn.Variable[], long)}
      * @param values the values of the variables [row][variable], if a value is
      * null, it means "unspecified"
      * @param vars the variables that correspond to the values
@@ -148,9 +148,9 @@ public class EM extends LearningAlg {
      */
     @Override
     public void train(Object[][] values, Variable[] vars, long seed) {
-    	int nSample = values.length; // this is how training samples we have
+    	int nSample = values.length; // this is how many training samples we have
         // we only need to initialize the relevant nodes.
-        //	setRandom(seed); // init network CPTs and CDTs
+        // setRandom(seed); // init network CPTs and CDTs
 
         for (BNode node : bn.getNodes()) {
             if (node.isTrainable()) {
@@ -172,33 +172,30 @@ public class EM extends LearningAlg {
 
             double log_likelihood = 0;
             // the set of nodes to be updated:
-            Map<BNode, Object[]> updateMap = new HashMap<>();
-            Map<BNode, Object[]> update = Collections.synchronizedMap(updateMap); //THREAD SAFE MAP
+            Map<BNode, Object[]> update = Collections.synchronizedMap(new HashMap<>()); //THREAD SAFE MAP
             // for each sample with observations...
             for (int i = 0; i < values.length; i++) {
-                // set variables and keys according to observations
+                // assign variables and keys according to observations
+                // the set of variables that are expanded to include those that are parents and children of those for which values are supplied
                 for (int j = 0; j < vars.length; j++) {
                     BNode instantiate_me = bn.getNode(vars[j]);
-                    if (instantiate_me == null) {
+                    if (instantiate_me == null)
                         throw new EMRuntimeException("Variable \"" + vars[i].getName() + "\" is not part of Bayesian network");
-                    }
                     if (values[i][j] != null) { // check so that the observation is not null
                         // the node is instantiated to the value in the data set
+                        // TODO: for multi-threading of EM to work, consider NOT setting the "global" BNode instance to a value
                         instantiate_me.setInstance(values[i][j]);
-                        //Has evidence so needs to be updated
+                        // has evidence so needs to be updated
                         update.put(instantiate_me, null);
-                        List<EnumVariable> parents = instantiate_me.getParents();	// if no, determine which are the parents of the node
+                        List<EnumVariable> parents = instantiate_me.getParents();	// if no, determine the parents of the node
                         if (parents != null) {
-                            for (EnumVariable parent : parents) {		// go through the parents and add them to the update set
+                            for (EnumVariable parent : parents) // go through the parents and add them to the update set
                                 update.put(bn.getNode(parent), null);
-                            }
                         }
-                        Set<String> children = bn.getChildrenNames(instantiate_me);	// if no, determine which are the parents of the node
+                        Set<BNode> children = bn.getChildren(instantiate_me); // if no, determine the children of the node
                         if (children != null) {
-                            for (String child : children) {		// go through the children and add them to the update set
-                                BNode c = bn.getNode(child);
+                            for (BNode c : children) // go through the children and add them to the update set
                                 update.put(c, null);
-                            }
                         }
                     } else { // the observation is null
                         // the node is reset, i.e. un-instantiated 
@@ -220,7 +217,7 @@ public class EM extends LearningAlg {
                  * 	     Assign a probability to each value permutation.
                  * 
                  * Which of the ways is better depends on the number of variables in Y' and the number of nodes N. 
-                 * Should benchmark this so way is chose automatically depending on the query complexity.
+                 * Should benchmark this so way is chosen automatically depending on the query complexity.
                  */
                 inf.instantiate(bn);
                 Variable.Assignment[] evidence = Variable.Assignment.array(vars, values[i]); // the evidence here
@@ -229,13 +226,9 @@ public class EM extends LearningAlg {
                 case 1: 
 
                     // Principal way 1: go through each of the BN nodes... pose a query for, and update each...
-                    if (i == 11)
-                        i = 11;
-                    
                     for (BNode node : update.keySet()) {
 
                         if (node.isTrainable()) {
-
                             // identify what variables that we need to infer, to generate expectations
                             List<Variable> query_vars = new ArrayList<>();
                             Object[] evid_key = null; // only applicable if the node has parents
@@ -257,7 +250,6 @@ public class EM extends LearningAlg {
                             // check if inference is required
                             if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
                                 try {
-                                    latentVariablesExist = true;
                                     Variable[] query_arr = new Variable[query_vars.size()];
                                     query_vars.toArray(query_arr);
                                     Query q = inf.makeQuery(query_arr);
@@ -270,9 +262,8 @@ public class EM extends LearningAlg {
                                         if (p == 0 || Double.isNaN(p)) // count is zero (or the log prob was so small that conversion failed)
                                             continue;
                                         JDF jdf = null;
-                                        if (qr.hasNonEnumVariables()) {
+                                        if (qr.hasNonEnumVariables())
                                             jdf = qr.getJDF(qr_index);
-                                        }
 
                                         if (!node.isRoot()) { // if node has parents
                                             // we need to construct a key for the update of the node

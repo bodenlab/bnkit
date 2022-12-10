@@ -40,7 +40,7 @@ import java.util.*;
  *
  * @author mikael
  */
-public class SubstNode implements BNode, TiedNode {
+public class SubstNode implements BNode {
 
     private final EnumVariable var;
     private final EnumVariable parent;
@@ -624,16 +624,6 @@ public class SubstNode implements BNode, TiedNode {
     @Override
     public void setTrainable(boolean trainable) {
         // no effect
-    }
-
-    @Override
-    public void tieTo(BNode source) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    @Override
-    public BNode getTieSource() {
-        return null;
     }
 
 	@Override

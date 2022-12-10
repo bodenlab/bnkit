@@ -1051,10 +1051,23 @@ public abstract class AbstractFactor implements Iterable<Integer> {
 
         public FactorFiller() {
             fmap = new double[getSize()];
+            Arrays.fill(fmap, LOG0);
         }
 
         public void setLogValue(int index, double logValue) {
             fmap[index] = logValue;
+            isUpdated = true;
+        }
+
+        public synchronized void setNormalised() {
+            double[] p = new double[fmap.length];
+            double sum = 0;
+            for (int i = 0; i < p.length; i ++) {
+                p[i] = Math.exp(fmap[i]);
+                sum += p[i];
+            }
+            for (int i = 0; i < p.length; i ++)
+                fmap[i] = Math.log(p[i] / sum);
             isUpdated = true;
         }
 

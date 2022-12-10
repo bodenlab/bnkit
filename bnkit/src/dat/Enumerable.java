@@ -243,13 +243,13 @@ public class Enumerable implements Domain {
         JSONObject jobj = new JSONObject();
         jobj.put("Size", order);
         jobj.put("Values", new JSONArray(values));
-        jobj.put("Datatype", datatype);
+        jobj.put("Datatype", datatype.getSimpleName());
         return jobj;
     }
 
     public static Enumerable fromJSON(JSONObject jobj) {
         JSONArray varr = jobj.getJSONArray("Values");
-        Class dtype = (Class)jobj.get("Datatype");
+        //Class dtype = (Class)jobj.get("Datatype");
         Object[] vals = new Object[varr.length()];
         for (int i = 0; i < varr.length(); i ++)
             vals[i] = varr.get(i);

@@ -83,6 +83,8 @@ public class BNet implements Serializable {
      * @param node the node (e.g. a CPT, or GDT)
      */
     public void add(BNode node) {
+        String name = node.getName();
+        Variable var = node.getVariable();
         if (nodesByName.containsKey(node.getName()) || nodesByVar.containsKey(node.getVariable())) {
             throw new BNetRuntimeException("Duplicate node names in BNet: " + node.getName());
         }
@@ -99,7 +101,8 @@ public class BNet implements Serializable {
      */
     public void add(BNode... nodes) {
         for (BNode node : nodes) {
-            add(node);
+            if (node != null)
+                add(node);
         }
     }
 
@@ -120,6 +123,9 @@ public class BNet implements Serializable {
      * example: linking ancestors and descendants.) Most (if not all) functions
      * will call this automatically so typically explicit calls are not
      * required.
+     *
+     * TODO: replace the ch2par and par2ch maps with bit arrays, or adjacency matrices;
+     * perhaps, include a separate ch2ancestors to make it quicker to determine dependencies in queries
      */
     public void compile() {
         if (!compiled) {
@@ -552,46 +558,44 @@ public class BNet implements Serializable {
 
     /**
      * Determine which subset of nodes that are relevant to a specific query and
-     * evidence combination. "Every variable that is not an ancestor of a query
+     * evidence combination, by the principle "Every variable that is not an ancestor of a query
      * variable or evidence variable is irrelevant to the query" (Russell and
      * Norvig, 2002, p. 509).
      *
+     * Note that evidence that is d-separated from query is also irrelevant but this is not
+     * considered here; so further exclusion can be made.
+     *
      * @param query the variables that are in the query
-     * @return a new BN with the relevant CPTs only
-     * @deprecated
+     * @return the preliminary list of relevant nodes, excluding query and evidence variables
      */
-    public BNet getRelevant(Variable... query) {
-        BNet nbn = new BNet();
-        Set<String> qset = new HashSet<>();
-        for (Variable query1 : query) {
-            qset.add(query1.toString());
+    public Set<BNode> getRelevantAndSome(Variable... query) {
+        List<BNode> relevant = new ArrayList<>();
+
+        Set<BNode> qset = new HashSet<>(); // set of nodes with query vars
+        for (Variable qvar : query) {
+            BNode qnode = this.getNode(qvar);
+            if (qnode.getInstance() == null)
+                qset.add(qnode);
         }
-        // first add all instantiated/evidence variables and queried variables
-        for (BNode node : nodesByName.values()) {
-//            if (node.getInstance() != null || qset.contains(node.getName())) {
-        	// query is list of variables and node name and variable name are different
-        	if (node.getInstance() != null || qset.contains(node.getVariable().toString())){
-                nbn.add(node);
-            }
+
+        Set<BNode> aset = new HashSet<>(); // set of nodes with ancestors of query nodes
+        for (BNode qnode : qset) {
+            aset.addAll(this.getAncestors(qnode));
         }
-        // next add the ancestors of those already added
-        Set<BNode> aset = new HashSet<>();
-        Set<String> direct = nbn.getNames();
-        for (String name : direct) {
-            List<BNode> ancestors = getAncestors(name);
-            if (ancestors != null) {
-                aset.addAll(ancestors);
-            }
+
+        Set<BNode> eset = new HashSet<>(); // set of nodes with evidence
+        for (BNode node : this.getOrdered()) {
+            if (node.getInstance() != null)
+                eset.add(node);
         }
-        for (BNode anode : aset) { // add ancestors to new BN
-            if (!nbn.getNames().contains(anode.getName())) {
-                nbn.add(anode);
-            }
+        for (BNode enode : eset) {
+            aset.addAll(this.getAncestors(enode));
         }
-        nbn.compile();
-        return nbn;
+        // aset.addAll(eset);
+        return aset;
     }
-    
+
+
     /**
      * Algorithm for finding nodes reachable from X(query) given Z(evidence) via active trails
      * Based on Algorithm 3.1 in Probabilistic Graphical Models - Principles and Techniques, Koller, D., Friedman, N., pg.75
@@ -599,6 +603,8 @@ public class BNet implements Serializable {
      * @return a new BN with relevant CPTs only
      * TODO: Either rename to a "setter" since it actually modifies the BNet (see comment at end), or rewrite so that it only
      * returns the list of D-connected nodes.
+     *
+     * FIXME: I don't think this implementation is correct (MB)
      */
     public List<BNode> getDconnected(Variable... query) {
         //Get set of evidence
@@ -621,7 +627,7 @@ public class BNet implements Serializable {
         //PhaseII: traverse active trails starting from X (query)
         List<NodeDirection> l = new ArrayList<NodeDirection>(); //nodes to be visited
         //Have to add query as node to be visited
-        //FIXME direction for the query?
+        // FIXME direction for the query?
         //I think a query node can always be added once with a single direction and that will always work
         for (Variable q : query) {
             BNode qNode = this.getNode(q);

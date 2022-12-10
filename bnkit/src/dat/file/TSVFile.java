@@ -163,6 +163,26 @@ public class TSVFile {
         return keyIndex.keySet();
     }
 
+    public Set<Object> getValues() {
+        Set<Object> vals = new HashSet<>();
+        for (Object[] row : rows)
+            for (Object val : row)
+                if (val != null)
+                    vals.add(val);
+        return vals;
+    }
+
+    public static boolean isDouble(Object[] col) {
+        try {
+            for (int i = 0; i < col.length; i ++) {
+                Double y = (Double) col[i];
+            }
+            return true; // must have all been of type T, because no exception has been thrown
+        } catch (ClassCastException e) {
+            return false;
+        }
+    }
+
     private Map<Object, int[]> getIndexMap(int col) {
         Map<Object, int[]> keyIndex = indexMap.get(col);
         if (keyIndex == null) { // we need to construct it
@@ -290,7 +310,10 @@ public class TSVFile {
                         try {
                             values[i] = Double.valueOf(tokens[i]); // value is a double
                         } catch (NumberFormatException e2) {
-                            values[i] = tokens[i]; // value is a string
+                            if (tokens[i].isBlank() || tokens[i].equalsIgnoreCase("null") || tokens[i].equalsIgnoreCase("nil"))
+                                values[i] = null;
+                            else
+                                values[i] = tokens[i]; // value is a string
                         }
                     }
                 }
@@ -308,6 +331,7 @@ public class TSVFile {
         br.close();
         return data;
     }
+
 
     /**
      * Load a TSV file from a file and place the contents in a two-dimensional object matrix.
@@ -335,7 +359,7 @@ public class TSVFile {
             if (row == null)
                 System.err.println("row is null");
             for (int i = 0; i < row.length; i ++) {
-                Object val = row[i];
+                Object val = row[i] != null ? row[i] : "";
                 bd.write(val + (i == row.length - 1 ? "" : "\t"));
             }
             bd.newLine();

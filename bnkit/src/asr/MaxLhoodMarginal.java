@@ -1,12 +1,12 @@
 package asr;
 
 import bn.BNode;
+import bn.Distrib;
 import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.SubstModel;
 import bn.prob.EnumDistrib;
-import dat.Variable;
 import dat.phylo.IdxTree;
 import dat.phylo.PhyloBN;
 import dat.phylo.TreeDecor;
@@ -15,11 +15,10 @@ import dat.phylo.TreeInstance;
 /**
  * "Marginal" reconstruction view of Bayesian network.
  */
-public class MaxLhoodMarginal implements TreeDecor<EnumDistrib> {
+public class MaxLhoodMarginal <E extends Distrib> implements TreeDecor<E> {
 
-    private EnumDistrib value = null;
+    private E value = null;
     final private IdxTree tree;
-    final private SubstModel model;
     final private int bpidx;
     final private PhyloBN pbn;
 
@@ -34,7 +33,6 @@ public class MaxLhoodMarginal implements TreeDecor<EnumDistrib> {
      */
     public MaxLhoodMarginal(int bpidx, IdxTree tree, SubstModel model, double rate) {
         this.tree = tree;
-        this.model = model;
         this.bpidx = bpidx;
         pbn = PhyloBN.create(tree, model, rate);;
     }
@@ -49,11 +47,20 @@ public class MaxLhoodMarginal implements TreeDecor<EnumDistrib> {
      */
     public MaxLhoodMarginal(int bpidx, IdxTree tree, SubstModel model) {
         this.tree = tree;
-        this.model = model;
         this.bpidx = bpidx;
         pbn = PhyloBN.create(tree, model);;
     }
 
+    /**
+     * Set-up marginal inference based directly on a PhyloBN instance (with defined/pre-trained nodes)
+     * @param bpidx
+     * @param pbn
+     */
+    public MaxLhoodMarginal(int bpidx, PhyloBN pbn) {
+        this.tree = pbn.getTree();
+        this.bpidx = bpidx;
+        this.pbn = pbn;
+    }
 
     /**
      * Retrieves the already computed distribution
@@ -61,7 +68,7 @@ public class MaxLhoodMarginal implements TreeDecor<EnumDistrib> {
      * @return the posterior distribution over states defined by the substitution model
      */
     @Override
-    public EnumDistrib getDecoration(int idx) {
+    public E getDecoration(int idx) {
         if (idx == bpidx)
             return value;
         else
@@ -76,22 +83,29 @@ public class MaxLhoodMarginal implements TreeDecor<EnumDistrib> {
     public void decorate(TreeInstance ti) {
         // instantiate all nodes for which there are values, i.e. leaf nodes most probably
         for (int i = 0; i < ti.getSize(); i++) {
-            BNode bnode = pbn.getBNode(i);
+            BNode bnode = pbn.isExt() ? pbn.getExtNode(i) : pbn.getBNode(i);
             if (bnode != null) { // not hidden, so can be instantiated and inferred
                 Object y = ti.getInstance(i);
                 bnode.setInstance(y);
-            } // else, this branchpoint is outside of the BN, and will be ignored
+            } else { // this branchpoint is outside of the BN, and will be ignored
+            }
         }
         if (pbn.isValid()) {
             // set-up the inference engine
             VarElim ve = new VarElim();
             ve.instantiate(pbn.getBN());
-            BNode querynode = pbn.getBNode(bpidx);
+            BNode querynode;
+            if (pbn.isExt())
+                querynode = pbn.getExtNode(bpidx) != null ? pbn.getExtNode(bpidx) : pbn.getBNode(bpidx);
+            else
+                querynode = pbn.getBNode(bpidx);
             if (querynode == null)
                 throw new ASRRuntimeException("Marginal inference of invalid branchpoint: " + bpidx);
             Query q = ve.makeQuery(querynode.getVariable());
             CGTable r1 = (CGTable) ve.infer(q);
-            value = (EnumDistrib)r1.query(querynode.getVariable());
+            value = (E)r1.query(querynode.getVariable());
         } // else the BN is incapable of performing inference, so just leave values as they are
     }
+
 }
+

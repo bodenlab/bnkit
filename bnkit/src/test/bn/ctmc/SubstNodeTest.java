@@ -28,6 +28,9 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 import util.MilliTimer;
 
+/**
+ * Many of the tests below are written to debug the implementations, evaluate efficiency and accuracy.
+ */
 class SubstNodeTest {
 
     SubstModel model = SubstModel.createModel("JTT");
@@ -251,6 +254,8 @@ class SubstNodeTest {
      * If agreed, the rank is 1, otherwise the joint state ranks 2nd, 3rd, etc by falling probability.
      * The code saves trees which differ to a noticeable extent (average rank > 1.5), and
      * tests the assertion that the average rank is lower than 2 on average.
+     * Note that the input columns are random so they display nothing that looks like conservation.
+     * This in turn means reconstructions will tend to be more variable than those on natural data.
      */
     @Test
     void compare_Joint_Marg() {

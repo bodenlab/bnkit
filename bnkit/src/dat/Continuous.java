@@ -33,4 +33,19 @@ public class Continuous implements Domain {
             return false;
         }
     }
+
+    /**
+     * Two Continuous domains are equal by definition
+     * @param other
+     * @return
+     */
+    @Override
+    public boolean equals(Object other) {
+        try {
+            Continuous x = (Continuous) other;
+            return true;
+        } catch (ClassCastException e) {
+            return false;
+        }
+    }
 }

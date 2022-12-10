@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * "Joint" reconstruction view of Bayesian network.
+ * Note that the BN represents a single position (one rate).
  */
 public class MaxLhoodJoint implements TreeDecor<Object> {
 

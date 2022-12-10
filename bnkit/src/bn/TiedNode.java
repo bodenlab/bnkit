@@ -19,14 +19,20 @@
 package bn;
 
 /**
- * Interface for a class of BNode that can tie a set of universal parameters 
- via post-constructor exchange.
- * Use by constructing BNode instances then "couple" two instances
+ * Interface for BNodes that share parameters collected during training, i.e. counts.
+ * Use by constructing BNode instances then "couple" one instance to another,
+ * where the latter is the source for counts of the former.
+ * Note that implies that "counts" are kept and accumulated only in the "source" node.
+ *
  * @author mikael
  */
-public interface TiedNode<T extends BNode> {
+public interface TiedNode<T extends BNode> extends BNode {
 
-    void tieTo(T source);
+    boolean tieTo(T master);
 
-    BNode getTieSource();
+    /**
+     * Return the TiedNode that is the "master" or "source" of this BNode.
+     * @return master node (where parameters are sourced from learning), or null if this node is the master
+     */
+    T getMaster();
 }

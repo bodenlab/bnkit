@@ -1,7 +1,11 @@
 package bn.prob;
 
 import bn.Distrib;
+import dat.Continuous;
 import dat.Enumerable;
+import json.JSONArray;
+import json.JSONObject;
+
 import java.io.Serializable;
 import java.util.Random;
 
@@ -55,6 +59,26 @@ public class GaussianDistrib implements Distrib, Serializable {
     public GaussianDistrib(double mean, double variance) {
         setMean(mean);
         setVariance(variance);
+    }
+
+    /**
+     * Create a JSON representation of distribution
+     * @return
+     */
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        json.put("Domain", "Real");
+        json.put("Pr", new JSONArray(new double[] {getMean(), getVariance()}));
+        return json;
+    }
+
+    public static GaussianDistrib fromJSON(JSONObject json) {
+        if (!json.getString("Domain").equals("Real"))
+            throw new RuntimeException("Invalid JSON format: " + json);
+        double[] pr = new double[2];
+        JSONArray prarr = json.getJSONArray("Pr");
+        assert(pr.length == prarr.length());
+        return new GaussianDistrib(prarr.getDouble(0), prarr.getDouble(1));
     }
 
     /**

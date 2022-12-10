@@ -17,21 +17,16 @@
  */
 package bn.alg;
 
-import asr.GRASP;
 import bn.BNet;
 import bn.BNode;
-import bn.ctmc.SubstNode;
 import dat.EnumVariable;
 import bn.factor.Factor;
-import bn.JPT;
 import dat.Variable;
 import bn.factor.AbstractFactor;
 import bn.factor.Factorize;
-import bn.factor.Factorize.FactorProductTree;
 import util.MilliTimer;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Exact inference in Bayesian network by variable elimination, more
@@ -67,7 +62,7 @@ public class VarElim implements Inference {
      * of inference of belief. There are three types of variables (given the BN): 
      *  1. Assignment variables E--which have been assigned values via the BN 
      *  2. Query variables Q--for which probabilities are sought P(Q|E) 
-     *  3. Other variables X--which will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
+     *  3. Other variables X--which can/will be summed out during inference P(Q|E) = SUM_X P(Q|E,X).
      *  Note that inference should return a JPT with variables in the *same* order 
      *  as that specified by Q.
      * @param qvars variables to include in query
@@ -75,15 +70,26 @@ public class VarElim implements Inference {
     @SuppressWarnings("rawtypes")
     @Override
     public Query makeQuery(Variable... qvars) {
-	// Find out which variables in the BN that will be summed out and organise them into "buckets".
+	    // Find out what variables in the BN that are relevant to answer the query, and
+        // which of these that can be summed out; organise them into "buckets".
         // They will be listed in "topological order" (parents before children) as per heuristics given in Dechter.
-        // Each margin variable will be assigned a bucket.
-        List<Variable> Q = new ArrayList<>(); // Query, all nodes identified by user of this function
-        List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
-        List<Variable> X = new ArrayList<>(); // Un-instantiated but relevant nodes (not d-separated from any query node), to-be summed out
+        // Each to-be-marginalised variable will be assigned a separate bucket,
+        // so that when factorised and summed out, the result is passed-down to another.
+        List<Variable> Q = new ArrayList<>();               // Query, all nodes identified by user of this function
+        List<Variable.Assignment> E = new ArrayList<>();    // Assignment, all variables that are instantiated with values AND relevant (not d-separated from any query node)
+        List<Variable> X = new ArrayList<>();               // Un-instantiated but relevant nodes (not independent from any query or evidence node), but to-be summed out
         Q.addAll(Arrays.asList(qvars));
-        List<BNode> rnl = null;
-        rnl = bn.getDconnected(qvars); //relevant *ordered* node list, based on the concept of D-separation, and topological ordering
+        Set<BNode> relevant = bn.getRelevantAndSome(qvars);
+        for (BNode node : bn.getOrdered()) {
+            Variable var = node.getVariable();
+            Object val = node.getInstance();
+            if (val != null)
+                E.add(new Variable.Assignment(var, val));
+            else if (relevant.contains(node) && !Q.contains(var))
+                X.add(var);
+        }
+        /*
+        List<BNode> rnl = bn.getDconnected(qvars); // relevant *ordered* node list, based on the concept of D-separation, and topological ordering
         for (BNode node : rnl) {
             Variable var = node.getVariable();
             Object val = node.getInstance();
@@ -93,6 +99,7 @@ public class VarElim implements Inference {
                 X.add(var);
             }
         }
+         */
         return new CGQuery(Q, E, X);
     }
     
@@ -119,9 +126,7 @@ public class VarElim implements Inference {
         List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
         Q.addAll(Arrays.asList(qvars));
-//        BNet qbn = bn.getRelevant(qvars);
-        List<BNode> rnl = bn.getOrdered(); // with MPE all nodes are relevant by definition // getDconnected(qvars); //relevant ordered node list
-        //BNet qbn = bn;
+        List<BNode> rnl = bn.getOrdered();    // with MPE all nodes are relevant by definition
         for (BNode node : rnl) {
             Variable var = node.getVariable();
             Object val = node.getInstance();
@@ -150,7 +155,7 @@ public class VarElim implements Inference {
      */
     @SuppressWarnings("rawtypes")
     public Query makeNominatedMPEQuery(Variable... nomvars) {
-	// Find out which variables in the BN that will be max:ed out and organise them into "buckets".
+	    // Find out which variables in the BN that will be max:ed out and organise them into "buckets".
         List<Variable> Q = new ArrayList<>(); // Query, empty in this variant
         List<Variable.Assignment> E = new ArrayList<>(); // Assignment, all nodes that are instantiated with values AND relevant (not d-separated from any query node)
         List<Variable> X = new ArrayList<>(); // Unspecified, to-be summed out
@@ -180,7 +185,6 @@ public class VarElim implements Inference {
     @SuppressWarnings("rawtypes")
     @Override
     public QueryResult infer(Query query) {
-//        int[] nprods = new int[3];
 	    // All CPTs will be converted to "factors", and put in the bucket which is the first to sum-out any of the variables in the factor.
         // Assignment will be incorporated into the factor when it is constructed.
         // Create list of buckets: first one has query variables, then all sum-outs in topological ordering (as sorted by the constructor)
@@ -203,7 +207,7 @@ public class VarElim implements Inference {
 
         // Fill buckets backwards with appropriate factor tables (instantiated when "made")
         timer.start("factors");
-        Map<Variable, Object> relmap = q.getRelevant();
+        Map<Variable, Object> relmap = q.getVariableScope();
         for (Variable var : relmap.keySet()) {
             BNode node = bn.getNode(var);
             // next call is causing delays with threading
@@ -230,16 +234,9 @@ public class VarElim implements Inference {
         }
         timer.stop("factors");
         // Purge buckets, merge sum-out variables
-//        System.out.println(buckets.size());
         List<Integer> remove = new ArrayList<>();
         timer.start("merge");
         for (int i = 1; i < nBuckets; i++) { // ignore query bucket
-//        	try {
-//        		Bucket b = buckets.get(i);
-//        	} catch (IndexOutOfBoundsException e) {
-//        		System.out.println("i = "+i+", nBuckets = "+nBuckets);
-//        		System.out.println(buckets.size());
-//        	}
             Bucket b = buckets.get(i);
             if (b.factors.isEmpty()) { // no factors, put sum-out variables in other bucket(s)
                 for (Variable sumout : b.vars) { // check each sum-out variable
@@ -255,7 +252,6 @@ public class VarElim implements Inference {
                     }
                 }
                 remove.add(i);
-//                buckets.remove(i); // we can safely remove bucket since variables have been assigned to others
                 //FIXME if you remove a bucket the loop fails because nBuckets has not been updated
             }
         }
@@ -484,21 +480,33 @@ public class VarElim implements Inference {
         final List<Variable> Q; // query variables, for which values are sought
         final Map<Variable, Object> E; // evidence variables; their nodes are instantiated to values
         final List<Variable> X; // unspecified variables, incl all not listed as query or evidence
+        final Map<Variable, Object> all;
+
         private int status = STATUS_BEL;
         
         CGQuery(List<Variable> Q, List<Variable.Assignment> E, List<Variable> X) {
+            this.all = new HashMap<>();
             this.Q = Q;
+            for (Variable q : Q)
+                all.put(q, null);
             this.E = new HashMap<>();
             // evidence variables passed to this method are relevant
-            for (Variable.Assignment assign : E) 
+            for (Variable.Assignment assign : E) {
                 this.E.put(assign.var, assign.val);
+                all.put(assign.var, assign.val);
+            }
+            /*
             // all query variables are relevant by default, but no values are assigned
             for (Variable q : Q)
                 this.E.put(q, null);
             // unspecified variables passed to this method are relevant, but no values are assigned
-            for (Variable x : X)
+            for (Variable x : X) {
                 this.E.put(x, null);
+            }
+             */
             this.X = X;
+            for (Variable x : X)
+                all.put(x, null);
         }
         
         void setStatus(int status) {
@@ -513,8 +521,8 @@ public class VarElim implements Inference {
          * Get relevant variables for the query as a map, with evidence if available.
          * @return a map of all relevant variables with assigned values
          */
-        Map<Variable, Object> getRelevant() {
-            return E;
+        Map<Variable, Object> getVariableScope() {
+            return all;
         }
         
         public String toString() {

@@ -42,9 +42,11 @@ import java.util.*;
  * distributions as values, with each row specifying a single Dirichlet density, specifying what 
  * distributions it produces. The node has one or more enumerable parents.
  *
+ * TODO: Tying of DirDT nodes is not complete. Check how GDT does it with "master" nodes, incl. amending maximizeInstance
+ *
  * @author m.boden
  */
-public class DirDT implements BNode, TiedNode, Serializable {
+public class DirDT implements BNode, TiedNode<DirDT>, Serializable {
 
     private static final long serialVersionUID = 1L;
     
@@ -246,7 +248,7 @@ public class DirDT implements BNode, TiedNode, Serializable {
             }
             int[] indices = table.getIndices(searchcpt);
             Object[] fkey = new Object[evars.length];
-            double[] map = new double[ft.getSize()];
+            AbstractFactor.FactorFiller ff = ft.getFiller();
             boolean isLog = true;
             for (int index : indices) {
                 DirichletDistrib d = table.getValue(index);
@@ -263,31 +265,35 @@ public class DirDT implements BNode, TiedNode, Serializable {
                             if (fkey.length == 0) // and the parents are too
                                 ft.setLogValue(d.logLikelihood(counts)); // these probs can be very small, stay in log-space...
                             else
-                                map[ft.getIndex(fkey)] = d.logLikelihood(counts);
+                                ff.setLogValue(ft.getIndex(fkey), d.logLikelihood(counts));
                         } catch (ClassCastException e) {
                             isLog = false;
                             // Assume the instance is an EnumDistrib
                             if (fkey.length == 0) // and the parents are too
                                 ft.setValue(d.get(varinstance));
                             else
-                                map[ft.getIndex(fkey)] = d.get(varinstance);
+                                ff.setValue(ft.getIndex(fkey), d.get(varinstance));
                         }
                     } else { // the variable for this DirDT is NOT instantiated so we put it in the JDF
                         if (fkey.length == 0) { // but the parents are instantiated
                             ft.setLogValue(0.0); 
                             ft.setDistrib(myvar, d);
                         } else {
-                            map[ft.getIndex(fkey)] = 0.0;
+                            ff.setValue(ft.getIndex(fkey), 0.0);
                             // ft.setLogValue(fkey, 0.0);
                             ft.setDistrib(fkey, myvar, d);
                         }
                     }
                 } 
             }
+            ff.setNormalised();
+            ft.setValuesByFiller(ff);
+            /*
             if (isLog)
                 ft.setLogValues(map);
             else
                 ft.setValues(map);
+             */
             //ft = Factorize.getNormal(ft);
             if (!sumout.isEmpty()) {
                 Variable[] sumout_arr = new Variable[sumout.size()];
@@ -621,6 +627,8 @@ public class DirDT implements BNode, TiedNode, Serializable {
      * Find the best parameter setting for the observed data.
      * This uses a method to find the ML estimate for the Dirichlet from
      * a set of IntegerSeq, counted in countInstance.
+     *
+     * If extended to
      */
     @Override
     public void maximizeInstance() {
@@ -781,28 +789,34 @@ public class DirDT implements BNode, TiedNode, Serializable {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
-    public void tieTo(BNode source) {
-        DirDT src = (DirDT)source;
-        if (!this.var.getDomain().equals(source.getVariable().getDomain()))
-            throw new RuntimeException("Invalid sharing: " + var.getName() + " does not share domain with " + source.getVariable().getName());
-        if (this.table.nParents != src.table.nParents)
-            throw new RuntimeException("Invalid sharing: " + var.getName() + " has different number of parents from " + source.getVariable().getName());
-        for (int i = 0; i < this.table.nParents; i ++) {
-            Variable p1 = this.getParents().get(i);
-            Variable p2 = src.getParents().get(i);
-            if (!p1.getDomain().equals(p2.getDomain()))
-                throw new RuntimeException("Invalid sharing: " + p1.getName() + " does not share domain with " + p2.getName());
+    public boolean tieTo(DirDT source) {
+        try {
+            DirDT src = (DirDT) source;
+            if (!this.var.getDomain().equals(source.getVariable().getDomain()))
+                throw new RuntimeException("Invalid sharing: " + var.getName() + " does not share domain with " + source.getVariable().getName());
+            if (this.table.nParents != src.table.nParents)
+                throw new RuntimeException("Invalid sharing: " + var.getName() + " has different number of parents from " + source.getVariable().getName());
+            for (int i = 0; i < this.table.nParents; i++) {
+                Variable p1 = this.getParents().get(i);
+                Variable p2 = src.getParents().get(i);
+                if (!p1.getDomain().equals(p2.getDomain()))
+                    throw new RuntimeException("Invalid sharing: " + p1.getName() + " does not share domain with " + p2.getName());
+            }
+            this.tieSource = src;
+            // need to tie:
+            // - count (used during learning)
+            // - prior (if applicable)
+            // - table (if applicable)
+            this.prior = src.prior;
+            if (this.table.nParents > 0)
+                this.table = src.table.retrofit(this.getParents());
+            return true;
+        } catch (ClassCastException e) {
+            return false;
         }
-        this.tieSource = src;
-        // need to tie:
-        // - count (used during learning)
-        // - prior (if applicable)
-        // - table (if applicable)
-        this.prior = src.prior;
-        if (this.table.nParents > 0)
-            this.table = src.table.retrofit(this.getParents());
     }
-    public BNode getTieSource(){
+
+    public DirDT getMaster(){
         return this.tieSource;
     }
 

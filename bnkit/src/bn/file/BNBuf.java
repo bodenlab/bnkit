@@ -27,7 +27,6 @@ import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.FactoryConfigurationError;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
@@ -35,7 +34,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
@@ -215,7 +213,7 @@ public class BNBuf {
                     NamedNodeMap tie_atts = node.getAttributes();
                     String dep = tie_atts.getNamedItem("dependant").getNodeValue();
                     String source = tie_atts.getNamedItem("source").getNodeValue();
-                    ((TiedNode)bn.getNode(dep)).tieTo(bn.getNode(source));
+                    ((TiedNode)bn.getNode(dep)).tieTo((TiedNode) bn.getNode(source));
                 }
             }
             return bn;
@@ -416,10 +414,10 @@ public class BNBuf {
             for (BNode node : bn.getNodes()){
                 try{
                     TiedNode tnode = (TiedNode) node;
-                    if (tnode.getTieSource() != null){
+                    if (tnode.getMaster() != null){
                         Element tie_element = doc.createElement("tie");
                         rootElement.appendChild(tie_element);
-                        tie_element.setAttribute("source", tnode.getTieSource().getName());
+                        tie_element.setAttribute("source", tnode.getMaster().getName());
                         tie_element.setAttribute("dependant", node.getName());
                     }
                 } catch (ClassCastException exception){

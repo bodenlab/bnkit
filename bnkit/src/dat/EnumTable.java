@@ -33,13 +33,30 @@ public class EnumTable<E> implements Iterable<Integer> {
         return map.keySet().iterator();
     }
 
-    protected final Map<Integer, E> map;
+    protected Map<Integer, E> map;
     public final int nParents;
     protected final List<EnumVariable> parents;
     protected final EnumVariable[] pararr;
     protected final int[] period;
     protected final int[] step;
     protected final int[] domsize; // size of domain
+
+    /**
+     * Retrieve the pointer to the map with values of this table
+     * @return
+     */
+    public Map<Integer, E> getMapRef() {
+        return map;
+    }
+
+    /**
+     * Set the map from another table (which needs to have the same domains etc).
+     * Use with extreme care. Handy for "tying" nodes to one another.
+     * @param map
+     */
+    public void setMapRef(Map<Integer, E> map) {
+        this.map = map;
+    }
 
     public EnumTable(EnumVariable... useParents) {
         this(EnumVariable.toList(useParents));

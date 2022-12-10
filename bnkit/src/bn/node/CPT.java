@@ -20,7 +20,6 @@ package bn.node;
 import bn.BNode;
 import bn.CountTable;
 import bn.Distrib;
-import bn.prior.Prior;
 import bn.prob.EnumDistrib;
 import bn.factor.Factor;
 import bn.JPT;
@@ -34,7 +33,7 @@ import dat.Enumerable;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
-import static bn.factor.Factorize.exitIfInvalid;
+
 import java.io.Serializable;
 import java.util.*;
 import java.util.Map.Entry;
@@ -44,9 +43,11 @@ import java.util.Map.Entry;
  * conditioned enumerable variable, that has any number (incl 0) enumerable
  * parents.
  *
+ * Note it implements TiedNode meaning it can be "tied" to another CPT, i.e. share the same counts.
+ *
  * @author mikael
  */
-public class CPT implements BNode, TiedNode<CPT>, Serializable{
+public class CPT implements BNode, TiedNode<CPT>, Serializable {
 
     private static final long serialVersionUID = 1L;
     final private EnumVariable var;
@@ -55,7 +56,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
     final protected int nParents;
     protected CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in CPT
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
-    private BNode tieSource = null;
+    private CPT tiedMaster = null;
 
     /**
      * Create a conditional probability table for a variable. The variable is
@@ -776,16 +777,24 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      */
     @Override
     public void countInstance(Object[] key, Object value, Double prob) {
-    	if (prob == 0.0 || Double.isNaN(prob)) {
+        if (prob == 0.0 || Double.isNaN(prob))
             return;
-    	}
-        if (key == null) {
+        if (key == null)
             key = new Object[0];
-        }
         Object[] mykey = new Object[key.length + 1];
         mykey[0] = value;
         System.arraycopy(key, 0, mykey, 1, key.length);
-        count.count(mykey, prob);
+        CPT master = getMaster();
+        if (master == null) { // this node is its own master
+            // could do this:
+            // master = this;
+            // and then jump to a shared code fragment
+            // but currently just duplicating code...
+            count.count(mykey, prob);
+        } else { // there is a master
+            master.count.count(mykey, prob);
+
+        }
     }
     
     /**
@@ -800,13 +809,7 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      */
     @Override
     public void countInstance(Object[] key, Object value) {
-        if (key == null) {
-            key = new Object[0];
-        }
-        Object[] mykey = new Object[key.length + 1];
-        mykey[0] = value;
-        System.arraycopy(key, 0, mykey, 1, key.length);
-        count.count(mykey, 1.0);
+        countInstance(key, value, 1.0);
     }
 
     /**
@@ -816,52 +819,60 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
      */
     @Override
     public void maximizeInstance() {
-        if (count.table.isEmpty()) {
-            return;
-        }
-        if (table != null) { // there are parents in the CPT
-            // Set all 'old' distributions in the CPT to valid = false, i.e.
-            // we are marking entries so we can remove 'ghosts' after counting
-            for (EnumDistrib d : this.table.getValues()) {
-                d.setValid(false);
-            }
+        CPT master = getMaster();
+        if (master == null) { // this node is its own master, so should definitely be updated
+            if (count.table.isEmpty())
+                return;
+            if (table != null) { // there are parents in the CPT
+                // Set all 'old' distributions in the CPT to valid = false, i.e.
+                // we are marking entries so we can remove 'ghosts' after counting
+                for (EnumDistrib d : this.table.getValues()) {
+                    d.setValid(false);
+                }
 
-            // add the counts to the CPT
-            for (Map.Entry<Integer, Double> entry : count.table.getMapEntries()) {
-                double nobserv = entry.getValue();
-                Object[] cntkey = count.table.getKey(entry.getKey().intValue());
-                Object[] cptkey = new Object[cntkey.length - 1];
-                for (int i = 0; i < cptkey.length; i++) {
-                    cptkey[i] = cntkey[i + 1];
+                // add the counts to the CPT
+                for (Map.Entry<Integer, Double> entry : count.table.getMapEntries()) {
+                    double nobserv = entry.getValue();
+                    Object[] cntkey = count.table.getKey(entry.getKey().intValue());
+                    Object[] cptkey = new Object[cntkey.length - 1];
+                    for (int i = 0; i < cptkey.length; i++) {
+                        cptkey[i] = cntkey[i + 1];
+                    }
+                    EnumDistrib d = this.table.getValue(cptkey);
+                    if (d == null) {
+                        d = new EnumDistrib(var.getDomain()); // this will automatically set entry to "valid"
+                        d.set(cntkey[0], nobserv);
+                        this.put(cptkey, d);
+                    } else {
+                        d.set(cntkey[0], nobserv);
+                    }
+                } // normalisation happens internally when values are required
+
+                //Remove 'old' (or 'ghost' entries from CPT (for which no counts
+                for (Iterator<Entry<Integer, EnumDistrib>> it = table.getMapEntries().iterator(); it.hasNext(); ) {
+                    Entry<Integer, EnumDistrib> entry = it.next();
+                    EnumDistrib obs = entry.getValue();
+                    if (!obs.isValid())
+                        it.remove();
                 }
-                EnumDistrib d = this.table.getValue(cptkey);
-                if (d == null) {
-                    d = new EnumDistrib(var.getDomain()); // this will automatically set entry to "valid" 
-                    d.set(cntkey[0], nobserv);
-                    this.put(cptkey, d);
-                } else {
-                    d.set(cntkey[0], nobserv);
+
+            } else { // there are no parents
+                Object[] cntkey = new Object[1];
+                double[] cnts = new double[var.size()];
+                for (int i = 0; i < var.size(); i++) {
+                    cntkey[0] = var.getDomain().get(i);
+                    cnts[i] = count.get(cntkey);
                 }
-            } // normalisation happens internally when values are required	
-    	
-            //Remove 'old' (or 'ghost' entries from CPT (for which no counts
-            for (Iterator<Entry<Integer, EnumDistrib>> it = table.getMapEntries().iterator(); it.hasNext(); ) {
-                Entry<Integer, EnumDistrib> entry = it.next();
-            	EnumDistrib obs = entry.getValue();
-            	if (!obs.isValid()) 
-                    it.remove();
+                prior = new EnumDistrib(this.var.getDomain(), cnts);    // EnumDistrib normalises the counts internally
             }
-            
-        } else { // there are no parents
-            Object[] cntkey = new Object[1];
-            double[] cnts = new double[var.size()];
-            for (int i = 0; i < var.size(); i++) {
-                cntkey[0] = var.getDomain().get(i);
-                cnts[i] = count.get(cntkey);
+            count.table.setEmpty(); // reset counts
+        } else { // there is a master
+            if (!master.count.table.isEmpty()) { // and it is not (yet) maximised
+                // do it now...
+                master.maximizeInstance();
+                // the alternative is to wait for the master, but that may not happen if not in the update set
             }
-            prior = new EnumDistrib(this.var.getDomain(), cnts);	// EnumDistrib normalises the counts internally
         }
-        count.table.setEmpty(); // reset counts
     }
 
     protected CountTable getCount() {
@@ -1031,36 +1042,44 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable{
         this.relevant = relevant;
     }
 
-    public BNode getTieSource(){
-        return this.tieSource;
+    public CPT getMaster(){
+        return this.tiedMaster;
     }
 
     /**
-     * Tie all parameters essential to inference and training for this CPT to those of another CPT.
-     * Variables should be separate but they are required to (1) be of the same type/domain, and (2) be listed in the same order.
-     * @param source the CPT from which parameters will be copied and held fixed.
+     * Tie parameters from training for this CPT to those of another CPT.
+     * Variables should be separate, but they are required to (1) be of the same type/domain, and (2) be listed in the same order.
+     * @param master the CPT from which parameters will be copied and held fixed.
+     * @return true if successful, false otherwise
      */
     @Override
-    public void tieTo(CPT source) {
-        CPT src = (CPT)source;
-        if (!this.var.getDomain().equals(source.getVariable().getDomain()))
-            throw new RuntimeException("Invalid sharing: " + var.getName() + " does not share domain with " + source.getVariable().getName());
-        if (this.nParents != src.nParents)
-            throw new RuntimeException("Invalid sharing: " + var.getName() + " has different number of parents from " + source.getVariable().getName());
-        for (int i = 0; i < this.nParents; i ++) {
+    public boolean tieTo(CPT master) {
+        if (master.getMaster() != null)
+            return false;
+        if (!this.var.getDomain().equals(master.getVariable().getDomain()))
+            throw new RuntimeException("Invalid sharing: " + var.getName() + " does not share domain with " + master.getVariable().getName());
+        if (this.nParents != master.nParents)
+            throw new RuntimeException("Invalid sharing: " + var.getName() + " has different number of parents from " + master.getVariable().getName());
+        for (int i = 0; i < this.nParents; i++) {
             Variable p1 = this.getParents().get(i);
-            Variable p2 = src.getParents().get(i);
+            Variable p2 = master.getParents().get(i);
             if (!p1.getDomain().equals(p2.getDomain()))
                 throw new RuntimeException("Invalid sharing: " + p1.getName() + " does not share domain with " + p2.getName());
         }
-        this.tieSource = source;
+        this.tiedMaster = master;
         // need to tie:
-        // - count (used during learning)
         // - prior (if applicable)
         // - table (if applicable)
-        this.prior = source.prior;
-        if (this.nParents > 0)
-            this.table = source.table.retrofit(this.getParents());
+        this.prior = master.prior; // copy the reference to the value
+        if (this.nParents > 0) {
+            // we assume that parents are in the same order, belong to the same domains etc (as checked above)
+            this.table.setMapRef(master.table.getMapRef()); // copy the reference to the actual "master" table (not a copy of)
+            // removed "retro-fitted" table as this makes a shallow copy of the master table
+            // this.table = src.table.retrofit(this.getParents());
+        }
+        // also need to tie:
+        // - count (used during learning, i.e. when "counting", so this happens in countInstance, not here
+        return true;
     }
 
     /**
