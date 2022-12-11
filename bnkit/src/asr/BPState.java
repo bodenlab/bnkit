@@ -307,41 +307,36 @@ public class BPState {
                     MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal(bpidx, pbn);
                     // perform marginal inference
                     inf.decorate(ti);
-                    if (LEAVES_ONLY) {
-                        // retrieve the distribution at the node previously nominated
-                        EnumDistrib distrib = inf.getDecoration(bpidx);
-                    } else { // internal nodes have external distributions too
-                        // retrieve the distribution at the node previously nominated
-                        Distrib anydistrib = inf.getDecoration(bpidx);
-                        Object[][] save = null;
-                        try {
-                            EnumDistrib distrib = (EnumDistrib) anydistrib;
-                            if (FORMAT_IDX == 2)
-                                System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" + distrib);
-                            else if (FORMAT_IDX == 0) {
-                                save = new Object[2][1 + distrib.getDomain().size()];
-                                save[0][0] = "";
-                                save[1][0] = tree.getLabel(bpidx);
-                                Object[] vals = distrib.getDomain().getValues();
-                                for (int i = 0; i < vals.length; i++)
-                                    save[0][1 + i] = vals[i];
-                                for (int i = 0; i < vals.length; i++)
-                                    save[1][1 + i] = distrib.get(i);
-                            }
-                        } catch (ClassCastException e) { // GDT probably
-                            if (FORMAT_IDX == 2)
-                                System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" +anydistrib);
-                            else if (FORMAT_IDX == 0) {
-                                save = new Object[1][1];
-                                save[0][0] = tree.getLabel(bpidx);
-                                save[0][1] = anydistrib;
-                            }
+                    // retrieve the distribution at the node previously nominated
+                    Distrib anydistrib = inf.getDecoration(bpidx);
+                    Object[][] save = null;
+                    try {
+                        EnumDistrib distrib = (EnumDistrib) anydistrib; // if this cast succeeds, it is a discrete distribution
+                        if (FORMAT_IDX == 2)
+                            System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" + distrib);
+                        else if (FORMAT_IDX == 0) {
+                            save = new Object[2][1 + distrib.getDomain().size()];
+                            save[0][0] = "";
+                            save[1][0] = tree.getLabel(bpidx);
+                            Object[] vals = distrib.getDomain().getValues();
+                            for (int i = 0; i < vals.length; i++)
+                                save[0][1 + i] = vals[i];
+                            for (int i = 0; i < vals.length; i++)
+                                save[1][1 + i] = distrib.get(i);
                         }
-                        try {
-                            TSVFile.saveObjects(OUTPUT, save);
-                        } catch (IOException e) {
-                            usage(6, "Failed to save output to " + OUTPUT);
+                    } catch (ClassCastException e) { // GDT probably
+                        if (FORMAT_IDX == 2)
+                            System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" +anydistrib);
+                        else if (FORMAT_IDX == 0) {
+                            save = new Object[1][2];
+                            save[0][0] = tree.getLabel(bpidx);
+                            save[0][1] = anydistrib;
                         }
+                    }
+                    try {
+                        TSVFile.saveObjects(OUTPUT, save);
+                    } catch (IOException e) {
+                        usage(6, "Failed to save output to " + OUTPUT);
                     }
                 }
             }
