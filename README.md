@@ -18,4 +18,22 @@ As part of work funded by the Australian Research Council, the inference engine 
 
 In `bnkit` there is a command-line interface of GRASP `asr.GRASP`. This Java application can prove useful if you want to automate tasks, run reconstructions on your own dedicated hardware, and/or access the latest features. This version is essentially a command-line interface to the backend features of the web-based service. It is worth noting that the web-based version has the advantage of a visual user interface, but that also means that it may lack the latest functionality.
 
-If you want to use `asr.GRASP`, go here [here](https://bodenlab.github.io/GRASP-suite/project/graspcmd/) or download the [JAR file](https://bodenlab.github.io/GRASP-suite/project/graspcmd/archive/bnkit.jar).
+If you want to use `asr.GRASP`, go [here](https://bodenlab.github.io/GRASP-suite/project/graspcmd/) or download the [JAR file](https://bodenlab.github.io/GRASP-suite/project/graspcmd/archive/bnkit.jar).
+
+
+## Configuring GRASP to run in IntelliJ
+- Open Intellij
+- Select File > New Project From Version Control
+- Under URL add the URL http://github.com/bodenlab/bnkit
+- Under directory add where you want to save the project
+- Under Run -> Edit Configurations
+- Add New 'Application'
+- Give it a name 'GRASP'
+- And add 'asr.GRASP' as the main class
+- Now you can run GRASP (green arrow / ctrl-R / Run > Run GRASP )
+- If you want to add command line arguments, you can add these under Run > Edit Configurations and add them to the 'Program arguments' textbox
+
+## Generate an external JAR using Maven
+- Click on Maven (on the far right vertical bar)
+- Click on bnkit > Lifecycle > package
+- A jar will be created in the <directory>/target/bnkit-1.0.jar
