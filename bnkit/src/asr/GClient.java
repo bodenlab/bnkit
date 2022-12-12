@@ -17,9 +17,10 @@ public class GClient
         try {
             socket = new Socket(address, port);
             System.out.println("Client connected to server");
+            // stream from server
+            in_stream = socket.getInputStream();
             // stream from terminal
             stdin = new InputStreamReader(System.in);
-            in_stream = socket.getInputStream();
             // sends output to the socket
             out = new PrintWriter(socket.getOutputStream(), true);
 
@@ -61,7 +62,79 @@ public class GClient
     }
 
     public static void main(String args[]) {
-        GClient client = new GClient("127.0.0.1", 4072);
 
+        String SERVERNAME = "127.0.0.1"; // localhost
+        Integer SERVERPORT = 4072; // default UQ's post-code
+
+        if (args.length == 2) {
+            SERVERNAME = args[0];
+            SERVERPORT = Integer.parseInt(args[1]);
+        }
+
+        try {
+            Socket serverSocket = new Socket(SERVERNAME, SERVERPORT);
+            ClientServerOutputReader csor = new ClientServerOutputReader(serverSocket);
+            csor.start();
+            ClientUserInputReader cuir = new ClientUserInputReader(serverSocket);
+            cuir.start();
+        } catch (UnknownHostException e) {
+            System.err.println("Don't know about host " + SERVERNAME);
+            System.exit(1);
+        } catch (IOException e) {
+            System.err.println("Couldn't get I/O for the connection to " +
+                    SERVERNAME);
+            System.exit(1);
+        }
+
+        //GClient client = new GClient("127.0.0.1", 4072);
+
+    }
+}
+
+class ClientServerOutputReader extends Thread {
+    Socket serverSocket;
+    public ClientServerOutputReader(Socket serverSocket){
+        this.serverSocket = serverSocket;
+    }
+
+    public void run() {
+        try {
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(serverSocket.getInputStream()));
+
+            String outputFromServer="";
+            while((outputFromServer=in.readLine())!= null){
+                //This part is printing the output to console
+                //Instead it should be appending the output to some file
+                //or some swing element. Because this output may overlap
+                //the user input from console
+                System.out.println(outputFromServer);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+}
+
+class ClientUserInputReader extends Thread {
+    Socket serverSocket;
+    public ClientUserInputReader(Socket serverSocket){
+        this.serverSocket = serverSocket;
+    }
+    public void run(){
+        BufferedReader stdIn = new BufferedReader(
+                new InputStreamReader(System.in));
+        PrintWriter out;
+        try {
+            out = new PrintWriter(serverSocket.getOutputStream(), true);
+            String userInput;
+
+            while ((userInput = stdIn.readLine()) != null) {
+                out.println(userInput);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
