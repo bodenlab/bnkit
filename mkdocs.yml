@@ -6,4 +6,4 @@ theme:
 
 nav:
     - 'index.md'
-    - 'about.md'
+    - 'travis.md'
