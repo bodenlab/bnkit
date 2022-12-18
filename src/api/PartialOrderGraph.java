@@ -18,6 +18,7 @@ import java.util.Map;
  * Created by marnie on 28/3/17.
  * Patched by mikael 10/10/2019
  * FIXME: clean out a lot of deprecated functions relating to the old definition of consensus/most supported sequence.
+ * @deprecated
  */
 public class PartialOrderGraph {
 

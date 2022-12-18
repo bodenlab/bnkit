@@ -4,7 +4,6 @@ import bn.Distrib;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
-import bn.prob.GaussianDistrib;
 import bn.prob.MixtureDistrib;
 import dat.phylo.IdxTree;
 import dat.phylo.PhyloBN;
