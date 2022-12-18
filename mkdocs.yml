@@ -1,0 +1,9 @@
+site_name: bnkit
+
+theme:
+  name: material
+
+
+nav:
+    - 'index.md'
+    - 'travis.md'

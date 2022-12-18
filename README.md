@@ -31,6 +31,7 @@ If you want to use `asr.GRASP`, go [here](https://bodenlab.github.io/GRASP-suite
 - Give it a name 'GRASP'
 - And add 'asr.GRASP' as the main class
 - Now you can run GRASP (green arrow / ctrl-R / Run > Run GRASP )
+- You may need to upgrade your Java version / SDK in your settings
 - If you want to add command line arguments, you can add these under Run > Edit Configurations and add them to the 'Program arguments' textbox
 
 ## Generate an external JAR using Maven
