@@ -19,10 +19,17 @@ package dat;
 
 import dat.file.AlnReader;
 import dat.file.FastaReader;
+import json.JSONArray;
+import json.JSONException;
+import json.JSONObject;
+import json.JSONString;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.Buffer;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -53,6 +60,21 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
 
     public Object getFromIndex(int index) { return arr[index];}
 
+    @Override
+    public boolean equals(Object other) {
+        try {
+            EnumSeq oseq = (EnumSeq) other;
+            if (name != null)
+                if (!getName().equals(oseq.getName()))
+                    return false;
+            if (info != null)
+                if (!getInfo().equals(oseq.getInfo()))
+                    return false;
+            return super.equals(other);
+        } catch (ClassCastException e) {
+            return false;
+        }
+    }
 
     @Override
     public E getType() {
@@ -62,7 +84,21 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
     public String getInfo() {
     	return info;
     }
-    
+
+    public JSONObject toJSONslim() {
+        JSONObject json = new JSONObject();
+        json.put("Name", getName());
+        json.put("Seq", fromObjectArray(get()));
+        return json;
+    }
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        json.put("Name", getName());
+        json.put("Seq", fromObjectArray(get()));
+        json.put("Datatype", getType().toJSON());
+        return json;
+    }
+
     public String toString() {
         StringBuffer sb = new StringBuffer();
         Object[] syms = get();
@@ -70,9 +106,59 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
             if (syms[i] == null)
                 sb.append('-');
             else
-            sb.append(syms[i]);
+                sb.append(syms[i]);
         }
         return sb.toString();
+    }
+
+    public String toParsableString() {
+        StringBuffer sb = new StringBuffer(length() > 0 ? "|" : "");
+        Object[] syms = get();
+        for (int i = 0; i < syms.length; i ++) {
+            if (syms[i] == null)
+                sb.append("null|");
+            else
+                sb.append(syms[i].toString() + "|");
+        }
+        return sb.toString();
+    }
+
+    public static JSONArray fromObjectArray(Object[] array) {
+        JSONArray jsonarr = new JSONArray(array);
+        return jsonarr;
+    }
+
+    public static Object[] toObjectArray(JSONArray jsonArray) {
+        Object[] arr = new Object[jsonArray.length()];
+        for (int i = 0; i < arr.length; i ++) {
+            arr[i] = jsonArray.get(i);
+            if (arr[i] == JSONObject.NULL) // JSON library inserts a non-null marker for NULL values; we need a proper null
+                arr[i] = null;
+        }
+        return arr;
+    }
+
+    public static EnumSeq fromJSON(JSONObject json, Enumerable domain) {
+        try {
+            String name = json.getString("Name");
+            EnumSeq eseq = new EnumSeq.Gappy<>(domain);
+            Object[] arr = toObjectArray(json.getJSONArray("Seq"));
+            eseq.set(arr);
+            eseq.setName(name);
+            return eseq;
+        } catch (JSONException e) {
+            throw new RuntimeException("Error in JSON encoding sequence: " + json.toString());
+        }
+    }
+
+    public static EnumSeq fromJSON(JSONObject json) {
+        try {
+            JSONObject jdom = json.getJSONObject("Datatype");
+            Enumerable domain = Enumerable.fromJSON(jdom);
+            return fromJSON(json, domain);
+        } catch (JSONException e) {
+            throw new RuntimeException("Error in JSON encoding sequence: " + json.toString());
+        }
     }
 
     public Object[] getStripped() {
@@ -167,6 +253,29 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
                 return false;
             }
             return true;
+        }
+
+        public static EnumSeq.Gappy fromJSON(JSONObject json, Enumerable domain) {
+            try {
+                String name = json.getString("Name");
+                EnumSeq.Gappy eseq = new EnumSeq.Gappy<>(domain);
+                Object[] arr = toObjectArray(json.getJSONArray("Seq"));
+                eseq.set(arr);
+                eseq.setName(name);
+                return eseq;
+            } catch (JSONException e) {
+                throw new RuntimeException("Error in JSON encoding sequence: " + json);
+            }
+        }
+
+        public static EnumSeq.Gappy fromJSON(JSONObject json) {
+            try {
+                JSONObject jdom = json.getJSONObject("Datatype");
+                Enumerable domain = Enumerable.fromJSON(jdom);
+                return fromJSON(json, domain);
+            } catch (JSONException e) {
+                throw new RuntimeException("Error in JSON encoding sequence: " + json);
+            }
         }
 
         /**
@@ -280,7 +389,70 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
             }
             width = w;
         }
-        
+
+        /**
+         * Create an alignment structure out of aligned, gappy sequences.
+         * @param aseqs
+         */
+        public Alignment(EnumSeq.Gappy[] aseqs) {
+            this(List.of(aseqs));
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            try {
+                Alignment oaln = (Alignment) other;
+                int idx = 0;
+                for (EnumSeq seq : seqs) {
+                    EnumSeq oseq = oaln.getEnumSeq(idx);
+                    if (!oseq.equals(seq))
+                        return false;
+                    if (!oseq.getType().equals(seq.getType()))
+                        return false;
+                    if (!oseq.getName().equals(seq.getName()))
+                        return false;
+                    idx += 1;
+                }
+            } catch (ClassCastException e) {
+                return false;
+            }
+            return true;
+        }
+
+        public EnumSeq[] getArray() {
+            EnumSeq[] arr = new EnumSeq[seqs.size()];
+            seqs.toArray(arr);
+            return arr;
+        }
+
+        public JSONObject toJSON() {
+            JSONObject json = new JSONObject();
+            json.put("Datatype", domain.toJSON());
+            JSONArray array = new JSONArray();
+            for (EnumSeq seq : seqs) {
+                JSONObject jseq = seq.toJSONslim(); // no datatype included
+                array.put(jseq);
+            }
+            json.put("Sequences", array);
+            return json;
+        }
+
+        public static Alignment fromJSON(JSONObject json) {
+            try {
+                Enumerable domain = Enumerable.fromJSON(json.getJSONObject("Datatype"));
+                JSONArray seqarr = json.getJSONArray("Sequences");
+                List<EnumSeq> eseqs = new ArrayList<>();
+                for (int i = 0; i < seqarr.length(); i++) {
+                    JSONObject jseq = seqarr.getJSONObject(i);
+                    eseqs.add(EnumSeq.Gappy.fromJSON(jseq, domain));
+                }
+                Alignment aln = new Alignment(eseqs);
+                return aln;
+            } catch (JSONException e) {
+                throw new RuntimeException("Invalid JSON encoding of alignment");
+            }
+        }
+
         public EnumSeq.Gappy<E> getEnumSeq(int index) {
             return seqs.get(index);
         }

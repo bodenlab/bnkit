@@ -239,8 +239,38 @@ public class Enumerable implements Domain {
     public static Enumerable gap_character = new Enumerable(new Character[]{'G','C'});
     public static Enumerable gap_ext = new Enumerable(new Character[]{'G','C','?'});
 
+    public static Map<String, Enumerable> predef = new HashMap<>();
+    public static Map<Enumerable, String> predef_reverse = new HashMap<>();
+
+    // Instantiating the static map
+    static
+    {
+        predef.put("Boolean", bool);
+        predef.put("DNA", nacid);
+        predef.put("RNA", nacidRNA);
+        predef.put("DNA with N", nacidwn);
+        predef.put("RNA with N", nacidwnRNA);
+        predef.put("Protein", aacid);
+        predef.put("Protein with X", aacidwx);
+        predef.put("Protein with gap", aacid_ext);
+        predef_reverse.put(bool, "Boolean");
+        predef_reverse.put(nacid, "DNA");
+        predef_reverse.put(nacidRNA, "RNA");
+        predef_reverse.put(nacidwn, "DNA with N");
+        predef_reverse.put(nacidwnRNA, "RNA with N");
+        predef_reverse.put(aacid, "Protein");
+        predef_reverse.put(aacidwx, "Protein with X");
+        predef_reverse.put(aacid_ext, "Protein with gap");
+    }
+
     public JSONObject toJSON() {
         JSONObject jobj = new JSONObject();
+        String defID = predef_reverse.get(this);
+        if (defID != null) { // predefined
+            jobj.put("Predef", defID);
+            return jobj;
+        }
+        // not predefined, so provide details
         jobj.put("Size", order);
         jobj.put("Values", new JSONArray(values));
         jobj.put("Datatype", datatype.getSimpleName());
@@ -248,10 +278,18 @@ public class Enumerable implements Domain {
     }
 
     public static Enumerable fromJSON(JSONObject jobj) {
+        String defID = jobj.getString("Predef");
+        if (defID != null) {
+            Enumerable match = predef.get(defID);
+            if (match == null) {
+                throw new RuntimeException("Invalid predefined domain name: " + defID + ". Please check dat.Enumerable");
+            }
+            return match;
+        }
         JSONArray varr = jobj.getJSONArray("Values");
         //Class dtype = (Class)jobj.get("Datatype");
         Object[] vals = new Object[varr.length()];
-        for (int i = 0; i < varr.length(); i ++)
+        for (int i = 0; i < varr.length(); i++)
             vals[i] = varr.get(i);
         return new Enumerable(vals);
     }

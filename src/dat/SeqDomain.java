@@ -60,6 +60,26 @@ public class SeqDomain<E extends Domain> implements Domain {
         return arr[idx];
     }
 
+    @Override
+    public boolean equals(Object other) {
+        try {
+            SeqDomain odom = (SeqDomain) other;
+            if (odom.arr.length != this.arr.length)
+                return false;
+            if (!odom.getType().equals(this.getType()))
+                return false;
+            for (int i = 0; i < arr.length; i ++)
+                if (arr[i] != null) {
+                    if (!arr[i].equals(odom.arr[i]))
+                        return false;
+                } else if (odom.arr[i] != null) // this null, other is NOT
+                    return false;
+        } catch (ClassCastException e) {
+            return false;
+        }
+        return true;
+    }
+
     public int length() {
         if (arr != null)
             return arr.length;

@@ -1,6 +1,5 @@
 package asr;
 
-import bn.Distrib;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
