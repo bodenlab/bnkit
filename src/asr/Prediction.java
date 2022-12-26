@@ -13,6 +13,7 @@ import dat.phylo.TreeDecor;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
 import json.JSONArray;
+import json.JSONException;
 import json.JSONObject;
 
 import java.io.*;
@@ -71,12 +72,42 @@ public class Prediction {
     }
 
     /**
+     * Convert instance from JSON.
+     * @param json specification of prediction on JSON format
+     * @return
+     * @throws IOException
+     */
+    public static Prediction fromJSON(JSONObject json) {
+        String datatype = json.optString("Datatype", null);
+        if (datatype != null) { // can only check if provided
+            if (!datatype.equals(Prediction.class.getSimpleName()))
+                throw new ASRRuntimeException("Invalid input file: Wrong datatype " + datatype + " should be " + Prediction.class.getSimpleName());
+        }
+        JSONObject jinput = json.optJSONObject("Input");
+        if (jinput == null)
+            throw new ASRRuntimeException("Missing \"Input\" field in JSON");
+        POGTree pogtree = POGTree.fromJSON(jinput);
+        JSONArray jancs = json.optJSONArray("Ancestors");
+        if (jancs == null)
+            throw new ASRRuntimeException("Missing \"Ancestors\" field in JSON");
+        if (jancs.length() != pogtree.getTree().getNParents())
+            throw new ASRRuntimeException("Number of ancestors " + jancs.length() + " does not match tree " + pogtree.getTree().getNParents());
+        Map<Object, POGraph> ancestors = new HashMap<>();
+        for (int i = 0; i < jancs.length(); i ++) {
+            JSONObject obj = jancs.getJSONObject(i);
+            POGraph pog = POGraph.fromJSON(obj);
+            ancestors.put(pog.getName(), pog);
+        }
+        return new Prediction(pogtree, ancestors);
+    }
+
+    /**
      * Load instance from a JSON file.
      * @param filename
      * @return
      * @throws IOException
      */
-    public static Prediction load(String filename) throws IOException {
+    public static Prediction load(String filename) throws IOException, JSONException {
         FileReader freader=new FileReader(filename);
         BufferedReader reader=new BufferedReader(freader);
         StringBuilder sb = new StringBuilder();
@@ -86,27 +117,7 @@ public class Prediction {
             line = reader.readLine();
         }
         JSONObject json = new JSONObject(sb.toString());
-        String datatype = json.optString("Datatype");
-        if (datatype != null) { // can only check if provided
-            if (!datatype.equals(Prediction.class.getSimpleName()))
-                throw new ASRRuntimeException("Invalid input file: Wrong datatype " + datatype + " should be " + Prediction.class.getSimpleName());
-        }
-        JSONObject jinput = json.optJSONObject("Input");
-        if (jinput == null)
-            throw new ASRRuntimeException("Invalid input file: Missing \"Input\" field in JSON file");
-        POGTree pogtree = POGTree.fromJSON(jinput);
-        JSONArray jancs = json.optJSONArray("Ancestors");
-        if (jancs == null)
-            throw new ASRRuntimeException("Invalid input file: Missing \"Ancestors\" field in JSON file");
-        if (jancs.length() != pogtree.getTree().getNParents())
-            throw new ASRRuntimeException("Invalid input file: Number of ancestors " + jancs.length() + " does not match tree " + pogtree.getTree().getNParents());
-        Map<Object, POGraph> ancestors = new HashMap<>();
-        for (int i = 0; i < jancs.length(); i ++) {
-            JSONObject obj = jancs.getJSONObject(i);
-            POGraph pog = POGraph.fromJSON(obj);
-            ancestors.put(pog.getName(), pog);
-        }
-        return new Prediction(pogtree, ancestors);
+        return Prediction.fromJSON(json);
     }
 
     /**

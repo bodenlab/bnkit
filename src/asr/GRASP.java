@@ -142,7 +142,7 @@ public class GRASP {
         String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
         String[] SPATH = new String[] {"DIJKSTRA", "ASTAR"};
-        int SPATH_IDX = 0; // default indel approach is that above indexed 0
+        int SPATH_IDX = 0; // default supported path approach is that above indexed 0
         boolean GAPPY = true;
         // output formats
         boolean SAVE_AS = false;

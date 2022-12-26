@@ -1,31 +1,41 @@
 package api;
 
-import dat.file.Newick;
+import dat.EnumSeq;
 import dat.phylo.IdxTree;
 import json.JSONException;
 import json.JSONObject;
 
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.PriorityBlockingQueue;
 
 /**
  * Class to represent a request to GRASP server
  */
 public class GRequest extends Thread implements Comparable<GRequest> {
 
-    private static int JOBCOUNTER = 0;
+    private static int JOBCOUNTER = 1;
     private final int JOB;
+    private enum STATUS {NONE, WAITING, RUNNING, COMPLETED};
+    private STATUS status;
     private final String command;
     private final String authtoken;
 
     private Map<String, Object> params;
-    private Object param;
-    private JSONObject result; // container for result of job, when complete
+    private int PRIORITY = 0; // default -10 to +10 with -10 being lowest priority and +10 being the highest
+    private int NTHREADS = 1; // default number of threads that will be allowed to spawn from this
+    private int MEMORY   = 1; // expected GB requirement of the request
 
-    private GRequest(String command, String authtoken) {
+    private JSONObject result = null; // container for result of job, when complete
+    private String savedAsFile = null;  // filename, if result has been written
+
+    public GRequest(String command, String authtoken) {
         this.command = command;
         this.authtoken = authtoken;
         this.JOB = JOBCOUNTER;
+        this.status = STATUS.NONE;
         GRequest.JOBCOUNTER += 1;
     }
 
@@ -38,19 +48,12 @@ public class GRequest extends Thread implements Comparable<GRequest> {
             for (Map.Entry<String, Object> entry : params.entrySet())
                 jparams.put(entry.getKey(), entry.getValue());
             json.put("Params", jparams);
-        } else if (param != null)
-            json.put("Param", param);
+        }
         return json;
     }
 
     public void setParams(Map<String, Object> params) {
-        this.param = null;
         this.params = params;
-    }
-
-    public void setParam(Object param) {
-        this.params = null;
-        this.param = param;
     }
 
     @Override
@@ -58,56 +61,49 @@ public class GRequest extends Thread implements Comparable<GRequest> {
         return "Command \"" + this.command + "\" [" + authtoken + "]";
     }
 
-    public static GRequest fromJSON(JSONObject json) {
-        try {
-            String command = json.getString("Command");
-            String authtoken = json.getString("Auth");
-            GRequest greq = new GRequest(command, authtoken);
-            JSONObject jparams = json.optJSONObject("Params");
-            if (jparams != null) {
-                Map<String, Object> params = new HashMap<>();
-                for (String key : jparams.keySet())
-                    params.put(key, jparams.opt(key));
-                greq.setParams(params);
-            } else {
-                Object jparam = json.opt("Param");
-                if (jparam != null)
-                    greq.setParam(jparam);
-            }
-            return greq;
-        } catch (JSONException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Invalid request: missing Command or Auth");
-        }
-    }
-
-    /**
-     * Execute the job
-     * and place results in the instance of this class for later retrieval with {@see GRequest#getResult()}
-     */
     @Override
     public void run() {
-        if (command.equals("Label-tree")) {
-            JSONObject tree = (JSONObject) params.get("Tree");
-            IdxTree idxTree = IdxTree.fromJSON(tree);
-            System.out.println("Labelling: " + idxTree);
-        } else if (command.equals("Retrieve")) {
-            int job = (int) param;
 
+    }
 
-        } else {
-            System.out.println("Server started job " + JOB + " using thread: " + toString());
-            try {
-                Thread.sleep(10000);
-            } catch (InterruptedException e) {
-                System.err.println("Server was interrupted");
-            }
-        }
-        System.out.println("Job done.");
+    public STATUS getStatus() {
+        return status;
     }
 
     public JSONObject getResult() {
-        return result;
+        if (status == STATUS.COMPLETED) {
+            if (this.result != null) // in memory still
+                return result;
+            else if (this.savedAsFile != null) { // not in memory, but saved
+                try {
+                    // read from a temporary file
+                    BufferedReader br = new BufferedReader(new FileReader(savedAsFile));
+                    StringBuilder sb = new StringBuilder();
+                    String line = br.readLine();
+                    while (line != null) {
+                        sb.append(line);
+                        line = br.readLine();
+                    }
+                    JSONObject json = new JSONObject(sb.toString());
+                    return json;
+                } catch (JSONException e) {
+                    throw new RuntimeException(e);
+                } catch (FileNotFoundException e) {
+                    throw new RuntimeException(e);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            } else { // job has been removed entirely
+                // TODO: respond?
+            }
+        } else { // job not complete
+            // TODO: respond?
+        }
+        return null;
+    }
+
+    protected void setResult(JSONObject json) {
+        result = json;
     }
 
     public int getJob() {
@@ -115,7 +111,9 @@ public class GRequest extends Thread implements Comparable<GRequest> {
     }
 
     public boolean isQueued() {
-        if (command.startsWith("Recon-")) {
+        if (command.startsWith("Recon")) {
+            return true;
+        } else if (command.startsWith("Fake")) {
             return true;
         } else if (command.startsWith("Label-")) {
             return false;
@@ -131,29 +129,39 @@ public class GRequest extends Thread implements Comparable<GRequest> {
     /**
      * Basic job queue for requests
      */
-    public static class JobQueue {
-        List<GRequest> queue = new ArrayList<>();
-        public JobQueue() {
+    public static class JobQueue extends Thread {
+        private final File directory;
+        private final List<GRequest> currentjobs = new ArrayList<>();
+
+        /**
+         * Open a job queue, with storage (of completed jobs) located in specified directory
+         * @param storage
+         */
+        public JobQueue(File storage) {
+            this.directory = storage;
         }
-        public void add(GRequest request) {
-            queue.add(request);
+        public synchronized void add(GRequest request) {
+            request.status = STATUS.WAITING;
+            currentjobs.add(request);
         }
         public synchronized GRequest poll() {
-            if (queue.size() > 0) {
-                GRequest req = queue.get(0);
-                queue.remove(0);
-                return req;
+            if (currentjobs.size() > 0) {
+                for (GRequest req : currentjobs) {
+                    if (req.status == STATUS.WAITING) {
+                        return req;
+                    }
+                }
             }
             return null;
         }
 
         /**
-         * Find job request entry
+         * Find job request entry in queue
          * @param job job number
          * @return request
          */
         public GRequest getRequest(int job) {
-            for (GRequest req : queue) {
+            for (GRequest req : currentjobs) {
                 if (req.getJob() == job)
                     return req;
             }
@@ -166,7 +174,7 @@ public class GRequest extends Thread implements Comparable<GRequest> {
          * @return place 1-size of queue; 0 if the job request does not exist
          */
         public int getPlace(GRequest request) {
-            return queue.indexOf(request) + 1;
+            return currentjobs.indexOf(request) + 1;
         }
         /**
          * Retrieve place in queue of job.
@@ -175,12 +183,60 @@ public class GRequest extends Thread implements Comparable<GRequest> {
          */
         public int getPlace(int job) {
             int place = 1;
-            for (GRequest req : queue) {
+            for (GRequest req : currentjobs) {
                 if (req.getJob() == job)
                     return place;
                 place += 1;
             }
             return 0;
+        }
+
+        @Override
+        public void run() {
+            // job queue thread
+            // TODO: additional tasks not yet implemented include
+            //  1. cleaning-up the queue from client-retrieved jobs,
+            //  2. cleaning-up filed jobs once lapsed
+            try {
+                while (true) {
+                    GRequest req = this.poll();
+                    if (req == null) {
+                        // System.out.println("Waiting (sleeping) for jobs to be submitted");
+                        Thread.sleep(500);
+                    } else {
+                        System.out.println("Found job");
+                        // TODO: more advanced scheduling could be done; here, 1 job at a time
+                        req.status = STATUS.RUNNING;
+                        System.out.println("Server started job " + req.JOB);
+                        req.start(); // could just be "run", so that current call stack is used
+                        req.join();  // always wait for the request to finish
+                        req.status = STATUS.COMPLETED;
+                        System.out.println("Server completed job " + req.JOB);
+                        JSONObject result = req.getResult();
+                        if (result != null) {
+                            // create a temporary file
+                            try {
+                                String filename = directory + File.separator + "GRequest_" + req.JOB + ".json";
+                                BufferedWriter br = new BufferedWriter(new FileWriter(filename));
+                                // Writes a string to the above temporary file, FIXME consider saving to storage that is under better control
+                                br.write(result.toString());
+                                System.out.println("Wrote job " + req.JOB + " to file \"" + filename + "\"");
+                                br.close();
+                                req.savedAsFile = filename;
+                                req.result = null;
+                            } catch (IOException e2) {
+                                System.err.println("Failed to create temp file for completed job " + req.JOB);
+                            }
+                        } else {
+                            // TODO: how to act if the job completed without result?
+                        }
+                    }
+                }
+            } catch (InterruptedException e) {
+                System.err.println("Job queue interrupted: " + e.getMessage());
+                // TODO: save state of queue?
+
+            }
         }
     }
 }

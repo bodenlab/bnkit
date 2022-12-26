@@ -1,6 +1,8 @@
 package asr;
 
+import api.CommandCentral;
 import api.GRequest;
+import api.GMessage;
 import json.JSONException;
 import json.JSONObject;
 
@@ -9,7 +11,6 @@ import java.io.*;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 public class GServer {
 
@@ -17,7 +18,8 @@ public class GServer {
 
     private ServerSocket serverSocket;
     protected Map<ClientHandler, Date> clients = new HashMap<>();
-    final GRequest.JobQueue queue;
+    private final GRequest.JobQueue queue;
+    private final CommandCentral commandCentral;
 
     /**
      * Open the socket on the server using specified port
@@ -26,17 +28,18 @@ public class GServer {
      */
     public void start(int port) throws IOException {
         serverSocket = new ServerSocket(port);
-        while (true) {
-            Socket client = serverSocket.accept();
+        while (true) { // this runs forever
+            Socket client = serverSocket.accept(); // accept new client at the socket
             ClientHandler handler = new ClientHandler(client);
+            // before we start a thread, make sure we are not exceeding maximum number of clients
             if (clients.size() < MAX_CLIENTS) {
                 clients.put(handler, new Date());
                 handler.start(); // spawn-off client thread
             } else {
+                // deny service to client
                 handler.deny();
             }
         }
-
     }
 
     /**
@@ -50,33 +53,94 @@ public class GServer {
     /**
      * Create a server instance
      */
-    public GServer() {
-        queue = new GRequest.JobQueue();
+    public GServer(String directory) {
+        // the command central is where actual jobs are managed; for now, we just create the instance
+        commandCentral = new CommandCentral(this);
+        // as requests come in (via the command central) they may be queued; here we create the job queue
+        queue = new GRequest.JobQueue(new File(directory)); // the directory is where completed jobs are stored
+        // the job queue is a separate thread (which monitors and dispatches jobs as they pile up), which we start here
+        queue.start();
     }
 
+    /**
+     * Print usage instructions without error
+     */
+    public static void usage() {
+        usage(0, null);
+    }
+    /**
+     * Print usage instructions with (optional) error
+     */
+    public static void usage(int error, String message) {
+        System.out.println("Usage:");
+        System.out.println("asr.GServer [-p <port>] [-d <dir>] [-c <max-clients>] [-h]");
+        System.out.println("\twhere <port> is the port number that this server is listening to (default is 4072)");
+        System.out.println("\t<dir> is the directory in which completed jobs are stored temporarily (default is /tmp)");
+        System.out.println("\t<max-clients> is the maximum number of clients that will be allowed (default is 20)");
+        System.out.println("\t-h prints this help screen");
+        if (error > 0) {
+            System.err.println("Error " + error + ": " + message);
+        }
+        System.exit(error);
+    }
 
+    /**
+     * Main commandline front-end of GRASP server.
+     * Program operates by accepting requests via sockets.
+     * @param args see usage instructions
+     */
     public static void main(String args[]) {
         Integer SERVERPORT = 4072; // default UQ's post-code
-        if (args.length == 1) {
-            SERVERPORT = Integer.parseInt(args[1]);
+        String  DIRECTORY = "/tmp/";
+
+        for (int a = 0; a < args.length; a ++) {
+            if (args[a].startsWith("-")) {
+                String arg = args[a].substring(1);
+                if (arg.equalsIgnoreCase("p") && args.length > a + 1) {
+                    try {
+                        SERVERPORT = Integer.parseInt(args[++a]);
+                    } catch (NumberFormatException e) {
+                        usage(1, args[a] + "port must be an integer 0 - 65535 (default is 4072)");
+                    }
+                } else if (arg.equalsIgnoreCase("c") && args.length > a + 1) {
+                    try {
+                        MAX_CLIENTS = Integer.parseInt(args[++a]);
+                    } catch (NumberFormatException e) {
+                        usage(3, args[a] + "max-clients must be a positive integer 1 or above (default is 20)");
+                    }
+                    if (MAX_CLIENTS < 1)
+                        usage(3, args[a] + "max-clients must be a positive integer 1 or above (default is 20)");
+                } else if (arg.equalsIgnoreCase("d") && args.length > a + 1) {
+                    DIRECTORY = args[++a];
+                } else if (arg.equalsIgnoreCase("h")) {
+                    usage();
+                }
+            }
         }
-        GServer server = new GServer();
+        GServer server = new GServer(DIRECTORY);
         System.out.println("Server initialises a socket open for requests");
         try {
             server.start(SERVERPORT);
             System.out.println("Server proceeds to terminate its socket");
             server.stop();
         } catch (IOException e) {
-            System.err.println(e.getMessage());
-            System.exit(1);
+            usage(2, e.getMessage());
         }
     }
 
+    /**
+     * Inner class that is responsible to handle the communications with a specific client.
+     * If client is not denied service, the server class (above) will "start" the "run" method (hence a separate thread).
+     */
     private class ClientHandler extends Thread {
         private Socket clientSocket;
-        private PrintWriter out;
-        private BufferedReader in;
+        private PrintWriter out;   // the stream to which messages to the client are written
+        private BufferedReader in; // the stream from which messages from the client is read
 
+        /**
+         * Start to handle a client on a socket.
+         * @param socket the reference to the client
+         */
         public ClientHandler(Socket socket) {
             this.clientSocket = socket;
             System.out.println("Client connected: \"" + clientSocket.toString() + "\"");
@@ -91,8 +155,8 @@ public class GServer {
         }
 
         public void deny() {
-            System.out.println("Denied client, server's closing their socket and associated thread");
-            out.println("Denying connection: too many clients currently.");
+            System.out.println("[" + clientSocket.toString() + "]: Denied client, server's closing their socket and associated thread");
+            out.println(GMessage.errorToJSON(5));
             try {
                 in.close();
                 out.close();
@@ -102,52 +166,89 @@ public class GServer {
             }
         }
 
+        /**
+         * This is the method that is called if server-to-client socket thread is "started".
+         * It receives messages from the client, which are parsed and made into "requests"
+         * The first type of requests are simply concerned with the server, e.g. queries about queue.
+         * The method has access to the command central instance, which is used to manage
+         * jobs that are initiated by the client (the second, important type of requests).
+         */
         public void run() { // client-specific thread running on server
             try {
-                System.out.println("In thread; socket thread on server started: \"" + clientSocket.toString() + "\"");
+                System.out.println("[" + clientSocket.toString() + "] client connected");
                 String inputLine = in.readLine();
                 while (inputLine != null) {
-                    System.out.println("In thread; server responds to client \"" + clientSocket.toString() + "\": " + inputLine);
+                    System.out.println("[" + clientSocket.toString() + "] message (50 chars max): " + inputLine.substring(0, Math.min(inputLine.length(), 50)) + ((inputLine.length() > 50) ? "..." : ""));
                     try {
-                        JSONObject json = new JSONObject(inputLine);
-                        // Distinguish between Server/Job related commands
-                        Integer job = json.optInt("Job");
-                        if (job != null) { // this command has job number, so needs to be handled by server-aware code
-                             String command = json.optString("Command");
-                             if (command.equals("Retrieve")) {
-                                 GRequest request = queue.getRequest(job);
-                                 if (request != null)
-                                     out.println(request.toJSON());
-                                 else
-                                     out.println("No such job in queue: " + job);
-                             } else if (command.equals("Output")) {
+                        JSONObject json = new JSONObject(inputLine); // client message is parsed as JSON, and an exception is generated if it fails (+ error passed to client)
 
-                             }
-                        } else { // this command is a new, actual job so needs to be managed and may be queued
-                            GRequest greq = GRequest.fromJSON(json);
-                            out.println("OK--command detected: " + greq);
-                            // decision: run it now, or queue it for later...
-                            if (greq.isQueued()) { // queue the request
-                                queue.add(greq);
-                                System.out.println("Job " + greq.getJob() + " has been dispatched to queue, cancel with {\"Job\":\" + greq.getJob() + \",\"Command\":\"Cancel\"}");
-                            } else { // run now ... not in separate thread
-                                System.out.println("Once complete use {\"Job\":" + greq.getJob() + ",\"Command\":\"Output\"}");
-                                greq.run();
+                        // Distinguish between Server/Job related commands (first type, when there's mention of "Job")
+                        int job = GMessage.fromJSON2Job(json);
+                        if (job > 0) { // this command has job number, so needs to be handled by server-aware code
+                            GRequest request = queue.getRequest(job);               // retrieve from current job queue
+                            if (request != null) {                                  // found job...
+                                String command = json.optString("Command");    // extract command
+                                if (command.equals("Retrieve")) {
+                                    // System.out.println("Sending this to client: " + request.toJSON());
+                                    out.println(request.toJSON());                  // pass on job info
+                                } else if (command.equals("Output")) {
+                                    JSONObject result = request.getResult();        // request to retrieve output of completed job
+                                    if (result != null) {                           // if available... probably in storage
+                                        // System.out.println("Sending this to client: " + result);
+                                        out.println(GMessage.server2clientReJob(job, "Result", result));
+                                    } else {
+                                        out.println(GMessage.errorToJSON(2));       // job not available; pass error
+                                    }
+                                } else if (command.equals("Status")) {              // what's the job doing
+                                    // System.out.println("Sending this to client: " + request.getStatus());
+                                    out.println(GMessage.server2clientReJob(job, "Status", request.getStatus()));
+                                } else if (command.equals("Place")) {
+                                    // System.out.println("Sending this to client: " + queue.getPlace(request));
+                                    out.println(GMessage.server2clientReJob(job, "Place", queue.getPlace(request)));
+                                } else {
+                                    out.println(GMessage.errorToJSON(3, "Invalid command: " + command));
+                                }
+                            } else
+                                out.println(GMessage.errorToJSON(2,"No such job in queue: " + job));
+
+                        // Second type of commands: a new, actual compute job so needs to be managed and may be queued
+                        } else {
+                            try {
+                                GRequest greq = commandCentral.createRequest(json);
+                                // System.out.println("OK--command detected: " + greq);
+                                // decision: run it now, or queue it for later...
+                                if (greq.isQueued()) {      // the request requires to be queued
+                                    queue.add(greq);        // add to job queue
+                                    // System.out.println("Informing client: Job " + greq.getJob() + " has been dispatched to queue, cancel with {\"Job\":\"" + greq.getJob() + "\",\"Command\":\"Cancel\"}");
+                                    // TODO: find more info about what resources are required for job so client (and compute) can be advised
+                                    out.println(GMessage.server2clientReJob(greq.getJob(), "Queued"));
+                                } else { // run now ... not in separate thread
+                                    greq.run();
+                                    JSONObject result = greq.getResult();           // request to retrieve output of completed job
+                                    if (result != null) {                           // if available... probably in storage
+                                        out.println(GMessage.server2clientReJob(job, "Result", result));
+                                    } else {
+                                        out.println(GMessage.errorToJSON(2));       // job not available; pass error
+                                    }
+                                }
+                            } catch (CommandCentral.GRequestRuntimeException syntax) {
+                                out.println(GMessage.errorToJSON(4, syntax.getMessage()));
                             }
                         }
-                        System.out.println("Accepts new request");
+                        // System.out.println("Accepts new request");
                     } catch (JSONException e) {
-                        out.println("OK--no JSON detected. Waiting for another command");
+                        out.println(GMessage.errorToJSON(1));
+                        System.out.println("[" + clientSocket.toString() + "]: " + GMessage.errorToJSON(1));
                     }
                     inputLine = in.readLine();
                 }
-                System.out.println("Finished with client, server's closing their socket and associated thread");
+                System.out.println("[" + clientSocket.toString() + "]: closing socket and associated thread");
                 in.close();
                 out.close();
                 clientSocket.close();
                 clients.remove(this);
             } catch (IOException e) {
-                System.err.println("In thread; client socket thread failed: \"" + clientSocket.toString() + "\"");
+                System.err.println("[" + clientSocket.toString() + "]: socket thread failed");
             }
         }
     }

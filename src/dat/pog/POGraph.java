@@ -149,6 +149,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         }
     }
 
+
     public static List<POGraph> loadFromJSON(String directory) throws IOException {
         Path filename = Paths.get(directory);
         BufferedReader reader = Files.newBufferedReader(filename, StandardCharsets.UTF_8);

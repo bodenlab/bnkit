@@ -128,12 +128,19 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
         return jsonarr;
     }
 
+    /**
+     * Converts a JSONArray of what-looks-like single-char strings to a character array, with null indicating the absence of string (i.e. gaps)
+     * @param jsonArray
+     * @return
+     */
     public static Object[] toObjectArray(JSONArray jsonArray) {
         Object[] arr = new Object[jsonArray.length()];
         for (int i = 0; i < arr.length; i ++) {
             arr[i] = jsonArray.get(i);
             if (arr[i] == JSONObject.NULL) // JSON library inserts a non-null marker for NULL values; we need a proper null
                 arr[i] = null;
+            else
+                arr[i] = ((String)arr[i]).toCharArray()[0];
         }
         return arr;
     }
