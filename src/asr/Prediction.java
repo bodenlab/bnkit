@@ -102,6 +102,25 @@ public class Prediction {
     }
 
     /**
+     * Convert instance from JSON.
+     * @param json specification of prediction on JSON format
+     * @return
+     * @throws IOException
+     */
+    public static Map<Object, POGraph> fromJSONJustAncestors(JSONObject json) {
+        JSONArray jancs = json.optJSONArray("Ancestors");
+        Map<Object, POGraph> ancestors = new HashMap<>();
+        if (jancs != null) {
+            for (int i = 0; i < jancs.length(); i++) {
+                JSONObject obj = jancs.getJSONObject(i);
+                POGraph pog = POGraph.fromJSON(obj);
+                ancestors.put(pog.getName(), pog);
+            }
+        }
+        return ancestors;
+    }
+
+    /**
      * Load instance from a JSON file.
      * @param filename
      * @return
@@ -146,6 +165,22 @@ public class Prediction {
         // to enable the confirmation of what input data was used, the input will also contain a hashcode
         json.put("Input", pogTree.toJSON());
         // finally, put the predicted POGs in there
+        List<POGraph> pogs = new ArrayList<>();
+        for (int i : pogTree.getTree().getAncestors())
+            pogs.add(ancarr[i]);
+        json.put("Ancestors", POGraph.toJSONArray(pogs));
+        return json;
+    }
+
+    /**
+     * Convert this instance to a JSON object, for saving or messaging.
+     * @return
+     */
+    public JSONObject toJSONJustAncestors() {
+        JSONObject json = new JSONObject();
+        // To enable the confirmation of what software generated the data
+        json.put("GRASP_version", GRASP.VERSION);
+        // put the predicted POGs in there
         List<POGraph> pogs = new ArrayList<>();
         for (int i : pogTree.getTree().getAncestors())
             pogs.add(ancarr[i]);

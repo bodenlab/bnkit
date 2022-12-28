@@ -16,6 +16,10 @@ import org.junit.jupiter.api.Test;
 import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GRequestTest {
 
@@ -85,43 +89,49 @@ class GRequestTest {
 
     @Test
     void fromJSON_queue() {
+        int[] jobtimes = new int[] {4000, 3000, 2000, 1000};
+        int[] jobnumbers = new int[jobtimes.length];
         try {
-            JSONObject jreq1 = new JSONObject();
-            jreq1.put("Command", "Fake");
-            jreq1.put("Auth", "Guest");
-            JSONObject params = new JSONObject();
-            params.put("Sleep", 10000);
-            jreq1.put("Params", params);
-            System.out.println("My server-request: " + jreq1);
-            server_output.println(jreq1);
-            String response = server_input.readLine();
-            System.out.println("Server responded: " + response);
-            response = server_input.readLine();
-            System.out.println("Server responded: " + response);
-            Thread.sleep(1000);
-            JSONObject jreq2 = new JSONObject();
-            jreq2.put("Job", 1);
-            jreq2.put("Command", "Retrieve");
-            System.out.println("My server-request: " + jreq2);
-            server_output.println(jreq2);
-            response = server_input.readLine();
-            System.out.println("Server responded: " + response);
-            Thread.sleep(5000);
-            JSONObject jreq3 = new JSONObject();
-            jreq3.put("Job", 1);
-            jreq3.put("Command", "Status");
-            System.out.println("My server-request: " + jreq3);
-            server_output.println(jreq3);
-            response = server_input.readLine();
-            System.out.println("Server responded: " + response);
-            Thread.sleep(5000);
-            jreq3 = new JSONObject();
-            jreq3.put("Job", 1);
-            jreq3.put("Command", "Output");
-            System.out.println("My server-request: " + jreq3);
-            server_output.println(jreq3);
-            response = server_input.readLine();
-            System.out.println("Server responded: " + response);
+            for (int i = 0; i < jobtimes.length; i ++) {
+                JSONObject jreq1 = new JSONObject();
+                jreq1.put("Command", "Fake");
+                jreq1.put("Auth", "Guest");
+                JSONObject params = new JSONObject();
+                params.put("Sleep", jobtimes[i]);
+                jreq1.put("Params", params);
+                System.out.println("My server-request: " + jreq1);
+                server_output.println(jreq1);
+                JSONObject jresponse = new JSONObject(server_input.readLine());
+                jobnumbers[i] = GMessage.fromJSON2Job(jresponse);
+            }
+
+            Thread.sleep(500);
+            for (int i = 0; i < jobnumbers.length; i ++) {
+                JSONObject jreq2 = new JSONObject();
+                jreq2.put("Job", jobnumbers[i]);
+                jreq2.put("Command", "Place");
+                System.out.println("My server-request: " + jreq2);
+                server_output.println(jreq2);
+                JSONObject jresponse = new JSONObject(server_input.readLine());
+                System.out.println("Server responded: " + jresponse);
+                jreq2.put("Command", "Status");
+                System.out.println("My server-request: " + jreq2);
+                server_output.println(jreq2);
+                jresponse = new JSONObject(server_input.readLine());
+                System.out.println("Server responded: " + jresponse);
+            }
+
+            Thread.sleep(Arrays.stream(jobtimes).sum()); // wait until all jobs have been finished
+            for (int i = 0; i < jobnumbers.length; i ++) {
+                JSONObject jreq2 = new JSONObject();
+                jreq2.put("Job", jobnumbers[i]);
+                jreq2.put("Command", "Output");
+                System.out.println("My server-request: " + jreq2);
+                server_output.println(jreq2);
+                JSONObject jresponse = new JSONObject(server_input.readLine());
+                System.out.println("Server responded: " + jresponse);
+            }
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -144,8 +154,8 @@ class GRequestTest {
             server_output.println(jreq1);
             JSONObject jresponse = new JSONObject(server_input.readLine());
             int job = GMessage.fromJSON2Job(jresponse);
-            System.out.println("Server responded: " + jresponse);
-            Thread.sleep(5000); // waiting 5 secs to make sure the job has finished
+            // System.out.println("Server responded: " + jresponse);
+            Thread.sleep(2000); // waiting 5 secs to make sure the job has finished
             jreq1 = new JSONObject();
             jreq1.put("Job", job);
             jreq1.put("Command", "Output"); // request the output/result
@@ -154,14 +164,24 @@ class GRequestTest {
             System.out.println("Server responded: " + jresponse);
             int idx108 = tree.getIndex("sequence108");
             int parent_108 = tree.getParent(idx108);
-            Object label = tree.getLabel(parent_108);
+            Object label = tree.getLabel(parent_108).toString();
             JSONObject jresult = jresponse.getJSONObject("Result");
-            Prediction pred = Prediction.fromJSON(jresult.getJSONObject("Prediction"));
-            POGraph pog = pred.getAncestor(label);
-            System.out.println(pog);
+            Map<Object, POGraph> ancestors = Prediction.fromJSONJustAncestors(jresult);
+            POGraph pog = ancestors.get(label);
+            // System.out.println(pog);
             int[] supported = pog.getMostSupported();
-            for (int i = 0; i < supported.length; i ++)
-                System.out.println(pog.getNode(supported[i]).toJSON());
+            String[] names = aln.getNames();
+            int idx = -1;
+            for (int i = 0; i < names.length; i ++) {
+                if (names[i].equals("sequence108")) {
+                    idx = i;
+                    break;
+                }
+            }
+            for (int i = 0; i < supported.length; i ++) {
+                //System.out.println(pog.getNode(supported[i]).toJSON().get("Value") + "\t" + aln.getEnumSeq(idx).getStripped()[i]);
+                assertTrue(pog.getNode(supported[i]).toJSON().get("Value").toString().toCharArray()[0] == (Character) aln.getEnumSeq(idx).getStripped()[i]);
+            }
         } catch (JSONException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -173,12 +193,63 @@ class GRequestTest {
 
     @Test
     void fromJSON_retrieve() {
-
+        try {
+            Tree tree = loadNwk("66.nwk");
+            EnumSeq.Alignment aln = loadAln("66.aln");
+            JSONObject jreq1 = new JSONObject();
+            jreq1.put("Command", "Pogit");
+            jreq1.put("Auth", "Guest");
+            JSONObject params = new JSONObject();
+            params.put("Tree", tree.toJSON());
+            params.put("Alignment", aln.toJSON());
+            jreq1.put("Params", params);
+            server_output.println(jreq1);
+            JSONObject jresponse = new JSONObject(server_input.readLine());
+            System.out.println(GMessage.fromJSON2Result(jresponse));
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Test
     void fromJSON_cancel() {
+        int[] jobtimes = new int[] {4000, 3000, 2000, 1000};
+        int[] jobnumbers = new int[jobtimes.length];
 
+        try {
+            for (int i = 0; i < jobtimes.length; i++) {
+                JSONObject jreq1 = new JSONObject();
+                jreq1.put("Command", "Fake");
+                jreq1.put("Auth", "Guest");
+                JSONObject params = new JSONObject();
+                params.put("Sleep", jobtimes[i]);
+                jreq1.put("Params", params);
+                System.out.println("My server-request: " + jreq1);
+                server_output.println(jreq1);
+                JSONObject jresponse = new JSONObject(server_input.readLine());
+                jobnumbers[i] = GMessage.fromJSON2Job(jresponse);
+            }
+
+            Thread.sleep(500);
+            // should succeed to cancel three (last) jobs, not the first, which should've started
+            boolean[] success = new boolean[] {false, true, true, true};
+            for (int i = jobnumbers.length - 1; i >= 0; i--) {
+                JSONObject jreq2 = new JSONObject();
+                jreq2.put("Job", jobnumbers[i]);
+                jreq2.put("Command", "Cancel");
+                System.out.println("My server-request: " + jreq2);
+                server_output.println(jreq2);
+                JSONObject jresponse = new JSONObject(server_input.readLine());
+                System.out.println("Server responded: " + jresponse);
+                assertTrue(jresponse.getBoolean("Cancel") == success[i]);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
 }

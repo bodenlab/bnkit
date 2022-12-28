@@ -8,6 +8,7 @@ import bn.ctmc.SubstModel;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.phylo.IdxTree;
+import dat.pog.IdxGraph;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import json.JSONArray;
@@ -15,6 +16,7 @@ import json.JSONException;
 import json.JSONObject;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class CommandCentral {
@@ -49,6 +51,9 @@ public class CommandCentral {
             if (command.equals("Recon")) {
                 request = new GRequest_Recon(command, authtoken, jparams);
 
+            } else if (command.equals("Pogit")) {
+                request = new GRequest_Pogit(command, authtoken, jparams);
+
             } else if (command.equals("Label-tree")) {
                 request = new GRequest_LabelTree(command, authtoken, jparams);
 
@@ -67,6 +72,45 @@ public class CommandCentral {
         return request;
     }
 
+
+    /**
+     * Definition of the "Pogit" command.
+     *
+     * "Pogit" combines a tree and an alignment to construct a POGTree, i.e.
+     * POGs representing sequences in alignment, attached to leaves of the tree (with congruent labels)
+     */
+    public static class GRequest_Pogit extends GRequest {
+        private IdxTree idxTree = null;
+        private EnumSeq.Alignment aln = null;
+
+        public GRequest_Pogit(String command, String auth, JSONObject params) {
+            super(command, auth);
+            // extract necessary detail from command params etc
+            try {
+                JSONObject tree = params.getJSONObject("Tree");
+                idxTree = IdxTree.fromJSON(tree);
+                JSONObject jaln = params.getJSONObject("Alignment");
+                aln = EnumSeq.Alignment.fromJSON(jaln);
+            } catch (JSONException e) {
+                throw new GRequestRuntimeException("Invalid JSON in command : " + command + "; " + e.getMessage());
+            }
+        }
+
+        @Override
+        public boolean isQueued() {
+            return false; // run immediately
+        }
+
+        /**
+         * Execute the job
+         * and place results in the instance of this class for later retrieval with {@see GRequest#getResult()}
+         */
+        @Override
+        public void run() {
+            POGTree pogtree = new POGTree(aln, idxTree);
+            this.setResult(pogtree.toJSON());
+        }
+    }
     /**
      * Definition of the "Recon" command.
      *
@@ -82,6 +126,7 @@ public class CommandCentral {
         private SubstModel MODEL = null;
         String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
+        private POGTree pogTree = null;
         private Prediction indelpred = null;
         private double[] RATES = null;
         private long START_TIME;
@@ -90,28 +135,20 @@ public class CommandCentral {
             super(command, auth);
             // extract necessary detail from command params etc
             try {
-                JSONObject jinput = params.optJSONObject("POGTree");
-                if (jinput != null) {
-                    POGTree pogtree = POGTree.fromJSON(jinput);
-                    JSONArray jancs = params.optJSONArray("Ancestors");
-                    if (jancs != null) {
-                        if (jancs.length() == pogtree.getTree().getNParents()) {
-                            Map<Object, POGraph> ancestors = new HashMap<>();
-                            for (int i = 0; i < jancs.length(); i++) {
-                                JSONObject obj = jancs.getJSONObject(i);
-                                POGraph pog = POGraph.fromJSON(obj);
-                                ancestors.put(pog.getName(), pog);
-                            }
-                            indelpred = new Prediction(pogtree, ancestors);
-                        }
-                    }
-                    idxTree = pogtree.getTree();
-                } else {
+                pogTree = POGTree.fromJSON(params);
+                idxTree = pogTree.getTree();
+            } catch (ASRRuntimeException e1) { // incomplete pogtree
+                try {
                     JSONObject tree = params.getJSONObject("Tree");
                     idxTree = IdxTree.fromJSON(tree);
                     JSONObject jaln = params.getJSONObject("Alignment");
                     aln = EnumSeq.Alignment.fromJSON(jaln);
+                    pogTree = new POGTree(aln, idxTree);
+                } catch (JSONException e2) {
+                    throw new GRequestRuntimeException("Invalid JSON in command : " + command + "; " + e2.getMessage());
                 }
+            }
+            try {
                 String infmode = params.optString("Inference", "Joint");
                 MODE = infmode.equals("Joint") ? GRASP.Inference.JOINT : (infmode.equals("Marginal") ? GRASP.Inference.MARGINAL : null);
                 if (MODE == GRASP.Inference.MARGINAL) {
@@ -120,7 +157,7 @@ public class CommandCentral {
                         if (ancspec1 == null) {
                             JSONArray ancspec2 = params.optJSONArray("Ancestors");
                             ancestors = new int[ancspec2.length()];
-                            for (int i = 0; i < ancestors.length; i ++)
+                            for (int i = 0; i < ancestors.length; i++)
                                 ancestors[i] = ancspec2.getInt(i);
                         } else {
                             ancestors = new int[1];
@@ -131,21 +168,20 @@ public class CommandCentral {
                         if (ancspec1 == null) {
                             JSONArray ancspec2 = params.optJSONArray("Ancestors");
                             ancestors = new int[ancspec2.length()];
-                            for (int i = 0; i < ancestors.length; i ++)
+                            for (int i = 0; i < ancestors.length; i++)
                                 ancestors[i] = Integer.parseInt(ancspec2.getString(i).substring(1));
                         } else {
                             ancestors = new int[1];
-                            ancestors[0] = Integer.parseInt(ancspec1.substring(1));;
+                            ancestors[0] = Integer.parseInt(ancspec1.substring(1));
+                            ;
                         }
                     }
                 }
-                if (indelpred == null) { // no POGTree AND no ancestor POGs provided
-                    String indels = params.optString("Indels", "BEP");
-                    for (int i = 0; i < INDELS.length; i ++) {
-                        if (INDELS[i].equalsIgnoreCase(indels)) {
-                            INDEL_IDX = i;
-                            break;
-                        }
+                String indels = params.optString("Indels", "BEP");
+                for (int i = 0; i < INDELS.length; i++) {
+                    if (INDELS[i].equalsIgnoreCase(indels)) {
+                        INDEL_IDX = i;
+                        break;
                     }
                 }
                 // other params:
@@ -158,7 +194,7 @@ public class CommandCentral {
                 JSONArray jrates = params.optJSONArray("Rates");
                 if (jrates != null) {
                     RATES = new double[jrates.length()];
-                    for (int i = 0; i < RATES.length; i ++)
+                    for (int i = 0; i < RATES.length; i++)
                         RATES[i] = jrates.getDouble(i);
                 }
             } catch (JSONException e) {
@@ -181,30 +217,27 @@ public class CommandCentral {
         @Override
         public void run() {
             START_TIME = System.currentTimeMillis();
-            if (indelpred == null) {
-                POGTree pogtree = new POGTree(aln, idxTree);
-                switch (INDEL_IDX) {
-                    case 0:
-                        indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
-                        break;
-                    case 1:
-                        indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogtree);
-                        break;
-                    case 2:
-                        indelpred = Prediction.PredictBySICP(pogtree);
-                        break;
-                    case 3:
-                        indelpred = Prediction.PredictBySICML(pogtree);
-                        break;
-                    case 4:
-                        indelpred = Prediction.PredictByParsimony(pogtree);
-                        break;
-                    case 5:
-                        indelpred = Prediction.PredictByMaxLhood(pogtree);
-                        break;
-                    default:
-                        break;
-                }
+            switch (INDEL_IDX) {
+                case 0:
+                    indelpred = Prediction.PredictByBidirEdgeParsimony(pogTree);
+                    break;
+                case 1:
+                    indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogTree);
+                    break;
+                case 2:
+                    indelpred = Prediction.PredictBySICP(pogTree);
+                    break;
+                case 3:
+                    indelpred = Prediction.PredictBySICML(pogTree);
+                    break;
+                case 4:
+                    indelpred = Prediction.PredictByParsimony(pogTree);
+                    break;
+                case 5:
+                    indelpred = Prediction.PredictByMaxLhood(pogTree);
+                    break;
+                default:
+                    break;
             }
             if (MODE == GRASP.Inference.JOINT)
                 indelpred.getJoint(MODEL, RATES);
@@ -217,10 +250,7 @@ public class CommandCentral {
                 }
             }
             Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
-            // TODO: collate results
-            JSONObject myres = new JSONObject();
-            myres.put("Prediction", indelpred.toJSON());
-            this.setResult(myres);
+            this.setResult(indelpred.toJSONJustAncestors());
         }
     }
 

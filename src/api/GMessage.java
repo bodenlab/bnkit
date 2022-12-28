@@ -64,6 +64,15 @@ public class GMessage {
         return job;
     }
 
+    /**
+     * Extract result from JSON message
+     * @param json
+     * @return
+     */
+    public static JSONObject fromJSON2Result(JSONObject json) {
+        return json.optJSONObject("Result");
+    }
+
     public static JSONObject client2serverReJob(int job, String command) {
         JSONObject json = new JSONObject();
         json.put("Job",   job);

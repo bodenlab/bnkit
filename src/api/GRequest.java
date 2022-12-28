@@ -63,7 +63,13 @@ public class GRequest extends Thread implements Comparable<GRequest> {
 
     @Override
     public void run() {
+    }
 
+    public void runnow() {
+        status = STATUS.RUNNING;
+        run();
+        status = STATUS.COMPLETED;
+        System.out.println("Server completed job " + JOB);
     }
 
     public STATUS getStatus() {
@@ -174,7 +180,7 @@ public class GRequest extends Thread implements Comparable<GRequest> {
          * @return place 1-size of queue; 0 if the job request does not exist
          */
         public int getPlace(GRequest request) {
-            return currentjobs.indexOf(request) + 1;
+            return getPlace(request.JOB);
         }
         /**
          * Retrieve place in queue of job.
@@ -184,18 +190,46 @@ public class GRequest extends Thread implements Comparable<GRequest> {
         public int getPlace(int job) {
             int place = 1;
             for (GRequest req : currentjobs) {
-                if (req.getJob() == job)
-                    return place;
-                place += 1;
+                if (req.status == STATUS.WAITING) {
+                    if (req.getJob() == job)
+                        return place;
+                    else
+                        place += 1;
+                }
             }
             return 0;
+        }
+
+        /**
+         * Cancel job in queue (when WAITING).
+         * @param request job request
+         * @return true if cancelled, else false
+         */
+        public boolean cancel(GRequest request) {
+            return cancel(request.JOB);
+        }
+        /**
+         * Cancel job in queue (when WAITING).
+         * @param job job number
+         * @return true if cancelled, else false
+         */
+        public boolean cancel(int job) {
+            for (GRequest req : currentjobs) {
+                if (req.status == STATUS.WAITING) {
+                    if (req.getJob() == job) {
+                        return currentjobs.remove(req);
+                    }
+                }
+            }
+            return false;
         }
 
         @Override
         public void run() {
             // job queue thread
             // TODO: additional tasks not yet implemented include
-            //  1. cleaning-up the queue from client-retrieved jobs,
+            //  1a. cleaning-up the queue from client-retrieved jobs,
+            //  1b. keep a pointer for queue to avoid re-scanning from top,
             //  2. cleaning-up filed jobs once lapsed
             try {
                 while (true) {
@@ -204,7 +238,7 @@ public class GRequest extends Thread implements Comparable<GRequest> {
                         // System.out.println("Waiting (sleeping) for jobs to be submitted");
                         Thread.sleep(500);
                     } else {
-                        System.out.println("Found job");
+                        System.out.println("Found job; " + currentjobs.size() + " requests in queue");
                         // TODO: more advanced scheduling could be done; here, 1 job at a time
                         req.status = STATUS.RUNNING;
                         System.out.println("Server started job " + req.JOB);
@@ -218,7 +252,7 @@ public class GRequest extends Thread implements Comparable<GRequest> {
                             try {
                                 String filename = directory + File.separator + "GRequest_" + req.JOB + ".json";
                                 BufferedWriter br = new BufferedWriter(new FileWriter(filename));
-                                // Writes a string to the above temporary file, FIXME consider saving to storage that is under better control
+                                // Writes a string to the above temporary file
                                 br.write(result.toString());
                                 System.out.println("Wrote job " + req.JOB + " to file \"" + filename + "\"");
                                 br.close();

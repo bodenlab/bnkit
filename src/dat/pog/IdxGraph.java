@@ -1090,6 +1090,14 @@ public class IdxGraph {
         return narr;
     }
 
+    public static List<IdxGraph> fromJSONArray(JSONArray jarr) {
+        List<IdxGraph> list = new ArrayList<>();
+        for (int i = 0; i < jarr.length(); i ++) {
+            list.add(IdxGraph.fromJSON(jarr.getJSONObject(i)));
+        }
+        return list;
+    }
+
     /**
      * Save a map of graphs, where each entry has as key a string "labeL, then the graph as value.
      * The label will then be used to tag each graph.

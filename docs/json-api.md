@@ -31,11 +31,25 @@ Server returns (if queued)
 
 or runs job directly (based on `request.isQueued()`) and returns result
 
+### Create input for reconstruction: `<command>` is `"Pogit"`
+
+`<params>` is
+
+    { "Tree":<tree>,
+      "Alignment":<alignment> }
+
+Result is a `<POGTree>`
+
+    { 
+      }
+
 ### Run reconstruction: `<command>` is `"Recon"`
 
-`<params>` is 
+`<params>` is
 
-`{"Tree":<tree>,"Alignment":<alignment>, <optional>}`
+    { "Tree":<tree>,
+      "Alignment":<alignment>,
+      <optional-args> }
 
 or 
 
@@ -61,7 +75,7 @@ Result is
 
 ## Data structures
 
-### `<tree>`
+### `<tree>` (`dat.phylo.IdxTree`)
 
     { "Branchpoints":<number-of-idxs>,
       "Labels":[<list-of-labels>],
@@ -78,13 +92,41 @@ JSON definition (note internal nodes are re-numbered, left-to-right, depth-first
 
     {"Parents":[-1,0,1,1,3,4,4,6,6,3,9,10,10,9,0],"Labels":["0","1","A","2","3","B","4","C","D","5","6","E","F","G","H"],"Distances":[0,0.5,0.6,3.2,5,3.3,1.8,1,2.5,7,2.5,3.9,4.5,0.3,1.1],"Branchpoints":15}
 
-### `<alignment>`
+### `<alignment>` (`dat.EnumSeq.Alignment`)
 
 
-### `<POG>`
+### `<POG>` (`dat.pog.POGraph`)
 
+#### Example
 
-### '<POGTree>'
+Graph with a maximum of 5 nodes, here with two (indices 2 and 4), where 2 is adjacent to 4. 
+The graph starts with node with index 2 and ends with node with index 4.
+
+    { "Size":5,
+      "Indices":[2,4],
+      "Adjacent":[[4],[]],
+      "Starts":[2],
+      "Ends":[4],
+      "Nodetype":"class dat.pog.SymNode",
+      "GRASP_version":"12-Dec-2022",
+      "Directed":true,
+      "Terminated":true,
+      "Nodes":[{"Value":"E"},{"Value":"H"}],
+      "Datatype":"class dat.pog.POGraph",
+      "Name":"sequence47" }
+
+Additional fields in graphs with edge attributes (including POGs):
+
+      "Edgeindices":[[2,4],[-1,2],[4,5]],
+      "Edges":[{"Recip":true,"Backward":true,"Forward":true,"Weight":0}, ...],
+
+### '<POGTree>' (`dat.pog.POGTree`)
+
+    { "Tree":<tree>,
+      "Hashcode":-631886170,
+      "Extants":[<POG1>, <POG2>, ...] }
+
+Note that 
 
 
 

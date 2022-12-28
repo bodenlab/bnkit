@@ -205,6 +205,8 @@ public class GServer {
                                 } else if (command.equals("Place")) {
                                     // System.out.println("Sending this to client: " + queue.getPlace(request));
                                     out.println(GMessage.server2clientReJob(job, "Place", queue.getPlace(request)));
+                                } else if (command.equals("Cancel")) {
+                                    out.println(GMessage.server2clientReJob(job, "Cancel", queue.cancel(request)));
                                 } else {
                                     out.println(GMessage.errorToJSON(3, "Invalid command: " + command));
                                 }
@@ -223,7 +225,7 @@ public class GServer {
                                     // TODO: find more info about what resources are required for job so client (and compute) can be advised
                                     out.println(GMessage.server2clientReJob(greq.getJob(), "Queued"));
                                 } else { // run now ... not in separate thread
-                                    greq.run();
+                                    greq.runnow();
                                     JSONObject result = greq.getResult();           // request to retrieve output of completed job
                                     if (result != null) {                           // if available... probably in storage
                                         out.println(GMessage.server2clientReJob(job, "Result", result));
