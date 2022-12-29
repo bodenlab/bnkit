@@ -152,6 +152,7 @@ class GRequestTest {
             params.put("Alignment", aln.toJSON());
             jreq1.put("Params", params);
             server_output.println(jreq1);
+            System.out.println(jreq1);
             JSONObject jresponse = new JSONObject(server_input.readLine());
             int job = GMessage.fromJSON2Job(jresponse);
             // System.out.println("Server responded: " + jresponse);
