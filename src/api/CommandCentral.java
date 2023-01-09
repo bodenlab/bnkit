@@ -503,11 +503,12 @@ public class CommandCentral {
         @Override
         public void run() {
             if (MODE == GRASP.Inference.MARGINAL) {
-                // retrieve the branchpoint index for (each of) the nominated ancestors
+                JSONObject jpred = new JSONObject();
                 for (int MARG_LABEL : ancestors) {
-                    int bpidx = idxTree.getIndex(MARG_LABEL);
+                    int bpidx = idxTree.getIndex(MARG_LABEL); // retrieve the branchpoint index for (each of) the nominated ancestors
                     if (bpidx < 0) // did not find it...
                         continue;
+                    JSONArray jarr = new JSONArray();
                     // inference below; first create the inference instance
                     MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal(bpidx, pbn);
                     // perform marginal inference
@@ -518,12 +519,31 @@ public class CommandCentral {
                         inf.decorate(ti);
                         // retrieve the distribution at the node previously nominated
                         Distrib anydistrib = inf.getDecoration(bpidx);
+                        if (anydistrib instanceof EnumDistrib) {
+                            jarr.put(((EnumDistrib) anydistrib).toJSON());
+                        } else {
+                            jarr.put(anydistrib.toString());
+                        }
                         System.out.println("Ancestor " + MARG_LABEL + "\tBranch point " + bpidx + "\tExample " + i + ":\t" + anydistrib);
                     }
+                    jpred.put("N" + MARG_LABEL, jarr);
                 }
+                this.setResult(jpred);
+            } else { // joint: TODO: not yet implemented as it requires modifications to MaxLhoodJoint
+                JSONObject jpred = new JSONObject();
+                String[] headers = dataset.headers;
+                Object[][] rows = dataset.values;
+                Object[][] preds = new Object[idxTree.getAncestors().length][rows.length];
+                for (int i = 0; i < rows.length; i ++) {
+                    TreeInstance ti = idxTree.getInstance(headers, rows[i]);
+                    // inference will include all ancestors
+                    for (int j : idxTree.getAncestors()) {
+                        preds[j][i] = null; // TODO
+                    }
+                }
+//                jpred.put("N" + MARG_LABEL, jarr);
+                this.setResult(jpred);
             }
-            JSONObject myres = new JSONObject();
-            this.setResult(myres);
         }
     }
 

@@ -29,7 +29,7 @@ public class MaxLhoodMarginal <E extends Distrib> implements TreeDecor<E> {
      * @param bpidx branch point index for the ancestor
      * @param tree phylogenetic tree indexing the branch points and their distances
      * @param model evolutionary model
-     * @param rate relative evolutionary rate (for the index in POG/alignment)
+     * @param rate relative evolutionary rate (for the index in POG/alignment, if applicable)
      */
     public MaxLhoodMarginal(int bpidx, IdxTree tree, SubstModel model, double rate) {
         this.tree = tree;

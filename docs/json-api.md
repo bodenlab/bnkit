@@ -127,14 +127,71 @@ and
 
 where `<distrib>` specifies a distribution appropriate for the values in the `<dataset>` (see below).
 
-Result is
-
+Result is a new/refined distribution (see example below).
 
 #### Example
 
+    { "Command":"Train",
+      "Auth":"Guest",
+      "Params":
+        { "States":["A","B"],
+          "Dataset":
+            { "Headers":["S009","S005","S002","S006","S003","S001","S008","S010","S004","S007"],
+              "Data":[[3.63],[3.81],[2.89],[3.81],[2.54],[2.76],[3.79],[3.7],[1.94],[3.97]]},
+              "Tree":<tree> } } }
 
 which results in
+    
+    { "Distrib":
+        { "Condition":[["A"],["B"]],
+          "Pr":[[3.784926135903969,0.056738891699391655],[2.5324588293595744,0.056738891699391655]],
+          "Index":[0,1],
+          "Domain":"dat.Continuous@3bd5adde" } }
 
+### Infer properties: `<command>` is `"Infer"`
+
+`<params>` is
+
+    { "Tree":<tree>,
+      "Dataset":<dataset>,
+      "States":[<state1>,<state2>,...],
+      "Distrib":<distrib>,
+      <optional-args> }
+
+and
+
+`<optional-args>` is
+
+      "Distrib":<distrib>,
+      "Leaves-only":<true/false>,
+      "Rate":<rate>,
+      "Seed":<seed>,
+      "Gamma":<gamma>
+
+where `<distrib>` specifies a distribution appropriate for the values in the `<dataset>` (see below).
+
+Result is a new/refined distribution (see example below).
+
+#### Example
+
+    { "Command":"Infer",
+      "Auth":"Guest",
+      "Params":
+        { "States":["A","B"],
+          "Leaves-only":true,
+          "Dataset":
+            { "Headers":["S009","S005","S002","S006","S003","S001","S008","S010","S004","S007"],"Data":[[3.63,3.33],[3.81,3.21],[2.89,2.93],[3.81,3.51],[2.54,2.59],[2.76,2.96],[3.79,3.49],[3.7,3.4],[1.94,2.24],[3.97,3.44]] },
+          "Tree":<tree>,
+          "Inference":"Marginal",
+          "Distrib":
+            { "Condition":[["A"],["B"]],"Pr":[[3.784926135903969,0.056738891699391655],[2.532458829359575,0.056738891699391655]],"Index":[0,1],"Domain":"dat.Continuous@3cf71bc7"},
+          "Ancestor":0 } }
+
+Server responds:
+
+    { "N0":[
+        { "Pr":[0.6652270145537978,0.3347729854462022],"Domain":{"Size":2,"Values":["A","B"],"Datatype":"String"} },
+        { "Pr":[0.649968113685095,0.350031886314905],"Domain":{"Size":2,"Values":["A","B"],"Datatype":"String"} }] }
 
 ## Data structures
 

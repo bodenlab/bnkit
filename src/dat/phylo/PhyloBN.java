@@ -172,31 +172,25 @@ public class PhyloBN {
      */
     public void overrideMasterJSON(JSONObject json) {
         if (gdt_master != null) {
-            gdt_master = GDT.fromJSON(json, gdt_master.getVariable(), gdt_master.getParents());
-            /*
+            GDT replace = GDT.fromJSON(json, gdt_master.getVariable(), gdt_master.getParents());
             List<EnumVariable> parents = gdt_master.getParents();
             if (parents.size() == 1) {
                 EnumVariable par = parents.get(0);
                 for (Object state : par.getDomain().getValues()) {
-                    JSONObject component = json.getJSONObject(state.toString());
-                    GaussianDistrib gd = GaussianDistrib.fromJSON(component);
-                    gdt_master.put(new Object[] {state}, gd);
+                    Object[] cond = new Object[] {state};
+                    gdt_master.put(cond, replace.getDistrib(cond));
                 }
             }
-             */
         } else if (cpt_master != null) {
-            cpt_master = CPT.fromJSON(json, cpt_master.getVariable(), cpt_master.getParents());
-            /*
+            CPT replace = CPT.fromJSON(json, cpt_master.getVariable(), cpt_master.getParents());
             List<EnumVariable> parents = cpt_master.getParents();
             if (parents.size() == 1) {
                 EnumVariable par = parents.get(0);
                 for (Object state : par.getDomain().getValues()) {
-                    JSONObject component = json.getJSONObject(state.toString());
-                    EnumDistrib ed = EnumDistrib.fromJSON(component);
-                    cpt_master.put(new Object[] {state}, ed);
+                    Object[] cond = new Object[] {state};
+                    cpt_master.put(cond, replace.getDistrib(cond));
                 }
             }
-             */
         }
     }
 

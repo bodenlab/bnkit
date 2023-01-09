@@ -19,6 +19,7 @@
 package bn.prob;
 
 import bn.Distrib;
+import json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -362,6 +363,9 @@ public class MixtureDistrib implements Distrib {
         for(int i = 0; i < distribs.size(); i++)
             sb.append("{" + distribs.get(i) + "*" + String.format("%4.2f", weights.get(i)) + "}");
         return sb.toString();
+    }
+    public JSONObject toJSON() {
+        throw new RuntimeException("Not implemented");
     }
 
     public String toXMLString() {

@@ -237,7 +237,9 @@ class GRequestTest {
         IdxTree tree = IdxTree.fromJSON(new JSONObject("{\"Parents\":[-1,0,1,2,2,4,4,1,0,8,9,9,11,11,8,14,14,16,16],\"Labels\":[\"0\",\"1\",\"2\",\"S001\",\"3\",\"S002\",\"S003\",\"S004\",\"4\",\"5\",\"S005\",\"6\",\"S006\",\"S007\",\"7\",\"S008\",\"8\",\"S009\",\"S010\"],\"Distances\":[0,0.14,0.03,0.14,0.08,0.16,0.10,0.12,0.06,0.06,0.28,0.13,0.12,0.14,0.11,0.20,0.07,0.12,0.19],\"Branchpoints\":19}\n"));
         String[] headers = {   "S009","S005","S002","S006","S003","S001","S008","S010","S004","S007"};
         // The values assigned to the tree above, tabulated as per headers; they were intended to group nicely per clade
-        Double[][] rows1 = {{   3.63,  3.81,  2.89,  3.81,  2.54,  2.76,  3.79,  3.70,  1.94,  3.97}};
+        Double[][] rows = {
+                {   3.63,  3.81,  2.89,  3.81,  2.54,  2.76,  3.79,  3.70,  1.94,  3.97},
+                {   3.33,  3.21,  2.93,  3.51,  2.59,  2.96,  3.49,  3.40,  2.24,  3.44}};
 
         try {
             JSONObject jreq1 = new JSONObject();
@@ -245,11 +247,12 @@ class GRequestTest {
             jreq1.put("Auth", "Guest");
             JSONObject params = new JSONObject();
             params.put("Tree", tree.toJSON());
-            params.put("Dataset", JSONUtils.toJSON(headers,rows1));
+            params.put("Dataset", JSONUtils.toJSON(headers,rows));
             params.put("States", new JSONArray(new Character[] {'A','B'}));
             params.put("Distrib", new JSONObject("{\"Condition\":[[\"A\"],[\"B\"]],\"Pr\":[[3.784926135903969,0.056738891699391655],[2.532458829359575,0.056738891699391655]],\"Index\":[0,1],\"Domain\":\"dat.Continuous@3cf71bc7\"}"));
+            params.put("Leaves-only", true);
             params.put("Inference", "Marginal");
-            params.put("Ancestor", 5);
+            params.put("Ancestor", 0);
             jreq1.put("Params", params);
             server_output.println(jreq1);
             System.out.println(jreq1);
