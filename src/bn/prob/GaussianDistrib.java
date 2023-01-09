@@ -72,6 +72,23 @@ public class GaussianDistrib implements Distrib, Serializable {
         return json;
     }
 
+    /**
+     * Create a JSON array with the mean and variance
+     * @return
+     */
+    public JSONArray toJSONArray() {
+        return new JSONArray(new double[] {getMean(), getVariance()});
+    }
+
+    /**
+     * Recover a gaussian distribution from the specified JSON array
+     * @param distrib_params
+     * @return
+     */
+    public static GaussianDistrib fromJSONArray(JSONArray distrib_params) {
+        return new GaussianDistrib(distrib_params.getDouble(0), distrib_params.getDouble(1));
+    }
+
     public static GaussianDistrib fromJSON(JSONObject json) {
         if (!json.getString("Domain").equals("Real"))
             throw new RuntimeException("Invalid JSON format: " + json);

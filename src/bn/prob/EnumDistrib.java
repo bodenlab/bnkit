@@ -169,10 +169,30 @@ public class EnumDistrib implements Distrib, Domain {
         return json;
     }
 
+    /**
+     * Create a JSON representation of distribution but leave out domain
+     * @return
+     */
+    public JSONArray toJSONArray() {
+        return new JSONArray(this.get());
+    }
+
     public static EnumDistrib fromJSON(JSONObject json) {
         Enumerable domain = Enumerable.fromJSON(json.getJSONObject("Domain"));
+        return fromJSON(json, domain);
+    }
+
+    public static EnumDistrib fromJSON(JSONObject json, Enumerable domain) {
         double[] pr = new double[domain.size()];
         JSONArray prarr = json.getJSONArray("Pr");
+        assert(pr.length == prarr.length());
+        for (int i = 0; i < prarr.length(); i ++)
+            pr[i] = prarr.getDouble(i);
+        return new EnumDistrib(domain, pr);
+    }
+
+    public static EnumDistrib fromJSONArray(JSONArray prarr, Enumerable domain) {
+        double[] pr = new double[domain.size()];
         assert(pr.length == prarr.length());
         for (int i = 0; i < prarr.length(); i ++)
             pr[i] = prarr.getDouble(i);

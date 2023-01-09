@@ -3,91 +3,89 @@ package asr;
 import java.net.*;
 import java.io.*;
 
-public class GClient
-{
+public class GClient extends Thread {
+
+    /**
+     * Print usage instructions without error
+     */
+    public static void usage() {
+        usage(0, null);
+    }
+    /**
+     * Print usage instructions with (optional) error
+     */
+    public static void usage(int error, String message) {
+        System.out.println("Usage:");
+        System.out.println("asr.GClient [-s <server-name>] [-p <port>] [-h]");
+        System.out.println("\twhere <server-name> is the URL for the server (default is 127.0.0.1 or localhost)");
+        System.out.println("\t<port> is the port number that the server is using (default is 4072)");
+        System.out.println("\t-h prints this help screen");
+        if (error > 0) {
+            System.err.println("Error " + error + ": " + message);
+        }
+        System.exit(error);
+    }
+
+    /**
+     * Main commandline front-end of GRASP server.
+     * Program operates by accepting requests via sockets.
+     * @param args see usage instructions
+     */
+    public static void main(String args[]) {
+        Integer SERVERPORT = 4072; // default UQ's post-code
+        String SERVERNAME = "127.0.0.1"; // localhost
+
+        for (int a = 0; a < args.length; a ++) {
+            if (args[a].startsWith("-")) {
+                String arg = args[a].substring(1);
+                if (arg.equalsIgnoreCase("p") && args.length > a + 1) {
+                    try {
+                        SERVERPORT = Integer.parseInt(args[++a]);
+                    } catch (NumberFormatException e) {
+                        usage(1, args[a] + "port must be an integer 0 - 65535 (default is 4072)");
+                    }
+                } else if (arg.equalsIgnoreCase("s") && args.length > a + 1) {
+                    SERVERNAME = args[++a];
+                } else if (arg.equalsIgnoreCase("h")) {
+                    usage();
+                }
+            }
+        }
+        GClient client = new GClient(SERVERNAME, SERVERPORT);
+        System.out.println("Client initialises a socket open for requests");
+        client.start();
+        System.out.println("Input stream (user typing) and output stream (server responding)\nare read and written asynchronously. ");
+    }
+
     // initialize socket and input output streams
     private Socket socket            = null;
+    private ClientServerOutputReader csor = null;
+    private ClientUserInputReader cuir = null;
+
     private InputStreamReader stdin = null;
     private InputStream in_stream = null;
     private PrintWriter out     = null;
 
     // constructor to put ip address and port
-    public GClient(String address, int port) {
-        // establish a connection
+    public GClient(String SERVERNAME, int SERVERPORT) {
         try {
-            socket = new Socket(address, port);
-            System.out.println("Client connected to server");
-            // stream from server
-            in_stream = socket.getInputStream();
-            // stream from terminal
-            stdin = new InputStreamReader(System.in);
-            // sends output to the socket
-            out = new PrintWriter(socket.getOutputStream(), true);
-
-        }
-        catch(UnknownHostException u) {
-            System.out.println("Problem host: " + u);
-
-        } catch(IOException i) {
-            System.out.println("Problem I/O:" + i);
-        }
-
-        BufferedReader reader = new BufferedReader(stdin);
-        BufferedReader server_input = new BufferedReader(new InputStreamReader(in_stream));
-
-        // string to read message from input
-        String line = "";
-        // keep reading until "Over" is input
-        while (!line.startsWith("Exit")) {
-            try {
-                line = reader.readLine();
-                System.out.println("Trying to send: " + line.toUpperCase());
-                out.println(line);
-                String server_line = server_input.readLine();
-                System.out.println(server_line);
-                if (server_line.equals("Breaking-up"))
-                    break;
-            } catch(IOException e) {
-                System.err.println("Client could not read and write: " + e);
-            }
-        }
-        // close the connection
-        try {
-            stdin.close();
-            out.close();
-            socket.close();
-        } catch(IOException i) {
-            System.out.println(i);
+            // establish a connection
+            socket = new Socket(SERVERNAME, SERVERPORT);
+            csor = new ClientServerOutputReader(socket);
+            cuir = new ClientUserInputReader(socket);
+        } catch (UnknownHostException e) {
+            System.err.println("Invalid host " + SERVERNAME);
+            System.exit(1);
+        } catch (IOException e) {
+            System.err.println("Couldn't get I/O for the connection to " + SERVERNAME);
+            System.exit(1);
         }
     }
 
-    public static void main(String args[]) {
-
-        String SERVERNAME = "127.0.0.1"; // localhost
-        Integer SERVERPORT = 4072; // default UQ's post-code
-
-        if (args.length == 2) {
-            SERVERNAME = args[0];
-            SERVERPORT = Integer.parseInt(args[1]);
-        }
-
-        try {
-            Socket serverSocket = new Socket(SERVERNAME, SERVERPORT);
-            ClientServerOutputReader csor = new ClientServerOutputReader(serverSocket);
-            csor.start();
-            ClientUserInputReader cuir = new ClientUserInputReader(serverSocket);
-            cuir.start();
-        } catch (UnknownHostException e) {
-            System.err.println("Don't know about host " + SERVERNAME);
-            System.exit(1);
-        } catch (IOException e) {
-            System.err.println("Couldn't get I/O for the connection to " +
-                    SERVERNAME);
-            System.exit(1);
-        }
-
-        //GClient client = new GClient("127.0.0.1", 4072);
-
+    @Override
+    public void run() {
+        csor.start();
+        cuir.start();
     }
 }
 
@@ -99,15 +97,10 @@ class ClientServerOutputReader extends Thread {
 
     public void run() {
         try {
-            BufferedReader in = new BufferedReader(
-                    new InputStreamReader(serverSocket.getInputStream()));
-
+            BufferedReader in = new BufferedReader(new InputStreamReader(serverSocket.getInputStream()));
             String outputFromServer="";
             while((outputFromServer=in.readLine())!= null){
-                //This part is printing the output to console
-                //Instead it should be appending the output to some file
-                //or some swing element. Because this output may overlap
-                //the user input from console
+                // This output may overlap the user input from console
                 System.out.println(outputFromServer);
             }
         } catch (IOException e) {
@@ -123,15 +116,17 @@ class ClientUserInputReader extends Thread {
         this.serverSocket = serverSocket;
     }
     public void run(){
-        BufferedReader stdIn = new BufferedReader(
-                new InputStreamReader(System.in));
+        BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
         PrintWriter out;
+        int row = 1;
         try {
             out = new PrintWriter(serverSocket.getOutputStream(), true);
+            // System.out.print("[" + row + "]>");
             String userInput;
-
             while ((userInput = stdIn.readLine()) != null) {
                 out.println(userInput);
+                row += 1;
+                // System.out.print("[" + row + "]>");
             }
         } catch (IOException e) {
             e.printStackTrace();

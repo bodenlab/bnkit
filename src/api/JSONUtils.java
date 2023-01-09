@@ -36,7 +36,8 @@ public class JSONUtils {
                             ds.values[j][i] = null;
                     }
                 }
-            }
+            } else
+                return null;
             return ds;
         }
 
@@ -63,7 +64,6 @@ public class JSONUtils {
             }
             return ds;
         }
-
     }
 
     public static JSONObject toJSON(DataSet dataset) {

@@ -36,6 +36,20 @@ public class TSVFile {
 
     /**
      * Construct a TSV data structure from a matrix of objects, which has a header row (first row)
+     * @param headers the headers (one for each column)
+     * @param objects the values in the matrix, index by row then column
+     */
+    public TSVFile(String[] headers, Object[][] objects) {
+        ncols = headers.length;
+        this.headers = new HashMap<>();
+        for (int i = 0; i < headers.length; i++)
+            this.headers.put(headers[i], i);
+        for (int i = 0; i < objects.length; i++)
+            rows.add(i, objects[i]);
+    }
+
+    /**
+     * Construct a TSV data structure from a matrix of objects, which has a header row (first row)
      * @param objects the values in the matrix, index by row then column
      * @param useHeader indicate if the header row is used to label columns or ignored
      */
@@ -174,10 +188,33 @@ public class TSVFile {
         return vals;
     }
 
+    /**
+     * Check if all values are either cast-able to double or null.
+     * @param col
+     * @return
+     */
     public static boolean isDouble(Object[] col) {
         try {
             for (int i = 0; i < col.length; i ++) {
                 Double y = (Double) col[i];
+            }
+            return true; // must have all been of type T, because no exception has been thrown
+        } catch (ClassCastException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if all values are either cast-able to double or null.
+     * @param rows
+     * @return
+     */
+    public static boolean isDouble(Object[][] rows) {
+        try {
+            for (int i = 0; i < rows.length; i ++) {
+                for (int j = 0; j < rows[i].length; j ++) {
+                    Double y = (Double) rows[i][j];
+                }
             }
             return true; // must have all been of type T, because no exception has been thrown
         } catch (ClassCastException e) {

@@ -33,6 +33,9 @@ import dat.Enumerable;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
+import json.JSONArray;
+import json.JSONException;
+import json.JSONObject;
 
 import java.io.Serializable;
 import java.util.*;
@@ -975,6 +978,87 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable {
             }
         }
         return sbuf.toString();
+    }
+
+    /**
+     * Convert CPT to JSON
+     * @return
+     */
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        if (isPrior()) {
+            EnumDistrib d = prior;
+            json.put("Prior", d.toJSON());
+        } else {
+            JSONArray jidxs = new JSONArray();
+            JSONArray jcond = new JSONArray();
+            JSONArray jdist = new JSONArray();
+            for (int i = 0; i < table.getSize(); i++) {
+                EnumDistrib d = table.getValue(i);
+                if (d != null) {
+                    jidxs.put(i);
+                    Object[] key = table.getKey(i);
+                    jcond.put(new JSONArray(key));
+                    jdist.put(d.toJSONArray());
+                }
+            }
+            json.put("Index", jidxs);
+            json.put("Condition", jcond);
+            json.put("Pr", jdist);
+            json.put("Domain", this.var.getDomain().toJSON());
+        }
+        return json;
+    }
+
+    /**
+     * Recover the (unconditioned) CPT from JSON, based on a specified variable
+     * @param json JSON representation
+     * @param prior_var the enumerable variable defining this node
+     * @return new CPT
+     * @throws JSONException if the JSON specification is invalid
+     */
+    public static CPT fromJSON(JSONObject json, EnumVariable prior_var) throws JSONException {
+        CPT cpt = new CPT(prior_var);
+        JSONObject jed = json.getJSONObject("Prior");
+//        if (jed == null)
+//            return null;
+        cpt.put(EnumDistrib.fromJSON(jed));
+        return cpt;
+    }
+
+    /**
+     * Recover the (conditioned) CPT from JSON, based on a specified variable, and the parent variables
+     * @param json JSON representation
+     * @param nodevar the enumerable variable defining this node
+     * @param parvars  the enumerable variables that are the parents of this node
+     * @return new CPT
+     * @throws JSONException if the JSON specification is invalid
+     */
+    public static CPT fromJSON(JSONObject json, EnumVariable nodevar, List<EnumVariable> parvars) throws JSONException {
+        CPT cpt = new CPT(nodevar, parvars);
+        JSONArray jidxs = json.getJSONArray("Index");
+        JSONArray jeds = json.getJSONArray("Pr");
+        Enumerable dom = Enumerable.fromJSON(json.getJSONObject("Domain"));
+        if (!dom.equals(nodevar.getDomain()))
+            throw new RuntimeException("Incompatible domains: \"" + dom + "\" from JSON is not equal to that of variable \"" + nodevar.getDomain() + "\"");
+        for (int i = 0; i < jidxs.length(); i++) {
+            int idx = jidxs.getInt(i);
+            JSONArray jed = jeds.getJSONArray(i);
+            cpt.put(idx, EnumDistrib.fromJSONArray(jed, nodevar.getDomain()));
+        }
+        return cpt;
+    }
+
+    /**
+     * Recover the (conditioned) CPT from JSON, based on a specified variable, and the parent variables
+     * @param json JSON representation
+     * @param nodevar the enumerable variable defining this node
+     * @param parvars  the enumerable variables that are the parents of this node
+     * @return new CPT
+     * @throws JSONException if the JSON specification is invalid
+     */
+    public static CPT fromJSON(JSONObject json, EnumVariable nodevar, EnumVariable ... parvars) throws JSONException {
+        return CPT.fromJSON(json, nodevar, EnumVariable.toList(parvars));
     }
 
     @Override

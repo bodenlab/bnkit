@@ -19,14 +19,16 @@ package bn.node;
 
 import bn.*;
 import bn.factor.Factor;
-import dat.Continuous;
-import dat.EnumVariable;
-import dat.Variable;
-import dat.EnumTable;
+import bn.prob.EnumDistrib;
+import dat.*;
 import bn.prob.GaussianDistrib;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
+import json.JSONArray;
+import json.JSONException;
+import json.JSONObject;
+
 import java.io.Serializable;
 import java.util.*;
 
@@ -812,6 +814,63 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
     @Override
     public String getType() {
         return "GDT";
+    }
+
+    /**
+     * Convert GDT to JSON
+     * @return
+     */
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        JSONArray jidxs = new JSONArray();
+        JSONArray jcond = new JSONArray();
+        JSONArray jdist = new JSONArray();
+        for (int i = 0; i < table.getSize(); i++) {
+            GaussianDistrib d = table.getValue(i);
+            if (d != null) {
+                jidxs.put(i);
+                Object[] key = table.getKey(i);
+                jcond.put(new JSONArray(key));
+                jdist.put(d.toJSONArray());
+            }
+        }
+        json.put("Index", jidxs);
+        json.put("Condition", jcond);
+        json.put("Pr", jdist);
+        json.put("Domain", var.getDomain().toString());
+        return json;
+    }
+
+    /**
+     * Recover the (conditioned) GDT from JSON, based on a specified variable, and the parent variables
+     * @param json JSON representation
+     * @param nodevar the non-enumerable variable defining this node
+     * @param parvars  the enumerable variables that are the parents of this node
+     * @return new GDT
+     * @throws JSONException if the JSON specification is invalid
+     */
+    public static GDT fromJSON(JSONObject json, Variable nodevar, List<EnumVariable> parvars) throws JSONException {
+        GDT gdt = new GDT(nodevar, parvars);
+        JSONArray jidxs = json.getJSONArray("Index");
+        JSONArray jeds = json.getJSONArray("Pr");
+        for (int i = 0; i < jidxs.length(); i++) {
+            int idx = jidxs.getInt(i);
+            JSONArray jed = jeds.getJSONArray(i);
+            gdt.put(idx, GaussianDistrib.fromJSONArray(jed));
+        }
+        return gdt;
+    }
+
+    /**
+     * Recover the (conditioned) GDT from JSON, based on a specified variable, and the parent variables
+     * @param json JSON representation
+     * @param nodevar the non-enumerable variable defining this node
+     * @param parvars  the enumerable variables that are the parents of this node
+     * @return new GDT
+     * @throws JSONException if the JSON specification is invalid
+     */
+    public static GDT fromJSON(JSONObject json, Variable nodevar, EnumVariable ... parvars) throws JSONException {
+        return fromJSON(json, nodevar, EnumVariable.toList(parvars));
     }
 
     @Override

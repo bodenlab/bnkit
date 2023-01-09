@@ -1,23 +1,24 @@
 package api;
 
-import asr.ASRRuntimeException;
-import asr.GRASP;
-import asr.GServer;
-import asr.Prediction;
+import asr.*;
+import bn.Distrib;
 import bn.ctmc.SubstModel;
+import bn.ctmc.matrix.JC;
+import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
+import dat.file.TSVFile;
 import dat.phylo.IdxTree;
-import dat.pog.IdxGraph;
+import dat.phylo.PhyloBN;
+import dat.phylo.TreeInstance;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.util.*;
 
 public class CommandCentral {
 
@@ -56,6 +57,12 @@ public class CommandCentral {
 
             } else if (command.equals("Label-tree")) {
                 request = new GRequest_LabelTree(command, authtoken, jparams);
+
+            } else if (command.equals("Train")) {
+                request = new GRequest_Train(command, authtoken, jparams);
+
+            } else if (command.equals("Infer")) {
+                request = new GRequest_InferBP(command, authtoken, jparams);
 
             } else if (command.equals("Fake")) {
                 request = new GRequest_Fake(command, authtoken, jparams);
@@ -263,7 +270,7 @@ public class CommandCentral {
                 JSONObject tree = params.getJSONObject("Tree");
                 idxTree = IdxTree.fromJSON(tree);
             } catch (JSONException e) {
-                throw new GRequestRuntimeException("Invalid JSON in command : " + command + "; " + e.getMessage());
+                throw new GRequestRuntimeException("Invalid JSON in command: " + command + "; " + e.getMessage());
             }
         }
 
@@ -281,6 +288,241 @@ public class CommandCentral {
             idxTree.getBranchPoint(0).setInternalLabels(0);
             JSONObject myres = new JSONObject();
             myres.put("Tree", idxTree.toJSON());
+            this.setResult(myres);
+        }
+    }
+
+    public static class GRequest_Train extends GRequest {
+
+        private final IdxTree idxTree;
+        private final JSONUtils.DataSet dataset;
+        private enum DATATYPE {CONTINUOUS, ENUMERABLE};
+        private final DATATYPE TIP_TYPE;
+        private PhyloBN pbn = null;
+        private SubstModel MODEL = null;
+        private int OBSERVED_NSTATES;
+        private String[] OBSERVED_ALPHA = null;
+        private Object[] LATENT_STATES = null;
+        private Double GAMMA = 1.0;
+        private Double RATE = 1.0;
+        private Long SEED = 1L;
+        private Boolean LEAVES_ONLY = true;
+
+        public GRequest_Train(String command, String auth, JSONObject params) {
+            super(command, auth);
+            try {
+                JSONObject tree = params.getJSONObject("Tree");
+                idxTree = IdxTree.fromJSON(tree);
+                JSONObject jdataset = params.getJSONObject("Dataset");
+                dataset = JSONUtils.DataSet.fromJSON(jdataset);
+                JSONObject TIP_DISTRIB = params.optJSONObject("Distrib");
+                JSONArray JSTATES = params.optJSONArray("States");
+                if (JSTATES != null) {
+                    LATENT_STATES = new Object[JSTATES.length()];
+                    for (int i = 0; i < JSTATES.length(); i ++)
+                        LATENT_STATES[i] = JSTATES.get(i);
+                }
+                LEAVES_ONLY = params.optBoolean("Leaves-only", LEAVES_ONLY);
+                SEED = params.optLong("Seed", SEED);
+                RATE = params.optDouble("Rate", RATE);
+                GAMMA = params.optDouble("Gamma", GAMMA);
+                if (TSVFile.isDouble(dataset.values)) { // real values for tip nodes
+                    TIP_TYPE = DATATYPE.CONTINUOUS;
+                    if (LATENT_STATES != null) {
+                        MODEL = new JC(GAMMA, LATENT_STATES);
+                    } else
+                        throw new GRequestRuntimeException("Latent states are invalid for " + command + "; States are " + (JSTATES != null ? JSTATES : "not given"));
+                } else { // the column has discrete values (not real)
+                    TIP_TYPE = DATATYPE.ENUMERABLE;
+                    Set observed = new HashSet(new TSVFile(dataset.values).getValues());
+                    OBSERVED_NSTATES = observed.size();
+                    OBSERVED_ALPHA = new String[observed.size()];
+                    observed.toArray(OBSERVED_ALPHA);
+                    if (TIP_DISTRIB == null && LATENT_STATES == null) { // no extra nodes
+                        MODEL = new JC(GAMMA, OBSERVED_ALPHA);
+                    } else if (LATENT_STATES != null) {
+                        MODEL = new JC(GAMMA, LATENT_STATES);
+                    } else
+                        throw new GRequestRuntimeException("Latent states are invalid for " + command + "; States are " + (JSTATES != null ? JSTATES : "not given"));
+                }
+
+                if (TIP_TYPE == DATATYPE.CONTINUOUS) {
+                    pbn = PhyloBN.withGDTs(idxTree, MODEL, RATE, LEAVES_ONLY, SEED);
+                    if (TIP_DISTRIB != null) // GDT given?
+                        pbn.overrideMasterJSON(TIP_DISTRIB);
+                } else { // discrete states only
+                    if (TIP_DISTRIB == null && LATENT_STATES == null) { // no extra nodes
+                        pbn = PhyloBN.create(idxTree, MODEL, RATE);
+                    } else {
+                        pbn = PhyloBN.withCPTs(idxTree, MODEL, OBSERVED_ALPHA, RATE, LEAVES_ONLY, SEED);
+                        if (TIP_DISTRIB != null) // CPT given?
+                            pbn.overrideMasterJSON(TIP_DISTRIB);
+                    }
+                }
+            } catch (JSONException e) {
+                throw new GRequestRuntimeException("Invalid JSON in command : " + command + "; " + e.getMessage());
+            }
+            //
+            // TODO: figure out compute resources, threads, memory, priority, queueing strategy etc.
+            //
+
+        }
+
+        /**
+         * Execute the job
+         * and place results in the instance of this class for later retrieval with {@see GRequest#getResult()}
+         */
+        @Override
+        public boolean isQueued() {
+            return true;
+        }
+
+        @Override
+        public void run() {
+            pbn.trainEM(dataset.headers, dataset.values, SEED);
+            JSONObject myres = new JSONObject();
+            myres.put("Distrib", pbn.getMasterJSON());
+            this.setResult(myres);
+        }
+    }
+    public static class GRequest_InferBP extends GRequest {
+
+        private final IdxTree idxTree;
+        private final JSONUtils.DataSet dataset;
+        private enum DATATYPE {CONTINUOUS, ENUMERABLE};
+        private final DATATYPE TIP_TYPE;
+        private PhyloBN pbn = null;
+        private SubstModel MODEL = null;
+        private int OBSERVED_NSTATES;
+        private String[] OBSERVED_ALPHA = null;
+        private Object[] LATENT_STATES = null;
+        private Double GAMMA = 1.0;
+        private Double RATE = 1.0;
+        private Long SEED = 1L;
+        private Boolean LEAVES_ONLY = true;
+        private Integer MARG_LABEL = 0;
+        private GRASP.Inference MODE = null;
+        private int[] ancestors = null; // if marginal inference, a list of ancestors of at least one
+
+        public GRequest_InferBP(String command, String auth, JSONObject params) {
+            super(command, auth);
+            try {
+                JSONObject tree = params.getJSONObject("Tree");
+                idxTree = IdxTree.fromJSON(tree);
+                JSONObject jdataset = params.getJSONObject("Dataset");
+                dataset = JSONUtils.DataSet.fromJSON(jdataset);
+                JSONObject TIP_DISTRIB = params.getJSONObject("Distrib");
+                JSONArray JSTATES = params.optJSONArray("States");
+                if (JSTATES != null) {
+                    LATENT_STATES = new Object[JSTATES.length()];
+                    for (int i = 0; i < JSTATES.length(); i ++)
+                        LATENT_STATES[i] = JSTATES.get(i);
+                }
+                LEAVES_ONLY = params.optBoolean("Leaves-only", LEAVES_ONLY);
+                SEED = params.optLong("Seed", SEED);
+                String infmode = params.optString("Inference", "Marginal");
+                MODE = infmode.equals("Joint") ? GRASP.Inference.JOINT : (infmode.equals("Marginal") ? GRASP.Inference.MARGINAL : null);
+                if (MODE == GRASP.Inference.MARGINAL) {
+                    try {
+                        Integer ancspec1 = params.optInt("Ancestor");
+                        if (ancspec1 == null) {
+                            JSONArray ancspec2 = params.optJSONArray("Ancestors");
+                            ancestors = new int[ancspec2.length()];
+                            for (int i = 0; i < ancestors.length; i++)
+                                ancestors[i] = ancspec2.getInt(i);
+                        } else {
+                            ancestors = new int[1];
+                            ancestors[0] = ancspec1;
+                        }
+                    } catch (ClassCastException e) { // ancestor IDs specified with "N" prefix
+                        String ancspec1 = params.optString("Ancestor");
+                        if (ancspec1 == null) {
+                            JSONArray ancspec2 = params.optJSONArray("Ancestors");
+                            ancestors = new int[ancspec2.length()];
+                            for (int i = 0; i < ancestors.length; i++)
+                                ancestors[i] = Integer.parseInt(ancspec2.getString(i).substring(1));
+                        } else {
+                            ancestors = new int[1];
+                            ancestors[0] = Integer.parseInt(ancspec1.substring(1));
+                            ;
+                        }
+                    }
+                }
+                RATE = params.optDouble("Rate", RATE);
+                GAMMA = params.optDouble("Gamma", GAMMA);
+                if (TSVFile.isDouble(dataset.values)) { // real values for tip nodes
+                    TIP_TYPE = DATATYPE.CONTINUOUS;
+                    if (LATENT_STATES != null) {
+                        MODEL = new JC(GAMMA, LATENT_STATES);
+                    } else
+                        throw new GRequestRuntimeException("Latent states are invalid for " + command + "; States are " + (JSTATES != null ? JSTATES : "not given"));
+                } else { // the column has discrete values (not real)
+                    TIP_TYPE = DATATYPE.ENUMERABLE;
+                    Set observed = new HashSet(new TSVFile(dataset.values).getValues());
+                    OBSERVED_NSTATES = observed.size();
+                    OBSERVED_ALPHA = new String[observed.size()];
+                    observed.toArray(OBSERVED_ALPHA);
+                    if (TIP_DISTRIB == null && LATENT_STATES == null) { // no extra nodes
+                        MODEL = new JC(GAMMA, OBSERVED_ALPHA);
+                    } else if (LATENT_STATES != null) {
+                        MODEL = new JC(GAMMA, LATENT_STATES);
+                    } else
+                        throw new GRequestRuntimeException("Latent states are invalid for " + command + "; States are " + (JSTATES != null ? JSTATES : "not given"));
+                }
+                if (TIP_TYPE == DATATYPE.CONTINUOUS) {
+                    pbn = PhyloBN.withGDTs(idxTree, MODEL, RATE, LEAVES_ONLY, SEED);
+                    if (TIP_DISTRIB != null) // GDT given?
+                        pbn.overrideMasterJSON(TIP_DISTRIB);
+                } else { // discrete states only
+                    if (TIP_DISTRIB == null && LATENT_STATES == null) { // no extra nodes
+                        pbn = PhyloBN.create(idxTree, MODEL, RATE);
+                    } else {
+                        pbn = PhyloBN.withCPTs(idxTree, MODEL, OBSERVED_ALPHA, RATE, LEAVES_ONLY, SEED);
+                        if (TIP_DISTRIB != null) // CPT given?
+                            pbn.overrideMasterJSON(TIP_DISTRIB);
+                    }
+                }
+            } catch (JSONException e) {
+                throw new GRequestRuntimeException("Invalid JSON in command : " + command + "; " + e.getMessage());
+            }
+            //
+            // TODO: figure out compute resources, threads, memory, priority, queueing strategy etc.
+            //
+
+        }
+
+        /**
+         * Execute the job
+         * and place results in the instance of this class for later retrieval with {@see GRequest#getResult()}
+         */
+        @Override
+        public boolean isQueued() {
+            return true;
+        }
+
+        @Override
+        public void run() {
+            if (MODE == GRASP.Inference.MARGINAL) {
+                // retrieve the branchpoint index for (each of) the nominated ancestors
+                for (int MARG_LABEL : ancestors) {
+                    int bpidx = idxTree.getIndex(MARG_LABEL);
+                    if (bpidx < 0) // did not find it...
+                        continue;
+                    // inference below; first create the inference instance
+                    MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal(bpidx, pbn);
+                    // perform marginal inference
+                    String[] headers = dataset.headers;
+                    Object[][] rows = dataset.values;
+                    for (int i = 0; i < rows.length; i ++) {
+                        TreeInstance ti = idxTree.getInstance(headers, rows[i]);
+                        inf.decorate(ti);
+                        // retrieve the distribution at the node previously nominated
+                        Distrib anydistrib = inf.getDecoration(bpidx);
+                        System.out.println("Ancestor " + MARG_LABEL + "\tBranch point " + bpidx + "\tExample " + i + ":\t" + anydistrib);
+                    }
+                }
+            }
+            JSONObject myres = new JSONObject();
             this.setResult(myres);
         }
     }

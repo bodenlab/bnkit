@@ -5,8 +5,10 @@ import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.FastaReader;
 import dat.file.Newick;
+import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.pog.POGraph;
+import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
@@ -183,6 +185,84 @@ class GRequestTest {
                 //System.out.println(pog.getNode(supported[i]).toJSON().get("Value") + "\t" + aln.getEnumSeq(idx).getStripped()[i]);
                 assertTrue(pog.getNode(supported[i]).toJSON().get("Value").toString().toCharArray()[0] == (Character) aln.getEnumSeq(idx).getStripped()[i]);
             }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    @Test
+    void fromJSON_request_train() {
+        IdxTree tree = IdxTree.fromJSON(new JSONObject("{\"Parents\":[-1,0,1,2,2,4,4,1,0,8,9,9,11,11,8,14,14,16,16],\"Labels\":[\"0\",\"1\",\"2\",\"S001\",\"3\",\"S002\",\"S003\",\"S004\",\"4\",\"5\",\"S005\",\"6\",\"S006\",\"S007\",\"7\",\"S008\",\"8\",\"S009\",\"S010\"],\"Distances\":[0,0.14,0.03,0.14,0.08,0.16,0.10,0.12,0.06,0.06,0.28,0.13,0.12,0.14,0.11,0.20,0.07,0.12,0.19],\"Branchpoints\":19}\n"));
+        String[] headers = {   "S009","S005","S002","S006","S003","S001","S008","S010","S004","S007"};
+        // The values assigned to the tree above, tabulated as per headers; they were intended to group nicely per clade
+        Double[][] rows1 = {{   3.63,  3.81,  2.89,  3.81,  2.54,  2.76,  3.79,  3.70,  1.94,  3.97}};
+
+        try {
+            JSONObject jreq1 = new JSONObject();
+            jreq1.put("Command", "Train");
+            jreq1.put("Auth", "Guest");
+            JSONObject params = new JSONObject();
+            params.put("Tree", tree.toJSON());
+            params.put("Dataset", JSONUtils.toJSON(headers,rows1));
+            params.put("States", new JSONArray(new Character[] {'A','B'}));
+            jreq1.put("Params", params);
+            server_output.println(jreq1);
+            System.out.println(jreq1);
+            JSONObject jresponse = new JSONObject(server_input.readLine());
+            int job = GMessage.fromJSON2Job(jresponse);
+            System.out.println("Server responded: " + jresponse);
+            Thread.sleep(5000); // waiting 5 secs to make sure the job has finished
+            jreq1 = new JSONObject();
+            jreq1.put("Job", job);
+            jreq1.put("Command", "Output"); // request the output/result
+            server_output.println(jreq1);
+            jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    void fromJSON_request_infer() {
+        IdxTree tree = IdxTree.fromJSON(new JSONObject("{\"Parents\":[-1,0,1,2,2,4,4,1,0,8,9,9,11,11,8,14,14,16,16],\"Labels\":[\"0\",\"1\",\"2\",\"S001\",\"3\",\"S002\",\"S003\",\"S004\",\"4\",\"5\",\"S005\",\"6\",\"S006\",\"S007\",\"7\",\"S008\",\"8\",\"S009\",\"S010\"],\"Distances\":[0,0.14,0.03,0.14,0.08,0.16,0.10,0.12,0.06,0.06,0.28,0.13,0.12,0.14,0.11,0.20,0.07,0.12,0.19],\"Branchpoints\":19}\n"));
+        String[] headers = {   "S009","S005","S002","S006","S003","S001","S008","S010","S004","S007"};
+        // The values assigned to the tree above, tabulated as per headers; they were intended to group nicely per clade
+        Double[][] rows1 = {{   3.63,  3.81,  2.89,  3.81,  2.54,  2.76,  3.79,  3.70,  1.94,  3.97}};
+
+        try {
+            JSONObject jreq1 = new JSONObject();
+            jreq1.put("Command", "Infer");
+            jreq1.put("Auth", "Guest");
+            JSONObject params = new JSONObject();
+            params.put("Tree", tree.toJSON());
+            params.put("Dataset", JSONUtils.toJSON(headers,rows1));
+            params.put("States", new JSONArray(new Character[] {'A','B'}));
+            params.put("Distrib", new JSONObject("{\"Condition\":[[\"A\"],[\"B\"]],\"Pr\":[[3.784926135903969,0.056738891699391655],[2.532458829359575,0.056738891699391655]],\"Index\":[0,1],\"Domain\":\"dat.Continuous@3cf71bc7\"}"));
+            params.put("Inference", "Marginal");
+            params.put("Ancestor", 5);
+            jreq1.put("Params", params);
+            server_output.println(jreq1);
+            System.out.println(jreq1);
+            JSONObject jresponse = new JSONObject(server_input.readLine());
+            int job = GMessage.fromJSON2Job(jresponse);
+            System.out.println("Server responded: " + jresponse);
+            Thread.sleep(2000); // waiting 2 secs to make sure the job has finished
+            jreq1 = new JSONObject();
+            jreq1.put("Job", job);
+            jreq1.put("Command", "Output"); // request the output/result
+            server_output.println(jreq1);
+            jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
         } catch (JSONException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {

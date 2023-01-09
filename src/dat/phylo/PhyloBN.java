@@ -172,6 +172,8 @@ public class PhyloBN {
      */
     public void overrideMasterJSON(JSONObject json) {
         if (gdt_master != null) {
+            gdt_master = GDT.fromJSON(json, gdt_master.getVariable(), gdt_master.getParents());
+            /*
             List<EnumVariable> parents = gdt_master.getParents();
             if (parents.size() == 1) {
                 EnumVariable par = parents.get(0);
@@ -181,7 +183,10 @@ public class PhyloBN {
                     gdt_master.put(new Object[] {state}, gd);
                 }
             }
+             */
         } else if (cpt_master != null) {
+            cpt_master = CPT.fromJSON(json, cpt_master.getVariable(), cpt_master.getParents());
+            /*
             List<EnumVariable> parents = cpt_master.getParents();
             if (parents.size() == 1) {
                 EnumVariable par = parents.get(0);
@@ -191,6 +196,7 @@ public class PhyloBN {
                     cpt_master.put(new Object[] {state}, ed);
                 }
             }
+             */
         }
     }
 
@@ -214,6 +220,8 @@ public class PhyloBN {
      */
     public JSONObject getMasterJSON() {
         if (gdt_master != null) {
+            return gdt_master.toJSON();
+            /*
             List<EnumVariable> parents = gdt_master.getParents();
             if (parents.size() == 1) {
                 EnumVariable par = parents.get(0);
@@ -224,7 +232,10 @@ public class PhyloBN {
                 }
                 return json;
             }
+             */
         } else if (cpt_master != null) {
+            return cpt_master.toJSON();
+            /*
             List<EnumVariable> parents = cpt_master.getParents();
             if (parents.size() == 1) {
                 EnumVariable par = parents.get(0);
@@ -235,6 +246,7 @@ public class PhyloBN {
                 }
                 return json;
             }
+             */
         }
         return null;
     }

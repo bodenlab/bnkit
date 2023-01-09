@@ -104,6 +104,38 @@ Note: consider returning the full package with input data, i.e.
                     "Ancestors":[<list-of-POGs>],
                     "Datatype":"Prediction"}}}
 
+### Train BP2Prop model: `<command>` is `"Train"`
+
+`<params>` is
+
+    { "Tree":<tree>,
+      "Dataset":<dataset>,
+      "States":[<state1>,<state2>,...],
+      <optional-args> }
+
+where `<dataset>` specifies a data set (see below).
+
+and
+
+`<optional-args>` is
+
+      "Distrib":<distrib>,
+      "Leaves-only":<true/false>,
+      "Rate":<rate>,
+      "Seed":<seed>,
+      "Gamma":<gamma>
+
+where `<distrib>` specifies a distribution appropriate for the values in the `<dataset>` (see below).
+
+Result is
+
+
+#### Example
+
+
+which results in
+
+
 ## Data structures
 
 ### `<tree>` (`dat.phylo.IdxTree`)
@@ -157,14 +189,33 @@ Additional fields in graphs with edge attributes (including POGs):
       "Hashcode":-631886170,
       "Extants":[<POG1>, <POG2>, ...] }
 
-### `<DataSet>` (`api.JSONUtils.DataSet`)
+### `<dataset>` (`api.JSONUtils.DataSet`)
 
     { "Headers":[<header1>,<header2>, ...],
       "Data":[ [ ... ] ] }
 
 Note: the data matrix is given column 1, column 2, etc, with values in row 1, row 2 etc within
 
-        
+### `<bnode>` (`bn.BNode` i.e. Bayesian network node) 
+
+Here's a discrete/enumerable CPT node (with one enumerable parent variable):
+
+    { "Condition":[["A"],["B"],["C"]],
+      "Pr":[[0.36,0.38,0.26],[0.50,0.32,0.18],[0.07,0.39,0.54]],
+      "Index":[0,1,2],
+      "Domain":
+        { "Size":3,
+          "Values":[0,1,2],
+          "Datatype":"Integer" } }
+
+Here's a continuous/Gaussian GDT node (with the same enumerable parent variable):
+
+    { "Condition":[["A"],["B"],["C"]],
+      "Pr":[[2.1,0.5],[6.4,0.5],[1.3,0.5]],
+      "Index":[0,1,2],
+      "Domain":"dat.Continuous@525b461a" }
+
+
 
 
 

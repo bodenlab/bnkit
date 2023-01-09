@@ -278,11 +278,11 @@ public class Enumerable implements Domain {
     }
 
     public static Enumerable fromJSON(JSONObject jobj) {
-        String defID = jobj.getString("Predef");
+        String defID = jobj.optString("Predef", null);
         if (defID != null) {
             Enumerable match = predef.get(defID);
             if (match == null) {
-                throw new RuntimeException("Invalid predefined domain name: " + defID + ". Please check dat.Enumerable");
+                throw new RuntimeException("Invalid predefined domain name: \"" + defID + "\". Please check dat.Enumerable");
             }
             return match;
         }
