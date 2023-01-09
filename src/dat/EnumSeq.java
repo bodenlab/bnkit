@@ -139,8 +139,12 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
             arr[i] = jsonArray.get(i);
             if (arr[i] == JSONObject.NULL) // JSON library inserts a non-null marker for NULL values; we need a proper null
                 arr[i] = null;
-            else
-                arr[i] = ((String)arr[i]).toCharArray()[0];
+            else {
+                try { // see if can be converted to a String
+                    arr[i] = ((String) arr[i]).toCharArray()[0];
+                } catch (ClassCastException e) {
+                }
+            }
         }
         return arr;
     }

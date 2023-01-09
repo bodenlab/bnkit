@@ -289,6 +289,7 @@ class GRequestTest {
             jreq1.put("Params", params);
             server_output.println(jreq1);
             JSONObject jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
             System.out.println(GMessage.fromJSON2Result(jresponse));
         } catch (JSONException e) {
             e.printStackTrace();

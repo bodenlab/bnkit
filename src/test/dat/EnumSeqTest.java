@@ -86,6 +86,7 @@ class EnumSeqTest {
     void processAlignment() {
         System.out.println(aln.toJSON());
         EnumSeq.Alignment aln_copy = EnumSeq.Alignment.fromJSON(aln.toJSON());
+        System.out.println(aln_copy.toJSON());
         assertTrue(aln_copy.equals(aln));
         /*
         try {
