@@ -18,8 +18,8 @@ public class GRequest extends Thread implements Comparable<GRequest> {
 
     private static int JOBCOUNTER = 1;
     private final int JOB;
-    private enum STATUS {NONE, WAITING, RUNNING, COMPLETED};
-    private STATUS status;
+    enum STATUS {NONE, WAITING, RUNNING, COMPLETED};
+    STATUS status;
     private final String command;
     private final String authtoken;
 
@@ -37,6 +37,22 @@ public class GRequest extends Thread implements Comparable<GRequest> {
         this.JOB = JOBCOUNTER;
         this.status = STATUS.NONE;
         GRequest.JOBCOUNTER += 1;
+    }
+
+    /**
+     * Retrieve a JSON object containing meta info about request
+     * @return
+     */
+    public JSONObject job2JSON() {
+        JSONObject json = new JSONObject();
+        json.put("Command", command);
+        json.put("Auth", authtoken);
+        json.put("Job", getJob());
+        json.put("Status", getStatus());
+        json.put("Priority", PRIORITY);
+        json.put("Threads", NTHREADS);
+        json.put("Memory", MEMORY);
+        return json;
     }
 
     public JSONObject toJSON() {
@@ -74,6 +90,10 @@ public class GRequest extends Thread implements Comparable<GRequest> {
 
     public STATUS getStatus() {
         return status;
+    }
+
+    public boolean isWaiting() {
+        return status == STATUS.WAITING;
     }
 
     public JSONObject getResult() {
@@ -159,6 +179,10 @@ public class GRequest extends Thread implements Comparable<GRequest> {
                 }
             }
             return null;
+        }
+
+        public List<GRequest> getJobs() {
+            return currentjobs;
         }
 
         /**

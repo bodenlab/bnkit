@@ -3,6 +3,7 @@ package asr;
 import api.CommandCentral;
 import api.GRequest;
 import api.GMessage;
+import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
 
@@ -156,7 +157,7 @@ public class GServer {
 
         public void deny() {
             System.out.println("[" + clientSocket.toString() + "]: Denied client, server's closing their socket and associated thread");
-            out.println(GMessage.errorToJSON(5));
+            out.println(GMessage.errorToJSON(5, "Denied, since max number of clients (" + MAX_CLIENTS + ") reached on server"));
             try {
                 in.close();
                 out.close();
@@ -187,54 +188,72 @@ public class GServer {
                         if (job > 0) { // this command has job number, so needs to be handled by server-aware code
                             GRequest request = queue.getRequest(job);               // retrieve from current job queue
                             if (request != null) {                                  // found job...
-                                String command = json.optString("Command");    // extract command
-                                if (command.equals("Retrieve")) {
-                                    // System.out.println("Sending this to client: " + request.toJSON());
-                                    out.println(request.toJSON());                  // pass on job info
-                                } else if (command.equals("Output")) {
-                                    JSONObject result = request.getResult();        // request to retrieve output of completed job
-                                    if (result != null) {                           // if available... probably in storage
-                                        // System.out.println("Sending this to client: " + result);
-                                        out.println(GMessage.server2clientReJob(job, "Result", result));
-                                    } else {
-                                        out.println(GMessage.errorToJSON(2));       // job not available; pass error
-                                    }
-                                } else if (command.equals("Status")) {              // what's the job doing
-                                    // System.out.println("Sending this to client: " + request.getStatus());
-                                    out.println(GMessage.server2clientReJob(job, "Status", request.getStatus()));
-                                } else if (command.equals("Place")) {
-                                    // System.out.println("Sending this to client: " + queue.getPlace(request));
-                                    out.println(GMessage.server2clientReJob(job, "Place", queue.getPlace(request)));
-                                } else if (command.equals("Cancel")) {
-                                    out.println(GMessage.server2clientReJob(job, "Cancel", queue.cancel(request)));
+                                String command = json.optString("Command", null);    // extract command
+                                if (command == null) {
+                                    out.println(GMessage.errorToJSON(3, "No command given about job " + job));
                                 } else {
-                                    out.println(GMessage.errorToJSON(3, "Invalid command: " + command));
+                                    if (command.equals("Retrieve")) {
+                                        // System.out.println("Sending this to client: " + request.toJSON());
+                                        out.println(request.toJSON());                  // pass on job info
+                                    } else if (command.equals("Output")) {
+                                        JSONObject result = request.getResult();        // request to retrieve output of completed job
+                                        if (result != null) {                           // if available... probably in storage
+                                            // System.out.println("Sending this to client: " + result);
+                                            out.println(GMessage.server2clientReJob(job, "Result", result));
+                                        } else {
+                                            out.println(GMessage.errorToJSON(2));       // job not available; pass error
+                                        }
+                                    } else if (command.equals("Status")) {              // what's the job doing
+                                        // System.out.println("Sending this to client: " + request.getStatus());
+                                        out.println(GMessage.server2clientReJob(job, "Status", request.getStatus()));
+                                    } else if (command.equals("Place")) {
+                                        // System.out.println("Sending this to client: " + queue.getPlace(request));
+                                        out.println(GMessage.server2clientReJob(job, "Place", queue.getPlace(request)));
+                                    } else if (command.equals("Cancel")) {
+                                        out.println(GMessage.server2clientReJob(job, "Cancel", queue.cancel(request)));
+                                    } else {
+                                        out.println(GMessage.errorToJSON(3, "Invalid command: " + command));
+                                    }
                                 }
                             } else
-                                out.println(GMessage.errorToJSON(2,"No such job in queue: " + job));
-
-                        // Second type of commands: a new, actual compute job so needs to be managed and may be queued
-                        } else {
-                            try {
-                                GRequest greq = commandCentral.createRequest(json);
-                                // System.out.println("OK--command detected: " + greq);
-                                // decision: run it now, or queue it for later...
-                                if (greq.isQueued()) {      // the request requires to be queued
-                                    queue.add(greq);        // add to job queue
-                                    // System.out.println("Informing client: Job " + greq.getJob() + " has been dispatched to queue, cancel with {\"Job\":\"" + greq.getJob() + "\",\"Command\":\"Cancel\"}");
-                                    // TODO: find more info about what resources are required for job so client (and compute) can be advised
-                                    out.println(GMessage.server2clientReJob(greq.getJob(), "Queued"));
-                                } else { // run now ... not in separate thread
-                                    greq.runnow();
-                                    JSONObject result = greq.getResult();           // request to retrieve output of completed job
-                                    if (result != null) {                           // if available... probably in storage
-                                        out.println(GMessage.server2clientReJob(job, "Result", result));
-                                    } else {
-                                        out.println(GMessage.errorToJSON(2));       // job not available; pass error
-                                    }
+                                out.println(GMessage.errorToJSON(2, "No such job in queue: " + job));
+                        } else { // no "Job"
+                            String command = json.optString("Command", "");    // extract command
+                            if (command.equals("Status")) {
+                                JSONObject jreport = new JSONObject();
+                                JSONArray jtable = new JSONArray();
+                                int cnt = 1;
+                                for (GRequest greq : queue.getJobs()) {
+                                    JSONObject jjob = greq.job2JSON();
+                                    jjob.put("Place", greq.isWaiting() ? cnt++ : 0);
+                                    jtable.put(jjob);
                                 }
-                            } catch (CommandCentral.GRequestRuntimeException syntax) {
-                                out.println(GMessage.errorToJSON(4, syntax.getMessage()));
+                                jreport.put("Jobs", jtable);
+                                jreport.put("Clients", clients.size());
+                                out.println(jreport);
+                            } else {
+                                // Second type of commands: a new, actual compute job so needs to be managed and may be queued
+                                try {
+                                    GRequest greq = commandCentral.createRequest(json);
+                                    // System.out.println("OK--command detected: " + greq);
+                                    // decision: run it now, or queue it for later...
+                                    if (greq.isQueued()) {      // the request requires to be queued
+                                        queue.add(greq);        // add to job queue
+                                        // System.out.println("Informing client: Job " + greq.getJob() + " has been dispatched to queue, cancel with {\"Job\":\"" + greq.getJob() + "\",\"Command\":\"Cancel\"}");
+                                        // TODO: find more info about what resources are required for job so client (and compute) can be advised
+                                        out.println(GMessage.server2clientReJob(greq.getJob(), "Queued"));
+                                    } else { // run now ... not in separate thread
+                                        greq.runnow();
+                                        JSONObject result = greq.getResult();           // request to retrieve output of completed job
+                                        if (result != null) {                           // if available... probably in storage
+                                            out.println(GMessage.server2clientReJob(job, "Result", result));
+                                        } else {
+                                            out.println(GMessage.errorToJSON(2));       // job not available; pass error
+                                        }
+                                    }
+                                } catch (CommandCentral.GRequestRuntimeException syntax) {
+                                    out.println(GMessage.errorToJSON(4, syntax.getMessage()));
+                                }
                             }
                         }
                         // System.out.println("Accepts new request");
@@ -244,14 +263,14 @@ public class GServer {
                     }
                     inputLine = in.readLine();
                 }
-                System.out.println("[" + clientSocket.toString() + "]: closing socket and associated thread");
                 in.close();
-                out.close();
                 clientSocket.close();
-                clients.remove(this);
             } catch (IOException e) {
                 System.err.println("[" + clientSocket.toString() + "]: socket thread failed");
             }
+            System.out.println("[" + clientSocket.toString() + "]: closing socket and associated thread");
+            out.close();
+            clients.remove(this);
         }
     }
 }

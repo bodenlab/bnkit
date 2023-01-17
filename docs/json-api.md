@@ -17,6 +17,23 @@ Return the result of the request
 ### `<request>` is `"Place"`
 Find the place in queue of the request
 
+### List all jobs
+
+    { "Command":"Status"}
+
+returns
+
+    { "Jobs":[<list-of-jobs>],
+      "Clients":<number-of-clients>}
+
+for example
+
+    { "Jobs":[
+        { "Status":"COMPLETED","Threads":1,"Command":"Fake","Priority":0,"Memory":1,"Auth":"Guest","Job":1,"Place":0 },
+        { "Status":"COMPLETED","Threads":1,"Command":"Fake","Priority":0,"Memory":1,"Auth":"Guest","Job":2,"Place":0 },
+        { "Status":"RUNNING","Threads":1,"Command":"Fake","Priority":0,"Memory":1,"Auth":"Guest","Job":3,"Place":0 },
+        { "Status":"WAITING","Threads":1,"Command":"Fake","Priority":0,"Memory":1,"Auth":"Guest","Job":4,"Place":1 }],
+      "Clients":1 }
 
 ## Commands for `asr.GServer`
 Execute/submit job
