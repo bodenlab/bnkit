@@ -416,22 +416,29 @@ public class PhyloBN {
      */
 
     public void trainEM(String[] labels, Object[][] data, long seed) {
-        Variable[] vars = new Variable[labels.length];
-        for (int i = 0; i < labels.length; i++) {
-            boolean found = false;
+        List<Integer> varidxlist = new ArrayList<>();
+        List<Integer> datidxlist = new ArrayList<>();
+        for (int i = 0; i < labels.length; i ++) {
             for (int j = 0; j < names.length; j ++) {
                 if (names[j].equals(labels[i])) {
-                    vars[i] = bp2ext == null ? bp2node[j].getVariable() : bp2ext[j].getVariable();
-                    found = true;
+                    varidxlist.add(j);
+                    datidxlist.add(i);
                     break;
                 }
             }
-            if (!found)
-                throw new RuntimeException("Could not find label in BN");
+        }
+        Object[][] dats = new Object[data.length][datidxlist.size()];
+        Variable[] vars = new Variable[varidxlist.size()];
+        for (int i = 0; i < varidxlist.size(); i ++) {
+            int varidx = varidxlist.get(i);
+            int datidx = datidxlist.get(i);
+            vars[i] = bp2ext == null ? bp2node[varidx].getVariable() : bp2ext[varidx].getVariable();
+            for (int k = 0; k < data.length; k ++)
+                dats[k][i] = data[k][datidx];
         }
         EM em = new EM(bn);
         em.setEMOption(1);
-        em.train(data, vars, seed);
+        em.train(dats, vars, seed);
     }
 
     /**

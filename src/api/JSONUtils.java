@@ -74,6 +74,14 @@ public class JSONUtils {
         return toJSON(tsv.getHeaders(), tsv.getRows());
     }
 
+    /**
+     * Transform headers and data matrix into a JSON representation; the matrix
+     * has rows that correspond to samples and columns to features (named by headers);
+     * the resulting JSON representation joins all samples for each feature/header (i.e. the transpose of the matrix).
+     * @param headers
+     * @param data matrix ([sample][feature])
+     * @return
+     */
     public static JSONObject toJSON(String[] headers, Object[][] data) {
         JSONObject json = new JSONObject();
         json.put("Headers", headers);

@@ -123,15 +123,17 @@ and
 
 `<optional-args>` is
 
-      "Distrib":<distrib>,
+      "Distrib":<bnode>,
       "Leaves-only":<true/false>,
       "Rate":<rate>,
       "Seed":<seed>,
       "Gamma":<gamma>
 
-where `<distrib>` specifies a distribution appropriate for the values in the `<dataset>` (see below).
+where `<bnode>` specifies a probability distribution appropriate for the values in the `<dataset>` 
+(see below, `bnode` is actually a part of a Bayesian network). 
+If you specify one, it will be used as a starting point for training.
 
-Result is a new/refined distribution (see example below).
+The result is a new/refined distribution (see example below).
 
 #### Example
 
@@ -144,7 +146,7 @@ Result is a new/refined distribution (see example below).
               "Data":[[3.63],[3.81],[2.89],[3.81],[2.54],[2.76],[3.79],[3.7],[1.94],[3.97]]},
               "Tree":<tree> } } }
 
-which results in
+which results in a distribution, or `bnode`: 
     
     { "Distrib":
         { "Condition":[["A"],["B"]],
@@ -159,20 +161,16 @@ which results in
     { "Tree":<tree>,
       "Dataset":<dataset>,
       "States":[<state1>,<state2>,...],
-      "Distrib":<distrib>,
+      "Distrib":<bnode>,
       <optional-args> }
 
-and
-
+where `<bnode>` must specify a distribution appropriate for the values in the `<dataset>` (see below); 
 `<optional-args>` is
 
-      "Distrib":<distrib>,
       "Leaves-only":<true/false>,
       "Rate":<rate>,
       "Seed":<seed>,
       "Gamma":<gamma>
-
-where `<distrib>` specifies a distribution appropriate for the values in the `<dataset>` (see below).
 
 Result is a new/refined distribution (see example below).
 
@@ -287,7 +285,17 @@ Additional fields in graphs with edge attributes (including POGs):
     { "Headers":[<header1>,<header2>, ...],
       "Data":[ [ ... ] ] }
 
-Note: the data matrix is given column 1, column 2, etc, with values in row 1, row 2 etc within
+Note: the data matrix is given column 1, column 2, etc, with values in row 1, row 2 etc within (see example below)
+
+#### Example
+
+The example has 39 protein names as `Headers`, 
+which are listed in the same order as the list of observations for each. 
+In the example below, there is only a single observation for each protein name; 
+the value `null` signifies absence of observation. 
+
+    { "Headers":["A5ILB0","P08144","P29957","H2N0D4","T1WDH2","T1WE96","H9B4I9","A0A060DAC6","Q47R94","Q5UZY3","D8J7H2","Q4A3E0","L8B068","Q2QC88","O93647","Q4J9M2","Q97YY0","O33476","D0KTV8","P96107","P06279","P04746","P00690","O08452","D4P4Y7","Q1KLC8","Q8A1G3","P17654","B8Y698","P00692","B8Y1H0","B1VK33","B5ARZ9","P20845","B6RB08","P06278","P04063","P00693","Q8LJQ6","Q2KJQ1","Q6WUB6","A8VWC5","A0SEG1","P04745","Q75UG5"],
+      "Data":[[8.5],[7.35],[7.35],[7],[9],[9],[null],[8.5],[7.35],[null],[null],[null],[7],[5.75],[5.25],[3.25],[null],[6.5],[null],[null],[null],[null],[7.35],[5.75],[5.5],[7],[null],[null],[8],[6],[null],[7],[6.5],[null],[6.5],[6.466666666666666],[null],[null],[null],[null],[9.5],[null],[null],[6.9],[7]]}
 
 ### `<bnode>` (`bn.BNode` i.e. Bayesian network node) 
 

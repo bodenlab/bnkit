@@ -133,7 +133,7 @@ public class TSVFile {
     /**
      * Retrieve the column index of a given header
      * @param header name of column
-     * @return the column index (starting at 0)
+     * @return the column index (starting at 0); returns -1 if not found
      */
     public int getColumn(String header) {
         Integer col = headers.get(header);
@@ -220,6 +220,28 @@ public class TSVFile {
         } catch (ClassCastException e) {
             return false;
         }
+    }
+
+    /**
+     * Check if all values are either cast-able to double, int or null.
+     * @param rows
+     * @return
+     */
+    public static boolean isDoubleOrInt(Object[][] rows) {
+        for (int i = 0; i < rows.length; i ++) {
+            for (int j = 0; j < rows[i].length; j ++) {
+                try {
+                    Double y = (Double) rows[i][j];
+                } catch (ClassCastException e) {
+                    try {
+                        Integer y = (Integer) rows[i][j];
+                    } catch (ClassCastException e2) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true; // must have all been of type T, because no exception has been thrown
     }
 
     private Map<Object, int[]> getIndexMap(int col) {

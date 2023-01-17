@@ -501,7 +501,11 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
         try {
             instance = (Double) value;
         } catch (ClassCastException e) {
-            e.printStackTrace();
+            try {
+                instance = ((Integer) value)/1.0;
+            } catch (ClassCastException e2) {
+                e.printStackTrace();
+            }
         }
     }
 

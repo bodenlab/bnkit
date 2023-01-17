@@ -326,7 +326,7 @@ public class CommandCentral {
                 SEED = params.optLong("Seed", SEED);
                 RATE = params.optDouble("Rate", RATE);
                 GAMMA = params.optDouble("Gamma", GAMMA);
-                if (TSVFile.isDouble(dataset.values)) { // real values for tip nodes
+                if (TSVFile.isDoubleOrInt(dataset.values)) { // real values for tip nodes
                     TIP_TYPE = DATATYPE.CONTINUOUS;
                     if (LATENT_STATES != null) {
                         MODEL = new JC(GAMMA, LATENT_STATES);
@@ -450,7 +450,7 @@ public class CommandCentral {
                 }
                 RATE = params.optDouble("Rate", RATE);
                 GAMMA = params.optDouble("Gamma", GAMMA);
-                if (TSVFile.isDouble(dataset.values)) { // real values for tip nodes
+                if (TSVFile.isDoubleOrInt(dataset.values)) { // real values for tip nodes
                     TIP_TYPE = DATATYPE.CONTINUOUS;
                     if (LATENT_STATES != null) {
                         MODEL = new JC(GAMMA, LATENT_STATES);

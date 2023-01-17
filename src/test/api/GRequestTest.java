@@ -5,6 +5,7 @@ import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.FastaReader;
 import dat.file.Newick;
+import dat.file.TSVFile;
 import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.pog.POGraph;
@@ -20,6 +21,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.StringTokenizer;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -333,6 +335,136 @@ class GRequestTest {
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /*
+    Test tree from Seb: Glycosyl hydrolase 13 family (stored in the ~/data folder
+    Properties with good coverage include
+    pH optimum: 56%
+    TO: 62%
+    Tn: 31%
+    TS: 49%
+     */
+    JSONUtils.DataSet getProperty(String propname) throws IOException {
+        TSVFile tsv = new TSVFile("data/3_2_1_1_annotations.txt", true);
+        int col = tsv.getColumn(propname);
+        if (col == -1)
+            return null;
+        Object[] vals = tsv.getCol(col);
+        Object[] curated = new Object[vals.length];
+        for (int i = 0; i < vals.length; i ++) {
+            if (vals == null)
+                continue;
+            String sval = vals[i].toString();
+            StringTokenizer stok = new StringTokenizer(sval, ";");
+            String[] subsvals = new String[stok.countTokens()];
+            boolean none = false;
+            int j = 0;
+            while (stok.hasMoreTokens()) {
+                String tok = stok.nextToken().trim();
+                if (tok.equals("None") || tok.equals("none") || tok.equals("Null") || tok.equals("null")) {
+                    none = true;
+                    break;
+                }
+                int stophere = tok.indexOf('_');
+                if (stophere == -1)
+                    subsvals[j] = tok;
+                else
+                    subsvals[j] = tok.substring(0, stophere);
+                j += 1;
+            }
+            if (none)
+                continue;
+            Double[] subsvald = new Double[subsvals.length];
+            double sum = 0;
+            for (j = 0; j < subsvald.length; j ++) {
+                try {
+                    // could be a range
+                    int stophere = subsvals[j].indexOf('-');
+                    if (stophere == -1) // not a range
+                        subsvald[j] = Double.parseDouble(subsvals[j]);
+                    else { // range indeed, so pick middle point
+                        String part2 = subsvals[j].substring(stophere + 1);
+                        String part1 = subsvals[j].substring(0, stophere);
+                        subsvald[j] = (Double.parseDouble(part2) + Double.parseDouble(part1)) / 2.0;
+                    }
+                } catch (NumberFormatException e) {
+                    // not a number
+                    throw new RuntimeException("Invalid format: value \"" + subsvals[j] + "\" on row " + (j + 1) + " is not a number, or range of numbers");
+                }
+                sum += subsvald[j];
+            }
+            curated[i] = sum / (double)subsvald.length;
+        }
+        JSONUtils.DataSet ds = new JSONUtils.DataSet();
+        ds.headers = new String[vals.length];
+        ds.values = new Object[1][vals.length];
+        int entrycol = tsv.getColumn("Entry");
+        for (int i = 0; i < vals.length; i ++) {
+            ds.headers[i] = tsv.getCol(entrycol)[i].toString();
+            ds.values[0][i] = curated[i];
+        }
+        return ds;
+    }
+
+    @Test
+    void request_Sebs_tree() {
+        try {
+            Tree tree = Newick.load("data/3_2_1_1_filt.nwk");
+            tree.save("data/glycosol_hydrolase.nwk", "ancestor");
+            JSONUtils.DataSet ds = getProperty("BRENDA_PHO_DATA");
+            JSONObject jreq1 = new JSONObject();
+            jreq1.put("Command", "Train");
+            jreq1.put("Auth", "Guest");
+            JSONObject params = new JSONObject();
+            params.put("Tree", tree.toJSON());
+            params.put("Dataset", JSONUtils.toJSON(ds));
+            params.put("States", new JSONArray(new Character[] {'A','B','C'}));
+            jreq1.put("Params", params);
+            server_output.println(jreq1);
+            System.out.println(jreq1);
+            JSONObject jresponse = new JSONObject(server_input.readLine());
+            int job = GMessage.fromJSON2Job(jresponse);
+            System.out.println("Server responded: " + jresponse);
+            Thread.sleep(5000); // waiting 5 secs to make sure the job has finished
+            jreq1 = new JSONObject();
+            jreq1.put("Job", job);
+            jreq1.put("Command", "Output"); // request the output/result
+            server_output.println(jreq1);
+            jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
+            JSONObject jresult = jresponse.getJSONObject("Result");
+            JSONObject jdistrib = jresult.getJSONObject("Distrib");
+
+            JSONObject jreq2 = new JSONObject();
+            jreq2.put("Command", "Infer");
+            jreq2.put("Auth", "Guest");
+            params.put("Distrib", jdistrib);
+            params.put("Inference", "Marginal");
+            for (int idx : tree.getAncestors()) {
+                Integer ancid = (Integer) tree.getLabel(idx);
+                params.put("Ancestor", ancid);
+                jreq2.put("Params", params);
+                server_output.println(jreq2);
+                System.out.println(jreq2);
+                jresponse = new JSONObject(server_input.readLine());
+                job = GMessage.fromJSON2Job(jresponse);
+                System.out.println("Server responded: " + jresponse);
+                Thread.sleep(500); // waiting 0.5 secs to make sure the job has finished
+                JSONObject jreq2b = new JSONObject();
+                jreq2b.put("Job", job);
+                jreq2b.put("Command", "Output"); // request the output/result
+                server_output.println(jreq2b);
+                jresponse = new JSONObject(server_input.readLine());
+                System.out.println("Server responded: " + jresponse);
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
