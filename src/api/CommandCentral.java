@@ -152,7 +152,9 @@ public class CommandCentral {
                     aln = EnumSeq.Alignment.fromJSON(jaln);
                     pogTree = new POGTree(aln, idxTree);
                 } catch (JSONException e2) {
-                    throw new GRequestRuntimeException("Invalid JSON in command : " + command + "; " + e2.getMessage());
+                    throw new GRequestRuntimeException("Invalid JSON in command: " + command + "; " + e2.getMessage());
+                } catch (RuntimeException e3) {
+                    throw new GRequestRuntimeException("Invalid parameters in command: " + command + "; " + e3.getMessage());
                 }
             }
             try {
@@ -197,6 +199,8 @@ public class CommandCentral {
                 MODEL = SubstModel.createModel(modelname);
                 if (MODEL == null)
                     throw new ASRRuntimeException("Invalid model");
+//              TODO: more user data error checking
+//                if (MODEL.getDomain().)
                 // rates (optional)
                 JSONArray jrates = params.optJSONArray("Rates");
                 if (jrates != null) {

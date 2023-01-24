@@ -271,11 +271,12 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
                 String name = json.getString("Name");
                 EnumSeq.Gappy eseq = new EnumSeq.Gappy<>(domain);
                 Object[] arr = toObjectArray(json.getJSONArray("Seq"));
-                eseq.set(arr);
+                if (!eseq.set(arr))
+                    throw new RuntimeException("Invalid sequence in JSON: " + json);
                 eseq.setName(name);
                 return eseq;
             } catch (JSONException e) {
-                throw new RuntimeException("Error in JSON encoding sequence: " + json);
+                throw new RuntimeException("Formatting error in JSON: " + json);
             }
         }
 

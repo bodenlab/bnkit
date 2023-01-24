@@ -96,6 +96,7 @@ class ClientServerOutputReader extends Thread {
     }
 
     public void run() {
+
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(serverSocket.getInputStream()));
             String outputFromServer="";
@@ -103,10 +104,11 @@ class ClientServerOutputReader extends Thread {
                 // This output may overlap the user input from console
                 System.out.println(outputFromServer);
             }
+        } catch (SocketException e) {
+            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-
     }
 }
 

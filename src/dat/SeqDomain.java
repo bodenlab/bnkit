@@ -45,11 +45,13 @@ public class SeqDomain<E extends Domain> implements Domain {
         return true;
     }
     
-    public void set(Object[] value) {
+    public boolean set(Object[] value) {
         if (this.isValid(value)) {
             //System.err.println("Invalid character found: " + value);
             this.arr = value;
+            return true;
         }
+        return false;
     }
     
     public Object[] get() {
