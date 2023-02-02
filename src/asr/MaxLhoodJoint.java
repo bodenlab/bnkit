@@ -67,6 +67,19 @@ public class MaxLhoodJoint implements TreeDecor<Object> {
     }
 
     /**
+     * Set-up joint inference based directly on a PhyloBN instance (with defined/pre-trained nodes).
+     * The BN always has nodes for the nodes of the phylogenetic tree, and if isExt() is true it has nodes for accessory variables.
+     * Accessory variables are "tied" meaning that they share the parameters. Moreover, these variables may be confined to leaves on the
+     * tree, or apply to all nodes of the tree.
+     * @param pbn
+     */
+    public MaxLhoodJoint(PhyloBN pbn) {
+        this.tree = pbn.getTree();
+        this.pbn = pbn;
+    }
+
+
+    /**
      * Retrieve the inferred state for a specified branch point, as determined by max likelihood
      * @param idx branch point index
      * @return state which jointly with all others assigns the greatest probability to the observed values (at leaves)
@@ -86,7 +99,7 @@ public class MaxLhoodJoint implements TreeDecor<Object> {
     @Override
     public void decorate(TreeInstance ti) {
         long START_TIME = System.currentTimeMillis();
-        if (model == null)
+        if (model == null && !pbn.isExt())
             inf = infer(ti, true);
         else
             inf = infer(ti);
@@ -101,20 +114,35 @@ public class MaxLhoodJoint implements TreeDecor<Object> {
     /**
      * Determine the joint state that assigns the maximum likelihood to the specified observations.
      * This is the bit that will be multi-threaded usually.
-     * @param ti observed tree states
+     * @param ti observed tree states; these correspond to either the nodes of the phylogenetic tree, or to variables attached below them
      */
     public Inference infer(TreeInstance ti) {
-        Inference myinf = new Inference(ti);
-        Map<String, Integer> quick = new HashMap<>();
-        // instantiate all nodes for which there are values, i.e. leaf nodes most probably but not necessarily.
-        // also, leaf nodes do not need to be instantiated.
+        Inference myinf = new Inference(ti);            // setting up a structure to keep the values
+        Map<String, Integer> quick = new HashMap<>();   // creating a map so that variables (whatever they may represent) can be linked to a specific index in the tree
+        // instantiate all nodes for which there are values, i.e. leaf nodes most probably but not necessarily or exclusively
         for (int i = 0; i < ti.getSize(); i++) {
-            myinf.values[i] = ti.getInstance(i);
-            BNode bnode = pbn.getBNode(i);
-            if (bnode != null) { // not hidden, so can be instantiated and inferred
-                quick.put(bnode.getVariable().getName(), i);
-                bnode.setInstance(myinf.values[i]);
-            } // else, this branchpoint is outside of the BN, and will be ignored
+            myinf.values[i] = ti.getInstance(i);  // input value is always output value, so transferred to result here
+            // we may infer two different values for the same index in the phylogenetic tree!
+            // inferred values are in two places; in the main tree (always), ...
+            if (pbn.isExt()) { // will have accessory (ext) variables
+                BNode bnode = pbn.getExtNode(i); // but they are not always there (e.g. accessory vars for ancestors)
+                if (bnode != null) {             // not hidden, so can be instantiated and inferred
+                    quick.put(bnode.getVariable().getName(), i);
+                    bnode.setInstance(myinf.values[i]);
+                } else {       // additional complication is that some indices do NOT have accessory variables, so we rely on the main tree instead
+                    bnode = pbn.getBNode(i);
+                    if (bnode != null) {
+                        quick.put(bnode.getVariable().getName(), i);
+                        bnode.setInstance(myinf.values[i]);
+                    } // else, this branchpoint is outside of the BN
+                }
+            } else { // will NOT have accessory variables, so much more straightforward...
+                BNode bnode = pbn.getBNode(i);
+                if (bnode != null) {
+                    quick.put(bnode.getVariable().getName(), i);
+                    bnode.setInstance(myinf.values[i]);
+                } // else, this branchpoint is outside of the BN
+            }
         }
         if (pbn.isValid()) {
             // set-up the inference engine
@@ -126,7 +154,9 @@ public class MaxLhoodJoint implements TreeDecor<Object> {
             for (Variable.Assignment assign1 : assign) {
                 Integer idx = quick.get(assign1.var.getName());
                 if (idx != null) {
-                    myinf.values[idx] = assign1.val;
+                    if (ti.getInstance(idx) == null) { // was not instantiated
+                        myinf.values[idx] = assign1.val;
+                    }
                 }
             }
         } // else the BN is incapable of performing inference, so just leave values as they are
@@ -218,8 +248,18 @@ public class MaxLhoodJoint implements TreeDecor<Object> {
 
     class Inference {
         final private Object[] values;
+        final private IdxTree tree;
         public Inference(TreeInstance ti) {
             this.values = new Object[ti.getSize()];
+            this.tree = ti.getTree();
+        }
+        @Override
+        public String toString() {
+            return getTreeInstance().toString();
+        }
+
+        public TreeInstance getTreeInstance() {
+            return new TreeInstance(tree, values);
         }
     }
 

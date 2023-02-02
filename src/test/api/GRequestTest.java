@@ -446,6 +446,7 @@ class GRequestTest {
             for (int idx : tree.getAncestors()) {
                 Integer ancid = (Integer) tree.getLabel(idx);
                 params.put("Ancestor", ancid);
+                params.put("Leaves-only", false); // switch to true if you want to see the parents distribution
                 jreq2.put("Params", params);
                 server_output.println(jreq2);
                 System.out.println(jreq2);
@@ -514,13 +515,14 @@ class GRequestTest {
             for (int idx : tree.getAncestors()) {
                 Integer ancid = (Integer) tree.getLabel(idx);
                 params.put("Ancestor", ancid);
+                params.put("Leaves-only", false); // switch to true if you want to see the parents distribution
                 jreq2.put("Params", params);
                 server_output.println(jreq2);
                 System.out.println(jreq2);
                 jresponse = new JSONObject(server_input.readLine());
                 job = GMessage.fromJSON2Job(jresponse);
                 System.out.println("Server responded: " + jresponse);
-                Thread.sleep(1000); // waiting 0.5 secs to make sure the job has finished
+                Thread.sleep(1000); // waiting 1 sec to make sure the job has finished
                 JSONObject jreq2b = new JSONObject();
                 jreq2b.put("Job", job);
                 jreq2b.put("Command", "Output"); // request the output/result
@@ -528,6 +530,64 @@ class GRequestTest {
                 jresponse = new JSONObject(server_input.readLine());
                 System.out.println("Server responded: " + jresponse);
             }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    void request_Train_1xmotif_joint() {
+        try {
+            Tree tree = Newick.load("data/3_2_1_1_filt.nwk");
+            tree.save("data/glycosol_hydrolase.nwk", "ancestor");
+            EnumSeq.Alignment aln = loadAln("3_2_1_1_filt.aln");
+            JSONUtils.DataSet ds = getDataset(aln, 709);
+            JSONObject jreq1 = new JSONObject();
+            jreq1.put("Command", "Train");
+            jreq1.put("Auth", "Guest");
+            JSONObject params = new JSONObject();
+            params.put("Tree", tree.toJSON());
+            params.put("Dataset", JSONUtils.toJSON(ds));
+            params.put("States", new JSONArray(new Character[] {'A','B','C'}));
+            jreq1.put("Params", params);
+            server_output.println(jreq1);
+            System.out.println(jreq1);
+            JSONObject jresponse = new JSONObject(server_input.readLine());
+            int job = GMessage.fromJSON2Job(jresponse);
+            System.out.println("Server responded: " + jresponse);
+            Thread.sleep(5000); // waiting 5 secs to make sure the job has finished
+            jreq1 = new JSONObject();
+            jreq1.put("Job", job);
+            jreq1.put("Command", "Output"); // request the output/result
+            server_output.println(jreq1);
+            jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
+            JSONObject jresult = jresponse.getJSONObject("Result");
+            JSONObject jdistrib = jresult.getJSONObject("Distrib");
+
+            JSONObject jreq2 = new JSONObject();
+            jreq2.put("Command", "Infer");
+            jreq2.put("Auth", "Guest");
+            params.put("Distrib", jdistrib);
+            params.put("Inference", "Joint");
+            params.put("Leaves-only", true); // switch to true if you want to see the parents distribution
+            jreq2.put("Params", params);
+            server_output.println(jreq2);
+            System.out.println(jreq2);
+            jresponse = new JSONObject(server_input.readLine());
+            job = GMessage.fromJSON2Job(jresponse);
+            System.out.println("Server responded: " + jresponse);
+            Thread.sleep(5000); // waiting 5 secs to make sure the job has finished
+            JSONObject jreq2b = new JSONObject();
+            jreq2b.put("Job", job);
+            jreq2b.put("Command", "Output"); // request the output/result
+            server_output.println(jreq2b);
+            jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
         } catch (JSONException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {

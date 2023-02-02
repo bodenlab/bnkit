@@ -212,6 +212,8 @@ public class VarElim implements Inference {
             BNode node = bn.getNode(var);
             // next call is causing delays with threading
             AbstractFactor ft = node.makeDenseFactor(relmap); // forces new makeFactor method to be used on only relevant nodes
+            // make sure we trace values of variables at the factor table level for MPE queries
+            //ft.setTraced(q.getStatus() == STATUS_MPE);
             boolean added = false;
             if (!ft.hasEnumVars()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
                 buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
@@ -291,9 +293,10 @@ public class VarElim implements Inference {
                         Variable[] margin = new Variable[b.vars.size()];
                         for (int j = 0; j < margin.length; j ++) 
                             margin[j] = b.vars.get(j);
-                        if (q.getStatus() == STATUS_MPE)
+                        if (q.getStatus() == STATUS_MPE) {
+                            // result.setTraced(true);
                             result = Factorize.getMaxMargin(result, margin); // max-out variables of bucket
-                        else
+                        } else
                             result = Factorize.getMargin(result, margin);    // sum-out variables of bucket
                         
                         if (!result.hasEnumVars())      // if no enumerable variables, we may still have non-enumerables

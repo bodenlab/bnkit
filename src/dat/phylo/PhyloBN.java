@@ -165,6 +165,22 @@ public class PhyloBN {
     private GDT gdt_master = null;
     private CPT cpt_master = null;
 
+    public GDT getMasterGDT() {
+        return gdt_master;
+    }
+
+    public void setMasterGDT(Object[] conditions, GaussianDistrib[] distribs) {
+        if (conditions.length == distribs.length) {
+            for (int i = 0; i < conditions.length; i ++) {
+                gdt_master.put(new Object[] {conditions[i]}, distribs[i]);
+            }
+        }
+    }
+
+    public CPT getMasterCPT() {
+        return cpt_master;
+    }
+
     /**
      * With the specified JSON encoding, override an existing definition of the so-called master node,
      * shared across branch points, extending as a CPT or GDT.

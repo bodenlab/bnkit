@@ -364,7 +364,9 @@ public class CommandCentral {
                     }
                 }
             } catch (JSONException e) {
-                throw new GRequestRuntimeException("Invalid JSON in command : " + command + "; " + e.getMessage());
+                throw new GRequestRuntimeException("Invalid JSON in command: " + command + "; " + e.getMessage());
+            } catch (JSONUtils.JSONUtilsException e) {
+                throw new GRequestRuntimeException("Invalid format: " + command + "; " + e.getMessage());
             }
             //
             // TODO: figure out compute resources, threads, memory, priority, queueing strategy etc.
@@ -528,24 +530,39 @@ public class CommandCentral {
                         } else {
                             jarr.put(anydistrib.toString());
                         }
-                        System.out.println("Ancestor " + MARG_LABEL + "\tBranch point " + bpidx + "\tExample " + i + ":\t" + anydistrib);
+                        //System.out.println("Ancestor " + MARG_LABEL + "\tBranch point " + bpidx + "\tExample " + i + ":\t" + anydistrib);
                     }
                     jpred.put("N" + MARG_LABEL, jarr);
                 }
                 this.setResult(jpred);
-            } else { // joint: TODO: not yet implemented as it requires modifications to MaxLhoodJoint
+            } else { // joint:
                 JSONObject jpred = new JSONObject();
                 String[] headers = dataset.headers;
                 Object[][] rows = dataset.values;
-                Object[][] preds = new Object[idxTree.getAncestors().length][rows.length];
+                Object[][] preds = new Object[idxTree.getSize()][rows.length];
+                MaxLhoodJoint inf = new MaxLhoodJoint(pbn);
                 for (int i = 0; i < rows.length; i ++) {
                     TreeInstance ti = idxTree.getInstance(headers, rows[i]);
-                    // inference will include all ancestors
-                    for (int j : idxTree.getAncestors()) {
-                        preds[j][i] = null; // TODO
+                    try {
+                        ti.save("/Users/mikael/Downloads/m709_" + i + ".nwk");
+                    } catch (IOException e) {
+                        System.err.println("Failed to save");
+                    }
+                    inf.decorate(ti);
+                    // inference will include all nodes (a subset instantiated before inference)
+                    for (int j : idxTree) {
+                        preds[j][i] = inf.getDecoration(j); //ti.getInstance(j);
                     }
                 }
-//                jpred.put("N" + MARG_LABEL, jarr);
+                for (int NODE_LABEL : idxTree) {
+                    JSONArray jarr = new JSONArray();
+                    jarr.put(preds[NODE_LABEL]);
+                    //for (int i = 0; i < rows.length; i ++) {
+                    if (idxTree.isLeaf(NODE_LABEL))
+                        jpred.put(idxTree.getLabel(NODE_LABEL).toString(), jarr);
+                    else
+                        jpred.put("N" + NODE_LABEL, jarr);
+                }
                 this.setResult(jpred);
             }
         }
