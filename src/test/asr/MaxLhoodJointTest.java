@@ -2,11 +2,13 @@ package asr;
 
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
+import bn.prob.EnumDistrib;
 import bn.prob.GaussianDistrib;
 import dat.Enumerable;
 import dat.file.Newick;
 import dat.phylo.*;
 import org.junit.jupiter.api.Test;
+import util.MilliTimer;
 
 import java.util.Random;
 
@@ -141,71 +143,193 @@ class MaxLhoodJointTest {
         assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(0)), C);
     }
 
+    /**
+     * Test of exact joint inference in phylogenetic trees, comparing against a naive product, exhaustively determining the prob of all combinations.
+     * Testing accuracy and reporting time efficiency.
+     * Data collected from MacBook Pro M1 2022:
+     * Naive_ML_Leaves=8	    27335
+     * Naive_ML_Leaves=7	     5949
+     * Naive_ML_Leaves=6	     1312
+     * Naive_ML_Leaves=5	      300
+     * Naive_ML_Leaves=4	       88
+     * Naive_ML_Leaves=3	       39
+     * BNKit_ML_Leaves=8	       10
+     * BNKit_ML_Leaves=7	        4
+     * BNKit_ML_Leaves=6	        4
+     * BNKit_ML_Leaves=5	        5
+     * BNKit_ML_Leaves=4	       11
+     * BNKit_ML_Leaves=3	       22
+     * BNKit_ML_CPT_Leaves=8	   13
+     * BNKit_ML_CPT_Leaves=7	    9
+     * BNKit_ML_CPT_Leaves=6	   11
+     * BNKit_ML_CPT_Leaves=5	   10
+     * BNKit_ML_CPT_Leaves=4	   12
+     * BNKit_ML_CPT_Leaves=3	   26
+     * BNKit_ML_GDT_Leaves=8	    7
+     * BNKit_ML_GDT_Leaves=7	    5
+     * BNKit_ML_GDT_Leaves=6	    6
+     * BNKit_ML_GDT_Leaves=5	    6
+     * BNKit_ML_GDT_Leaves=4	   10
+     * BNKit_ML_GDT_Leaves=3	   15
+     */
     @Test
     void joint1() {
-        SubstModel model = SubstModel.createModel("JC");
-        Enumerable alpha = new Enumerable(model.getDomain().getValues());
+        SubstModel model = SubstModel.createModel("JC"); // create a Jukes-Cantor substitution model
+        Enumerable alpha = new Enumerable(model.getDomain().getValues()); // the character states used by the above model (ACGT)
+        // we will create random trees, so the following parameters will control what they look like
         double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
         double GAMMA_SCALE = 0.2;
-        double SCALEDIST = 1.0;
-        int NLEAVES = 8; //
-        for (int SEED = 0; SEED < 100; SEED ++) {
-            // make a random tree with N - 1 ancestors for a binary tree, 2 x N - 1 variables in total
-            Tree tree = Tree.Random(NLEAVES, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2);
-            tree.adjustDistances(SCALEDIST);
-            int[] ancidxs = tree.getAncestors();
-            int[] leafidxs = tree.getLeaves();
-            // generate a random set of leaf states
-            Random rand = new Random(SEED);
-            Object[] allstates = new Object[tree.getSize()];
-            Object[] leafstates = new Object[leafidxs.length];
-            for (int i = 0; i < leafstates.length; i ++) {
-                leafstates[i] = alpha.get(rand.nextInt(alpha.size()));
-                allstates[leafidxs[i]] = leafstates[i];
-            }
-            // use bnkit to do the inference...
-            MaxLhoodJoint mlj = new MaxLhoodJoint(tree, model);
-            MaxLhoodJoint.Inference inf = mlj.infer(new TreeInstance(tree, allstates));
-            TreeInstance ti_bnkit = inf.getTreeInstance();
-            // to be benchmarked against the naive product of all conditional probs...
-            // nominate all possible ancestors
-            Object[][] ancstates = new Object[(int)Math.pow(alpha.size(), ancidxs.length)][];
-            double[] jointp = new double[(int)Math.pow(alpha.size(), ancidxs.length)];
-            for (int j  = 0; j < ancstates.length; j ++)
-                ancstates[j] = alpha.getWord4Key(j, ancidxs.length);
-            // now, main loop: for each ancestor state...
-            int maxidx = 0;
-            for (int j  = 0; j < ancstates.length; j ++) {
-                for (int i = 0; i < ancstates[j].length; i++)
-                    allstates[ancidxs[i]] = ancstates[j][i];
-                double joint = 1; // joint prob of the states
-                for (int idx : tree) { // loop through all nodes in the tree
-                    int child = idx;
-                    int parent = tree.getParent(child);
-                    double p = parent < 0 ? model.getProb(allstates[child]) : model.getProb(allstates[child], allstates[parent], tree.getDistance(child));
-                    joint *= p;
-                }
-                jointp[j] = joint;
-                if (joint > jointp[maxidx])
-                    maxidx = j;
-            }
-            for (int i = 0; i < ancstates[maxidx].length; i++)
-                allstates[ancidxs[i]] = ancstates[maxidx][i];
-            TreeInstance ti_naive = new TreeInstance(tree, allstates);
-            Object[] ancs_bnkit = new Object[ancidxs.length];
-            for (int i = 0; i < ancidxs.length; i ++)
-                ancs_bnkit[i] = ti_bnkit.getInstance(ancidxs[i]);
-            int bnkit_idx = alpha.getKey4Word(ancs_bnkit);
-            if (bnkit_idx != maxidx) {
-                System.out.println(ti_bnkit);
-                System.out.println(" [" + bnkit_idx + "] -LogL = " + -Math.log(jointp[bnkit_idx]));
-                System.out.println(ti_naive);
-                System.out.println(" [" + maxidx + "] -LogL = " + -Math.log(jointp[maxidx])); // + "\t < " + " [" + 42 + "] -LogL = " + -Math.log(jointp[42]));
-            }
+        double SCALEDIST = 1.0; // calibrate the leaf to root distance to be around 1
+        MilliTimer timer = new MilliTimer();
 
-            for (int idx : ancidxs) {
-//                assertEquals(ti_naive.getInstance(idx), ti_bnkit.getInstance(idx));
+        for (int NLEAVES = 3; NLEAVES < 8; NLEAVES ++) {
+            // int NLEAVES = 7; // this is how many leaf nodes each tree will have
+            timer.start("Leaves=" + NLEAVES);
+            for (int SEED = 0; SEED < 100; SEED++) { // generate a tree for each random seed
+                // make a random tree with N - 1 ancestors for a binary tree, 2 x N - 1 variables in total
+                Tree tree = Tree.Random(NLEAVES, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2);
+                tree.adjustDistances(SCALEDIST);
+                int[] ancidxs = tree.getAncestors();    // indices that recover all internal nodes
+                int[] leafidxs = tree.getLeaves();      // indices for all leaves
+                // generate a random set of leaf states
+                Random rand = new Random(SEED);
+                Object[] allstates = new Object[tree.getSize()];            // holder for states of all nodes (indexed by tree)
+                Object[] leafstates = new Object[leafidxs.length];          // holder for the subset of "leaf" states
+                for (int i = 0; i < leafstates.length; i++) {              // for each leaf...
+                    leafstates[i] = alpha.get(rand.nextInt(alpha.size()));  // randomly select one of the character states (defined in the JC model)
+                    allstates[leafidxs[i]] = leafstates[i];                 // patch the holder of all states
+                }
+                // use bnkit to do the inference...
+                timer.start("BNKit_ML_Leaves=" + NLEAVES);
+                MaxLhoodJoint mlj = new MaxLhoodJoint(tree, model);         // create inference object
+                MaxLhoodJoint.Inference inf = mlj.infer(new TreeInstance(tree, allstates)); // infer
+                timer.stop("BNKit_ML_Leaves=" + NLEAVES);
+                TreeInstance ti_bnkit = inf.getTreeInstance();              // recover the states from inference
+                // to be benchmarked against the naive product of all conditional probs...
+                // nominate all possible ancestors
+                timer.start("Naive_ML_Leaves=" + NLEAVES);
+                Object[][] ancstates = new Object[(int) Math.pow(alpha.size(), ancidxs.length)][];   // holds all combinations of ancestor states
+                for (int j = 0; j < ancstates.length; j++)                                        // they are enumerated here...
+                    ancstates[j] = alpha.getWord4Key(j, ancidxs.length);                            // assigned the state...
+                double[] jointp = new double[(int) Math.pow(alpha.size(), ancidxs.length)];          // and each will be assigned a probability based on tree and leaf states
+                // now, main loop: for each ancestor state...
+                int maxidx = 0; // remember which state (by index) has the max prob
+                String[] trace = new String[ancstates.length];  // document the calcs done for each ancestor state combination
+                for (int j = 0; j < ancstates.length; j++) {  //
+                    for (int i = 0; i < ancstates[j].length; i++)   // assign the ancestor state to the holder of all states
+                        allstates[ancidxs[i]] = ancstates[j][i];    // only ancestor states are over-written (leaf states have been assigned already)
+                    double joint = 1;                               // start calc joint prob of the states
+                    StringBuilder sb = new StringBuilder();         // document the calcs
+                    for (int idx : tree) {  // loop through all nodes in the tree
+                        int child = idx;    // the perspective is that the current node is a child (of a possible parent node)
+                        int parent = tree.getParent(child); // this is the parent
+                        double p;       // determine the probability of the implied substitution
+                        if (parent < 0) {   // no parent, so use a-priori prob of child state...
+                            p = model.getProb(allstates[child]);    // taken from the substitution model
+                            sb.append(String.format("P(N%d=%s)=%5.3f", child, allstates[child], p));
+                        } else {            // parent indeed...
+                            double[][] probs = model.getProbs(tree.getDistance(child));     // the model has them all...
+                            p = model.getProb(allstates[child], allstates[parent], probs);  // so extract the appropriate substitution
+                            sb.append(String.format("P(N%d=%s|N%d=%s)=%5.3f", child, allstates[child], parent, allstates[parent], p));
+                        }
+                        joint *= p; // the prob of the combination of states is the product of their (conditional) probabilities
+                        if (idx < tree.getSize() - 1)
+                            sb.append(" x ");
+                    }
+                    trace[j] = sb.toString();
+                    jointp[j] = joint;              // put the prob in place for the list of all ancestor combinations
+                    if (joint > jointp[maxidx])     // check if max
+                        maxidx = j;
+                } // all ancestor combinations have been calculated...
+                timer.stop("Naive_ML_Leaves=" + NLEAVES);
+                for (int i = 0; i < ancstates[maxidx].length; i++) // place the best combination in "allstates" (which already has the leaf states)
+                    allstates[ancidxs[i]] = ancstates[maxidx][i];
+                TreeInstance ti_naive = new TreeInstance(tree, allstates);  // put them in a tree, so we can easily look at them
+                Object[] ancs_bnkit = new Object[ancidxs.length];           // holder for the best combination with bnkit's ML inference (above)
+                for (int i = 0; i < ancidxs.length; i++)
+                    ancs_bnkit[i] = ti_bnkit.getInstance(ancidxs[i]);       // take them from the tree instance from before
+                int bnkit_idx = alpha.getKey4Word(ancs_bnkit);              // bnkit's inference would correspond to a state enumeration index
+                if (bnkit_idx != maxidx) {                                  // if they are different (which they should not be)...
+                    System.out.println(ti_bnkit);                           // print out some useful info for debugging
+                    System.out.println(" [" + bnkit_idx + "] -LogL = " + -Math.log(jointp[bnkit_idx]));
+                    System.out.println(ti_naive);
+                    System.out.println(" [" + maxidx + "] -LogL = " + -Math.log(jointp[maxidx])); // + "\t < " + " [" + 42 + "] -LogL = " + -Math.log(jointp[42]));
+                }
+                for (int idx : ancidxs) { // just look at each ancestor, to test the same outcome with naive as with bnkit ML
+                    assertEquals(ti_naive.getInstance(idx), ti_bnkit.getInstance(idx));
+                }
+
+                // next test accessory CPT nodes to those in the tree
+                String[] lowercase_alpha = new String[]{"a", "c", "g", "t"};   // use lowercase to distinguish the accessory leaf states from states in the actual tree
+                Enumerable lowercase_enum = new Enumerable(lowercase_alpha);    // create an alphabet from them
+                // next create a BN from tree, with each leaf node having an extra, accessory node hanging of it
+                PhyloBN pbn = PhyloBN.withCPTs(tree, model, lowercase_alpha, 1, true, SEED + 1);
+                Enumerable leaf_alpha = model.getDomain();                      // the latent states
+                pbn.setMasterCPT(leaf_alpha.getValues(), new EnumDistrib[]{    // set the (shared/master) conditional prob table for the accessory nodes
+                        new EnumDistrib(lowercase_enum, 0.997, 0.001, 0.001, 0.001), // A is parent
+                        new EnumDistrib(lowercase_enum, 0.001, 0.997, 0.001, 0.001), // C is parent
+                        new EnumDistrib(lowercase_enum, 0.001, 0.001, 0.997, 0.001), // G is parent
+                        new EnumDistrib(lowercase_enum, 0.001, 0.001, 0.001, 0.997)  // T is parent
+                });
+                Object[] lowercase_states = new Object[tree.getSize()];         // holder for accessory states
+                for (int i = 0; i < leafstates.length; i++)                    // we're pinching the leaf states from the original, already tested trees/BNs
+                    lowercase_states[leafidxs[i]] = leafstates[i].toString().toLowerCase();
+                TreeInstance ti_inp = new TreeInstance(tree, lowercase_states); // from them, create a tree instance that can be used as input to bnkit inference
+                timer.start("BNKit_ML_CPT_Leaves=" + NLEAVES);
+                MaxLhoodJoint mlj_cpt = new MaxLhoodJoint(pbn);                 // setup of ML inference
+                MaxLhoodJoint.Inference inf_cpt = mlj_cpt.infer(ti_inp);        // bnkit inference...
+                timer.stop("BNKit_ML_CPT_Leaves=" + NLEAVES);
+                TreeInstance ti_cpt = inf_cpt.getTreeInstance();                // extract output from inference
+                // inferred states should be identical to the max (naive) product of all conditional probs that was determined before
+                Object[] ancs_cpt = new Object[ancidxs.length];                 // collect the ancestor states from bnkit's output
+                for (int i = 0; i < ancidxs.length; i++)
+                    ancs_cpt[i] = ti_cpt.getInstance(ancidxs[i]);
+                int cpt_idx = alpha.getKey4Word(ancs_cpt);                      // determine the index of bnkit's favourite state combination
+                if (cpt_idx != maxidx) {                                        // debug: were they not the same? they should be
+                    System.out.println(ti_cpt);
+                    System.out.println(" [" + cpt_idx + "] -LogL = " + -Math.log(jointp[cpt_idx]));
+                    System.out.println(ti_naive);
+                    System.out.println(" [" + maxidx + "] -LogL = " + -Math.log(jointp[maxidx])); // + "\t < " + " [" + 42 + "] -LogL = " + -Math.log(jointp[42]));
+                }
+                for (int idx : ancidxs) {                                       // junit testing
+                    assertEquals(ti_naive.getInstance(idx), ti_cpt.getInstance(idx));
+                }
+
+                // next test accessory GDT nodes to those in the tree
+                PhyloBN pbn_gdt = PhyloBN.withGDTs(tree, model, 1, true, SEED + 1);
+                GaussianDistrib[] gds = new GaussianDistrib[]{        // spike the table so that parent state is fixed (in principle)
+                        new GaussianDistrib(0, 0.01),   // A is parent
+                        new GaussianDistrib(1, 0.01),   // C is parent
+                        new GaussianDistrib(2, 0.01),   // G is parent
+                        new GaussianDistrib(3, 0.01)    // T is parent
+                };
+                pbn_gdt.setMasterGDT(leaf_alpha.getValues(), gds);
+                Object[] double_states = new Object[tree.getSize()];    // holder of accessory values
+                for (int i = 0; i < leafstates.length; i++)            // set them so each parent state equals that of the original tree (above)
+                    double_states[leafidxs[i]] = gds[leaf_alpha.getIndex(leafstates[i])].sample();
+                TreeInstance ti_inp2 = new TreeInstance(tree, double_states);
+                timer.start("BNKit_ML_GDT_Leaves=" + NLEAVES);
+                MaxLhoodJoint mlj_gdt = new MaxLhoodJoint(pbn_gdt);
+                MaxLhoodJoint.Inference inf_gdt = mlj_gdt.infer(ti_inp2);
+                timer.stop("BNKit_ML_GDT_Leaves=" + NLEAVES);
+                TreeInstance ti_gdt = inf_gdt.getTreeInstance();
+                // to be benchmarked against the naive product of all conditional probs...
+                Object[] ancs_gdt = new Object[ancidxs.length];
+                for (int i = 0; i < ancidxs.length; i++)
+                    ancs_gdt[i] = ti_gdt.getInstance(ancidxs[i]);
+                int gdt_idx = alpha.getKey4Word(ancs_gdt);
+                if (gdt_idx != maxidx) {
+                    System.out.println(ti_gdt);
+                    System.out.println(" [" + gdt_idx + "] -LogL = " + -Math.log(jointp[gdt_idx]));
+                    System.out.println(ti_naive);
+                    System.out.println(" [" + maxidx + "] -LogL = " + -Math.log(jointp[maxidx])); // + "\t < " + " [" + 42 + "] -LogL = " + -Math.log(jointp[42]));
+                }
+                for (int idx : ancidxs) {
+                    assertEquals(ti_naive.getInstance(idx), ti_gdt.getInstance(idx));
+                }
             }
+            timer.stop("Leaves=" + NLEAVES);
         }
+        timer.report(true);
     }
 }

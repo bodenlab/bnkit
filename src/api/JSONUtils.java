@@ -10,6 +10,9 @@ public class JSONUtils {
         String[] headers;
         Object[][] values; // [row][col], but note that the JSON array is first column, then row
 
+        public DataSet() {
+        }
+
         public static DataSet fromJSON(JSONObject json) {
             DataSet ds = new DataSet();
             JSONArray jdata = json.optJSONArray("Data");
@@ -88,11 +91,8 @@ public class JSONUtils {
         JSONArray values = new JSONArray();
         for (int i = 0; i < headers.length; i ++) {
             Object[] col = new Object[data.length];
-            for (int j = 0; j < data.length; j ++) {
-                if (i >= data[j].length)
-                    throw new JSONUtilsException("Invalid data matrix");
+            for (int j = 0; j < col.length; j ++)
                 col[j] = data[j][i];
-            }
             JSONArray arr = new JSONArray(col);
             values.put(arr);
         }

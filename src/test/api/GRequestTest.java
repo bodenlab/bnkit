@@ -8,6 +8,7 @@ import dat.file.Newick;
 import dat.file.TSVFile;
 import dat.phylo.IdxTree;
 import dat.phylo.Tree;
+import dat.phylo.TreeInstance;
 import dat.pog.POGraph;
 import json.JSONArray;
 import json.JSONException;
@@ -552,7 +553,7 @@ class GRequestTest {
             JSONObject params = new JSONObject();
             params.put("Tree", tree.toJSON());
             params.put("Dataset", JSONUtils.toJSON(ds));
-            params.put("States", new JSONArray(new Character[] {'A','B','C'}));
+            params.put("States", new JSONArray(new Character[] {'a','b','c','d'}));
             jreq1.put("Params", params);
             server_output.println(jreq1);
             System.out.println(jreq1);
@@ -588,6 +589,13 @@ class GRequestTest {
             server_output.println(jreq2b);
             jresponse = new JSONObject(server_input.readLine());
             System.out.println("Server responded: " + jresponse);
+            JSONObject jresult2 = jresponse.getJSONObject("Result");
+            JSONUtils.DataSet dspred = JSONUtils.DataSet.fromJSON(jresult2.getJSONObject("Predict"));
+            TreeInstance[] multi = TreeInstance.createFromDataset(tree, dspred.headers, dspred.values);
+            for (TreeInstance ti : multi)
+                ti.save("data/3_2_1_1_pred.nwk");
+            TSVFile.print(new Object[][] {dspred.headers});
+            TSVFile.print(dspred.values);
         } catch (JSONException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {

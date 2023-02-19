@@ -530,7 +530,6 @@ public class CommandCentral {
                         } else {
                             jarr.put(anydistrib.toString());
                         }
-                        //System.out.println("Ancestor " + MARG_LABEL + "\tBranch point " + bpidx + "\tExample " + i + ":\t" + anydistrib);
                     }
                     jpred.put("N" + MARG_LABEL, jarr);
                 }
@@ -541,28 +540,28 @@ public class CommandCentral {
                 Object[][] rows = dataset.values;
                 Object[][] preds = new Object[idxTree.getSize()][rows.length];
                 MaxLhoodJoint inf = new MaxLhoodJoint(pbn);
+                JSONUtils.DataSet result = new JSONUtils.DataSet();
+                result.values = new Object[rows.length][idxTree.getSize()];
+                result.headers = new String[idxTree.getSize()];
                 for (int i = 0; i < rows.length; i ++) {
                     TreeInstance ti = idxTree.getInstance(headers, rows[i]);
-                    try {
-                        ti.save("/Users/mikael/Downloads/m709_" + i + ".nwk");
-                    } catch (IOException e) {
-                        System.err.println("Failed to save");
-                    }
                     inf.decorate(ti);
                     // inference will include all nodes (a subset instantiated before inference)
                     for (int j : idxTree) {
                         preds[j][i] = inf.getDecoration(j); //ti.getInstance(j);
+                        result.values[i][j] = preds[j][i];
                     }
                 }
                 for (int NODE_LABEL : idxTree) {
                     JSONArray jarr = new JSONArray();
                     jarr.put(preds[NODE_LABEL]);
-                    //for (int i = 0; i < rows.length; i ++) {
-                    if (idxTree.isLeaf(NODE_LABEL))
-                        jpred.put(idxTree.getLabel(NODE_LABEL).toString(), jarr);
-                    else
-                        jpred.put("N" + NODE_LABEL, jarr);
+                    if (idxTree.isLeaf(NODE_LABEL)) {
+                        result.headers[NODE_LABEL] = idxTree.getLabel(NODE_LABEL).toString();
+                    } else {
+                        result.headers[NODE_LABEL] = "N" + idxTree.getLabel(NODE_LABEL).toString();
+                    }
                 }
+                jpred.put("Predict", JSONUtils.toJSON(result));
                 this.setResult(jpred);
             }
         }

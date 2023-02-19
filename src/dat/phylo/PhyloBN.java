@@ -177,6 +177,14 @@ public class PhyloBN {
         }
     }
 
+    public void setMasterCPT(Object[] conditions, EnumDistrib[] distribs) {
+        if (conditions.length == distribs.length) {
+            for (int i = 0; i < conditions.length; i ++) {
+                cpt_master.put(new Object[] {conditions[i]}, distribs[i]);
+            }
+        }
+    }
+
     public CPT getMasterCPT() {
         return cpt_master;
     }

@@ -57,6 +57,41 @@ public class TreeInstance {
     }
 
     /**
+     * Create an instance by assigning values to branchpoints with given IDs
+     * @param tree
+     * @param ids
+     * @param assign
+     */
+    public TreeInstance(IdxTree tree, Object[] ids, Object[] assign) {
+        this.tree = tree;
+        instance = new Object[tree.getSize()];
+        Set s = new HashSet();
+        for (int i = 0; i < ids.length; i ++) {
+            int idx = tree.getIndex(ids[i]);
+            if (idx >= 0) {
+                instance[idx] = assign[i];
+                s.add(instance[i]);
+            }
+        }
+        this.possible = new Object[s.size()];
+        s.toArray(this.possible);
+    }
+
+    /**
+     * Create multiple instances from the same tree, using the same branchpoint IDs mapping to different (multiple) values.
+     * @param tree
+     * @param headers
+     * @param values
+     * @return
+     */
+    public static TreeInstance[] createFromDataset(IdxTree tree, Object[] headers, Object[][] values) {
+        TreeInstance[] ret = new TreeInstance[values.length];
+        for (int i = 0; i < values.length; i ++)
+            ret[i] = new TreeInstance(tree, headers, values[i]);
+        return ret;
+    }
+
+    /**
      * Create a new instance for a tree based on the values in another instance
      * (by reference to branch point IDs). No value is copied if an ID is not matched.
      * @param tree the tree from which an instance is created

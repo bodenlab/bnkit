@@ -679,6 +679,15 @@ public class IdxTree implements Iterable<Integer> {
                 if (this.getLabel(i).toString().equals(label))
                     return i;
             }
+            if (((String) label).startsWith("N")) {
+                String shortened = ((String) label).substring(1);
+                try {
+                    Object id = Integer.parseInt(shortened);
+                    return getIndex(id);
+                } catch (NumberFormatException e) {
+                    // nope, not an ancestor ID
+                }
+            }
         } else {
             for (int i : this) {
                 if (this.getLabel(i).equals(label))
