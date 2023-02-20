@@ -1,16 +1,23 @@
 package asr;
 
+import bn.CountTable;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
+import bn.prob.GaussianDistrib;
 import bn.prob.MixtureDistrib;
+import dat.EnumVariable;
+import dat.Enumerable;
 import dat.phylo.IdxTree;
 import dat.phylo.PhyloBN;
+import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
 import json.JSONObject;
 import org.junit.jupiter.api.Test;
+import util.MilliTimer;
 
 import java.util.HashSet;
+import java.util.Random;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -192,4 +199,93 @@ class MaxLhoodMarginalTest {
         }
         assertTrue(Math.abs(cnt[0] - cnt[1]) <= 1 && Math.abs(cnt[1] - cnt[2]) <= 1);
     }
+
+    /**
+     * Test of exact marginal inference in phylogenetic trees, comparing against a naive product, exhaustively determining the prob of all combinations.
+     * Testing accuracy and reporting time efficiency.
+     * Naive_ML_Leaves=8	13758
+     * Naive_ML_Leaves=7	 2996
+     * Naive_ML_Leaves=6	  707
+     * Naive_ML_Leaves=5	  145
+     * Naive_ML_Leaves=4	   33
+     * Naive_ML_Leaves=3	    7
+     * BNKit_ML_Leaves=8	   14
+     * BNKit_ML_Leaves=7	   12
+     * BNKit_ML_Leaves=6	   12
+     * BNKit_ML_Leaves=5	    7
+     * BNKit_ML_Leaves=4	   23
+     * BNKit_ML_Leaves=3	   30
+     */
+    @Test
+    void marginal1() {
+        SubstModel model = SubstModel.createModel("JC"); // create a Jukes-Cantor substitution model
+        Enumerable alpha = new Enumerable(model.getDomain().getValues()); // the character states used by the above model (ACGT)
+        // we will create random trees, so the following parameters will control what they look like
+        double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
+        double GAMMA_SCALE = 0.2;
+        double SCALEDIST = 1.0; // calibrate the leaf to root distance to be around 1
+        MilliTimer timer = new MilliTimer();
+        // the naive product is copied from MaxLhoodJointTest
+        for (int NLEAVES = 3; NLEAVES < 9; NLEAVES ++) {
+            timer.start("Leaves=" + NLEAVES);
+            for (int SEED = 0; SEED < 100; SEED++) { // generate a tree for each random seed
+                // make a random tree with N - 1 ancestors for a binary tree, 2 x N - 1 variables in total
+                Tree tree = Tree.Random(NLEAVES, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2);
+                tree.adjustDistances(SCALEDIST);
+                int[] ancidxs = tree.getAncestors();    // indices that recover all internal nodes; always start with "0"
+                int[] leafidxs = tree.getLeaves();      // indices for all leaves
+                // generate a random set of leaf states
+                Random rand = new Random(SEED);
+                Object[] allstates = new Object[tree.getSize()];            // holder for states of all nodes (indexed by tree)
+                Object[] leafstates = new Object[leafidxs.length];          // holder for the subset of "leaf" states
+                for (int i = 0; i < leafstates.length; i++) {              // for each leaf...
+                    leafstates[i] = alpha.get(rand.nextInt(alpha.size()));  // randomly select one of the character states (defined in the JC model)
+                    allstates[leafidxs[i]] = leafstates[i];                 // patch the holder of all states
+                }
+                // use bnkit to do the inference...
+                timer.start("BNKit_ML_Leaves=" + NLEAVES);
+                MaxLhoodMarginal mlj = new MaxLhoodMarginal(0, tree, model);         // create inference object
+                mlj.decorate(new TreeInstance(tree, allstates));
+                EnumDistrib ed_bnkit = (EnumDistrib) mlj.getDecoration(0);
+                timer.stop("BNKit_ML_Leaves=" + NLEAVES);
+                // to be benchmarked against marginalising the naive product of all conditional probs...
+                // nominate all possible ancestors
+                timer.start("Naive_ML_Leaves=" + NLEAVES);
+                Object[][] ancstates = new Object[(int) Math.pow(alpha.size(), ancidxs.length)][];   // holds all combinations of ancestor states
+                for (int j = 0; j < ancstates.length; j++)                                        // they are enumerated here...
+                    ancstates[j] = alpha.getWord4Key(j, ancidxs.length);                            // assigned the state...
+                double[] jointp = new double[(int) Math.pow(alpha.size(), ancidxs.length)];          // and each will be assigned a probability based on tree and leaf states
+                // now, main loop: for each ancestor state...
+                for (int j = 0; j < ancstates.length; j++) {  //
+                    for (int i = 0; i < ancstates[j].length; i++)   // assign the ancestor state to the holder of all states
+                        allstates[ancidxs[i]] = ancstates[j][i];    // only ancestor states are over-written (leaf states have been assigned already)
+                    double joint = 1;                               // start calc joint prob of the states
+                    for (int idx : tree) {  // loop through all nodes in the tree
+                        int child = idx;    // the perspective is that the current node is a child (of a possible parent node)
+                        int parent = tree.getParent(child); // this is the parent
+                        double p;       // determine the probability of the implied substitution
+                        if (parent < 0) {   // no parent, so use a-priori prob of child state...
+                            p = model.getProb(allstates[child]);    // taken from the substitution model
+                        } else {            // parent indeed...
+                            double[][] probs = model.getProbs(tree.getDistance(child));     // the model has them all...
+                            p = model.getProb(allstates[child], allstates[parent], probs);  // so extract the appropriate substitution
+                        }
+                        joint *= p; // the prob of the combination of states is the product of their (conditional) probabilities
+                    }
+                    jointp[j] = joint;              // put the prob in place for the list of all ancestor combinations
+                } // all ancestor combinations have been calculated...
+                // marginalise; sum-out all variables except N0
+                double[] counts = new double[alpha.size()];
+                for (int j = 0; j < ancstates.length; j++)
+                    counts[alpha.getIndex(ancstates[j][0])] += jointp[j]; // count the character seen in the first position (which is N0)
+                EnumDistrib ed_naive = new EnumDistrib(alpha, counts); // create a distribution for N0
+                // done marginalising...
+                timer.stop("Naive_ML_Leaves=" + NLEAVES);
+                assertArrayEquals(ed_naive.get(), ed_bnkit.get(), 0.01);
+            }
+            timer.stop("Leaves=" + NLEAVES);
+        }
+        timer.report(true);
+    }
+
 }
