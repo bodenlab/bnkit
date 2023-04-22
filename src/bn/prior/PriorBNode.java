@@ -12,6 +12,7 @@ import bn.Distrib;
 import bn.Sample;
 import bn.factor.AbstractFactor;
 import bn.factor.Factor;
+import json.JSONObject;
 
 public class PriorBNode implements BNode {
 
@@ -312,6 +313,11 @@ public class PriorBNode implements BNode {
 	public void put(int index, Distrib distr) {
 		bNode.put(index, distr);
 		
+	}
+
+	@Override
+	public JSONObject toJSON() {
+		throw new RuntimeException("Not implemented");
 	}
 
 }

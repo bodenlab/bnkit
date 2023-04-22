@@ -17,6 +17,8 @@
  */
 package dat;
 
+import json.JSONObject;
+
 /**
  * Interface for classes that implement type checking of variables
  * @author mikael
@@ -30,5 +32,15 @@ public interface Domain {
      * @return true if valid, false otherwise
      */
     public boolean isValid(Object value);
+    public JSONObject toJSON();
 
+    public static Domain fromJSON(JSONObject json) {
+        try { // enumerable?
+            Enumerable edom = Enumerable.fromJSON(json);
+            return edom;
+        } catch (RuntimeException e) { // not enumerable
+            Continuous cdom = Continuous.fromJSON(json);
+            return cdom;
+        }
+    }
 }

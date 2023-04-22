@@ -1,12 +1,9 @@
 package asr;
 
-import bn.CountTable;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
-import bn.prob.GaussianDistrib;
 import bn.prob.MixtureDistrib;
-import dat.EnumVariable;
 import dat.Enumerable;
 import dat.phylo.IdxTree;
 import dat.phylo.PhyloBN;

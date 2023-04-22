@@ -34,6 +34,8 @@ import bn.factor.DenseFactor;
 import bn.factor.Factorize;
 import dat.Domain;
 import dat.IntegerSeq;
+import json.JSONObject;
+
 import java.io.Serializable;
 import java.util.*;
 
@@ -396,6 +398,11 @@ public class DirDT implements BNode, TiedNode<DirDT>, Serializable {
      */
     public void put(int index, Distrib distr) {
         table.setValue(index, (DirichletDistrib) distr);
+    }
+
+    @Override
+    public JSONObject toJSON() {
+        throw new RuntimeException("Not implemented");
     }
 
     /**

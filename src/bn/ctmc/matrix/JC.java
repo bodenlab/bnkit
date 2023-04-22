@@ -55,6 +55,9 @@ public class JC extends SubstModel {
     public JC(double mu, Object[] alphabet) {
         super(F(alphabet.length), Q(mu, alphabet.length), new Enumerable((alphabet)), false);
     }
+    public JC(double mu, Enumerable domain) {
+        super(F(domain.size()), Q(mu, domain.size()), domain, false);
+    }
     public String getName() {
         return "JC";
     }

@@ -501,7 +501,7 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
             }
             return names;
         }
-        
+
         /**
          * Get the column of enumerable values for a given column, indexed from 0 up to alignment width - 1.
          * @param col column
@@ -515,6 +515,24 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
                 return syms;
             }
             return null;
+        }
+
+        /**
+         * Get the columns of enumerable values for a list of given columns (indexed from 0 up to alignment width - 1).
+         * @param cols columns
+         * @return rows of values in columns, null representing gap
+         */
+        public Object[][] getColumns(int[] cols) {
+            Object[][] syms = new Object[getHeight()][cols.length];
+            for (int i = 0; i < syms.length; i ++) {
+                Object[] seq = seqs.get(i).get();
+                for (int j = 0; j < cols.length; j ++) {
+                    int col = cols[j];
+                    if (col >= 0 && col < this.width)
+                        syms[i][j] = seq[col];
+                }
+            }
+            return syms;
         }
 
         /**

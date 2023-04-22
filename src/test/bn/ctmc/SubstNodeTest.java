@@ -5,9 +5,11 @@ import bn.Distrib;
 import bn.alg.CGTable;
 import bn.alg.Query;
 import bn.alg.VarElim;
+import bn.ctmc.matrix.JC;
 import bn.ctmc.matrix.JTT;
 import bn.factor.CachedFactor;
 import bn.factor.FactorCache;
+import bn.node.CPT;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.EnumVariable;
@@ -25,6 +27,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static dat.Enumerable.aacid;
 import static org.junit.jupiter.api.Assertions.*;
 import util.MilliTimer;
 
@@ -59,7 +62,7 @@ class SubstNodeTest {
             if (!tmap.containsKey(t))
                 tmap.put(t, 0);
             tmap.put(t, tmap.get(t) + 1);
-            vararr[i] = new EnumVariable(Enumerable.aacid, "N" + i);
+            vararr[i] = new EnumVariable(aacid, "N" + i);
             if (i == 0)
                 snarr[i] = new SubstNode(vararr[i], model);
             else
@@ -391,6 +394,23 @@ class SubstNodeTest {
         }
     }
 
+    @Test
+    void fromJSON() {
+        Enumerable dom = new Enumerable(new Object[] {1,2,3});
+        EnumVariable child = new EnumVariable(dom, "TestChild");
+        EnumVariable parent = new EnumVariable(dom, "TestParent");
+        EnumVariable child2 = new EnumVariable(aacid, "TestChild2");
+        EnumVariable parent2 = new EnumVariable(aacid, "TestParent2");
+        SubstNode snode = new SubstNode(child, parent, new JC(1, dom.getValues()), 1);
+        SubstNode snode2 = new SubstNode(child2, parent2, SubstModel.createModel("JTT"), 1);
+        System.out.println(snode.getStateAsText());
+        System.out.println(snode.toJSON());
+        System.out.println(snode2.toJSON());
+        SubstNode scopy = SubstNode.fromJSON(snode.toJSON(), child, parent);
+        assertTrue(scopy.toJSON().toString().equals(snode.toJSON().toString()));
+        SubstNode scopy2 = SubstNode.fromJSON(snode2.toJSON(), child2, parent2);
+        assertTrue(scopy2.toJSON().toString().equals(snode2.toJSON().toString()));
+    }
 
 
 }

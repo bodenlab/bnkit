@@ -17,6 +17,9 @@
  */
 package dat;
 
+import json.JSONArray;
+import json.JSONObject;
+
 /**
  *
  * @author mikael
@@ -108,4 +111,11 @@ public class SeqDomain<E extends Domain> implements Domain {
         sb.append("|");
         return sb.toString();
     }
+    @Override
+    public JSONObject toJSON() {
+        JSONObject jobj = new JSONObject();
+        jobj.put("Predef", "Sequence");
+        return jobj;
+    }
+
 }

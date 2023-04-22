@@ -18,6 +18,11 @@
 
 package dat;
 
+import json.JSONObject;
+
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Continuous domain definition. 
  * For checking validity of values for variables that belong to this domain.
@@ -48,4 +53,35 @@ public class Continuous implements Domain {
             return false;
         }
     }
+
+    @Override
+    public JSONObject toJSON() {
+        JSONObject jobj = new JSONObject();
+        jobj.put("Predef", "Real");
+        return jobj;
+    }
+
+    private static Map<String, Continuous> predef = new HashMap<>();
+    private static Map<Continuous, String> predef_reverse = new HashMap<>();
+
+    private static Continuous real = new Continuous();
+    // Instantiating the static map
+    static
+    {
+        predef.put("Real", real);
+        predef_reverse.put(real, "Real");
+    }
+
+    public static Continuous fromJSON(JSONObject json) {
+        String defID = json.optString("Predef", null);
+        if (defID != null) {
+            Continuous match = predef.get(defID);
+            if (match == null) {
+                throw new RuntimeException("Invalid predefined domain name: \"" + defID + "\". Please check dat.Enumerable");
+            }
+            return match;
+        }
+        return real;
+    }
+
 }

@@ -824,6 +824,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
      * Convert GDT to JSON
      * @return
      */
+    @Override
     public JSONObject toJSON() {
         JSONObject json = new JSONObject();
         JSONArray jidxs = new JSONArray();
@@ -838,10 +839,11 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                 jdist.put(d.toJSONArray());
             }
         }
+        json.put("Variable", var.toJSON());
         json.put("Index", jidxs);
         json.put("Condition", jcond);
         json.put("Pr", jdist);
-        json.put("Domain", var.getDomain().toString());
+        json.put("Nodetype", getType());
         return json;
     }
 
@@ -875,6 +877,28 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
      */
     public static GDT fromJSON(JSONObject json, Variable nodevar, EnumVariable ... parvars) throws JSONException {
         return fromJSON(json, nodevar, EnumVariable.toList(parvars));
+    }
+
+    /**
+     * Recover the (conditioned) GDT from JSON, based on the parent variables
+     * @param json JSON representation
+     * @param parvars  the enumerable variables that are the parents of this node
+     * @return new GDT
+     * @throws JSONException if the JSON specification is invalid
+     */
+    public static GDT fromJSON(JSONObject json, EnumVariable[] parvars) throws JSONException {
+        JSONObject jvar = json.getJSONObject("Variable");
+        Variable nvar = Variable.fromJSON(jvar);
+        GDT gdt = new GDT(nvar, parvars);
+        JSONArray jidxs = json.getJSONArray("Index");
+        JSONArray jeds = json.getJSONArray("Pr");
+        Domain dom = nvar.getDomain();
+        for (int i = 0; i < jidxs.length(); i++) {
+            int idx = jidxs.getInt(i);
+            JSONArray jed = jeds.getJSONArray(i);
+            gdt.put(idx, GaussianDistrib.fromJSONArray(jed));
+        }
+        return gdt;
     }
 
     @Override

@@ -239,7 +239,7 @@ public class Enumerable implements Domain {
     public static Enumerable gap_character = new Enumerable(new Character[]{'G','C'});
     public static Enumerable gap_ext = new Enumerable(new Character[]{'G','C','?'});
 
-    public static Map<String, Enumerable> predef = new HashMap<>();
+    private static Map<String, Enumerable> predef = new HashMap<>();
     public static Map<Enumerable, String> predef_reverse = new HashMap<>();
 
     // Instantiating the static map
@@ -263,6 +263,11 @@ public class Enumerable implements Domain {
         predef_reverse.put(aacid_ext, "Protein with gap");
     }
 
+    public static Collection<Enumerable> getEnumerablePredefs() {
+        return predef_reverse.keySet();
+    }
+
+    @Override
     public JSONObject toJSON() {
         JSONObject jobj = new JSONObject();
         String defID = predef_reverse.get(this);
@@ -287,7 +292,7 @@ public class Enumerable implements Domain {
             return match;
         }
         JSONArray varr = jobj.getJSONArray("Values");
-        //Class dtype = (Class)jobj.get("Datatype");
+        // Class dtype = (Class)jobj.get("Datatype");
         Object[] vals = new Object[varr.length()];
         for (int i = 0; i < varr.length(); i++)
             vals[i] = varr.get(i);

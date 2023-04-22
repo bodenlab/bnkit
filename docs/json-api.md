@@ -261,6 +261,95 @@ Server responds with a (completed) dataset:
         { "Headers":["N0","P08144","B8Y698","N1","Q2KJQ1","N2","N3","P29957","N4","N5","Q47R94","Q1KLC8","N6","Q4A3E0","N7","N8","N9","N10","Q5UZY3","L8B068","N11","Q8A1G3","N12","D8J7H2","N13","P20845","N14","A5ILB0","P96107","N15","N16","D4P4Y7","N17","T1WDH2","T1WE96","N18","H9B4I9","N19","B8Y1H0","A8VWC5","N20","N21","Q6WUB6","N22","A0A060DAC6","N23","B1VK33","N24","P06279","N25","P00692","P06278","N26","N27","N28","O33476","O08452","N29","Q2QC88","O93647","N30","Q8LJQ6","N31","P00693","N32","P17654","P04063","N33","B6RB08","N34","N35","P04746","P00690","N36","H2N0D4","A0SEG1"],
           "Data":[["d"],["Q"],["H"],["d"],["Q"],["d"],["d"],["Q"],["d"],["d"],["Q"],["Q"],["b"],["G"],["b"],["b"],["b"],["a"],["L"],["D"],["b"],["G"],["b"],["G"],["b"],["G"],["b"],["G"],["G"],["b"],["b"],["G"],["b"],["G"],["G"],["b"],["G"],["b"],["G"],["G"],["b"],["b"],["A"],["b"],["G"],["b"],["G"],["b"],["G"],["c"],["A"],["A"],["b"],["b"],["b"],["G"],["G"],["b"],["G"],["G"],["c"],["A"],["c"],["A"],["c"],["A"],["A"],["d"],["Q"],["d"],["d"],["Q"],["Q"],["d"],["Q"],["Q"]] } }
 
+### Train "modes" (example)
+
+    { "Command":"TrainModes",
+      "Auth":"Guest",
+      "Params":
+        { "Gamma":1,
+          "Rounds":10,
+          "Dataset":
+            { "Items":["P25910","Q704V1",...],
+              "Data":[[["H","H","H"],["H","H","H"], ...] ] },
+          "Seed":3,
+          "Rate":1,
+          "Tree":
+            { "Parents":[-1,0, ...],
+              "Labels":["0","P25910", ...],
+              "Distances":[0,0.73, ...],
+              "Branchpoints":220 },
+          "Distrib":
+            { "Targets":[[0],[0],[0]],
+              "Modetypes":[{"Size":3,"Values":["A","B","C"],"Datatype":"Character"}],
+              "Nodes":[
+                { "Condition":[],
+                  "Pr":[],
+                  "Variable":{"Domain":{"Predef":"Protein"},"Name":"N0__Pos184"},
+                  "Nodetype":"CPT",
+                  "Index":[] },
+                { "Condition":[],
+                  "Pr":[],
+                  "Variable":{"Domain":{"Predef":"Protein"},"Name":"N0__Pos186"},
+                  "Nodetype":"CPT",
+                  "Index":[] },
+                { "Condition":[],
+                  "Pr":[],
+                  "Variable":{"Domain":{"Predef":"Protein"},"Name":"N0__Pos306"},
+                  "Nodetype":"CPT",
+                  "Index":[] } ],
+              "Name":"N0" } } }
+
+### Infer "modes" (example)
+
+    { "Command":"InferModes",
+      "Auth":"Guest",
+      "Params":
+        { "Gamma":1,
+          "Latent":true,
+          "Rounds":10,
+          "Leaves-only":false,
+          "Dataset":
+            { "Items":["P25910","Q704V1", ...],
+              "Data":[[["H","H","H"],["H","H","H"], ...] ] },
+          "Seed":3,
+          "Rate":1,
+          "Tree":
+            { "Parents":[-1,0, ...],
+              "Labels":["0","P25910", ...],
+              "Distances":[0,0.73, ...],
+              "Branchpoints":220 },
+          "Inference":"Marginal",
+          "Distrib":
+            { "Targets":[[0],[0],[0]],
+              "Modetypes":[{"Size":3,"Values":["A","B","C"],"Datatype":"String"}],
+              "Nodes":[
+                { "Condition":[["A"],["B"],["C"]],
+                  "Pr":[ 
+                    [0,0,0,0,0,0,0.998,0,0,0,0,3.973E-4,0,1.329E-5,0.001,4.4E-203,0,0,0,0],
+                    [0,0,0,0,0,0,0.954,0,0,0,0,0.003,0,0.042,2.66E-4,0,0,0,0,0],
+                    [0,0,0.036,0,0,0,0.863,0,0,0,0,0.023,0,9.73E-4,0.034,0.036,0,0,0,0] ],
+                  "Variable":{"Domain":{"Predef":"Protein"},"Name":"P25910__Pos184"},
+                  "Nodetype":"CPT",
+                  "Index":[0,1,2] },
+                { "Condition":[["A"],["B"],["C"]],
+                  "Pr":[
+                    [0,0,0.081,0.185,0,0,0.733,0,0,0,0,3.83E-33,0,0,2.91E-4,1.65E-32,0,0,0,0],
+                    [0,0,9.36E-4,0.001,0,0,0.977,0,0,0,0,1.59E-44,0,0,0.021,4.53E-44,0,0,0,0],
+                    [0,0,3.61E-4,0.007,0,0,0.884,0,0,0,0,0.036,0,0.036,7.91E-4,0.036,0,0,0,0] ],
+                  "Variable":{"Domain":{"Predef":"Protein"},"Name":"P25910__Pos186"},
+                  "Nodetype":"CPT",
+                  "Index":[0,1,2] },
+                { "Condition":[["A"],["B"],["C"]],
+                  "Pr":[
+                    [0,0,0,0.167,0,0,0.766,0,0.007,0.008,0,0,0,4.45E-203,2.59E-7,0.0527,0,0,0,0],
+                    [0,0,0,8.17E-6,0,0,0.996,0,2.29E-4,2.70E-4,0,0,0,0,1.64E-8,0.003,0,0,0,0],
+                    [0.034,0,0,8.55E-5,0,0,0.721,0,0.028,0.026,0,0,0,0.038,0.113,0.036,0,0,0,0] ],
+                  "Variable":{"Domain":{"Predef":"Protein"},"Name":"P25910__Pos306"},
+                  "Nodetype":"CPT",
+                  "Index":[0,1,2] } ],
+              "Name":"P25910" },
+          "Ancestors":[0,1,2] } }
+
 ## Data structures
 
 ### `<tree>` (`dat.phylo.IdxTree`)

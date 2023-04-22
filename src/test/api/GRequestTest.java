@@ -1,12 +1,15 @@
 package api;
 
 import asr.Prediction;
+import bn.node.CPT;
 import dat.EnumSeq;
+import dat.EnumVariable;
 import dat.Enumerable;
 import dat.file.FastaReader;
 import dat.file.Newick;
 import dat.file.TSVFile;
 import dat.phylo.IdxTree;
+import dat.phylo.PhyloPlate;
 import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
 import dat.pog.POGraph;
@@ -14,6 +17,7 @@ import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +25,7 @@ import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
 
@@ -399,14 +404,14 @@ class GRequestTest {
             }
             curated[i] = sum / (double)subsvald.length;
         }
-        JSONUtils.DataSet ds = new JSONUtils.DataSet();
-        ds.headers = new String[vals.length];
-        ds.values = new Object[1][vals.length];
+        String[] features = new String[vals.length];
+        Object[][] values = new Object[1][vals.length];
         int entrycol = tsv.getColumn("Entry");
         for (int i = 0; i < vals.length; i ++) {
-            ds.headers[i] = tsv.getCol(entrycol)[i].toString();
-            ds.values[0][i] = curated[i];
+            features[i] = tsv.getCol(entrycol)[i].toString();
+            values[0][i] = curated[i];
         }
+        JSONUtils.DataSet ds = new JSONUtils.DataSet(features, values);
         return ds;
     }
 
@@ -472,9 +477,7 @@ class GRequestTest {
     }
 
     JSONUtils.DataSet getDataset(EnumSeq.Alignment aln, int col) {
-        JSONUtils.DataSet ds = new JSONUtils.DataSet();
-        ds.headers = aln.getNames();
-        ds.values = new Object[][] {aln.getColumn(col)};
+        JSONUtils.DataSet ds = new JSONUtils.DataSet(aln.getNames(), new Object[][] {aln.getColumn(col)});
         return ds;
     }
 
@@ -591,11 +594,107 @@ class GRequestTest {
             System.out.println("Server responded: " + jresponse);
             JSONObject jresult2 = jresponse.getJSONObject("Result");
             JSONUtils.DataSet dspred = JSONUtils.DataSet.fromJSON(jresult2.getJSONObject("Predict"));
-            TreeInstance[] multi = TreeInstance.createFromDataset(tree, dspred.headers, dspred.values);
+            TreeInstance[] multi = TreeInstance.createFromDataset(tree, dspred.getFeatures(), dspred.getNonitemisedData());
             for (TreeInstance ti : multi)
                 ti.save("data/3_2_1_1_pred.nwk");
-            TSVFile.print(new Object[][] {dspred.headers});
-            TSVFile.print(dspred.values);
+            TSVFile.print(new Object[][] {dspred.getFeatures()});
+            TSVFile.print(dspred.getNonitemisedData());
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    void request_TrainModes_motif_joint() {
+        IdxTree mblTree = null;
+        EnumSeq.Alignment mblAln = null;
+        Tree tree;
+        try {
+            tree = Tree.load("data/master_relabel.nwk", "newick");
+            mblTree = (IdxTree)tree;
+            FastaReader r = new FastaReader("data/master_t10.aln", Enumerable.aacid, '-');
+            EnumSeq.Gappy[] eseqs = r.loadGappy();
+            mblAln = new EnumSeq.Alignment(eseqs);
+
+            /* Metal binding at (positions in alignment, starting at column 1)
+            Alpha site: 184, 186, 306
+            Beta site: 188, 189, 567
+            Bridging residue: 332
+             */
+            int[] sites = new int[] {183, 185, 305};//,  187, 188, 566};
+            long SEED = 3;
+            JSONUtils.DataSet ds = new JSONUtils.DataSet(mblAln.getNames(), new String[] {"Pos184", "Pos186", "Pos306"}, new Object[][][] {mblAln.getColumns(sites)});
+            JSONObject jreq1 = new JSONObject();
+            jreq1.put("Command", "TrainModes");
+            jreq1.put("Auth", "Guest");
+            JSONObject params = new JSONObject();
+            params.put("Tree", tree.toJSON());
+            params.put("Dataset", JSONUtils.toJSON(ds));
+            PhyloPlate.Modes template = new PhyloPlate.Modes(new Enumerable[] {new Enumerable(new Object[] {'A','B','C'})}); //,new Enumerable(new Object[] {'a','b','c'})});
+            PhyloPlate phybn = new PhyloPlate(mblTree, template);
+            PhyloPlate.Plate plate1 = phybn.getPlate(0);
+            CPT[] masters = new CPT[sites.length];
+            for (int s = 0; s < sites.length; s ++) {
+                CPT pos = new CPT(new EnumVariable(Enumerable.aacid, "Pos" + (sites[s] + 1)), plate1.getParents(new int[] {0})); //,1}));
+                plate1.addNode(pos);
+            }
+            params.put("Distrib", plate1.toJSON());
+            params.put("Seed", SEED);
+            params.put("Gamma", 1.0);
+            params.put("Rate", 1.0);
+            params.put("Rounds", 10); // training rounds
+            jreq1.put("Params", params);
+            server_output.println(jreq1);
+            System.out.println(jreq1);
+            JSONObject jresponse = new JSONObject(server_input.readLine());
+            int job = GMessage.fromJSON2Job(jresponse);
+            System.out.println("Server responded: " + jresponse);
+
+            Thread.sleep(20000); // waiting 20 secs to make sure the job has finished
+            jreq1 = new JSONObject();
+            jreq1.put("Job", job);
+            jreq1.put("Command", "Output"); // request the output/result
+            server_output.println(jreq1);
+            jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
+            JSONObject jresult = jresponse.getJSONObject("Result");
+            JSONObject jdistrib = jresult.getJSONObject("Distrib");
+
+            JSONObject jreq2 = new JSONObject();
+            jreq2.put("Command", "InferModes");
+            jreq2.put("Auth", "Guest");
+            params.put("Distrib", jdistrib);
+            // params.put("Inference", "Marginal");
+            params.put("Inference", "Marginal");
+            params.put("Leaves-only", false);
+            params.put("Latent", true);
+            params.put("Ancestors", new JSONArray(new int[] {0, 1, 2}));
+            jreq2.put("Params", params);
+            server_output.println(jreq2);
+            System.out.println(jreq2);
+            jresponse = new JSONObject(server_input.readLine());
+            job = GMessage.fromJSON2Job(jresponse);
+            System.out.println("Server responded: " + jresponse);
+            Thread.sleep(5000); // waiting 5 secs to make sure the job has finished
+            JSONObject jreq2b = new JSONObject();
+            jreq2b.put("Job", job);
+            jreq2b.put("Command", "Output"); // request the output/result
+            server_output.println(jreq2b);
+            jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
+            JSONObject jresult2 = jresponse.getJSONObject("Result");
+           // JSONUtils.DataSet dspred = JSONUtils.DataSet.fromJSON(jresult2.getJSONObject("Predict"));
+ /*
+            TreeInstance[] multi = TreeInstance.createFromDataset(tree, dspred.getFeatures(), dspred.getNonitemisedData());
+            for (TreeInstance ti : multi)
+                ti.save("data/3_2_1_1_pred.nwk");
+            TSVFile.print(new Object[][] {dspred.getFeatures()});
+            TSVFile.print(dspred.getNonitemisedData());
+ */
         } catch (JSONException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {

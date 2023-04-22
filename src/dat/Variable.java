@@ -17,6 +17,9 @@
  */
 package dat;
 
+import bn.Predef;
+import json.JSONObject;
+
 import java.util.*;
 
 /**
@@ -48,6 +51,11 @@ public class Variable<E extends Domain> implements Comparable {
      */
     public Variable(E domain, String name) {
         this.domain = domain;
+        try {
+            this.setPredef(Enumerable.predef_reverse.get((Enumerable)domain));
+        } catch (ClassCastException e) {
+
+        }
         synchronized (pool) {
             Variable.pool.put(this, Variable.pool.size());
             this.canonicalIndex = Variable.pool.get(this);
@@ -65,6 +73,13 @@ public class Variable<E extends Domain> implements Comparable {
             Variable.pool.put(this, Variable.pool.size());
             this.canonicalIndex = Variable.pool.get(this);
         }
+    }
+
+    public Variable<E> copy(String name) {
+        Variable<E> var = new Variable<>(this.domain, name);
+        var.setPredef(this.getPredef());
+        var.setParams(this.getParams());
+        return var;
     }
 
     /**
@@ -97,6 +112,22 @@ public class Variable<E extends Domain> implements Comparable {
      */
     public String toString() {
         return this.name + "." + this.canonicalIndex;
+    }
+
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        if (getName().length() > 0)
+            json.put("Name", getName());
+        json.put("Domain", getDomain().toJSON());
+        return json;
+    }
+
+    public static Variable fromJSON(JSONObject json) {
+        String name = json.optString("Name");
+        Domain dom = Domain.fromJSON(json.getJSONObject("Domain"));
+        Variable var = (name != null) ? new Variable(dom, name) : new Variable(dom);
+        //var.setPredef(Enumerable.);
+        return var;
     }
 
     /**

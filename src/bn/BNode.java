@@ -19,11 +19,14 @@
 package bn;
 
 import bn.factor.Factor;
+import bn.node.CPT;
+import bn.node.GDT;
 import dat.EnumVariable;
 import dat.Variable;
 import dat.EnumTable;
 import bn.factor.AbstractFactor;
 import bn.prior.Prior;
+import json.JSONObject;
 
 import java.util.Collection;
 import java.util.List;
@@ -43,6 +46,21 @@ import java.util.Set;
  * @author Mikael Boden
  */
 public interface BNode {
+
+    public static BNode fromJSON(JSONObject json, EnumVariable[] parvars) {
+        BNode node = null;
+        String type = json.optString("Nodetype");
+        if (type != null) {
+            if (type.equals("CPT")) {
+                EnumVariable evar = EnumVariable.fromJSON(json.getJSONObject("Variable"));
+                node = CPT.fromJSON(json, parvars);
+            } else if (type.equals("GDT")) {
+                Variable nvar = Variable.fromJSON(json.getJSONObject("Variable"));
+                node = GDT.fromJSON(json, parvars);
+            }
+        }
+        return node;
+    }
 
     public String getName();
 
@@ -273,5 +291,7 @@ public interface BNode {
      * @param distr
      */
     public void put(int index, Distrib distr);
+
+    public JSONObject toJSON();
 
 }

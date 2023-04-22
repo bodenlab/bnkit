@@ -182,6 +182,8 @@ public class Predef {
      */
     public static Object getObject(Variable var, String vstr) {
         try {
+            if (var.getPredef() == null)
+                return null;
             switch (var.getPredef()) {
                 case "Boolean": {
                     if (vstr.charAt(0) == '0')
@@ -192,6 +194,10 @@ public class Predef {
                         return Boolean.parseBoolean(vstr);
                 }
                 case "Nucleic acid":
+                case "DNA":
+                case "DNA with N":
+                case "RNA":
+                case "RNA with N":
                     {
                         Character ch = vstr.charAt(0);
                         if (var.getDomain().isValid(ch)) {
@@ -199,6 +205,7 @@ public class Predef {
                         }       break;
                     }
                 case "Amino acid":
+                case "Protein":
                     {
                         Character ch = vstr.charAt(0);
                         if (var.getDomain().isValid(ch)) {
@@ -206,6 +213,8 @@ public class Predef {
                         }       break;
                     }
                 case "Amino acid extended":
+                case "Protein with X":
+                case "Protein with gap":
                 {
                     Character ch = vstr.charAt(0);
                     if (var.getDomain().isValid(ch)) {
@@ -240,6 +249,8 @@ public class Predef {
                     }   break;
             }
         } catch (NumberFormatException e) {
+            return null;
+        } catch (ClassCastException e) {
             return null;
         }
         return null;

@@ -18,6 +18,7 @@
 package bn.ctmc;
 
 import bn.factor.*;
+import bn.node.CPT;
 import bn.prob.EnumDistrib;
 import dat.EnumVariable;
 import dat.Variable;
@@ -28,6 +29,9 @@ import bn.alg.Query;
 import bn.alg.VarElim;
 import bn.ctmc.matrix.*;
 import dat.Enumerable;
+import json.JSONArray;
+import json.JSONException;
+import json.JSONObject;
 
 import java.util.*;
 
@@ -657,6 +661,67 @@ public class SubstNode implements BNode {
 	public void put(int index, Distrib distr) {
 		// TODO Auto-generated method stub
 	}
+
+    /**
+     * Convert SubstNode to JSON
+     * @return
+     */
+    @Override
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        SubstModel model = SubstModel.createModel(modelname);
+        if (model != null)
+            json.put("Model", model.toJSON());
+        else
+            throw new RuntimeException("Model for node " + this + " cannot be stored as JSON");
+        json.put("Rate", getTime());
+        json.put("Variable", var.toJSON());
+        return json;
+    }
+
+    /**
+     * Recover the (unconditioned) SubstNode from JSON, based on a specified variable
+     * @param json JSON representation
+     * @param prior_var the enumerable variable defining this node
+     * @return new substitution node
+     * @throws JSONException if the JSON specification is invalid
+     */
+    public static SubstNode fromJSON(JSONObject json, EnumVariable prior_var) throws JSONException {
+        JSONObject jmod = json.getJSONObject("Model");
+        SubstModel mod = SubstModel.fromJSON(jmod);
+        SubstNode node = new SubstNode(prior_var, mod);
+        return node;
+    }
+
+    /**
+     * Recover the (conditioned) substitution node from JSON, based on a specified variable, and the parent variable
+     * @param json JSON representation
+     * @param nodevar the enumerable variable defining this node
+     * @param parvar  the enumerable variable that is the parent of this node
+     * @return new substitution node
+     * @throws JSONException if the JSON specification is invalid
+     */
+    public static SubstNode fromJSON(JSONObject json, EnumVariable nodevar, EnumVariable parvar) throws JSONException {
+        JSONObject jmod = json.getJSONObject("Model");
+        SubstModel mod = SubstModel.fromJSON(jmod);
+        Double jrate = json.optDouble("Rate", 1);
+        SubstNode node = new SubstNode(nodevar, parvar, mod, jrate);
+        return node;
+    }
+
+    /**
+     * Recover the (conditioned) substitution node from JSON
+     * @param json JSON representation
+     * @return new substitution node
+     * @throws JSONException if the JSON specification is invalid
+     */
+/*    public static SubstNode fromJSON(JSONObject json, EnumVariable parvar) throws JSONException {
+        String jmod = json.getString("Model");
+        Double jrate = json.optDouble("Rate", 1);
+        SubstModel mod = SubstModel.createModel(jmod);
+        SubstNode node = new SubstNode(nodevar, parvar, mod, jrate);
+        return node;
+    } */
 
     public static void main0(String[] args) {
         // here are all the variables, representing the sequence at a position

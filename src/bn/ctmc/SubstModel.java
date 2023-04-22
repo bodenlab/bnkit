@@ -19,12 +19,14 @@
 package bn.ctmc;
 
 import asr.ASRRuntimeException;
+import bn.math.Matrix;
 import bn.prob.EnumDistrib;
 import dat.EnumTable;
 import dat.EnumVariable;
 import dat.Enumerable;
 import bn.ctmc.matrix.*;
 import bn.math.Matrix.Exp;
+import json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -95,6 +97,45 @@ public abstract class SubstModel {
         Rexp = new Exp(R);
     }
 
+    public JSONObject toJSON() {
+        JSONObject json = new JSONObject();
+        String knownname = SubstModel.getModelName(this);
+        if (knownname != null)
+            json.put("Name", knownname);
+        else {
+            json.put("F", Matrix.toJSON(getF()));
+            json.put("R", Matrix.toJSON(getR()));
+            json.put("Domain", alpha.toJSON());
+        }
+        return json;
+    }
+
+    private static class DefaultModel extends SubstModel {
+        private String name;
+        private DefaultModel(double[] F, double[][] R, Enumerable alpha, String name) {
+            super(F, R, alpha);
+            this.name = name;
+        }
+        @Override
+        public String getName() {
+            return name;
+        }
+    }
+    public static SubstModel fromJSON(JSONObject json) {
+        SubstModel model = null;
+        String knownname = json.optString("Name", null);
+        if (knownname != null)
+            model = SubstModel.createModel(knownname);
+        else
+            knownname = "Unknown";
+        if (model != null)
+            return model;
+        double[] F = Matrix.fromJSON2Vector(json.getJSONArray("F"));
+        double[][] R = Matrix.fromJSON2Matrix(json.getJSONArray("R"));
+        Enumerable alpha = Enumerable.fromJSON(json.getJSONObject("Domain"));
+        return new SubstModel.DefaultModel(F, R, alpha, knownname);
+    }
+
     /**
      * Get the name of the evolutionary model
      * @return the name as a text string
@@ -102,7 +143,7 @@ public abstract class SubstModel {
     public abstract String getName();
 
     /**
-     * The the frequencies of the character states
+     * The frequencies of the character states
      * @return a priori probability of each character
      */
     public double[] getF() {
@@ -266,27 +307,52 @@ public abstract class SubstModel {
         return prob;
     }
 
+    private static Map<String, SubstModel> predef = new HashMap<>();
+    private static Map<SubstModel, String> predef_reverse = new HashMap<>();
+
+
+    // Instantiating the static map
+    static
+    {
+        SubstModel gap = new Gap();
+        predef.put("Gap", gap);
+        predef_reverse.put(gap, "Gap");
+        SubstModel yang = new Yang();
+        predef.put("Yang", yang);
+        predef_reverse.put(yang, "Yang");
+        SubstModel JC1 = new JC(1, Enumerable.nacid);
+        predef.put("JC", JC1);
+        predef_reverse.put(JC1, "JC");
+        SubstModel GLOOME1 = new GLOOME1();
+        predef.put("GLOOME1", GLOOME1);
+        predef_reverse.put(GLOOME1, "GLOOME1");
+        SubstModel WAG = new WAG();
+        predef.put("WAG", WAG);
+        predef_reverse.put(WAG, "WAG");
+        SubstModel LG = new LG();
+        predef.put("LG", LG);
+        predef_reverse.put(LG, "LG");
+        SubstModel JTT = new JTT();
+        predef.put("JTT", JTT);
+        predef_reverse.put(JTT, "JTT");
+        SubstModel Dayhoff = new Dayhoff();
+        predef.put("Dayhoff", Dayhoff);
+        predef_reverse.put(Dayhoff, "Dayhoff");
+        SubstModel SIMPLE_3 = new SIMPLE_3();
+        predef.put("SIMPLE_3", SIMPLE_3);
+        predef_reverse.put(SIMPLE_3, "SIMPLE_3");
+    }
+
     public static SubstModel createModel(String name) {
-        if (name.equalsIgnoreCase("Gap")) {
-            return new Gap();
-        } else if (name.equalsIgnoreCase("Yang")) {
-            return new Yang();
-        } else if (name.equalsIgnoreCase("JC")) {
-            return new JC(1);
-        } else if (name.equalsIgnoreCase("GLOOME1")) {
-            return new GLOOME1();
-        } else if (name.equalsIgnoreCase("WAG")) {
-            return new WAG();
-        } else if (name.equalsIgnoreCase("LG")) {
-            return new LG();
-        }   else if (name.equalsIgnoreCase("JTT")) {
-            return new JTT();
-        } else if (name.equalsIgnoreCase("Dayhoff")) {
-            return new Dayhoff();
-        } else if (name.equalsIgnoreCase("SIMPLE_3")) {
-            return new SIMPLE_3();
-        } else
-            return null;
+        if (predef.containsKey(name))
+            return predef.get(name);
+        return null;
+    }
+
+    public static String getModelName(SubstModel model) {
+        if (predef_reverse.containsKey(model))
+            return predef_reverse.get(model);
+        return null;
     }
 
     public static class ModelCache {

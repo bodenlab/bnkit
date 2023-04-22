@@ -17,6 +17,9 @@
  */
 package bn.math;
 
+import json.JSONArray;
+import json.JSONObject;
+
 /**
  * This class is based on various maths libraries as indicated for each
  * function--all of which are open source.
@@ -109,6 +112,43 @@ public class Matrix {
             System.out.println("\\\\");
         }
         System.out.println("\\end{matrix}");
+    }
+
+    public static JSONArray toJSON(double[][] m) {
+        // JSONObject json = new JSONObject();
+        JSONArray jrows = new JSONArray();
+        for (int r = 0; r < m.length; r ++) {
+            JSONArray jcols = new JSONArray();
+            for (int c = 0; c < m[r].length; c++)
+                jcols.put(m[r][c]);
+            jrows.put(jcols);
+        }
+        return jrows;
+    }
+
+    public static double[][] fromJSON2Matrix(JSONArray jrows) {
+        double[][] m = new double[jrows.length()][];
+        for (int r = 0; r < jrows.length(); r ++) {
+            JSONArray jcols = jrows.getJSONArray(r);
+            m[r] = new double[jcols.length()];
+            for (int c = 0; c < jcols.length(); c ++)
+                m[r][c] = jcols.getDouble(c);
+        }
+        return m;
+    }
+
+    public static JSONArray toJSON(double[] m) {
+        JSONArray jcols = new JSONArray();
+        for (int c = 0; c < m.length; c++)
+            jcols.put(m[c]);
+        return jcols;
+    }
+
+    public static double[] fromJSON2Vector(JSONArray jcols) {
+        double[] m = new double[jcols.length()];
+        for (int c = 0; c < jcols.length(); c ++)
+            m[c] = jcols.getDouble(c);
+        return m;
     }
 
     /**

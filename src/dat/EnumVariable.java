@@ -17,6 +17,8 @@
  */
 package dat;
 
+import json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +35,13 @@ public class EnumVariable extends Variable<Enumerable> {
 
     public EnumVariable(Enumerable domain, String name) {
         super(domain, name);
+    }
+
+    public EnumVariable copy(String name) {
+        EnumVariable var = new EnumVariable(super.getDomain(), name);
+        var.setPredef(this.getPredef());
+        var.setParams(this.getParams());
+        return var;
     }
 
     public int size() {
@@ -53,5 +62,14 @@ public class EnumVariable extends Variable<Enumerable> {
         }
         return list;
     }
+
+    public static EnumVariable fromJSON(JSONObject json) {
+        String name = json.optString("Name");
+        if (name != null)
+            return new EnumVariable(Enumerable.fromJSON(json.getJSONObject("Domain")), name);
+        else
+            return new EnumVariable(Enumerable.fromJSON(json.getJSONObject("Domain")));
+    }
+
 
 }

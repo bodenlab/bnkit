@@ -32,6 +32,7 @@ import dat.Enumerable;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
+import json.JSONObject;
 
 import java.io.Serializable;
 import java.util.*;
@@ -58,6 +59,11 @@ public class SmartNoisyOR implements BNode, Serializable{
     final private int nParents;
     private CountTable count = null; // keep counts when learning/observing; first "parent" is the conditioned variable, then same order as in SmartNoisyOR
     private boolean relevant = false; //for inference, track whether the node is relevant to the query
+
+    @Override
+    public JSONObject toJSON() {
+        throw new RuntimeException("Not implemented");
+    }
 
     /**
      * Create a SmartNoisyOR table for a variable. The variable is

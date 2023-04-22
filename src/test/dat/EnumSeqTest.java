@@ -23,11 +23,10 @@ class EnumSeqTest {
 
     @BeforeEach
     void setup() {
-        seqs = new EnumSeq[Enumerable.predef.size()];
-        datatypes = new String[Enumerable.predef.size()];
+        seqs = new EnumSeq[Enumerable.getEnumerablePredefs().size()];
+        datatypes = new String[Enumerable.getEnumerablePredefs().size()];
         int i = 0;
-        for (Map.Entry<String, Enumerable> entry : Enumerable.predef.entrySet()) {
-            Enumerable domain = entry.getValue();
+        for (Enumerable domain : Enumerable.getEnumerablePredefs()) {
             seqs[i] = new EnumSeq(domain);
             Object[] s = new Object[rand.nextInt(50)];
             for (int j = 0; j < s.length; j ++)
@@ -37,10 +36,9 @@ class EnumSeqTest {
             datatypes[i] = domain.toString();
             i += 1;
         }
-        gappyseqs = new EnumSeq.Gappy[Enumerable.predef.size()];
+        gappyseqs = new EnumSeq.Gappy[Enumerable.getEnumerablePredefs().size()];
         i = 0;
-        for (Map.Entry<String, Enumerable> entry : Enumerable.predef.entrySet()) {
-            Enumerable domain = entry.getValue();
+        for (Enumerable domain : Enumerable.getEnumerablePredefs()) {
             gappyseqs[i] = new EnumSeq.Gappy<>(domain);
             Object[] s = new Object[rand.nextInt(50)];
             for (int j = 0; j < s.length; j ++)

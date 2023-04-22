@@ -384,7 +384,7 @@ public class EnumDistrib implements Distrib, Domain {
             sum += d.distrib[i];
         }
         for (int i = 0; i < d.distrib.length; i++) {
-            d.distrib[i] /= sum;
+            d.distrib[i] = d.distrib[i] / sum; // (double)Math.round(d.distrib[i]/sum * 100000d) / 100000d;;
         }
         d.normalised = true;
         return d;
