@@ -270,6 +270,7 @@ Server responds with a (completed) dataset:
           "Rounds":10,
           "Dataset":
             { "Items":["P25910","Q704V1",...],
+              "Features":["Pos184","Pos186","Pos306"],
               "Data":[[["H","H","H"],["H","H","H"], ...] ] },
           "Seed":3,
           "Rate":1,
@@ -310,6 +311,7 @@ Server responds with a (completed) dataset:
           "Leaves-only":false,
           "Dataset":
             { "Items":["P25910","Q704V1", ...],
+              "Features":["Pos184","Pos186","Pos306"],
               "Data":[[["H","H","H"],["H","H","H"], ...] ] },
           "Seed":3,
           "Rate":1,
@@ -437,20 +439,28 @@ Additional fields in graphs with edge attributes (including POGs):
 
 ### `<dataset>` (`api.JSONUtils.DataSet`)
 
+Currently, it is possible to represent either samples by "headers", or by "items" each of which has "features". The latter implies that data are indexed, not only by sample and header, but by sample, item and feature, forming a 3D tensor. 
+
     { "Headers":[<header1>,<header2>, ...],
       "Data":[ [ ... ] ] }
 
-Note: the data matrix is given column 1, column 2, etc, with values in row 1, row 2 etc within (see example below)
+or
+
+    { "Items":[<item1>,<item2>, ...],
+      "Features":[<feature1>,<feature2>, ...],
+      "Data":[ [ [ ... ] ] ] }
+
+Note: the data matrix is first indexed by sample, then either header, or by item then feature.
 
 #### Example
 
 The example has 39 protein names as `Headers`, 
 which are listed in the same order as the list of observations for each. 
-In the example below, there is only a single observation for each protein name; 
+In the example below, there is two observations for each protein name; 
 the value `null` signifies absence of observation. 
 
-    { "Headers":["A5ILB0","P08144","P29957","H2N0D4","T1WDH2","T1WE96","H9B4I9","A0A060DAC6","Q47R94","Q5UZY3","D8J7H2","Q4A3E0","L8B068","Q2QC88","O93647","Q4J9M2","Q97YY0","O33476","D0KTV8","P96107","P06279","P04746","P00690","O08452","D4P4Y7","Q1KLC8","Q8A1G3","P17654","B8Y698","P00692","B8Y1H0","B1VK33","B5ARZ9","P20845","B6RB08","P06278","P04063","P00693","Q8LJQ6","Q2KJQ1","Q6WUB6","A8VWC5","A0SEG1","P04745","Q75UG5"],
-      "Data":[[8.5],[7.35],[7.35],[7],[9],[9],[null],[8.5],[7.35],[null],[null],[null],[7],[5.75],[5.25],[3.25],[null],[6.5],[null],[null],[null],[null],[7.35],[5.75],[5.5],[7],[null],[null],[8],[6],[null],[7],[6.5],[null],[6.5],[6.466666666666666],[null],[null],[null],[null],[9.5],[null],[null],[6.9],[7]]}
+    { "Headers":["A5ILB0","P08144","P29957","H2N0D4"],
+      "Data":[[8.5,7.35,7.35,7],[9,9,null,8.5]]}
 
 ### `<bnode>` (`bn.BNode` i.e. Bayesian network node) 
 
