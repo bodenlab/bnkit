@@ -48,7 +48,7 @@ public class POGTree {
 //        this.domain = aln.getDomain();
         this.nNodes = aln.getWidth();
         this.ivals = new IntervalST<>();
-        for (int j = 0; j < aln.getHeight(); j++) {
+        for (int j = 0; j < aln.getHeight(); j++) { // create a POG for each sequence in the alignment
             EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(j);
             POGraph pog = new POGraph(aln.getWidth());
             pog.setName(gseq.getName());

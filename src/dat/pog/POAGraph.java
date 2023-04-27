@@ -1,9 +1,14 @@
 package dat.pog;
 
+import asr.ASRException;
+import asr.GRASP;
 import dat.EnumSeq;
 import dat.Enumerable;
+import dat.file.Utils;
+import dat.phylo.Tree;
 
 import java.io.IOException;
+import java.io.PrintStream;
 
 public class POAGraph extends IdxEdgeGraph<SeqEdge> {
 
@@ -101,14 +106,66 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
         return super.addNode(node);
     }
 
+    public static void usage() {
+        usage(0, null);
+    }
+    public static void usage(int error, String msg) {
+        PrintStream out = System.out;
+        if (error != 0)
+            out = System.err;
+        out.println("Usage: asr.GRASP \n" +
+                "\t[-a | --aln <filename>]\n" +
+                "\t[-n | --nwk <filename>]\n" +
+                "\t{-o | --out <filename>}"
+        );
+        if (msg != null)
+            out.println(msg);
+        System.exit(error);
+    }
+
     public static void main(String[] args) {
-        try {
-            EnumSeq.Alignment aln = new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/dp16_poag.aln", Enumerable.aacid));
-            POAGraph poag = new POAGraph(aln);
-            poag.saveToDOT("/Users/mikael/simhome/ASR/dp16_poag.dot");
-            poag.saveToMatrix("/Users/mikael/simhome/ASR/dp16_poag.m");
-        } catch (IOException e) {
-            System.err.println(e);
+        String ALN_FILE = null;
+        String NWK_FILE = null;
+        String OUT_FILE = null;
+        Integer MARG_NODE = null;
+        for (int a = 0; a < args.length; a ++) {
+            if (args[a].startsWith("-")) {
+                String arg = args[a].substring(1);
+                if ((arg.equalsIgnoreCase("-aln") || arg.equalsIgnoreCase("a")) && args.length > a + 1) {
+                    ALN_FILE = args[++a];
+                } else if ((arg.equalsIgnoreCase("-nwk") || arg.equalsIgnoreCase("n")) && args.length > a + 1) {
+                    NWK_FILE = args[++a];
+                } else if ((arg.equalsIgnoreCase("-out") || arg.equalsIgnoreCase("o")) && args.length > a + 1) {
+                    OUT_FILE = args[++a];
+                } else if (arg.equalsIgnoreCase("-ancestor") && args.length > a + 1) {
+                    String ancid = args[++a];
+                    if (ancid.startsWith("N"))
+                        ancid = ancid.substring(1);
+                    try {
+                        MARG_NODE = Integer.parseInt(ancid);
+                    } catch (NumberFormatException e) {
+                        usage(2, args[a] + " is not a valid ancestor name (use <number>, or \"N<number>\", where <number> starts with 0 at root, depth-first). Tip: perform joint reconstruction first to check branch point numbering in tree.");
+                    }
+                }
+            }
         }
+        if (ALN_FILE == null)
+            usage(1, "No alignment file given");
+        if (OUT_FILE == null)
+            usage(3, "No output file given");
+        try {
+            EnumSeq.Alignment aln = Utils.loadAlignment(ALN_FILE, Enumerable.aacid);
+            if (NWK_FILE != null) {
+                Tree tree = Utils.loadTree(NWK_FILE);
+                Utils.checkData(aln, tree);
+            }
+            POAGraph poag = new POAGraph(aln);
+            poag.saveToDOT(OUT_FILE);
+        } catch (IOException e) {
+            usage(5, e.getMessage());
+        } catch (ASRException e) {
+            usage(4, e.getMessage());
+        }
+
     }
 }

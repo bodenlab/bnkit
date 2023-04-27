@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "12-Dec-2022";
+    public static String VERSION = "27-Apr-2023";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -147,7 +147,7 @@ public class GRASP {
         // output formats
         boolean SAVE_AS = false;
         boolean INCLUDE_EXTANTS = false;
-        String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "MATLAB", "LATEX"};
+        String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "MATLAB", "LATEX", "POAG"};
         // select these, default for "joint reconstruction"
         boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
         // select to compute consensus path for these output formats
@@ -329,8 +329,9 @@ public class GRASP {
                 }
             }
             START_TIME = System.currentTimeMillis();
+            EnumSeq.Alignment aln = null;
             if (indelpred == null) {
-                EnumSeq.Alignment aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
+                aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
                 Tree tree = Utils.loadTree(NEWICK);
                 Utils.checkData(aln, tree);
                 // if we are past the above, we can assume that the data are good to process
@@ -526,6 +527,10 @@ public class GRASP {
                         for (int idx = 0; idx < ancestors.length; idx++)
                             saveme3.put("N" + idx, ancestors[idx]);
                         IdxGraph.saveToLaTeX(OUTPUT, saveme3);
+                        break;
+                    case 9: // POAG
+                        POAGraph poag = new POAGraph(aln);
+                        poag.saveToDOT(OUTPUT+ "/" + PREFIX + "_POAGunderN" + MARG_NODE + ".dot");
                         break;
  */
                 }
