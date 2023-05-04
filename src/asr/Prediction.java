@@ -30,7 +30,7 @@ import java.util.*;
  * 1.  Create/load data in (extant) POGs/alignments and tree; place these in POGTree.
  * 2.  Call factory methods to infer insertions and deletions (selection of algorithms is available), in which POGTree is queried and template POGs are created
  * 3a. Set evolutionary model
- * 3. Call methods to decorate ancestors with character states (joint reconstruction) and/or probability distributions (marginal reconstruction)
+ * 3b. Call methods to decorate ancestors with character states (joint reconstruction) and/or probability distributions (marginal reconstruction)
  *
  */
 public class Prediction {

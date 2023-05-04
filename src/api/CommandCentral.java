@@ -501,7 +501,7 @@ public class CommandCentral {
         private Boolean LEAVES_ONLY = true;
         private Boolean INFER_LATENT = true; // set to false for inferring the plate nodes
         private GRASP.Inference MODE = null;
-        private int[] ancestors = null; // if marginal inference, a list of ancestors of at least one
+        private String[] querynames = null; // if marginal inference, a list of (named) ancestors or extants of at least one
 
         private Map<String, Integer> latent2idx = new HashMap<>();
         private Map<String, Integer> feat2idx = new HashMap<>();
@@ -528,33 +528,27 @@ public class CommandCentral {
                 MODE = infmode.equals("Joint") ? GRASP.Inference.JOINT : (infmode.equals("Marginal") ? GRASP.Inference.MARGINAL : null);
                 if (MODE == GRASP.Inference.MARGINAL) {
                     try {
-                        Integer ancspec1 = params.optInt("Ancestor", -1);
-                        if (ancspec1 == -1) {
-                            JSONArray ancspec2 = params.getJSONArray("Ancestors");
-                            ancestors = new int[ancspec2.length()];
-                            for (int i = 0; i < ancestors.length; i++)
-                                ancestors[i] = ancspec2.getInt(i);
-                        } else {
-                            ancestors = new int[1];
-                            ancestors[0] = ancspec1;
-                        }
-                    } catch (ClassCastException e) { // ancestor IDs specified with "N" prefix
-                        String ancspec1 = params.optString("Ancestor");
+                        String ancspec1 = params.optString("Query", null);
                         if (ancspec1 == null) {
-                            JSONArray ancspec2 = params.getJSONArray("Ancestors");
-                            ancestors = new int[ancspec2.length()];
-                            for (int i = 0; i < ancestors.length; i++)
-                                ancestors[i] = Integer.parseInt(ancspec2.getString(i).substring(1));
+                            JSONArray ancspec2 = params.getJSONArray("Queries");
+                            querynames = new String[ancspec2.length()];
+                            for (int i = 0; i < querynames.length; i++) {
+                                try {
+                                    querynames[i] = ancspec2.getString(i);
+                                } catch (JSONException e) {
+                                    querynames[i] = "N" + ancspec2.getInt(i);
+                                }
+                            }
                         } else {
-                            ancestors = new int[1];
-                            ancestors[0] = Integer.parseInt(ancspec1.substring(1));
-                            ;
+                            querynames = new String[1];
+                            querynames[0] = ancspec1;
                         }
+                    } catch (JSONException e) { // would happen if the name is an ancestor index (a number)
+                        Integer ancspec1 = params.getInt("Query");
+                        querynames[0] = "N" + ancspec1;
                     }
                 } else { // joint inference
-                    ancestors = new int[idxTree.getSize()];
-//                    for (int idx : idxTree)
-                    //                        ancestors[idx] = idxTree.getLabel(idx);
+                    querynames = new String[idxTree.getSize()];
                 }
                 pbn = new PhyloPlate(idxTree, template);
                 PhyloPlate.Plate master = null;
@@ -617,12 +611,12 @@ public class CommandCentral {
 
         @Override
         public void run() {
-            int[] predictidxs = new int[ancestors.length];
-            String[] predictitems = new String[ancestors.length];
-            for (int i = 0; i < ancestors.length; i ++) {
+            int[] predictidxs = new int[querynames.length];
+            String[] predictitems = new String[querynames.length];
+            for (int i = 0; i < querynames.length; i ++) {
                 if (MODE == GRASP.Inference.MARGINAL) {
-                    predictidxs[i] = idxTree.getIndex(ancestors[i]); // retrieve the branchpoint index for (each of) the nominated ancestors
-                    predictitems[i] = "N" + ancestors[i];
+                    predictidxs[i] = idxTree.getIndex(querynames[i]); // retrieve the branchpoint index for (each of) the nominated ancestors or extants
+                    predictitems[i] = (!idxTree.isLeaf(predictidxs[i]) ? "N" : "") + idxTree.getLabel(predictidxs[i]).toString();
                 } else {
                     predictidxs[i] = i; // retrieve the branchpoint index for (each of) the nominated ancestors
                     predictitems[i] = (!idxTree.isLeaf(i) ? "N" : "") + idxTree.getLabel(i).toString();

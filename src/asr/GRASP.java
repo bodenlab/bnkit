@@ -72,7 +72,8 @@ public class GRASP {
                 "\t(2) For each ancestral position, the most probable character is assigned to each phylogenetic branch \n\tpoint when performing a joint reconstruction. Alternatively, for each \n\tposition at a nominated branch point, the probability distribution over all possible \n\tcharacters is inferred when performing a marginal reconstruction.\n" +
                 "\tFinally, edges are drawn to represent all inferred combinations of indels to form an ancestor POG \n\twith nodes that can form a valid sequence with inferred content; a preferred path\n\tthrough the POG is then inferred, nominating a single, best supported sequence.\n");
         out.println("Mode of character inference:\n" +
-                "\t-j (or --joint) activates joint reconstruction (default), \n\t-m (or --marginal) activates marginal reconstruction (requires a branch-point to be nominated)\n");
+                "\t-j (or --joint) activates joint reconstruction (default), \n\t-m (or --marginal) activates marginal reconstruction (requires a branch-point to be nominated)\n" +
+                "\t--onlyindel disengages the stage of character state inference\n");
         out.println("Required arguments:\n" +
                 "\t-a (or --aln) must specify the name of a multiple-sequence alignment file on FASTA or CLUSTAL format\n" +
                 "\t-n (or --nwk) must specify the name of a phylogenetic-tree file on Newick format\n");
@@ -186,6 +187,8 @@ public class GRASP {
                     } catch (NumberFormatException e) {
                         usage(2, args[a] + " is not a valid ancestor name (use <number>, or \"N<number>\", where <number> starts with 0 at root, depth-first). Tip: perform joint reconstruction first to check branch point numbering in tree.");
                     }
+                } else if (arg.equalsIgnoreCase("-onlyindel")) {
+                    MODE = null;
                 } else if ((arg.equalsIgnoreCase("-substitution-model") || arg.equalsIgnoreCase("s")) && args.length > a + 1) {
                     boolean found_model = false;
                     for (int i = 0; i < MODELS.length; i++) {
@@ -423,16 +426,18 @@ public class GRASP {
                     continue;
                 switch (i) { // {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX"};
                     case 0: // FASTA
-                        FastaWriter fw = null;
-                        if (MODE == Inference.MARGINAL) // just one sequence
-                            fw = new FastaWriter(new File(OUTPUT, PREFIX + "_N" + MARG_NODE + ".fa"));
-                        else
-                            fw = new FastaWriter(new File(OUTPUT, PREFIX + "_ancestors.fa"));
-                        if (GAPPY)
-                            fw.save(ancnames, ancseqs_gappy);
-                        else
-                            fw.save(ancnames, ancseqs_nogap);
-                        fw.close();
+                        if (MODE != null) {
+                            FastaWriter fw = null;
+                            if (MODE == Inference.MARGINAL) // just one sequence
+                                fw = new FastaWriter(new File(OUTPUT, PREFIX + "_N" + MARG_NODE + ".fa"));
+                            else if (MODE == Inference.JOINT)
+                                fw = new FastaWriter(new File(OUTPUT, PREFIX + "_ancestors.fa"));
+                            if (GAPPY)
+                                fw.save(ancnames, ancseqs_gappy);
+                            else
+                                fw.save(ancnames, ancseqs_nogap);
+                            fw.close();
+                        }
                         break;
                     case 1: // DISTRIB
                         if (MODE == Inference.MARGINAL) { // must be true for this format
@@ -468,13 +473,15 @@ public class GRASP {
                         }
                         break;
                     case 2: // CLUSTAL
-                        AlnWriter aw = null;
-                        if (MODE == Inference.MARGINAL) // just one sequence
-                            aw = new AlnWriter(new File(OUTPUT, PREFIX + "_N" + MARG_NODE + ".aln"));
-                        else
-                            aw = new AlnWriter(new File(OUTPUT, PREFIX + "_ancestors.aln"));
-                        aw.save(ancnames, ancseqs_gappy);
-                        aw.close();
+                        if (MODE != null) {
+                            AlnWriter aw = null;
+                            if (MODE == Inference.MARGINAL) // just one sequence
+                                aw = new AlnWriter(new File(OUTPUT, PREFIX + "_N" + MARG_NODE + ".aln"));
+                            else
+                                aw = new AlnWriter(new File(OUTPUT, PREFIX + "_ancestors.aln"));
+                            aw.save(ancnames, ancseqs_gappy);
+                            aw.close();
+                        }
                         break;
                     case 3: // TREE
                         Newick.save(indelpred.getTree(), OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
@@ -506,7 +513,7 @@ public class GRASP {
                     case 6: // TREES
                         if (MODE == Inference.JOINT)
                             indelpred.saveTreeInstances(OUTPUT);
-                        else
+                        else if (MODE == Inference.MARGINAL)
                             usage(9, "Instantiations of position specific trees not available from marginal inference");
                         break;
 /*

@@ -452,19 +452,19 @@ public class POGTree {
         for (int i : getLeafIndices()) {
             POGraph pog = extarr[i];
             if (pog != null) {
-                if (index == -1 || index == pog.maxsize()) {
-                    if (index == -1 && EDGE_STATUS_FORWARD) {
-                        int[] edges = pog.getForward(); // get start node
+                if (index == -1 || index == pog.maxsize()) { // if the reference index is a terminal node
+                    if (index == -1 && EDGE_STATUS_FORWARD) { // start node, we're looking forward
+                        int[] edges = pog.getForward(); // get first nodes with content...
+                        if (edges != null) // if there are any...
+                            if (edges.length > 0)
+                                instarr[i] = edges[0]; // for an extant POG there can only be one first node, so pick it
+                    } else if (index == pog.maxsize() && !EDGE_STATUS_FORWARD) { // if the reference node is at the end of the POG
+                        int[] edges = pog.getBackward(); // get terminal node, looking backward
                         if (edges != null)
                             if (edges.length > 0)
-                                instarr[i] = edges[0];
-                    } else if (index == pog.maxsize() && !EDGE_STATUS_FORWARD) {
-                        int[] edges = pog.getBackward(); // get terminal node
-                        if (edges != null)
-                            if (edges.length > 0)
-                                instarr[i] = edges[0];
+                                instarr[i] = edges[0]; // can only be one
                     }
-                } else {
+                } else { // the reference node is NOT terminal
                     if (pog.isStartNode(index) && !EDGE_STATUS_FORWARD) { // looking backward from the 1st node in the POG
                         instarr[i] = -1;
                     } else if (pog.isEndNode(index) && EDGE_STATUS_FORWARD) { // looking forward from last node in the POG
@@ -473,7 +473,7 @@ public class POGTree {
                         int[] edges = (EDGE_STATUS_FORWARD == EDGE_FORWARD ? pog.getForward(index) : pog.getBackward(index));
                         if (edges != null)
                             if (edges.length > 0)
-                                instarr[i] = edges[0];
+                                instarr[i] = edges[0]; // extant POG so only one option should apply
                     }
                 }
             }

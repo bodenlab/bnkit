@@ -672,7 +672,7 @@ class GRequestTest {
             params.put("Inference", "Marginal");
             params.put("Leaves-only", false);
             params.put("Latent", true);
-            params.put("Ancestors", new JSONArray(new int[] {0, 1, 2}));
+            params.put("Queries", new JSONArray(new Object[] {0, 1, 2, "Q704V1"}));
             jreq2.put("Params", params);
             server_output.println(jreq2);
             System.out.println(jreq2);
