@@ -350,7 +350,7 @@ Server responds with a (completed) dataset:
                   "Nodetype":"CPT",
                   "Index":[0,1,2] } ],
               "Name":"P25910" },
-          "Ancestors":[0,1,2] } }
+          "Queries":[0,1,2,"Q704V1"] } }
 
 ## Data structures
 
