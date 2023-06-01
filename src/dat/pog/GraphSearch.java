@@ -133,13 +133,17 @@ class DijkstraSearch<E extends POGraph.StatusEdge> extends GraphSearch<E> {
             for (int next : nexts) { // add all nodes coming-up
                 double cost_sofar = (current == start ? 0 : actual[current]);
                 E edge = g.getEdge(current, next);
-                double weight = getPriority(edge);
-                if (actual[next] > cost_sofar + weight) { // if better...
-                    actual[next] = cost_sofar + weight;
-                    closed[next] = new HashSet();
-                    closed[next].add(current);
-                } else if (actual[next] == cost_sofar + weight && closed[next] != null) { // else if just equal...
-                    closed[next].add(current);
+                if (edge == null) {
+
+                } else {
+                    double weight = getPriority(edge);
+                    if (actual[next] > cost_sofar + weight) { // if better...
+                        actual[next] = cost_sofar + weight;
+                        closed[next] = new HashSet();
+                        closed[next].add(current);
+                    } else if (actual[next] == cost_sofar + weight && closed[next] != null) { // else if just equal...
+                        closed[next].add(current);
+                    }
                 }
             }
             double cheapest_cost = Double.POSITIVE_INFINITY;

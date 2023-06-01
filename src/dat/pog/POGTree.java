@@ -102,7 +102,6 @@ public class POGTree {
         Enumerable mydomain = null;
         int mynNodes = -1;
         this.ivals = new IntervalST<>();
-        int j = 0;
         for (Map.Entry<String, POGraph> entry : extants.entrySet()) {
             String name = entry.getKey();
             POGraph pog = entry.getValue();
@@ -113,7 +112,6 @@ public class POGTree {
             int bpidx = tree.getIndex(name);
             extarr[bpidx] = pog;
             id2bpidx.put(name, bpidx);
-            Set<int[]> indels = pog.getIndels();
             for (int i = 0; i < pog.nNodes; i ++) {
                 if (pog.nodes[i] == null)
                     continue;
@@ -126,7 +124,6 @@ public class POGTree {
 //                    ivals.put(new Interval1D(from, to), bpidx);
                 }
             }
-            j += 1;
         }
         this.nNodes = mynNodes;
     }
