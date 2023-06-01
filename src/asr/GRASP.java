@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "04-May-2023";
+    public static String VERSION = "01-Jun-2023";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -65,7 +65,7 @@ public class GRASP {
                 "\t{--exclude-noedge}\n" +
                 "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES)\n" +
                 "\t{--save-all} (saves reconstruction with ALL formats)\n" +
-                "\t{--include-extants}\n" +
+                "\t{--save-tree} (bypasses inference and re-saves the tree with ancestor nodes labelled as per GRASP's depth-first labelling scheme starting with N0)\n" +
                 "\t{--time}{--verbose}{--help}\n");
         out.println("Inference is a two-stage process:\n" +
                 "\t(1) A history of indel events is inferred by either maximum likelihood or maximum parsimony and \n\tmapped onto the tree to determine what positions contain actual sequence content\n" +
@@ -125,6 +125,7 @@ public class GRASP {
 
     public static void main(String[] args) {
 
+        boolean BYPASS = false; // bypass inference, default is false
         String ASRFILE = "ASR.json";
         String ALIGNMENT = null;
         String NEWICK = null;
@@ -158,7 +159,7 @@ public class GRASP {
         // ancestor to reconstruct if inference mode is "marginal"
         Integer MARG_NODE = null;
 
-        long START_TIME, ELAPSED_TIME;
+        long START_TIME = System.currentTimeMillis(), ELAPSED_TIME;
 
         for (int a = 0; a < args.length; a ++) {
             if (args[a].startsWith("-")) {
@@ -243,6 +244,10 @@ public class GRASP {
                     for (int i = 0; i < FORMATS.length - 2; i ++)
                         SAVE_AS_IDX[i] = true;
                     SAVE_AS = true;
+                } else if (arg.equalsIgnoreCase("-save-tree")) {
+                    BYPASS = true;
+                    SAVE_AS = true;
+                    SAVE_AS_IDX[3] = true;
                 } else if (arg.equalsIgnoreCase("-exclude-noedge")) {
                     RECODE_NULL = false;
                 } else if (arg.equalsIgnoreCase("-include-extants")) {
@@ -314,16 +319,23 @@ public class GRASP {
                         int index = index_col == -1 ? i : (Integer) idxobjs[i] - 1; // starts with 1, so subtract "1" to use as position index
                         RATES[index] = (Double) rateobjs[i];
                     } catch (NumberFormatException e0) {
-                        e0.printStackTrace();
+                        usage(23, "Rates file has invalid number format:" + rateobjs[i]);
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                usage(24, "Rates file could not be opened or read: " + RATESFILE);
             }
         }
 
+        Object[][] ancseqs_gappy = null;
+        Object[][] ancseqs_nogap = null;
+        String[] ancnames = null;
+        POGraph[] ancestors = null;
+        Prediction indelpred = null;
+        EnumSeq.Alignment aln = null;
+        Tree tree = null;
+
         try {
-            Prediction indelpred = null;
             if (INPUT != null) {
                 try {
                     indelpred = Prediction.load(INPUT + "/" + ASRFILE);
@@ -332,36 +344,45 @@ public class GRASP {
                 }
             }
             START_TIME = System.currentTimeMillis();
-            EnumSeq.Alignment aln = null;
             if (indelpred == null) {
                 aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
-                Tree tree = Utils.loadTree(NEWICK);
+                tree = Utils.loadTree(NEWICK);
                 Utils.checkData(aln, tree);
-                // if we are past the above, we can assume that the data are good to process
-                POGTree pogtree = new POGTree(aln, tree);
-                switch (INDEL_IDX) {
-                    case 0:
-                        indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
-                        break;
-                    case 1:
-                        indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogtree);
-                        break;
-                    case 2:
-                        indelpred = Prediction.PredictBySICP(pogtree);
-                        break;
-                    case 3:
-                        indelpred = Prediction.PredictBySICML(pogtree);
-                        break;
-                    case 4:
-                        indelpred = Prediction.PredictByParsimony(pogtree);
-                        break;
-                    case 5:
-                        indelpred = Prediction.PredictByMaxLhood(pogtree);
-                        break;
-                    default:
-                        break;
-                }
             }
+        } catch (ASRException e) {
+            usage(22, "Invalid input for ASR: " + e.getMessage());
+        } catch (IOException e) {
+            usage(2, "Failed to read or write files: " + e.getMessage());
+        }
+
+        if (!BYPASS && indelpred == null) {
+            // if we are past the above, we can assume that the data are good to process
+            POGTree pogtree = new POGTree(aln, tree);
+            switch (INDEL_IDX) {
+                case 0:
+                    indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
+                    break;
+                case 1:
+                    indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogtree);
+                    break;
+                case 2:
+                    indelpred = Prediction.PredictBySICP(pogtree);
+                    break;
+                case 3:
+                    indelpred = Prediction.PredictBySICML(pogtree);
+                    break;
+                case 4:
+                    indelpred = Prediction.PredictByParsimony(pogtree);
+                    break;
+                case 5:
+                    indelpred = Prediction.PredictByMaxLhood(pogtree);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (!BYPASS) {
             if (indelpred == null)
                 usage(3, INDELS[INDEL_IDX] + " is not implemented");
             if (MODE == Inference.JOINT)
@@ -373,7 +394,7 @@ public class GRASP {
             }
             POGraph.SUPPORTED_PATH_DEFAULT = SPATH_IDX;
             Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
-            POGraph[] ancestors = new POGraph[pogs.size()];
+            ancestors = new POGraph[pogs.size()];
             try {
                 for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
                     if (MODE == Inference.MARGINAL) {
@@ -387,9 +408,7 @@ public class GRASP {
                 for (Map.Entry<Object, POGraph> entry : pogs.entrySet())
                     ancestors[ii++] = entry.getValue();
             }
-            Object[][] ancseqs_gappy = null;
-            Object[][] ancseqs_nogap = null;
-            String[] ancnames = new String[pogs.size()];
+            ancnames = new String[pogs.size()];
             if (NEED_CONSENSUS) {
                 ancseqs_gappy = new Object[pogs.size()][];
                 ancseqs_nogap = new Object[pogs.size()][];
@@ -405,13 +424,13 @@ public class GRASP {
                         ancnames[(Integer) entry.getKey()] = "N" + entry.getKey().toString();
                         ancseqs_gappy[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, true);
                         ancseqs_nogap[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, false);
-                        ii ++;
+                        ii++;
                     }
                 } catch (NumberFormatException exc) {
                     for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
                         ancnames[ii] = "N" + entry.getKey().toString();
                         ancseqs_gappy[ii] = indelpred.getSequence(entry.getKey(), MODE, true);
-                        ancseqs_nogap[ii ++] = indelpred.getSequence(entry.getKey(), MODE, false);
+                        ancseqs_nogap[ii++] = indelpred.getSequence(entry.getKey(), MODE, false);
                     }
                 }
             }
@@ -421,12 +440,15 @@ public class GRASP {
                 // System.err.println("Directory " + OUTPUT + " already exists");
                 // throw new ASRException("Directory " + directory + " already exists");
             }
+        }
+
+        try {
             for (int i = 0; i < SAVE_AS_IDX.length; i++) {
                 if (!SAVE_AS_IDX[i])
                     continue;
                 switch (i) { // {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX"};
                     case 0: // FASTA
-                        if (MODE != null) {
+                        if (!BYPASS && MODE != null) {
                             FastaWriter fw = null;
                             if (MODE == Inference.MARGINAL) // just one sequence
                                 fw = new FastaWriter(new File(OUTPUT, PREFIX + "_N" + MARG_NODE + ".fa"));
@@ -440,7 +462,7 @@ public class GRASP {
                         }
                         break;
                     case 1: // DISTRIB
-                        if (MODE == Inference.MARGINAL) { // must be true for this format
+                        if (!BYPASS && MODE == Inference.MARGINAL) { // must be true for this format
                             EnumDistrib[] d = indelpred.getMarginal(MARG_NODE, MODEL, RATES);
                             if (d != null) {
                                 Object[][] m = new Object[d.length + 1][];
@@ -473,7 +495,7 @@ public class GRASP {
                         }
                         break;
                     case 2: // CLUSTAL
-                        if (MODE != null) {
+                        if (!BYPASS && MODE != null) {
                             AlnWriter aw = null;
                             if (MODE == Inference.MARGINAL) // just one sequence
                                 aw = new AlnWriter(new File(OUTPUT, PREFIX + "_N" + MARG_NODE + ".aln"));
@@ -484,32 +506,27 @@ public class GRASP {
                         }
                         break;
                     case 3: // TREE
-                        Newick.save(indelpred.getTree(), OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
+                        if (indelpred == null)
+                            Newick.save(tree, OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
+                        else
+                            Newick.save(indelpred.getTree(), OUTPUT + "/" + PREFIX + "_ancestors.nwk", Newick.MODE_ANCESTOR);
                         break;
                     case 4: // POGS
-                        String filename = OUTPUT + "/" + ASRFILE;
-                        indelpred.save(filename);
+                        if (!BYPASS) {
+                            String filename = OUTPUT + "/" + ASRFILE;
+                            indelpred.save(filename);
+                        }
                         break;
                     case 5: // DOT
-                        Map<Object, IdxGraph> saveme2 = new HashMap<>();
-/*
-                        if (INCLUDE_EXTANTS) {
-                            IdxGraph g = new POAGraph(aln);
-                            g.setName("Exts");
-                            saveme2.put("*", g);
-                            for (Object name : aln.getNames()) {
-                                g = pogtree.getExtant(name);
-                                g.setName(name.toString());
-                                saveme2.put(name, g);
+                        if (!BYPASS) {
+                            Map<Object, IdxGraph> saveme2 = new HashMap<>();
+                            for (int idx = 0; idx < ancestors.length; idx++) {
+                                ancestors[idx].setName("N" + idx);
+                                saveme2.put("N" + idx, ancestors[idx]);
                             }
+                            IdxGraph.saveToDOT(OUTPUT, saveme2);
+                            break;
                         }
- */
-                        for (int idx = 0; idx < ancestors.length; idx++) {
-                            ancestors[idx].setName("N" + idx);
-                            saveme2.put("N" + idx, ancestors[idx]);
-                        }
-                        IdxGraph.saveToDOT(OUTPUT, saveme2);
-                        break;
                     case 6: // TREES
                         if (MODE == Inference.JOINT)
                             indelpred.saveTreeInstances(OUTPUT);
@@ -551,9 +568,6 @@ public class GRASP {
             usage(22, "Invalid input for ASR: " + e.getMessage());
         } catch (IOException e) {
             usage(2, "Failed to read or write files: " + e.getMessage());
-/*            } catch (InterruptedException e) {
-            usage(6, "Process interrupted: " + e.getMessage());
-*/
         }
     }
 }
