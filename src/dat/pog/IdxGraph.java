@@ -954,31 +954,36 @@ public class IdxGraph {
             int[] indices = new int[narr.length()];
             for (int i = 0; i < narr.length(); i ++)
                 indices[i] = narr.getInt(i);
-            JSONArray nodelist = json.getJSONArray("Nodes");
-            try {
-                Class nodetype = (Class) json.get("Nodetype");
-                // second, retrieve actual nodes
-                for (int i = 0; i < nodelist.length(); i++) {
-                    JSONObject jnode = nodelist.getJSONObject(i);
-                    if (nodetype.isAssignableFrom(SymNode.class))
-                        this.addNode(indices[i], SymNode.fromJSON(jnode));
-                    else if (nodetype.isAssignableFrom(EnumNode.class))
-                        this.addNode(indices[i], EnumNode.fromJSON(jnode));
-                    else
-                        this.addNode(indices[i], Node.fromJSON(jnode));
+            JSONArray nodelist = json.optJSONArray("Nodes");
+            if (nodelist != null) {
+                try {
+                    Class nodetype = (Class) json.get("Nodetype");
+                    // second, retrieve actual nodes
+                    for (int i = 0; i < nodelist.length(); i++) {
+                        JSONObject jnode = nodelist.getJSONObject(i);
+                        if (nodetype.isAssignableFrom(SymNode.class))
+                            this.addNode(indices[i], SymNode.fromJSON(jnode));
+                        else if (nodetype.isAssignableFrom(EnumNode.class))
+                            this.addNode(indices[i], EnumNode.fromJSON(jnode));
+                        else
+                            this.addNode(indices[i], Node.fromJSON(jnode));
+                    }
+                } catch (ClassCastException e) {
+                    String nodetype = json.getString("Nodetype");
+                    // second, retrieve actual nodes
+                    for (int i = 0; i < nodelist.length(); i++) {
+                        JSONObject jnode = nodelist.getJSONObject(i);
+                        if (nodetype.equals(SymNode.class.toString()))
+                            this.addNode(indices[i], SymNode.fromJSON(jnode));
+                        else if (nodetype.equals(EnumNode.class.toString()))
+                            this.addNode(indices[i], EnumNode.fromJSON(jnode));
+                        else
+                            this.addNode(indices[i], Node.fromJSON(jnode));
+                    }
                 }
-            } catch (ClassCastException e) {
-                String nodetype = json.getString("Nodetype");
-                // second, retrieve actual nodes
-                for (int i = 0; i < nodelist.length(); i++) {
-                    JSONObject jnode = nodelist.getJSONObject(i);
-                    if (nodetype.equals(SymNode.class.toString()))
-                        this.addNode(indices[i], SymNode.fromJSON(jnode));
-                    else if (nodetype.equals(EnumNode.class.toString()))
-                        this.addNode(indices[i], EnumNode.fromJSON(jnode));
-                    else
-                        this.addNode(indices[i], Node.fromJSON(jnode));
-                }
+            } else { // "Nodes" are not provided (happens when only indels have been predicted)
+                // TODO consider implications of leaving nodes un-instantiated
+
             }
             // add edges next; connected nodes need to have been added previously
             for (int i = 0; i < narr.length(); i ++) {
@@ -1012,7 +1017,7 @@ public class IdxGraph {
             String version = json.optString("GRASP_version", null);
             Class datatype = (Class)json.get("Datatype");
             if (version != null)
-                if (!(version.equals(GRASP.VERSION) || version.equals("30-July-2022")))
+                if (!(version.equals(GRASP.VERSION) || version.equals("04-May-2023") || version.equals("12-Dec-2022") || version.equals("28-Aug-2022") || version.equals("30-July-2022")))
                     throw new ASRRuntimeException("Invalid version: " + version);
             if (datatype != null)
                 if (!(IdxGraph.class.isAssignableFrom(datatype)))
@@ -1062,10 +1067,12 @@ public class IdxGraph {
                 nodelist.add(node);
             }
         }
-        json.put("Nodetype", nodetype);
         json.put("Indices", narr);
         json.put("Adjacent", earr);
-        json.put("Nodes", new JSONArray(nodelist.toArray()));
+        if (nodetype != null) {
+            json.put("Nodetype", nodetype);
+            json.put("Nodes", new JSONArray(nodelist.toArray()));
+        }
         return json;
     }
 

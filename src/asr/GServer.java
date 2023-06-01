@@ -58,6 +58,8 @@ public class GServer {
         // the command central is where actual jobs are managed; for now, we just create the instance
         commandCentral = new CommandCentral(this);
         // as requests come in (via the command central) they may be queued; here we create the job queue
+        // TODO: check that the directory exists and/or is writeable
+
         queue = new GRequest.JobQueue(new File(directory)); // the directory is where completed jobs are stored
         // the job queue is a separate thread (which monitors and dispatches jobs as they pile up), which we start here
         queue.start();

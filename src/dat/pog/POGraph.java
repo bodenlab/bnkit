@@ -110,7 +110,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             String version = json.optString("GRASP_version", null);
             Class datatype = null; //(Class)json.get("Datatype");
             if (version != null)
-                if (!(version.equals(GRASP.VERSION) || version.equals("28-Aug-2022")))
+                if (!(version.equals(GRASP.VERSION) || version.equals("04-May-2023") || version.equals("12-Dec-2022") || version.equals("28-Aug-2022")))
                     throw new ASRRuntimeException("Invalid version: " + version);
             if (datatype != null)
                 if (!(dat.pog.POGraph.class.isAssignableFrom(datatype)))

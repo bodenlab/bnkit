@@ -66,6 +66,7 @@ public class Parsimony implements TreeDecor<List> {
     /**
      * Completes inference.
      * @param ti
+     * @return result of inference
      */
     public synchronized Inference infer(TreeInstance ti, boolean recodeNull) {
         Object[] key = ti.encode(recodeNull); // convert instances to standardised list
@@ -218,8 +219,8 @@ public class Parsimony implements TreeDecor<List> {
         public Inference(TreeInstance ti) {
             this.treeInstance = ti;
             this.nsym = ti.getNPossibleValues();
-            this.scores = new double[nnodes][nsym];
-            this.optimal = new List[nnodes];
+            this.scores = new double[nnodes][nsym]; // after forward contains parsimony scores indexed by branchpoint, then symbol
+            this.optimal = new List[nnodes]; // after inference contains all optimal symbols for indexed branchpoint
 
             this.traceback = new int[nnodes][nsym][][];
             for (int bpidx = 0; bpidx < ti.getSize(); bpidx ++) {

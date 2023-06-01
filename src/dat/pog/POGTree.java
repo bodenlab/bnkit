@@ -82,6 +82,8 @@ public class POGTree {
             pog.addEdge(from, to);
             ivals.put(new Interval1D(from, to), bpidx);
         }
+        // Set<Interval1D> ivs1 = ivals.getAll();
+        // System.out.println(ivs1.size());
     }
 
     /**
@@ -111,6 +113,7 @@ public class POGTree {
             int bpidx = tree.getIndex(name);
             extarr[bpidx] = pog;
             id2bpidx.put(name, bpidx);
+            Set<int[]> indels = pog.getIndels();
             for (int i = 0; i < pog.nNodes; i ++) {
                 if (pog.nodes[i] == null)
                     continue;
@@ -527,10 +530,17 @@ public class POGTree {
             EnumSeq.Alignment aln = new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("/Users/mikael/simhome/ASR/dp16_poag5.aln", Enumerable.aacid));
             Tree tree = Tree.load("/Users/mikael/simhome/ASR/dp16_poag5.nwk", "newick");
             POGTree pogt = new POGTree(aln, tree);
+            Map<String, POGraph> extants = new HashMap<>();
             for (Object name : pogt.getExtantIDs()) {
                 POGraph pog = (POGraph) pogt.getExtant(name);
                 System.out.println(name + "\t" + pog);
+                extants.put(pog.getName(), pog);
                 //pog.saveToDOT("/Users/mikael/simhome/ASR/" + name + ".dot");
+            }
+            POGTree pogt2 = new POGTree(extants, tree);
+            for (Object name : pogt2.getExtantIDs()) {
+                POGraph pog = (POGraph) pogt2.getExtant(name);
+                System.out.println(name + "\t" + pog);
             }
         } catch (IOException e) {
             System.err.println(e);

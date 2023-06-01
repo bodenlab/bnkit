@@ -102,8 +102,12 @@ public class AlnWriter {
                 for (int s = 0; s < collection.length; s++) {
                     Object[] seq = collection[s];
                     writer.write(names[s] + "\t");
-                    for (int i = line; i < line + LINE_WIDTH && i < seq.length; i++)
-                        writer.write(seq[i].toString());
+                    for (int i = line; i < line + LINE_WIDTH && i < seq.length; i++) {
+                        if (seq[i] == null)
+                            writer.write('-');
+                        else
+                            writer.write(seq[i].toString());
+                    }
                     writer.newLine();
                 }
                 line += LINE_WIDTH;

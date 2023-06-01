@@ -1,6 +1,7 @@
 package dat.phylo;
 
 import asr.Parsimony;
+import bn.alg.Inference;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Newick;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,17 +27,18 @@ public class ParsimonyTests {
 
 
     Tree tree1 = Newick.parse("((((x01,x02)X01_02,x03)X01_03,(x04,((x05,x06)X05_06,(x07,x08)X07_08)X05_08)X04_08)X01_08,(x09,(x10,x11)X10_11)X09_11)X01_11;");
+    Tree tree2 = Newick.parse("((x01,x02)X01_02,x03)X01_03;");
 
     @BeforeAll
     public static void setUp() throws Exception {
         try {
             trees = new Tree[] { // MB: also successfully tried a 150-seq tree with alignment (not in test/resources)
-                    Tree.load("bnkit/src/test/resources/large.nwk", "newick"),
-                    Tree.load("bnkit/src/test/resources/default.nwk", "newick"),
+                    Tree.load("src/test/resources/large.nwk", "newick"),
+                    Tree.load("src/test/resources/default.nwk", "newick"),
             };
             alns = new EnumSeq.Alignment[] {
-                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("bnkit/src/test/resources/large.aln", Enumerable.aacid)),
-                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("bnkit/src/test/resources/default.aln", Enumerable.aacid)),
+                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("src/test/resources/large.aln", Enumerable.aacid)),
+                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("src/test/resources/default.aln", Enumerable.aacid)),
             };
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -100,68 +103,86 @@ public class ParsimonyTests {
         Parsimony tip = new Parsimony(ti.getTree());
         tip.SET_ONE_TARGET_PARSIMONY = false;
         tip.SET_RANDOM_PARSIMONY = false;
-        tip.infer(ti, false);
+        Parsimony.Inference inf = tip.infer(ti, false);
         BranchPoint n = tree1.find("X01_03");
         int bpidx = getBPIndex(tree1, n);
         if (bpidx >= 0 && n != null) {
             for (int i = 0; i < s.length; i++)
-                assertEquals(tip.getOptimal(bpidx).contains(s[i]), true);
+                assertEquals(inf.getOptimal(bpidx).contains(s[i]), true);
         }
         n = tree1.find("X04_08");
         bpidx = getBPIndex(tree1, n);
         if (bpidx >= 0 && n != null) {
             for (int i = 0; i < s.length; i++)
-                assertEquals(tip.getOptimal(bpidx).contains(s[i]), true);
+                assertEquals(inf.getOptimal(bpidx).contains(s[i]), true);
         }
         TreeInstance.LABEL_INCLUDES_INDEX = true;
         System.out.println("init1: " + tip);
-        try { Newick.parse(tip.toString()).save("bnkit/src/test/resources/init1.nwk", "nwk"); } catch (IOException e) {}
+        try { Newick.parse(tip.toString()).save("src/test/resources/init1.nwk", "nwk"); } catch (IOException e) {}
         ti = tree1.getInstance(names, init2);
         tip = new Parsimony(ti.getTree());
         tip.SET_ONE_TARGET_PARSIMONY = false;
         tip.SET_RANDOM_PARSIMONY = false;
-        tip.infer(ti, false);
+        inf = tip.infer(ti, false);
         n = tree1.find("X01_03");
         bpidx = getBPIndex(tree1, n);
         if (bpidx >= 0 && n != null) {
-            assertEquals(tip.getOptimal(bpidx).contains(s[0]), true);
-            assertEquals(tip.getOptimal(bpidx).contains(s[1]), true);
-            assertEquals(tip.getOptimal(bpidx).contains(s[2]), true);
-            assertEquals(tip.getOptimal(bpidx).contains(s[3]), false);
+            assertEquals(inf.getOptimal(bpidx).contains(s[0]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[1]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[2]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[3]), false);
         }
         n = tree1.find("X04_08");
         bpidx = getBPIndex(tree1, n);
         if (bpidx >= 0 && n != null) {
-            assertEquals(tip.getOptimal(bpidx).contains(s[0]), true);
-            assertEquals(tip.getOptimal(bpidx).contains(s[1]), true);
-            assertEquals(tip.getOptimal(bpidx).contains(s[2]), false);
-            assertEquals(tip.getOptimal(bpidx).contains(s[3]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[0]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[1]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[2]), false);
+            assertEquals(inf.getOptimal(bpidx).contains(s[3]), true);
         }
         System.out.println("init2: " + tip);
-        try { Newick.parse(tip.toString()).save("bnkit/src/test/resources/init2.nwk", "nwk"); } catch (IOException e) {}
+        try { Newick.parse(tip.toString()).save("src/test/resources/init2.nwk", "nwk"); } catch (IOException e) {}
         ti = tree1.getInstance(names, init3);
         tip = new Parsimony(ti.getTree());
         tip.SET_ONE_TARGET_PARSIMONY = false;
         tip.SET_RANDOM_PARSIMONY = false;
-        tip.infer(ti, false);
+        inf = tip.infer(ti, false);
         n = tree1.find("X01_03");
         bpidx = getBPIndex(tree1, n);
         if (bpidx >= 0 && n != null) {
-            assertEquals(tip.getOptimal(bpidx).contains(s[0]), true);
-            assertEquals(tip.getOptimal(bpidx).contains(s[1]), true);
-            assertEquals(tip.getOptimal(bpidx).contains(s[2]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[0]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[1]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[2]), true);
         }
         n = tree1.find("X04_08");
         bpidx = getBPIndex(tree1, n);
         if (bpidx >= 0 && n != null) {
-            assertEquals(tip.getOptimal(bpidx).contains(s[0]), false);
-            assertEquals(tip.getOptimal(bpidx).contains(s[1]), true);
-            assertEquals(tip.getOptimal(bpidx).contains(s[2]), false);
-            assertEquals(tip.getOptimal(bpidx).contains(s[3]), false);
+            assertEquals(inf.getOptimal(bpidx).contains(s[0]), false);
+            assertEquals(inf.getOptimal(bpidx).contains(s[1]), true);
+            assertEquals(inf.getOptimal(bpidx).contains(s[2]), false);
+            assertEquals(inf.getOptimal(bpidx).contains(s[3]), false);
         }
         System.out.println("init3: " + tip);
-        try { Newick.parse(tip.toString()).save("bnkit/src/test/resources/init3.nwk", "nwk"); } catch (IOException e) {}
+        try { Newick.parse(tip.toString()).save("src/test/resources/init3.nwk", "nwk"); } catch (IOException e) {}
 
+    }
+    @Test
+    public void testParsimony3() throws Exception {
+        String[] names = new String[]{"x01", "x02", "x03"};
+        Object[] s = new Object[]{"A", "B", "C"};
+        /* MB: manually checked the three inits below */
+        Object[] init1 = new Object[]{s[0], s[1], s[2]};
+        TreeInstance ti = tree1.getInstance(names, init1);
+        Parsimony tip = new Parsimony(ti.getTree());
+        tip.SET_ONE_TARGET_PARSIMONY = false;
+        tip.SET_RANDOM_PARSIMONY = false;
+        Parsimony.Inference inf = tip.infer(ti, false);
+        BranchPoint n = tree1.find("X01_03");
+        int bpidx = getBPIndex(tree1, n);
+        if (bpidx >= 0 && n != null) {
+            for (int i = 0; i < s.length; i++)
+                assertEquals(inf.getOptimal(bpidx).contains(s[i]), true);
+        }
     }
 
 }

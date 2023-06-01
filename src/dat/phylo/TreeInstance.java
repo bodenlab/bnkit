@@ -78,6 +78,20 @@ public class TreeInstance {
     }
 
     /**
+     * Remove symbols that can be considered for un-instantiated branchpoints
+     * @param impossible the symbol to remove
+     */
+    public synchronized void removePossible(Object impossible) {
+        Set s = new HashSet();
+        for (Object x : getPossible()) {
+            if (x != impossible)
+            s.add(x);
+        }
+        this.possible = new Object[s.size()];
+        s.toArray(this.possible);
+    }
+
+    /**
      * Create multiple instances from the same tree, using the same branchpoint IDs mapping to different (multiple) values.
      * @param tree
      * @param headers
