@@ -5,10 +5,13 @@ import asr.GRASP;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
+import dat.phylo.BranchPoint;
 import dat.phylo.Tree;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class POAGraph extends IdxEdgeGraph<SeqEdge> {
 
@@ -115,8 +118,9 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
             out = System.err;
         out.println("Usage: asr.GRASP \n" +
                 "\t[-a | --aln <filename>]\n" +
-                "\t[-n | --nwk <filename>]\n" +
-                "\t{-o | --out <filename>}"
+                "\t[-o | --out <filename>]\n" +
+                "\t{-n | --nwk <filename>}\n" +
+                "\t{--ancestor <ancestor-label>}"
         );
         if (msg != null)
             out.println(msg);
@@ -153,11 +157,30 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
             usage(1, "No alignment file given");
         if (OUT_FILE == null)
             usage(3, "No output file given");
+        if (NWK_FILE == null && MARG_NODE != null)
+            usage(2, "No tree file given, so cannot determine where ancestor\"" + MARG_NODE + "\" is");
         try {
             EnumSeq.Alignment aln = Utils.loadAlignment(ALN_FILE, Enumerable.aacid);
             if (NWK_FILE != null) {
+                List<EnumSeq.Gappy> select = new ArrayList<>();
                 Tree tree = Utils.loadTree(NWK_FILE);
                 Utils.checkData(aln, tree);
+                int bpidx = 0; // default root
+                if (MARG_NODE != null)
+                bpidx = tree.getIndex(MARG_NODE);
+                if (bpidx >= 0) {
+                    String[] names = aln.getNames();
+                    for (int idx : tree.getLeaves(bpidx)) {
+                        Object label = tree.getLabel(idx);
+                        for (int i = 0; i < names.length; i ++) {
+                            if (names[i].equals(label.toString())) {
+                                EnumSeq.Gappy seq = aln.getEnumSeq(i);
+                                select.add(seq);
+                            }
+                        }
+                    }
+                    aln = new EnumSeq.Alignment(select);
+                }
             }
             POAGraph poag = new POAGraph(aln);
             poag.saveToDOT(OUT_FILE);

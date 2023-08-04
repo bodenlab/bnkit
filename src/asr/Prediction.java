@@ -288,12 +288,55 @@ public class Prediction {
                         pruneMe.add(idx);
                 }
             }
-            // pruneMe contains indices that SHOULD BE REMOVED
-            int[] indices = phylo.getPrunedIndex(pruneMe);
+            // pruneMe contains indices that SHOULD BE REMOVED, optionally including orphaned (not linked to extants) ancestors
+            IdxTree postree = null;
+            int[] indices = null;
+            if (GRASP.REMOVE_INDEL_ORPHANS) {
+                if (GRASP.VERBOSE) {
+                    int[] indices_with_orphans = phylo.getPrunedIndex(pruneMe, false);
+                    IdxTree tree_with_orphans = IdxTree.createPrunedTree(phylo, indices_with_orphans);
+                    int[] roots_with_orphans = tree_with_orphans.getRoots();
+                    indices = phylo.getPrunedIndex(pruneMe, true);
+                    postree = IdxTree.createPrunedTree(phylo, indices);
+                    int[] roots_without_orphans = postree.getRoots();
+                    int different = (roots_with_orphans.length - roots_without_orphans.length);
+                    if (different > 0)
+                        System.out.println("Pos " + position + " removed \t" + different + " orphaned INDEL trees");
+                } else {
+                    indices = phylo.getPrunedIndex(pruneMe, true);
+                    postree = IdxTree.createPrunedTree(phylo, indices);
+                }
+            } else {
+                int[] indices_with_orphans = phylo.getPrunedIndex(pruneMe, false);
+                postree = IdxTree.createPrunedTree(phylo, indices_with_orphans);
+                indices = indices_with_orphans;
+                if (GRASP.VERBOSE) {
+                    int[] indices_without_orphans = phylo.getPrunedIndex(pruneMe, true);
+                    IdxTree tree_without_orphans = IdxTree.createPrunedTree(phylo, indices_without_orphans);
+                    int[] roots_with_orphans = postree.getRoots();
+                    int[] roots_without_orphans = tree_without_orphans.getRoots();
+                    int different = (roots_with_orphans.length - roots_without_orphans.length);
+                    if (different > 0)
+                        System.out.println("Pos " + position + " contains \t" + different + " orphaned INDEL trees");
+                }
+            }
+            // save tree for quick re-retrieval later
+            positrees[position] = postree;
             // save indices for quick re-retrieval later
             positidxs[position] = indices;
-            // save tree for quick re-retrieval later
-            positrees[position] = IdxTree.createPrunedTree(phylo, indices);
+/*
+            Set<Integer> orphans = positrees[position].getIndicesOfOrphanedTrees();
+            if (orphans.size() > 0)
+                System.out.println("" + position + " has " + orphans.size() +" members");
+            // TODO: make this into an option (to remove trees that do not have any extants in them)
+            pruneMe = positrees[position].getIndicesOfOrphanedTrees();
+            if (pruneMe.size() > 0) {
+                indices = positrees[position].getPrunedIndex(pruneMe);
+                positrees[position] = IdxTree.createPrunedTree(positrees[position], indices);
+                positidxs[position] = indices;
+            }
+
+ */
         } // else the index tree was already cached...
         return positrees[position];
     }

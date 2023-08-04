@@ -1,16 +1,10 @@
 package dat.phylo;
 
-import asr.TrAVIS;
-import dat.EnumSeq;
-import dat.Enumerable;
-import dat.file.Newick;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,19 +37,19 @@ class IdxTreeTest {
         pruned = IdxTree.createPrunedTree(defaultTree, s);
         assertEquals(defaultTree.getSize() - 1, pruned.getSize());
         assertEquals(3, pruned.getRoots().length);
-        IdxTree pruned_identical = IdxTree.createPrunedTree(defaultTree, defaultTree.getPrunedIndex(s));
+        IdxTree pruned_identical = IdxTree.createPrunedTree(defaultTree, defaultTree.getPrunedIndex(s, true));
         assertEquals(pruned.getSize(), pruned_identical.getSize());
         s = IdxTree.getIndices(false, new Object[] {true, true, false, true, true, false, true, false, false, true, true, true, true, false});
         pruned = IdxTree.createPrunedTree(defaultTree, s);
         assertEquals(defaultTree.getSize() - 5, pruned.getSize());
         assertEquals(6, pruned.getRoots().length); // did not check manually!
-        pruned_identical = IdxTree.createPrunedTree(defaultTree, defaultTree.getPrunedIndex(s));
+        pruned_identical = IdxTree.createPrunedTree(defaultTree, defaultTree.getPrunedIndex(s, true));
         assertEquals(pruned.getSize(), pruned_identical.getSize());
         s = IdxTree.getIndices(false, new Object[] {false, true, true, true, false, true, true, false, true, false, false, true, true, true, true, false});
         pruned = IdxTree.createPrunedTree(defaultTree, s);
         assertEquals(defaultTree.getSize() - 6, pruned.getSize());
         assertEquals(7, pruned.getRoots().length); // did not check manually!
-        pruned_identical = IdxTree.createPrunedTree(defaultTree, defaultTree.getPrunedIndex(s));
+        pruned_identical = IdxTree.createPrunedTree(defaultTree, defaultTree.getPrunedIndex(s, true));
         assertEquals(pruned.getSize(), pruned_identical.getSize());
     }
 
@@ -84,7 +78,7 @@ class IdxTreeTest {
     static void setThingsUp() {
         Tree tree;
         try {
-            tree = Tree.load("bnkit/src/test/resources/default.nwk", "newick");
+            tree = Tree.load("src/test/resources/default.nwk", "newick");
             defaultTree = (IdxTree)tree;
         } catch (IOException e) {
             System.err.println(e.getMessage());
@@ -116,5 +110,89 @@ class IdxTreeTest {
             assertTrue(t.toJSON().toString().equals(IdxTree.fromJSON(t.toJSON()).toJSON().toString()));
         for (IdxTree t : trees)
             assertEquals(t.hashCode(), IdxTree.fromJSON(t.toJSON()).hashCode());
+    }
+
+    @Test
+    void getIndicesOfOrphanedTrees1() {
+        Set<Integer> s = IdxTree.getIndices(false, new Object[] {true, true /*N1*/, false /*N2*/, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false /*N9*/, true, true, false /*N11*/, true, true});
+        for (int i : s) {
+            System.out.println("Delete branch point: " + i  + "[" + defaultTree.getLabel(i) + "]");
+        }
+        IdxTree t = IdxTree.createPrunedTree(defaultTree, s);
+        assertEquals(7, t.getRoots().length); // checked manually (MB)
+        for (int i : t.getRoots()) {
+            System.out.println("Root: " + i + "[" + t.getLabel(i) + "]");
+            for (int j : t.getSubtreeIndices(i))
+                System.out.println("\t" + j + "[" + t.getLabel(j) + "]");
+        }
+        Set<Integer> pruned = t.getIndicesOfOrphanedTrees();
+        for (int i : pruned) {
+            System.out.println("Remove: " + i + "[" + t.getLabel(i) + "]");
+        }
+        assertEquals(0, pruned.size()); // checked manually (MB)
+    }
+
+    @Test
+    void getIndicesOfOrphanedTrees2() {
+        Set<Integer> s = IdxTree.getIndices(false, new Object[] {true, true /*N1*/, false /*N2*/, true, true /*N3*/, true, true, true, true, true, true, true, true, true, true, false /*N8*/, true, true, true, false /*N10*/, true,
+                true /*N11*/, true, true, true, true, true, true, true, true /*N15*/, true, true, true, true, true, true, false /*N18*/});
+        for (int i : s) {
+            System.out.println("Delete branch point: " + i  + "[" + defaultTree.getLabel(i) + "]");
+        }
+        IdxTree t = IdxTree.createPrunedTree(defaultTree, s);
+        for (int i : t.getRoots()) {
+            System.out.println("Root: " + i + "[" + t.getLabel(i) + "]");
+            for (int j : t.getSubtreeIndices(i))
+                System.out.println("\t" + j + "[" + t.getLabel(j) + "]");
+        }
+        Set<Integer> pruned = t.getIndicesOfOrphanedTrees();
+        for (int i : pruned) {
+            System.out.println("Remove: " + i + "[" + t.getLabel(i) + "]");
+        }
+        assertEquals(9, t.getRoots().length); // checked manually (MB)
+        assertEquals(3, pruned.size()); // checked manually (MB)
+        IdxTree clean = IdxTree.createPrunedTree(t, pruned);
+        assertEquals(8, clean.getRoots().length); // one root fewer now
+    }
+
+    @Test
+    void getIndicesOfOrphanedTrees3() {
+        Set<Integer> s = IdxTree.getIndices(false, new Object[] {true, true /*N1*/, false /*N2*/, true, true /*N3*/, true, false /*N5*/, true, true, true, true, true, false /*N7*/, true, true, false /*N8*/, true, true, false /*N9*/, true /*N10*/, false /*s18*/,
+                false /*N11*/, true, true, true, true, true, true, true, true /*N15*/, true, true, true, true, true, true, false /*N18*/});
+        for (int i : s) {
+            System.out.println("Delete branch point: " + i  + "[" + defaultTree.getLabel(i) + "]");
+        }
+        IdxTree t = IdxTree.createPrunedTree(defaultTree, s);
+        for (int i : t.getRoots()) {
+            System.out.println("Root: " + i + "[" + t.getLabel(i) + "]");
+            for (int j : t.getSubtreeIndices(i))
+                System.out.println("\t" + j + "[" + t.getLabel(j) + "]");
+        }
+        Set<Integer> pruned = t.getIndicesOfOrphanedTrees();
+        for (int i : pruned) {
+            System.out.println("Remove: " + i + "[" + t.getLabel(i) + "]");
+        }
+        assertEquals(14, t.getRoots().length); // checked manually (MB)
+        assertEquals(3, pruned.size()); // checked manually (MB)
+        IdxTree clean = IdxTree.createPrunedTree(t, pruned);
+        assertEquals(12, clean.getRoots().length); // two roots fewer
+    }
+
+    @Test
+    void getPrunedTree() {
+        Set<Integer> s = IdxTree.getIndices(false, new Object[] {true, true /*N1*/, false /*N2*/, true, true /*N3*/, true, false /*N5*/, true, true, true, true, true, false /*N7*/, true, true, false /*N8*/, true, true, false /*N9*/, true /*N10*/, false /*s18*/,
+                false /*N11*/, true, true, true, true, true, true, true, true /*N15*/, true, true, true, true, true, true, false /*N18*/});
+        for (int i : s) {
+            System.out.println("Delete branch point: " + i  + "[" + defaultTree.getLabel(i) + "]");
+        }
+        int[] indices = defaultTree.getPrunedIndex(s, true);
+        IdxTree clean = IdxTree.createPrunedTree(defaultTree, indices);
+        for (int i : clean.getRoots()) {
+            System.out.println("Root: " + i + "[" + clean.getLabel(i) + "]");
+            for (int j : clean.getSubtreeIndices(i))
+                System.out.println("\t" + j + "[" + clean.getLabel(j) + "]");
+        }
+        assertEquals(12, clean.getRoots().length); // two roots fewer
+
     }
 }

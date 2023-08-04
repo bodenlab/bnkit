@@ -183,8 +183,8 @@ public class GServer {
                 while (inputLine != null) {
                     System.out.println("[" + clientSocket.toString() + "] message (50 chars max): " + inputLine.substring(0, Math.min(inputLine.length(), 50)) + ((inputLine.length() > 50) ? "..." : ""));
                     try {
-                        JSONObject json = new JSONObject(inputLine); // client message is parsed as JSON, and an exception is generated if it fails (+ error passed to client)
-
+                        // client message is parsed as JSON, and an exception is generated if it fails (+ error passed to client)
+                        JSONObject json = new JSONObject(inputLine);
                         // Distinguish between Server/Job related commands (first type, when there's mention of "Job")
                         int job = GMessage.fromJSON2Job(json);
                         if (job > 0) { // this command has job number, so needs to be handled by server-aware code

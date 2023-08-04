@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "01-Jun-2023";
+    public static String VERSION = "03-Aug-2023";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -35,6 +35,7 @@ public class GRASP {
     // Mode for BEP
     public static boolean RECODE_NULL = true;
 
+    public static boolean REMOVE_INDEL_ORPHANS = true;
     public enum Inference {
         JOINT,
         MARGINAL
@@ -65,7 +66,8 @@ public class GRASP {
                 "\t{--exclude-noedge}\n" +
                 "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES)\n" +
                 "\t{--save-all} (saves reconstruction with ALL formats)\n" +
-                "\t{--save-tree} (bypasses inference and re-saves the tree with ancestor nodes labelled as per GRASP's depth-first labelling scheme starting with N0)\n" +
+                "\t{--save-tree} (bypasses inference and re-saves the tree with ancestor nodes labelled as per GRASP's\n\tdepth-first labelling scheme starting with N0)\n" +
+                "\t{--save-poag { <branchpoint-id> } (bypasses inference and saves the input alignment as a POAG\n\t(partial order alignment graph of extant sequences under specified ancestor [default N0])\n" +
                 "\t{--time}{--verbose}{--help}\n");
         out.println("Inference is a two-stage process:\n" +
                 "\t(1) A history of indel events is inferred by either maximum likelihood or maximum parsimony and \n\tmapped onto the tree to determine what positions contain actual sequence content\n" +
@@ -248,6 +250,24 @@ public class GRASP {
                     BYPASS = true;
                     SAVE_AS = true;
                     SAVE_AS_IDX[3] = true;
+                } else if (arg.equalsIgnoreCase("-save-poag")) {
+                    String ancid = args[++a];
+                    if (ancid.startsWith("-")) { // another option, so no ancestor given
+                        MARG_NODE = 0;
+                        a--;
+                        break;
+                    } else { // ancestor specified
+                        if (ancid.startsWith("N"))
+                            ancid = ancid.substring(1);
+                        try {
+                            MARG_NODE = Integer.parseInt(ancid);
+                        } catch (NumberFormatException e) {
+                            usage(2, args[a] + " is not a valid ancestor name (use <number>, or \"N<number>\", where <number> starts with 0 at root, depth-first). Tip: use option --save-tree to check branch point numbering in tree.");
+                        }
+                        BYPASS = true;
+                        SAVE_AS = true;
+                        SAVE_AS_IDX[9] = true;
+                    }
                 } else if (arg.equalsIgnoreCase("-exclude-noedge")) {
                     RECODE_NULL = false;
                 } else if (arg.equalsIgnoreCase("-include-extants")) {
@@ -525,8 +545,8 @@ public class GRASP {
                                 saveme2.put("N" + idx, ancestors[idx]);
                             }
                             IdxGraph.saveToDOT(OUTPUT, saveme2);
-                            break;
                         }
+                        break;
                     case 6: // TREES
                         if (MODE == Inference.JOINT)
                             indelpred.saveTreeInstances(OUTPUT);
@@ -552,11 +572,14 @@ public class GRASP {
                             saveme3.put("N" + idx, ancestors[idx]);
                         IdxGraph.saveToLaTeX(OUTPUT, saveme3);
                         break;
-                    case 9: // POAG
-                        POAGraph poag = new POAGraph(aln);
-                        poag.saveToDOT(OUTPUT+ "/" + PREFIX + "_POAGunderN" + MARG_NODE + ".dot");
-                        break;
+
  */
+                    case 9: // POAG
+                        if (BYPASS) {
+                            POAGraph poag = new POAGraph(aln);
+                            poag.saveToDOT(OUTPUT + "/" + PREFIX + "_POAGunderN" + MARG_NODE + ".dot");
+                        }
+                        break;
                 }
                 ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
                 if (VERBOSE || TIME) {

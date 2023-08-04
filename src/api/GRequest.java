@@ -1,5 +1,6 @@
 package api;
 
+import asr.Job;
 import dat.EnumSeq;
 import dat.phylo.IdxTree;
 import json.JSONException;
@@ -14,7 +15,7 @@ import java.util.*;
 /**
  * Class to represent a request to GRASP server
  */
-public class GRequest extends Thread implements Comparable<GRequest> {
+public class GRequest extends Thread implements Comparable<GRequest>, Job {
 
     private static int JOBCOUNTER = 1;
     private final int JOB;
@@ -170,6 +171,13 @@ public class GRequest extends Thread implements Comparable<GRequest> {
             request.status = STATUS.WAITING;
             currentjobs.add(request);
         }
+
+        /**
+         * Retrieve next job
+         * TODO: possibly use priority instead of just polling the next in queue, then later when selected, ensure that CPU/memory requirements are managed
+         *
+         * @return next job to execute
+         */
         public synchronized GRequest poll() {
             if (currentjobs.size() > 0) {
                 for (GRequest req : currentjobs) {

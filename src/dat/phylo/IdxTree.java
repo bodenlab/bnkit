@@ -184,21 +184,60 @@ public class IdxTree implements Iterable<Integer> {
      * @param pruneMe indices of branch points to be removed
      * @return index with nominated branch points excluded
      */
-    public int[] getPrunedIndex(Set<Integer> pruneMe) {
+    public int[] getPrunedIndex(Set<Integer> pruneMe, boolean removeOrphans) {
         // dstidx counts branch points (kept from the source tree and) added to the new tree
         int dstidx = 0; // also used as the index for destination tree
         int[] match = new int[bpoints.length]; // a map for matching the source index to the destination index, -1 means no match
+
+        if (removeOrphans) {
+            boolean[] orphan = new boolean[bpoints.length]; // map for orphans (nodes with no extant descendant)
+            Arrays.fill(orphan, true);                  // assume all positions are orphans
+            for (int srcidx = 0; srcidx < bpoints.length; srcidx++) {
+                if (this.isLeaf(srcidx)) { // at leaf so traverse upwards to mark non-orphan status
+                    int top = -1, idx = srcidx;
+                    while (!pruneMe.contains(idx) && orphan[idx]) { // stop once hitting a pruned node or one already marked non-orphan
+                        orphan[idx] = false;        // mark it non-orphan
+                        top = idx;
+                        idx = this.getParent(idx);  // go to parent
+                        if (idx == -1)              // hitting a node without parent
+                            break;
+                    }
+                    // now flood all descendants (as non-orphans) because we've hit the top of a non-orphaned sub-tree
+                    if (top != -1) {
+                        markMyChildrenAsNonOrphans(top, pruneMe, orphan);
+                    }
+                }
+            }
+            for (int srcidx = 0; srcidx < bpoints.length; srcidx++) {
+                if (orphan[srcidx])
+                    pruneMe.add(srcidx);
+            }
+        } // any orphans are now included in the pruneMe set
+
+        // build the match index (to go from source tree idx to pruned position-specific tree
         // the source tree is traversed depth-first, srcidx is the index for each branch point
         for (int srcidx = 0; srcidx < bpoints.length; srcidx ++) {
             if (!pruneMe.contains(srcidx)) {    // branch point is not in the nominated kill-list, so WILL BE transferred to new tree
                 match[srcidx] = dstidx;         // update source-to-dest mapping, to use below
                 dstidx += 1;
-            } else
+            } else {
                 match[srcidx] = -1;             // update source-to-dest mapping, to indicate no match
+            }
         }
         return match;
     }
 
+    private void markMyChildrenAsNonOrphans(int idx, Set<Integer> pruned, boolean[] orphan) {
+        if (isLeaf(idx))
+            return;
+        int[] children = getChildren(idx);
+        for (int c : children) {
+            if (orphan[c] == false || pruned.contains(c))
+                continue;
+            orphan[c] = false;
+            markMyChildrenAsNonOrphans(c, pruned, orphan);
+        }
+    }
     /**
      *
      * @param source
@@ -331,6 +370,24 @@ public class IdxTree implements Iterable<Integer> {
     public static IdxTree createDuplicatedSubtree() {
         // FIXME: implement; note that "index" map needs to map from ancestor@position to recover duplicated branch points
         throw new RuntimeException("Not implemented");
+    }
+
+    public Set<Integer> getIndicesOfOrphanedTrees() {
+        int[] roots = this.getRoots();
+        Set<Integer> prune = new HashSet<>();
+        Set<Integer> members = new HashSet<>();
+        for (int r : roots) {
+            for (int i : getSubtreeIndices(r)) {
+                if (getBranchPoint(i).isLeaf()) {
+                    members.clear();
+                    break;
+                } else
+                    members.add(i);
+            }
+            prune.addAll(members); // will only be non-empty if no members is a proper leaf
+            members.clear();
+        }
+        return prune;
     }
 
     @Override
