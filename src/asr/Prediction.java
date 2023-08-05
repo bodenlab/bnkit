@@ -286,6 +286,13 @@ public class Prediction {
                         throw new ASRRuntimeException("Invalid ancestor at branchpoint " + idx);
                     if (!pog.isNode(position))
                         pruneMe.add(idx);
+                } else { // extant (Fixed: 5 Aug 2023)
+
+                    POGraph pog = pogTree.getExtant((int)idx);
+                    if (pog == null)
+                        throw new ASRRuntimeException("Invalid extant at branchpoint " + idx);
+                    if (!pog.isNode(position))
+                        pruneMe.add(idx);
                 }
             }
             // pruneMe contains indices that SHOULD BE REMOVED, optionally including orphaned (not linked to extants) ancestors

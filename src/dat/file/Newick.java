@@ -314,7 +314,7 @@ public class Newick {
         try {
             if (children.length > 0) {
                 Integer.parseInt(label);
-                label = "N" + label; // tagging-on an "N"
+                label = "N" + label; // tagging-on an "N"; FIXME: this does not catch cases where the ancestor happens to be at a leaf of a pruned tree
             }
         } catch (NumberFormatException e) {
         }

@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "03-Aug-2023";
+    public static String VERSION = "5-Aug-2023";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -90,6 +90,7 @@ public class GRASP {
                 "\t--include-extants means that extants are included in output files (when the format allows)\n" +
                 "\t--nogap means that the gap-character is excluded in the resulting output (when the format allows)\n" +
                 "\t--nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end\n" +
+                "\t--orphans de-activates the removal of orphaned indel trees\n" +
                 "\t--exclude-noedge removes non-existing edge as an option for parsimony in BEP\n" +
                 "\t--verbose prints out information about steps undertaken, and --time the time it took to finish\n" +
                 "\t-h (or --help) will print out this screen\n");
@@ -286,6 +287,8 @@ public class GRASP {
                     TIME = true;
                 } else if (arg.equalsIgnoreCase("-nonibble")) {
                     NIBBLE = false;
+                } else if (arg.equalsIgnoreCase("-orphans")) {
+                    REMOVE_INDEL_ORPHANS = false;
                 } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
                     usage();
                 } else {

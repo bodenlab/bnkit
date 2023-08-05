@@ -228,7 +228,7 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     private void markMyChildrenAsNonOrphans(int idx, Set<Integer> pruned, boolean[] orphan) {
-        if (isLeaf(idx))
+        if (isLeaf(idx) || pruned.contains(idx))
             return;
         int[] children = getChildren(idx);
         for (int c : children) {
