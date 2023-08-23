@@ -13,7 +13,9 @@ import dat.pog.POGraph;
 import json.JSONObject;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -25,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "5-Aug-2023";
+    public static String VERSION = "22-Aug-2023";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -156,7 +158,7 @@ public class GRASP {
         // select these, default for "joint reconstruction"
         boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
         // select to compute consensus path for these output formats
-        boolean[] CONSENSUS = new boolean[]  {true,    false,     true,      false,  false,  false, false,   false,    false  };
+        boolean[] CONSENSUS = new boolean[]  {true,    false,     true,      false,  false, false, false,   false,    false,   false  };
         // default inference mode
         Inference MODE = Inference.JOINT;
         // ancestor to reconstruct if inference mode is "marginal"
@@ -252,22 +254,24 @@ public class GRASP {
                     SAVE_AS = true;
                     SAVE_AS_IDX[3] = true;
                 } else if (arg.equalsIgnoreCase("-save-poag")) {
-                    String ancid = args[++a];
-                    if (ancid.startsWith("-")) { // another option, so no ancestor given
-                        MARG_NODE = 0;
-                        a--;
-                        break;
-                    } else { // ancestor specified
-                        if (ancid.startsWith("N"))
-                            ancid = ancid.substring(1);
-                        try {
-                            MARG_NODE = Integer.parseInt(ancid);
-                        } catch (NumberFormatException e) {
-                            usage(2, args[a] + " is not a valid ancestor name (use <number>, or \"N<number>\", where <number> starts with 0 at root, depth-first). Tip: use option --save-tree to check branch point numbering in tree.");
+                    MARG_NODE = 0;
+                    BYPASS = true;
+                    SAVE_AS = true;
+                    SAVE_AS_IDX[9] = true;
+                    if (a + 1 < args.length) {
+                        String ancid = args[++a];
+                        if (ancid.startsWith("-")) { // another option, so no ancestor given
+                            a --;
+                            continue;
+                        } else { // ancestor specified
+                            if (ancid.startsWith("N"))
+                                ancid = ancid.substring(1);
+                            try {
+                                MARG_NODE = Integer.parseInt(ancid);
+                            } catch (NumberFormatException e) {
+                                usage(2, args[a] + " is not a valid ancestor name (use <number>, or \"N<number>\", where <number> starts with 0 at root, depth-first). Tip: use option --save-tree to check branch point numbering in tree.");
+                            }
                         }
-                        BYPASS = true;
-                        SAVE_AS = true;
-                        SAVE_AS_IDX[9] = true;
                     }
                 } else if (arg.equalsIgnoreCase("-exclude-noedge")) {
                     RECODE_NULL = false;
@@ -579,7 +583,26 @@ public class GRASP {
  */
                     case 9: // POAG
                         if (BYPASS) {
+                            int bpidx = 0; // default root
+                            if (MARG_NODE != null)
+                                bpidx = tree.getIndex(MARG_NODE);
+                            if (bpidx > 0) {
+                                List<EnumSeq> select = new ArrayList<>();
+                                String[] names = aln.getNames();
+                                for (int idx : tree.getLeaves(bpidx)) {
+                                    Object label = tree.getLabel(idx);
+                                    for (int ii = 0; ii < names.length; ii ++) {
+                                        if (names[ii].equals(label.toString())) {
+                                            EnumSeq.Gappy seq = aln.getEnumSeq(ii);
+                                            select.add(seq);
+                                        }
+                                    }
+                                }
+                                aln = new EnumSeq.Alignment(select);
+                            }
                             POAGraph poag = new POAGraph(aln);
+                            if (VERBOSE)
+                                System.out.println("Saved POAG with " + aln.getHeight() + " sequences, under ancestor N" + MARG_NODE);
                             poag.saveToDOT(OUTPUT + "/" + PREFIX + "_POAGunderN" + MARG_NODE + ".dot");
                         }
                         break;
