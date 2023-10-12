@@ -1,16 +1,13 @@
 package dat;
 
-import dat.file.AlnWriter;
-import dat.file.FastaWriter;
 import json.JSONObject;
+
+import java.util.Random;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.Random;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EnumSeqTest {
 

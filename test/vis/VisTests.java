@@ -1,3 +1,5 @@
+package vis;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import api.PartialOrderGraph;

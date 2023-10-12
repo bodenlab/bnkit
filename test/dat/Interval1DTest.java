@@ -1,12 +1,12 @@
 package dat;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,7 +67,7 @@ public class Interval1DTest {
     }
 
     @Test
-    public void diff1() throws Exception {
+    public void diff1() {
         Set<Interval1D> myset = new HashSet<>();
         myset.add(new Interval1D(1,4));
         myset.add(new Interval1D(6,10));

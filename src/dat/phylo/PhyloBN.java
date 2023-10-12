@@ -81,6 +81,7 @@ public class PhyloBN {
      * @return
      * @deprecated
      */
+    @Deprecated
     public BNode[] getBNodes() {
         return bp2node;
     }
