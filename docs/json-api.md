@@ -6,16 +6,17 @@
       "Job":<job-number> }
 
 ### `<request>` is `"Retrieve"`
-Recall the request
+Recover the original request under the specified job-number
 
 ### `<request>` is `"Output"`
-Return the result of the request
+Return the result of the request under the specified job-number
+on the format
 
     { "Job":<job-number>,
       "Result":{<result-JSON>} }
 
 ### `<request>` is `"Place"`
-Find the place in queue of the request
+Find the place in queue of the request under the specified job-number
 
 ### List all jobs
 
@@ -36,7 +37,8 @@ for example
       "Clients":1 }
 
 ## Commands for `asr.GServer`
-Execute/submit job
+Execute/submit job; a "command" is a request that will require the server to dedicate resources both in terms of memory and CPU time, 
+which is why it is allocated a "job-number" and typically queued 
 
     { "Command":<command>,
       "Auth":<auth-token>,

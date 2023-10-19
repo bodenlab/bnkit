@@ -36,16 +36,16 @@ Another way to interact with GRASP is to use the JSON API of `asr.GServer`,
 documented [here](https://github.com/bodenlab/bnkit/blob/main/docs/json-api.md).
 
 ## Configuring GRASP to run in IntelliJ
-- Open Intellij
-- Select File > New Project From Version Control
-- Under URL add the URL http://github.com/bodenlab/bnkit
-- Under directory add where you want to save the project
-- Under Run -> Edit Configurations
-- Add New 'Application'
-- Give it a name 'GRASP'
-- And add 'asr.GRASP' as the main class
+- Open IntelliJ IDEA
+- Select File > New > Project From Version Control
+- For URL type http://github.com/bodenlab/bnkit
+- For Directory specify where you want to save the project
+- Under Run > Edit Configurations
+- Use '+' to add Application
+- Give it a name, e.g. 'GRASP'
+- Specify 'asr.GRASP' as the main class
 - Now you can run GRASP (green arrow / ctrl-R / Run > Run GRASP )
-- You may need to upgrade your Java version / SDK in your settings
+- You may need to upgrade your Java version / SDK in your settings (Version 11 or above)
 - If you want to add command line arguments, you can add these under Run > Edit Configurations and add them to the 'Program arguments' textbox
 
 ## Generate an external JAR using Maven
