@@ -246,6 +246,8 @@ public class GServer {
                                         out.println(GMessage.server2clientReJob(greq.getJob(), "Queued"));
                                     } else { // run now ... not in separate thread
                                         greq.runnow();
+                                        if (greq.isFailed())
+                                            System.out.println("Server failed to complete job because: " + greq.getError());
                                         JSONObject result = greq.getResult();           // request to retrieve output of completed job
                                         if (result != null) {                           // if available... probably in storage
                                             out.println(GMessage.server2clientReJob(job, "Result", result));

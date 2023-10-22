@@ -415,6 +415,7 @@ public class CommandCentral {
 
         public GRequest_TrainModes(String command, String auth, JSONObject params) {
             super(command, auth);
+            PhyloPlate.Plate plate = null;
             try {
                 JSONObject tree = params.getJSONObject("Tree");
                 idxTree = IdxTree.fromJSON(tree);
@@ -438,7 +439,7 @@ public class CommandCentral {
                     if (LEAVES_ONLY && !idxTree.isLeaf(idx))
                         continue;
                     //System.out.println("Adding plate to branchpoint " + idx);
-                    PhyloPlate.Plate plate = pbn.getPlate(idx);
+                    plate = pbn.getPlate(idx);
                     JSONArray jnodes = jdistrib.getJSONArray("Nodes");
                     JSONArray jtargets = jdistrib.getJSONArray("Targets");
                     BNode[] nodes = new BNode[jnodes.length()];
@@ -447,7 +448,7 @@ public class CommandCentral {
                         int[] targets = new int[jtargnode.length()];
                         for (int k = 0; k < targets.length; k ++)
                             targets[k] = jtargnode.getInt(k);
-                        plate.addNode(BNode.fromJSON(jnodes.getJSONObject(j), plate.getParents(targets)), pbn);
+                            plate.addNode(BNode.fromJSON(jnodes.getJSONObject(j), plate.getParents(targets)), pbn);
                     }
                     if (master == null) {
                         master = plate;
@@ -483,9 +484,14 @@ public class CommandCentral {
 
         @Override
         public void run() {
-            pbn.trainEM(dataset, SEED);
             JSONObject myres = new JSONObject();
-            myres.put("Distrib", pbn.getMasterJSON());
+            try {
+                pbn.trainEM(dataset, SEED);
+                myres.put("Distrib", pbn.getMasterJSON());
+            } catch (RuntimeException e) {
+                this.setError(e.getMessage());
+                myres.put("Distrib", pbn.getMasterJSON());
+            }
             this.setResult(myres);
         }
     }

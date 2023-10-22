@@ -201,6 +201,14 @@ public class PhyloPlate {
             this(name, template.mode_types);
         }
 
+        @Override
+        public String toString() {
+            StringBuffer sb = new StringBuffer();
+            for (int i = 0; i < modetypes.length; i ++)
+                sb.append(this.bpcvars[i].getName() + ((i < modetypes.length - 1) ? ";" : ""));
+            return name + "[" +sb.toString() + "]";
+        }
+
         public EnumVariable[] getParents(int[] idxs) {
             EnumVariable[] ret = new EnumVariable[idxs.length];
             for (int i = 0; i < idxs.length; i ++)

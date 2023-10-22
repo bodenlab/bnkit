@@ -21,6 +21,7 @@ public class GRequest extends Thread implements Comparable<GRequest>, Job {
     private final int JOB;
     enum STATUS {NONE, WAITING, RUNNING, COMPLETED};
     STATUS status;
+    private String ERRMSG = null;
     private final String command;
     private final String authtoken;
 
@@ -76,6 +77,18 @@ public class GRequest extends Thread implements Comparable<GRequest>, Job {
     @Override
     public String toString() {
         return "Command \"" + this.command + "\" [" + authtoken + "]";
+    }
+
+    protected void setError(String msg) {
+        ERRMSG = msg;
+    }
+
+    public boolean isFailed() {
+        return ERRMSG != null;
+    }
+
+    public String getError() {
+        return ERRMSG == null ? "" : ERRMSG;
     }
 
     @Override
@@ -277,8 +290,12 @@ public class GRequest extends Thread implements Comparable<GRequest>, Job {
                         req.start(); // could just be "run", so that current call stack is used
                         req.join();  // always wait for the request to finish
                         req.status = STATUS.COMPLETED;
-                        System.out.println("Server completed job " + req.JOB);
+                        if (req.isFailed())
+                            System.out.println("Server failed to complete job " + req.JOB + " because: " + req.ERRMSG);
+                        else
+                            System.out.println("Server completed job " + req.JOB);
                         JSONObject result = req.getResult();
+                        result.put("Error", req.ERRMSG);
                         if (result != null) {
                             // create a temporary file
                             try {

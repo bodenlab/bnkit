@@ -79,6 +79,8 @@ public class JSONUtils {
                     BNode node = bn.getNode(headers[i]);
                     if (node != null)
                         vars[j][k] = node.getVariable();
+                    else // could not locate a variable in the BN for the specified header
+                        throw new JSONUtilsException("Invalid header in dataset: " + headers[i]);
                 }
                 for (Object [][] sample : values) {
                     for (int j = 0; j < getNItems(); j ++) {
@@ -87,7 +89,7 @@ public class JSONUtils {
                                 try {
                                     sample[j][k] = Predef.getObject(vars[j][k], (String) sample[j][k]);
                                 } catch (ClassCastException e) {
-                                    ; // not a string so nothing we can do
+                                    // throw new JSONUtilsException("Invalid value found: " + sample[j][k]);
                                 }
                             }
                         }
