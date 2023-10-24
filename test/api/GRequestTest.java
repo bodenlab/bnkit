@@ -786,14 +786,6 @@ class GRequestTest {
             jresponse = new JSONObject(server_input.readLine());
             System.out.println("Server responded: " + jresponse);
             JSONObject jresult2 = jresponse.getJSONObject("Result");
-            // JSONUtils.DataSet dspred = JSONUtils.DataSet.fromJSON(jresult2.getJSONObject("Predict"));
- /*
-            TreeInstance[] multi = TreeInstance.createFromDataset(tree, dspred.getFeatures(), dspred.getNonitemisedData());
-            for (TreeInstance ti : multi)
-                ti.save("data/3_2_1_1_pred.nwk");
-            TSVFile.print(new Object[][] {dspred.getFeatures()});
-            TSVFile.print(dspred.getNonitemisedData());
- */
         } catch (JSONException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
