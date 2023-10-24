@@ -285,8 +285,11 @@ public class EM extends LearningAlg {
                                                     }
                                                 } catch (ClassCastException e) {
                                                     // we think it is a continuous variable, so we should have a distrib for it
-                                                    Distrib d = jdf.getDistrib(var);
-                                                    node.countInstance(evid_key, d, p);
+                                                    // MB exploring GDT learning fix Oct 2023
+                                                    // because d is a distribution from which samples are drawn for learning
+                                                    // "p" below needs to be a fraction (number of times sampled)
+                                                    // Distrib d = jdf.getDistrib(var);
+                                                    // node.countInstance(evid_key, d, p);
                                                 }
                                             }
                                         } else { // node IS root

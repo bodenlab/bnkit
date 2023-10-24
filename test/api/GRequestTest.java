@@ -2,9 +2,8 @@ package api;
 
 import asr.Prediction;
 import bn.node.CPT;
-import dat.EnumSeq;
-import dat.EnumVariable;
-import dat.Enumerable;
+import bn.node.GDT;
+import dat.*;
 import dat.file.FastaReader;
 import dat.file.Newick;
 import dat.file.TSVFile;
@@ -687,7 +686,107 @@ class GRequestTest {
             jresponse = new JSONObject(server_input.readLine());
             System.out.println("Server responded: " + jresponse);
             JSONObject jresult2 = jresponse.getJSONObject("Result");
-           // JSONUtils.DataSet dspred = JSONUtils.DataSet.fromJSON(jresult2.getJSONObject("Predict"));
+            // JSONUtils.DataSet dspred = JSONUtils.DataSet.fromJSON(jresult2.getJSONObject("Predict"));
+ /*
+            TreeInstance[] multi = TreeInstance.createFromDataset(tree, dspred.getFeatures(), dspred.getNonitemisedData());
+            for (TreeInstance ti : multi)
+                ti.save("data/3_2_1_1_pred.nwk");
+            TSVFile.print(new Object[][] {dspred.getFeatures()});
+            TSVFile.print(dspred.getNonitemisedData());
+ */
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    @Test
+    void request_TrainModes_real() {
+        long SEED = 2;
+        IdxTree tree = Newick.parse("(D:0.3,((A:0.1,B:0.1):0.1,C:0.2):0.1)");
+        try {
+            JSONUtils.DataSet ds = new JSONUtils.DataSet(tree.getNames(), new String[] {"Prop1"}, new Object[][][] {
+                    // sample 1:
+                    new Object[][] {
+                            // item 1 (D):
+                            {/* prop 1 */ 1.1},
+                            // item 2 (A):
+                            {/* prop 1 */ 3.2},
+                            // item 3 (B)
+                            {/* prop 1 */ null},
+                            // item 4 (C)
+                            {/* prop 1 */ 3.3}},
+                    // sample 2:
+                    new Object[][] {
+                            // item 1 (D):
+                            {/* prop 1 */ 1.5},
+                            // item 2 (A):
+                            {/* prop 1 */ null},
+                            // item 3 (B)
+                            {/* prop 1 */ 3.0},
+                            // item 4 (C)
+                            {/* prop 1 */ 3.4}}});
+            JSONObject jreq1 = new JSONObject();
+            jreq1.put("Command", "TrainModes");
+            jreq1.put("Auth", "Guest");
+            JSONObject params = new JSONObject();
+            params.put("Tree", tree.toJSON());
+            System.out.println(tree);
+            params.put("Dataset", JSONUtils.toJSON(ds));
+            PhyloPlate.Modes template = new PhyloPlate.Modes(new Enumerable[] {new Enumerable(new Object[] {'a','b'})});
+            PhyloPlate phybn = new PhyloPlate(tree, template);
+            PhyloPlate.Plate plate1 = phybn.getPlate(0);
+            Variable var = new Variable(new Continuous(), "Prop1");
+            GDT gdt = new GDT(var, plate1.getParents(new int[] {0})); //,1}));
+            plate1.addNode(gdt);
+            params.put("Distrib", plate1.toJSON());
+            params.put("Seed", SEED);
+            params.put("Gamma", 1.0);
+            params.put("Rate", 1.0);
+            params.put("Rounds", 10); // training rounds
+            jreq1.put("Params", params);
+            server_output.println(jreq1);
+            System.out.println(jreq1);
+            JSONObject jresponse = new JSONObject(server_input.readLine());
+            int job = GMessage.fromJSON2Job(jresponse);
+            System.out.println("Server responded: " + jresponse);
+
+            Thread.sleep(2000); // waiting 2 secs to make sure the job has finished
+            jreq1 = new JSONObject();
+            jreq1.put("Job", job);
+            jreq1.put("Command", "Output"); // request the output/result
+            server_output.println(jreq1);
+            jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
+            JSONObject jresult = jresponse.getJSONObject("Result");
+            JSONObject jdistrib = jresult.getJSONObject("Distrib");
+
+            JSONObject jreq2 = new JSONObject();
+            jreq2.put("Command", "InferModes");
+            jreq2.put("Auth", "Guest");
+            params.put("Distrib", jdistrib);
+            // params.put("Inference", "Marginal");
+            params.put("Inference", "Marginal");
+            params.put("Leaves-only", false);
+            params.put("Latent", true);
+            params.put("Queries", new JSONArray(new Object[] {0, 1, 2, "B"}));
+            jreq2.put("Params", params);
+            server_output.println(jreq2);
+            System.out.println(jreq2);
+            jresponse = new JSONObject(server_input.readLine());
+            job = GMessage.fromJSON2Job(jresponse);
+            System.out.println("Server responded: " + jresponse);
+            Thread.sleep(1000); // waiting 1 sec to make sure the job has finished
+            JSONObject jreq2b = new JSONObject();
+            jreq2b.put("Job", job);
+            jreq2b.put("Command", "Output"); // request the output/result
+            server_output.println(jreq2b);
+            jresponse = new JSONObject(server_input.readLine());
+            System.out.println("Server responded: " + jresponse);
+            JSONObject jresult2 = jresponse.getJSONObject("Result");
+            // JSONUtils.DataSet dspred = JSONUtils.DataSet.fromJSON(jresult2.getJSONObject("Predict"));
  /*
             TreeInstance[] multi = TreeInstance.createFromDataset(tree, dspred.getFeatures(), dspred.getNonitemisedData());
             for (TreeInstance ti : multi)

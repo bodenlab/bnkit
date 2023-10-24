@@ -696,9 +696,10 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                 row = new int[nTotal]; // the row in the table to which the observation belong
             }
             // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
-            int j = 0;                  // sample count
-            for (int index = 0; index < maxrows; index ++) {
-
+            double[] weights = new double[maxrows];             // weight for each "component" (combination of parent values)
+            int j = 0;                                          // sample count
+            for (int index = 0; index < maxrows; index ++) {    // go through all "components" (combinations of parent values)
+                weights[index] = 1.0 / maxrows; // weight of component
                 List<Sample<Distrib>> samplesDistrib = null;
                 if (countDistrib != null)
                     samplesDistrib = countDistrib.get(index);
@@ -712,7 +713,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                     continue;                 // no samples of any kind
                 // go through observed distributions... if any
                 if (samplesDistrib != null) {
-                    for (Sample<Distrib> sample : samplesDistrib) {// look at each distribution
+                    for (Sample<Distrib> sample : samplesDistrib) { // look at each distribution
                         for (int s = 0; s < nSample; s ++) {
                             observed[j] = (Double)sample.instance.sample();        // actual value (or score)
                             prob[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config
@@ -725,16 +726,16 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                 }
                 // go through actual values...
                 if (samplesDouble != null) {
-                    for (Sample<Double> sample : samplesDouble) {// look at each entry
-                        observed[j] = sample.instance;        // actual value (or score)
-                        prob[j] = sample.prob;            // p(class=key) i.e. the height of the density for this parent config
-                        sum += observed[j] * prob[j];            // update the numerator of the mean calc
-                        tot += prob[j];                   // update the denominator of the mean calc
+                    for (Sample<Double> sample : samplesDouble) {   // look at each entry
+                        observed[j] = sample.instance;              // actual value (or score)
+                        prob[j] = sample.prob;                      // p(class=key) i.e. the height of the density for this parent config
+                        sum += observed[j] * prob[j];               // update the numerator of the mean calc
+                        tot += prob[j];                             // update the denominator of the mean calc
                         row[j] = index;
-                        j++;
+                        j ++;
                     }
                 }
-                n[index] = tot; // save the number of possibly fractional samples on which the estimates were based
+                n[index] = tot;             // save the number of possibly fractional samples on which the estimates were based
                 // calculate mean
                 means[index] = sum / tot;
                 // now for calculating the variance

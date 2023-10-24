@@ -681,6 +681,19 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
+     * Get the names of all leaf nodes in this tree.
+     * @return array with names (in order of increasing branch point index)
+     */
+    public String[] getNames() {
+        int[] idxs = getLeaves();
+        String[] ret = new String[idxs.length];
+        for (int i = 0; i < ret.length; i ++) {
+            ret[i] = (String)this.getLabel(idxs[i]);
+        }
+        return ret;
+    }
+
+    /**
      * Get the branch point indices for all leaf nodes in this tree.
      * @return the subset of indices that identify leaves/extant species
      */
