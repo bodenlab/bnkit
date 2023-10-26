@@ -690,16 +690,17 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
             int nObservedDistrib = getNumberObservedDistrib();
             int nTotal = nObservedDouble + nObservedDistrib * nSample;
 
+            double[] responsibilities = new double[observed.length];
             if (observed.length != nTotal) {
                 observed = new double[nTotal];
                 prob = new double[nTotal];
                 row = new int[nTotal]; // the row in the table to which the observation belong
+                responsibilities = new double[nTotal];
             }
             // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
-            double[] weights = new double[maxrows];             // weight for each "component" (combination of parent values)
             int j = 0;                                          // sample count
             for (int index = 0; index < maxrows; index ++) {    // go through all "components" (combinations of parent values)
-                weights[index] = 1.0 / maxrows; // weight of component
+                Distrib d = this.table.getValue(index);
                 List<Sample<Distrib>> samplesDistrib = null;
                 if (countDistrib != null)
                     samplesDistrib = countDistrib.get(index);
@@ -708,34 +709,38 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                     samplesDouble = countDouble.get(index);
                 double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ...
                 double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
-                int jStart = j;             // start index for samples in the row
+                int jStart = j;     // start index for samples in the row
                 if (samplesDistrib == null && samplesDouble == null)
                     continue;                 // no samples of any kind
-                // go through observed distributions... if any
+                // go through observed distributions... if any, for this index/component
                 if (samplesDistrib != null) {
                     for (Sample<Distrib> sample : samplesDistrib) { // look at each distribution
                         for (int s = 0; s < nSample; s ++) {
-                            observed[j] = (Double)sample.instance.sample();        // actual value (or score)
+                            observed[j] = (Double)sample.instance.sample();    // actual value (or score)
                             prob[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config
-                            sum += observed[j] * prob[j];				// update the numerator of the mean calc
+                            responsibilities[index] = observed[j] * prob[j];
+                            sum += responsibilities[j];
                             tot += prob[j];					// update the denominator of the mean calc
                             row[j] = index;
                             j++;
                         }
                     }
                 }
-                // go through actual values...
+                // go through actual values... for this index/component
                 if (samplesDouble != null) {
                     for (Sample<Double> sample : samplesDouble) {   // look at each entry
                         observed[j] = sample.instance;              // actual value (or score)
-                        prob[j] = sample.prob;                      // p(class=key) i.e. the height of the density for this parent config
-                        sum += observed[j] * prob[j];               // update the numerator of the mean calc
-                        tot += prob[j];                             // update the denominator of the mean calc
+                        // weight of the parent
+                        prob[j] = sample.prob;                      // p(class=key) i.e. the (normalised) height of the density for this parent config
+                        // sum += observed[j] * prob[j];            // update the numerator of the mean calc
+                        responsibilities[index] = prob[j] * d.get(observed[j]);
+                        sum += responsibilities[index];        // update the numerator of the mean calc
+                        // tot += prob[j];                             // update the denominator of the mean calc
                         row[j] = index;
                         j ++;
                     }
                 }
-                n[index] = tot;             // save the number of possibly fractional samples on which the estimates were based
+                n[index] = sum;             // save the number of possibly fractional samples on which the estimates were based
                 // calculate mean
                 means[index] = sum / tot;
                 // now for calculating the variance
@@ -750,6 +755,77 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                 if (vars[index] > maxVar) {
                     maxVar = vars[index];
                 }
+
+                /*
+
+                double[] responsibilities = new double[observed.length];
+                if (observed.length != nTotal) {
+                    observed = new double[nTotal];
+                    prob = new double[nTotal];
+                    row = new int[nTotal]; // the row in the table to which the observation belong
+                    responsibilities = new double[nTotal];
+                }
+                // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
+                int j = 0;                                          // sample count
+                for (int index = 0; index < maxrows; index ++) {    // go through all "components" (combinations of parent values)
+                    Distrib d = this.table.getValue(index);
+                    List<Sample<Distrib>> samplesDistrib = null;
+                    if (countDistrib != null)
+                        samplesDistrib = countDistrib.get(index);
+                    List<Sample<Double>> samplesDouble = null;
+                    if (countDouble != null)
+                        samplesDouble = countDouble.get(index);
+                    double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ...
+                    double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
+                    int jStart = j;     // start index for samples in the row
+                    if (samplesDistrib == null && samplesDouble == null)
+                        continue;                 // no samples of any kind
+                    // go through observed distributions... if any, for this index/component
+                    if (samplesDistrib != null) {
+                        for (Sample<Distrib> sample : samplesDistrib) { // look at each distribution
+                            for (int s = 0; s < nSample; s ++) {
+                                observed[j] = (Double)sample.instance.sample();    // actual value (or score)
+                                prob[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config
+                                responsibilities[index] = observed[j] * prob[j];
+                                sum += responsibilities[j];
+                                tot += prob[j];					// update the denominator of the mean calc
+                                row[j] = index;
+                                j++;
+                            }
+                        }
+                    }
+                    // go through actual values... for this index/component
+                    if (samplesDouble != null) {
+                        for (Sample<Double> sample : samplesDouble) {   // look at each entry
+                            observed[j] = sample.instance;              // actual value (or score)
+                            // weight of the parent
+                            prob[j] = sample.prob;                      // p(class=key) i.e. the (normalised) height of the density for this parent config
+                            // sum += observed[j] * prob[j];            // update the numerator of the mean calc
+                            responsibilities[index] = prob[j] * d.get(observed[j]);
+                            sum += responsibilities[index];        // update the numerator of the mean calc
+                            // tot += prob[j];                             // update the denominator of the mean calc
+                            row[j] = index;
+                            j ++;
+                        }
+                    }
+                    n[index] = sum;             // save the number of possibly fractional samples on which the estimates were based
+                    // calculate mean
+                    means[index] = sum / tot;
+                    // now for calculating the variance
+                    double diff = 0;
+                    for (int jj = 0; jj < j - jStart; jj++) {
+                        diff += (means[index] - observed[jStart + jj]) * (means[index] - observed[jStart + jj]) * prob[jStart + jj];
+                    }
+                    vars[index] = diff / tot;
+                    if (vars[index] < 0.01) {
+                        vars[index] = 0.01;
+                    }
+                    if (vars[index] > maxVar) {
+                        maxVar = vars[index];
+                    }
+
+                */
+
                 // note the same key/index for both the CPT and the Sample table
                 middleTot += tot;
                 middleMean += sum;
