@@ -65,8 +65,12 @@ class GDTTest {
                     double weight = cpt.getDistrib().get(component);
                     gdt.countInstance(new Object[] {component}, data[d][0], weight);
                 }
-                gdt.maximizeInstance();
             }
+            gdt.maximizeInstance();
+            cpt.getDistrib().set(gdt.GMM_WEIGHTS);
         }
+        System.out.println("Mixing variable: " + cpt.getDistrib());
+        System.out.println("GDT: ");
+        gdt.print();
     }
 }

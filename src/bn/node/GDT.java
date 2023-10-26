@@ -702,6 +702,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
             for (int index = 0; index < nComponents; index ++) {    // go through all "components" (combinations of parent values)
                 Distrib d = this.table.getValue(index);
                 List<Sample<Double>> samplesDouble = null;
+                n[index] = 0;
                 if (countDouble != null)
                     samplesDouble = countDouble.get(index);
                 int jStart = j;     // start index for samples in the row
@@ -709,12 +710,14 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                     continue;                 // no samples of any kind
                 // go through actual values... for this index/component
                 if (samplesDouble != null) {
+                    n[index] = samplesDouble.size();
                     for (Sample<Double> sample : samplesDouble) {   // look at each entry
                         observed[j] = sample.instance;              // actual value (or score)
                         // weight of the parent
                         weight[j] = sample.prob;                      // p(class=key) i.e. the (normalised) height of the density for this parent config
                         // sum += observed[j] * prob[j];              // update the numerator of the mean calc
                         responsibilities[j] = weight[j] * d.get(observed[j]); // tentative assignment of responsibilities (sample-specific)
+                        // FIXME: responsibilities are not normalised across components
                         sum += responsibilities[j];               // keep sum so we can normalise responsibilities
                         // tot += prob[j];                            // update the denominator of the mean calc
                         row[j] = index;
@@ -723,10 +726,13 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                 }
             }
             // normalise responsibilities
-            for (int i = 0; i < j; i ++)
-                responsibilities[i] /= (sum * (getNumberObservedSample() / nComponents));
+            for (int i = 0; i < j; i ++) {
+                responsibilities[i] /= sum;
+                responsibilities[i] *= (getNumberObservedSample() / nComponents);
+            }
             // M-step
             double[] Nk = new double[nComponents];
+            GMM_WEIGHTS = new double[nComponents];
             j = 0;
             for (int index = 0; index < nComponents; index ++) {    // go through all "components" (combinations of parent values)
                 GaussianDistrib gd = this.table.getValue(index);
@@ -751,6 +757,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                 if (vars[index] > maxVar) {
                     maxVar = vars[index];
                 }
+                GMM_WEIGHTS[index] = Nk[index] / samplesDouble.size();
 
                 /*
 
