@@ -19,7 +19,6 @@ package bn.node;
 
 import bn.*;
 import bn.factor.Factor;
-import bn.prob.EnumDistrib;
 import dat.*;
 import bn.prob.GaussianDistrib;
 import bn.factor.AbstractFactor;
@@ -52,23 +51,25 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
 
     final private Variable<Continuous> var;
     private GaussianDistrib prior = null;
-    private EnumTable<GaussianDistrib> table = null;
+    private EnumTable<GaussianDistrib> table = null;    // the table with entries for each "component" distribution
 
     // Parameters used for training. Some of which are allocated prior to training, and then re-used to save time.
     
-    private SampleTable<Double> countDouble = null; // the table that will contain all samples of the type "Double" during learning
-    private SampleTable<Distrib> countDistrib = null; // the table that will contain all samples of the type "Distrib" during learning
+    private SampleTable<Double> countDouble = null;     // the table that will contain all samples of the type "Double" during learning
+    private SampleTable<Distrib> countDistrib = null;   // the table that will contain all samples of the type "Distrib" during learning
 
-    private double[] observed = new double[0];// observations are stored here AFTER sample collecting, some caching is possible (values and numbers there-of)
-    private double[] prob = new double[0];    // probability of making observation
-    private int[] row = new int[0];           // identifies to which "row" the observation belongs
-    
+    private double[] observed = new double[0];  // observations are stored here AFTER sample collecting, some caching is possible (values and numbers there-of)
+    private double[] weight = new double[0];      // probability of component/combination of parent values
+    private int[] row = new int[0];             // identifies to which "row" the observation belongs
+    private double[] responsibilities;          // assigned to each sample, so that it sums to 1.0 across components
+
+
     final private double[] means;       // save the means 
     final private double[] vars; 	    // save the variances
     final private double[] n;           // save the numbers of samples
     
     private boolean relevant = false;
-    private GDT tiedMaster = null;
+    private GDT tiedMaster = null; // set to another GDT in case the current GDT is "tied" to it (meaning that the master supplies the parameters for inference and learning)
 
     /**
      * Create a Gaussian density table for a variable. The variable is
@@ -667,7 +668,12 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
         }
         return number;
     }
-    
+
+    /**
+     * Weights when this GDT is used as a mixture of Gaussians
+     */
+    public double[] GMM_WEIGHTS = null;
+
     /**
      * Find the best parameter setting for the observed data.
      * Note that this uses observed Double:s which are looked at directly, and 
@@ -677,78 +683,68 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
      */
     @Override
     public void maximizeInstance() {
+        int nComponents = table.getSize();
+
         GDT master = getMaster();
         if (master == null) {
-            int maxrows = table.getSize();
-            int nSample = 20;                        // how many samples that should be generated for observed distributions
             double maxVar = 0;                      // the largest variance of any class
-            double middleMean = 0; 			// the mean of all values
-            double middleVar = 0;			// the variance of all values
-            double middleTot = 0;			// the sum of counts for all parent configs
 
-            int nObservedDouble = getNumberObservedSample();
-            int nObservedDistrib = getNumberObservedDistrib();
-            int nTotal = nObservedDouble + nObservedDistrib * nSample;
-
-            double[] responsibilities = new double[observed.length];
-            if (observed.length != nTotal) {
+            int nTotal = getNumberObservedSample();
+            if (observed.length != nTotal) { // check if we need to re-allocate memory; if not we will re-use
                 observed = new double[nTotal];
-                prob = new double[nTotal];
-                row = new int[nTotal]; // the row in the table to which the observation belong
+                weight = new double[nTotal];
+                row = new int[nTotal]; // the row in the table to which the observation belongs
                 responsibilities = new double[nTotal];
             }
             // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
             int j = 0;                                          // sample count
-            for (int index = 0; index < maxrows; index ++) {    // go through all "components" (combinations of parent values)
+            double sum = 0;
+            for (int index = 0; index < nComponents; index ++) {    // go through all "components" (combinations of parent values)
                 Distrib d = this.table.getValue(index);
-                List<Sample<Distrib>> samplesDistrib = null;
-                if (countDistrib != null)
-                    samplesDistrib = countDistrib.get(index);
                 List<Sample<Double>> samplesDouble = null;
                 if (countDouble != null)
                     samplesDouble = countDouble.get(index);
-                double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ...
-                double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
                 int jStart = j;     // start index for samples in the row
-                if (samplesDistrib == null && samplesDouble == null)
+                if (samplesDouble == null)
                     continue;                 // no samples of any kind
-                // go through observed distributions... if any, for this index/component
-                if (samplesDistrib != null) {
-                    for (Sample<Distrib> sample : samplesDistrib) { // look at each distribution
-                        for (int s = 0; s < nSample; s ++) {
-                            observed[j] = (Double)sample.instance.sample();    // actual value (or score)
-                            prob[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config
-                            responsibilities[index] = observed[j] * prob[j];
-                            sum += responsibilities[j];
-                            tot += prob[j];					// update the denominator of the mean calc
-                            row[j] = index;
-                            j++;
-                        }
-                    }
-                }
                 // go through actual values... for this index/component
                 if (samplesDouble != null) {
                     for (Sample<Double> sample : samplesDouble) {   // look at each entry
                         observed[j] = sample.instance;              // actual value (or score)
                         // weight of the parent
-                        prob[j] = sample.prob;                      // p(class=key) i.e. the (normalised) height of the density for this parent config
-                        // sum += observed[j] * prob[j];            // update the numerator of the mean calc
-                        responsibilities[index] = prob[j] * d.get(observed[j]);
-                        sum += responsibilities[index];        // update the numerator of the mean calc
-                        // tot += prob[j];                             // update the denominator of the mean calc
+                        weight[j] = sample.prob;                      // p(class=key) i.e. the (normalised) height of the density for this parent config
+                        // sum += observed[j] * prob[j];              // update the numerator of the mean calc
+                        responsibilities[j] = weight[j] * d.get(observed[j]); // tentative assignment of responsibilities (sample-specific)
+                        sum += responsibilities[j];               // keep sum so we can normalise responsibilities
+                        // tot += prob[j];                            // update the denominator of the mean calc
                         row[j] = index;
-                        j ++;
+                        j++;
                     }
                 }
-                n[index] = sum;             // save the number of possibly fractional samples on which the estimates were based
-                // calculate mean
-                means[index] = sum / tot;
-                // now for calculating the variance
-                double diff = 0;
-                for (int jj = 0; jj < j - jStart; jj++) {
-                    diff += (means[index] - observed[jStart + jj]) * (means[index] - observed[jStart + jj]) * prob[jStart + jj];
+            }
+            // normalise responsibilities
+            for (int i = 0; i < j; i ++)
+                responsibilities[i] /= (sum * (getNumberObservedSample() / nComponents));
+            // M-step
+            double[] Nk = new double[nComponents];
+            j = 0;
+            for (int index = 0; index < nComponents; index ++) {    // go through all "components" (combinations of parent values)
+                GaussianDistrib gd = this.table.getValue(index);
+                List<Sample<Double>> samplesDouble = countDouble.get(index);
+                if (samplesDouble == null)
+                    continue;                 // no samples of any kind
+                double meansum = 0;
+                double varsum = 0;
+                for (Sample<Double> sample : samplesDouble) {   // look at each entry
+                    Nk[index] += responsibilities[j];
+                    meansum += responsibilities[j] * observed[j];
+                    varsum += responsibilities[j] * Math.pow(observed[j] - gd.getMean(), 2);
+                    j ++;
                 }
-                vars[index] = diff / tot;
+                // calculate mean
+                means[index] = meansum / Nk[index];
+                // now for calculating the variance
+                vars[index] = varsum / Nk[index];
                 if (vars[index] < 0.01) {
                     vars[index] = 0.01;
                 }
@@ -826,16 +822,12 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
 
                 */
 
-                // note the same key/index for both the CPT and the Sample table
-                middleTot += tot;
-                middleMean += sum;
             }
-            middleMean /= middleTot;
             countDistrib = null;    // reset counts
             countDouble = null;     // reset counts
 
             if (tieVariances == VARIANCE_UNTIED) { // if we use the individual variances
-                for (int i = 0; i < maxrows; i ++) {
+                for (int i = 0; i < nComponents; i ++) {
                     if (n[i] > 0)
                         this.put(i, new GaussianDistrib(means[i], vars[i]));
                 }
@@ -843,7 +835,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                 // there are different ways of dealing with this
                 if (tieVariances == VARIANCE_TIED_MAX) {
                     // (1) simply use the max of the existing variances
-                    for (int i = 0; i < maxrows; i ++) {
+                    for (int i = 0; i < nComponents; i ++) {
                         if (n[i] > 0)
                             this.put(i, new GaussianDistrib(means[i], maxVar));
                     }
@@ -851,13 +843,13 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                     // (2) use the pooled existing variances (http://en.wikipedia.org/wiki/Pooled_variance)
                     double num = 0.0;
                     double denom = 0.0;
-                    for (int i = 0; i < maxrows; i ++) {
+                    for (int i = 0; i < nComponents; i ++) {
                         if (n[i] >= 1) {
                             num += (n[i] - 1) * vars[i];
                             denom += (n[i] - 1);
                         }
                     }
-                    for (int i = 0; i < maxrows; i ++) {
+                    for (int i = 0; i < nComponents; i ++) {
                         if (n[i] > 0)
                             this.put(i, new GaussianDistrib(means[i], num / denom));
                     }
