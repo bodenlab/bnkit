@@ -17,17 +17,23 @@
  */
 package bn.node;
 
+import api.JSONUtils;
 import bn.*;
+import bn.alg.EM;
 import bn.factor.Factor;
 import dat.*;
 import bn.prob.GaussianDistrib;
 import bn.factor.AbstractFactor;
 import bn.factor.DenseFactor;
 import bn.factor.Factorize;
+import dat.file.Newick;
+import dat.file.TSVFile;
+import dat.phylo.IdxTree;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 
@@ -45,9 +51,9 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
     public final int VARIANCE_UNTIED = 0;
     public final int VARIANCE_TIED_MAX = 1;
     public final int VARIANCE_TIED_POOLED = 2;
-    
-    private int tieVariances = VARIANCE_TIED_POOLED;
-    
+
+//    private int tieVariances = VARIANCE_TIED_POOLED;
+    private int tieVariances = VARIANCE_UNTIED;
 
     final private Variable<Continuous> var;
     private GaussianDistrib prior = null;
@@ -602,40 +608,45 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
         }
     }
 
-    /*	public void randomize(Object[] observations, int seed) {
-     // use observations to initialise this GDT
-     // we do not have access to parents so this is only a rough estimate
-     double min=0, max=0, sum=0, var=0;
-     for (int i=0; i<observations.length; i++) {
-     Double y=(Double)observations[i];
-     sum+=y;
-     if (i==0)
-     max=min=y;
-     else {
-     if (y>max)
-     max=y;
-     else if (y<min)
-     min=y;
+    public void randomize(Object[] observations, int seed) {
+        // use observations to initialise this GDT
+        // we do not have access to parents so this is only a rough estimate
+        double min=0, max=0, sum=0, var=0, cnt=0;
+        for (int i=0; i<observations.length; i++) {
+            if (observations[i] == null)
+                continue;
+            Double y=(Double)observations[i];
+            sum+=y;
+            if (i==0)
+                max=min=y;
+            else {
+                if (y>max)
+                    max=y;
+                else if (y<min)
+                    min=y;
+            }
+            cnt += 1;
+        }
+        double mean=sum/cnt;
+        for (int i=0; i<observations.length; i++) {
+            if (observations[i] == null)
+                continue;
+            Double y=(Double)observations[i];
+                var+=(mean-y)*(mean-y);
+        }
+        var/=cnt;
+        int nrows= table.getSize();
+        if (nrows<2)
+            put(new GaussianDistrib(mean, var));
+        else {
+            double range=max-min;
+            double stepsize=range/nrows;
+            for (int i=0; i<nrows; i++) {
+                put(i, new GaussianDistrib((max-stepsize*i)-stepsize/2, var));
+            }
+        }
      }
-     }
-     double mean=sum/observations.length;
-     for (int i=0; i<observations.length; i++) {
-     Double y=(Double)observations[i];
-     var+=(mean-y)*(mean-y);
-     }
-     var/=observations.length;
-     int nrows=getMaxIndex();
-     if (nrows<2)
-     put(new Gaussian(mean, var));
-     else {
-     double range=max-min;
-     double stepsize=range/nrows;
-     for (int i=0; i<nrows; i++) {
-     put(entry(i), new Gaussian((max-stepsize*i)-stepsize/2, var));
-     }
-     }
-     }
-     */
+
     /**
      * Couple/uncouple variances.
      *     public final int VARIANCE_UNTIED = 0;
@@ -690,6 +701,8 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
             double maxVar = 0;                      // the largest variance of any class
 
             int nTotal = getNumberObservedSample();
+            if (nTotal == 0) // no data, no learning
+                return;
             if (observed.length != nTotal) { // check if we need to re-allocate memory; if not we will re-use
                 observed = new double[nTotal];
                 weight = new double[nTotal];
@@ -699,6 +712,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
             // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
             int j = 0;                                          // sample count
             double sum = 0;
+            Map<Object, Double> respsum = new HashMap<>();
             for (int index = 0; index < nComponents; index ++) {    // go through all "components" (combinations of parent values)
                 Distrib d = this.table.getValue(index);
                 List<Sample<Double>> samplesDouble = null;
@@ -717,6 +731,11 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                         weight[j] = sample.prob;                      // p(class=key) i.e. the (normalised) height of the density for this parent config
                         // sum += observed[j] * prob[j];              // update the numerator of the mean calc
                         responsibilities[j] = weight[j] * d.get(observed[j]); // tentative assignment of responsibilities (sample-specific)
+                        if (!respsum.containsKey(observed[j])) {
+                            respsum.put(observed[j], responsibilities[j]);
+                        } else {
+                            respsum.put(observed[j], respsum.get(observed[j]) + responsibilities[j]);
+                        }
                         // FIXME: responsibilities are not normalised across components
                         sum += responsibilities[j];               // keep sum so we can normalise responsibilities
                         // tot += prob[j];                            // update the denominator of the mean calc
@@ -727,8 +746,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
             }
             // normalise responsibilities
             for (int i = 0; i < j; i ++) {
-                responsibilities[i] /= sum;
-                responsibilities[i] *= (getNumberObservedSample() / nComponents);
+                responsibilities[i] /= respsum.get(observed[i]);
             }
             // M-step
             double[] Nk = new double[nComponents];
@@ -736,7 +754,10 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
             j = 0;
             for (int index = 0; index < nComponents; index ++) {    // go through all "components" (combinations of parent values)
                 GaussianDistrib gd = this.table.getValue(index);
-                List<Sample<Double>> samplesDouble = countDouble.get(index);
+                List<Sample<Double>> samplesDouble = null;
+                if (countDouble != null)
+                    samplesDouble = countDouble.get(index);
+                int jStart = j;     // start index for samples in the row
                 if (samplesDouble == null)
                     continue;                 // no samples of any kind
                 double meansum = 0;
@@ -751,84 +772,13 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
                 means[index] = meansum / Nk[index];
                 // now for calculating the variance
                 vars[index] = varsum / Nk[index];
-                if (vars[index] < 0.01) {
-                    vars[index] = 0.01;
+                if (vars[index] < 0.001) {
+                    vars[index] = 0.001;
                 }
                 if (vars[index] > maxVar) {
                     maxVar = vars[index];
                 }
                 GMM_WEIGHTS[index] = Nk[index] / samplesDouble.size();
-
-                /*
-
-                double[] responsibilities = new double[observed.length];
-                if (observed.length != nTotal) {
-                    observed = new double[nTotal];
-                    prob = new double[nTotal];
-                    row = new int[nTotal]; // the row in the table to which the observation belong
-                    responsibilities = new double[nTotal];
-                }
-                // Go through each possible row, each with a unique combination of parent values (no need to know parent values actually)
-                int j = 0;                                          // sample count
-                for (int index = 0; index < maxrows; index ++) {    // go through all "components" (combinations of parent values)
-                    Distrib d = this.table.getValue(index);
-                    List<Sample<Distrib>> samplesDistrib = null;
-                    if (countDistrib != null)
-                        samplesDistrib = countDistrib.get(index);
-                    List<Sample<Double>> samplesDouble = null;
-                    if (countDouble != null)
-                        samplesDouble = countDouble.get(index);
-                    double sum = 0;		// we keep track of the sum of observed values for a specific parent config weighted by count, e.g. 4x0.5 + 3x1.3 + ...
-                    double tot = 0;		// we keep track of the total of counts for a specific parent config so we can compute the mean of values, e.g. there are 23 counted for parent is "true"
-                    int jStart = j;     // start index for samples in the row
-                    if (samplesDistrib == null && samplesDouble == null)
-                        continue;                 // no samples of any kind
-                    // go through observed distributions... if any, for this index/component
-                    if (samplesDistrib != null) {
-                        for (Sample<Distrib> sample : samplesDistrib) { // look at each distribution
-                            for (int s = 0; s < nSample; s ++) {
-                                observed[j] = (Double)sample.instance.sample();    // actual value (or score)
-                                prob[j] = sample.prob / nSample;                   // p(class=key) i.e. the height of the density for this parent config
-                                responsibilities[index] = observed[j] * prob[j];
-                                sum += responsibilities[j];
-                                tot += prob[j];					// update the denominator of the mean calc
-                                row[j] = index;
-                                j++;
-                            }
-                        }
-                    }
-                    // go through actual values... for this index/component
-                    if (samplesDouble != null) {
-                        for (Sample<Double> sample : samplesDouble) {   // look at each entry
-                            observed[j] = sample.instance;              // actual value (or score)
-                            // weight of the parent
-                            prob[j] = sample.prob;                      // p(class=key) i.e. the (normalised) height of the density for this parent config
-                            // sum += observed[j] * prob[j];            // update the numerator of the mean calc
-                            responsibilities[index] = prob[j] * d.get(observed[j]);
-                            sum += responsibilities[index];        // update the numerator of the mean calc
-                            // tot += prob[j];                             // update the denominator of the mean calc
-                            row[j] = index;
-                            j ++;
-                        }
-                    }
-                    n[index] = sum;             // save the number of possibly fractional samples on which the estimates were based
-                    // calculate mean
-                    means[index] = sum / tot;
-                    // now for calculating the variance
-                    double diff = 0;
-                    for (int jj = 0; jj < j - jStart; jj++) {
-                        diff += (means[index] - observed[jStart + jj]) * (means[index] - observed[jStart + jj]) * prob[jStart + jj];
-                    }
-                    vars[index] = diff / tot;
-                    if (vars[index] < 0.01) {
-                        vars[index] = 0.01;
-                    }
-                    if (vars[index] > maxVar) {
-                        maxVar = vars[index];
-                    }
-
-                */
-
             }
             countDistrib = null;    // reset counts
             countDouble = null;     // reset counts
@@ -920,6 +870,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
         json.put("Condition", jcond);
         json.put("Pr", jdist);
         json.put("Nodetype", getType());
+        json.put("TieVariance", this.tieVariances);
         return json;
     }
 
@@ -940,6 +891,9 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
             JSONArray jed = jeds.getJSONArray(i);
             gdt.put(idx, GaussianDistrib.fromJSONArray(jed));
         }
+        Integer tvar = json.optInt("TieVariance");
+        if (tvar != null)
+            gdt.setTieVariances(tvar);
         return gdt;
     }
 
@@ -974,6 +928,9 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
             JSONArray jed = jeds.getJSONArray(i);
             gdt.put(idx, GaussianDistrib.fromJSONArray(jed));
         }
+        Integer tvar = json.optInt("TieVariance");
+        if (tvar != null)
+            gdt.setTieVariances(tvar);
         return gdt;
     }
 
@@ -1070,7 +1027,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
     /**
      * @param args
      */
-    public static void main(String[] args) {
+    public static void main0(String[] args) {
         Variable<Continuous> v1 = Predef.Real();
         EnumVariable v2 = Predef.Boolean();
         EnumVariable v3 = Predef.Boolean();
@@ -1165,5 +1122,142 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
         // also need to tie:
         // - count (used during learning, i.e. when "counting", so this happens in countInstance, not here
         return true;
+    }
+
+    /**
+     * Train a Gaussian mixture model using a dataset
+     *
+     * example
+     * {"Items":["WT14","WT04","WT48","WT49","WT38","WT16","WT06","WT07","WT51","WT40","WT31","WT43"],
+     * "Features":["Tm"],
+     * "Data":[[[null],[null],[null],[0.49],[0.39],[null],[0.5],[0.49],[0.46],[0.39],[0.41],[0.43]]]}
+     *
+     * @param ds
+     * @return
+     */
+    public static GDT trainGMM(JSONUtils.DataSet ds, int nComponents, int nRounds, int seed) {
+        EnumVariable X = Predef.Number(nComponents, "Component");
+        String[] features = ds.getFeatures();
+        Variable<Continuous> Y = Predef.Real(features[0]);
+        GDT gdt = new GDT(Y, X);
+        CPT cpt = new CPT(X);
+        gdt.randomize(seed);
+        cpt.randomize(seed + 1);
+        Object[][] data = ds.getItemisedData()[0];
+        Double max = null;
+        Double min = null;
+        for (Object[] val : data) {
+            if (max == null)
+                max = (Double) val[0];
+            if (min == null)
+                min = (Double) val[0];
+            if (val[0] != null && max !=null)
+                max = ((Double) val[0] > max) ? (Double) val[0] : max;
+            if (val[0] != null && min !=null)
+                min = ((Double) val[0] < min) ? (Double) val[0] : min;
+        }
+        // assume uniform distribution
+        if (max == min || max == null || min == null)
+            throw new RuntimeException("Dataset is invalid");
+        double step = (max - min) / (nComponents);
+        double base = min + step / 2;
+        double nData = data.length;
+        double[] weights = new double[nComponents];
+        int j = 0;
+        for (Object component : cpt.getDistrib().getDomain().getValues()) {
+            weights[j ++] = (double)nData / (double)nComponents;
+            GaussianDistrib gd = (GaussianDistrib) gdt.getDistrib(new Object[]{component});
+            gd.setMean(base);
+            gd.setVariance(step);
+            base += step;
+        }
+        gdt.setTieVariances(gdt.VARIANCE_UNTIED);
+        //System.out.println("Before...");
+        //System.out.println("Mixing variable: " + cpt.getDistrib());
+        //System.out.println("GDT: ");
+        //gdt.print();
+        cpt.getDistrib().set(weights);
+        for (int i = 0; i < 100; i ++) {
+            for (int d = 0; d < data.length; d++) {
+                if (data[d][0] == null)
+                    continue;
+                for (Object component : cpt.getDistrib().getDomain().getValues()) {
+                    double weight = cpt.getDistrib().get(component);
+                    gdt.countInstance(new Object[] {component}, data[d][0], weight);
+                }
+            }
+            gdt.maximizeInstance();
+            cpt.getDistrib().set(gdt.GMM_WEIGHTS);
+        }
+        System.out.println("After...");
+        System.out.println("Mixing variable: " + cpt.getDistrib());
+        System.out.println("GDT: ");
+        gdt.print();
+        return gdt;
+    }
+
+
+    public static void main(String[] args) {
+        String folder = "/Users/mikael/simhome/ASR/ReconMode/";
+        try {
+            Set<String> extants = new HashSet<>();
+            Set<String> ancestors = new HashSet<>();
+            TSVFile names = new TSVFile(folder + "ERED_names.tsv", true);
+            Map<String, String> namemap = new HashMap<>();
+            for (Object[] row : names.getRows())
+                namemap.put((String) row[1], (String) row[4]);
+            TSVFile wt = new TSVFile(folder + "s2-2.tsv", true);
+            Map<String, Object[]> propmap = new HashMap<>();
+            for (Object[] row : wt.getRows()) {
+                propmap.put((String) row[0], row);
+                extants.add((String) row[0]);
+            }
+            TSVFile anc = new TSVFile(folder + "s2-1.tsv", true);
+            for (Object[] row : anc.getRows()) {
+                propmap.put((String) row[0], row);
+                ancestors.add((String) row[0]);
+            }
+            String[] extants_arr = new String[extants.size()];
+            String[] ancestors_arr = new String[ancestors.size()];
+            extants.toArray(extants_arr);
+            ancestors.toArray(ancestors_arr);
+            IdxTree tree = Newick.load(folder + "lewis_tree.nwk");
+
+            int NPROTEINS = 40;
+            int NCOMPONENTS = 3;
+            int[] percent_ancestors = new int[]{0, 20, 40, 60, 80, 100};
+            for (int percent : percent_ancestors) {
+                int NANCESTORS = NPROTEINS * percent / 100;
+                int NEXTANTS = NPROTEINS - NANCESTORS;
+                for (int SEED = 0; SEED < 5; SEED += 1) {
+                    Random rand = new Random(SEED);
+                    Set<String> select = new HashSet<>();
+                    while (select.size() < NEXTANTS)
+                        select.add(extants_arr[rand.nextInt(extants_arr.length)]);
+                    while (select.size() < NPROTEINS)
+                        select.add(ancestors_arr[rand.nextInt(ancestors_arr.length)]);
+                    String[] select_arr = new String[select.size()];
+                    select.toArray(select_arr);
+                    Object[][][] data = new Object[1][select_arr.length][1];
+                    for (int i = 0; i < select_arr.length; i++) {
+                        data[0][i][0] = propmap.get(select_arr[i])[1];
+                        if (data[0][i][0] != null)
+                            data[0][i][0] = (((double)((Integer)data[0][i][0]) + i/100.0));
+
+//                        data[0][i][0] = ((double) ((Integer) data[0][i][0]) / (10.0 + Math.abs(rand.nextGaussian())));
+                    }
+                    JSONUtils.DataSet ds = new JSONUtils.DataSet(select_arr, new String[]{"Tm"}, data);
+                    GDT gdt = GDT.trainGMM(ds, NCOMPONENTS, 10, SEED);
+                    System.out.println(ds.toJSON());
+                    System.out.println(gdt.toJSON());
+                    BNet bn = new BNet();
+                    //bn.add(new BNode[] {gdt, cpt});
+                }
+            }
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

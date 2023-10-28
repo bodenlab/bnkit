@@ -40,9 +40,16 @@ class GDTTest {
         EnumVariable X = Predef.Boolean("X");
         Variable<Continuous> Y = Predef.Real("Y");
         GDT gdt = new GDT(Y, X);
-        gdt.randomize(0);
+        gdt.randomize(2);
+
+        gdt.setTieVariances(gdt.VARIANCE_UNTIED);
         CPT cpt = new CPT(X);
         cpt.randomize(0);
+        System.out.println("Before...");
+        System.out.println("Mixing variable: " + cpt.getDistrib());
+        System.out.println("GDT: ");
+        gdt.print();
+
         BNet bn = new BNet();
         bn.add(new BNode[] {gdt, cpt});
         EM em = new EM(bn);
@@ -69,6 +76,7 @@ class GDTTest {
             gdt.maximizeInstance();
             cpt.getDistrib().set(gdt.GMM_WEIGHTS);
         }
+        System.out.println("After...");
         System.out.println("Mixing variable: " + cpt.getDistrib());
         System.out.println("GDT: ");
         gdt.print();

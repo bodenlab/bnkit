@@ -9,14 +9,13 @@ import bn.alg.VarElim;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
+import bn.prob.GaussianDistrib;
+import bn.prob.MixtureDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.Variable;
 import dat.file.TSVFile;
-import dat.phylo.IdxTree;
-import dat.phylo.PhyloBN;
-import dat.phylo.PhyloPlate;
-import dat.phylo.TreeInstance;
+import dat.phylo.*;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import json.JSONArray;
@@ -407,7 +406,7 @@ public class CommandCentral {
         private final IdxTree idxTree;
         private final JSONUtils.DataSet dataset;
         private PhyloPlate pbn = null;
-        private int EM_ROUNDS = 50;
+        private int EM_ROUNDS = 25;
         private Double GAMMA = 1.0;
         private Double RATE = 1.0;
         private Long SEED = 1L;
@@ -622,10 +621,14 @@ public class CommandCentral {
             for (int i = 0; i < querynames.length; i ++) {
                 if (MODE == GRASP.Inference.MARGINAL) {
                     predictidxs[i] = idxTree.getIndex(querynames[i]); // retrieve the branchpoint index for (each of) the nominated ancestors or extants
-                    predictitems[i] = (!idxTree.isLeaf(predictidxs[i]) ? "N" : "") + idxTree.getLabel(predictidxs[i]).toString();
+                    // should the system assign a name for the node? not below...
+                    // predictitems[i] = (!idxTree.isLeaf(predictidxs[i]) ? "N" : "") + idxTree.getLabel(predictidxs[i]).toString();
+                    predictitems[i] = querynames[i];
                 } else {
                     predictidxs[i] = i; // retrieve the branchpoint index for (each of) the nominated ancestors
-                    predictitems[i] = (!idxTree.isLeaf(i) ? "N" : "") + idxTree.getLabel(i).toString();
+                    // should the system assign a name for the node? not below...
+                    // predictitems[i] = (!idxTree.isLeaf(i) ? "N" : "") + idxTree.getLabel(i).toString();
+                    predictitems[i] = querynames[i];
                 }
             }
             String[] predictfeats = null;
@@ -661,12 +664,22 @@ public class CommandCentral {
                                 Query q = ve.makeQuery(querynodes[j].getVariable());
                                 CGTable r1 = (CGTable) ve.infer(q);
                                 Object anydistrib = r1.query(querynodes[j].getVariable());
-                                if (anydistrib instanceof EnumDistrib) {
-                                    jarr.put(((EnumDistrib) anydistrib).toJSON());
-                                    output[k][j] = ((EnumDistrib) anydistrib).toJSON();
+                                if (anydistrib != null) {
+                                    if (anydistrib instanceof EnumDistrib) {
+                                        jarr.put(((EnumDistrib) anydistrib).toJSON());
+                                        output[k][j] = ((EnumDistrib) anydistrib).toJSON();
+                                    } else if (anydistrib instanceof MixtureDistrib) {
+                                        Double sum = 0.0;
+                                        for (int s = 0; s < 100; s ++)
+                                            sum += (Double) ((MixtureDistrib) anydistrib).sample();
+                                        jarr.put(sum/(double)100);
+                                        output[k][j] = sum/(double)100;
+                                    } else {
+                                        jarr.put(anydistrib.toString());
+                                        output[k][j] = anydistrib;
+                                    }
                                 } else {
-                                    jarr.put(anydistrib.toString());
-                                    output[k][j] = anydistrib;
+                                    jarr.put("Failed");
                                 }
                             }
                             jmarg.put(predictitems[k], jarr);

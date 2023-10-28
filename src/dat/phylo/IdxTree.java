@@ -108,8 +108,10 @@ public class IdxTree implements Iterable<Integer> {
         JSONObject json = new JSONObject();
         json.put("Branchpoints", bpoints.length);
         String[] labels = new String[bpoints.length];
-        for (Map.Entry<Object, Integer> entry : index.entrySet())
-            labels[entry.getValue()] = entry.getKey().toString();
+        for (Map.Entry<Object, Integer> entry : index.entrySet()) {
+            //labels[entry.getValue()] = entry.getKey().toString();
+            labels[entry.getValue()] = (String) this.getBranchPoint(entry.getValue()).getLabel();
+        }
         JSONArray labarr = new JSONArray();
         JSONArray pararr = new JSONArray();
         JSONArray distarr = new JSONArray();
@@ -746,6 +748,8 @@ public class IdxTree implements Iterable<Integer> {
     public int getIndex(Object label) {
         if (label instanceof String) {
             for (int i : this) {
+                if (this.getBranchPoint(i).getLabel().toString().equals(label))
+                    return i;
                 if (this.getLabel(i).toString().equals(label))
                     return i;
             }

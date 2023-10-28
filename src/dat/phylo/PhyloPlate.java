@@ -46,7 +46,7 @@ public class PhyloPlate {
 
     private String[] names = null; // name of node, that could be used to reference phylo- or plate nodes by idx
 
-    public int EM_ROUNDS = 50;
+    public int EM_ROUNDS = 25;
 
     /**
      * Create a Bayesian network (BN) from a tree, preparing plates with branch point connectors for each enumerable data type (as identified by a template),

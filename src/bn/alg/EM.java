@@ -162,8 +162,7 @@ public class EM extends LearningAlg {
         double[] last_LL = new double[] {-999999, -999999, -999999, -999999, -999999};
         
         int round = 0;
-        boolean latentVariablesExist = false;
-        
+
         boolean EM_TERMINATE = false;
 
         // start training (keep going until convergence or stop criterion is met)
@@ -351,7 +350,6 @@ public class EM extends LearningAlg {
                         if (query_vars.size() > 0) { // there are unspecified/latent variables for this node
                             // so we need to perform inference, which can go bad (hence potential for exception)
                             try {
-                                latentVariablesExist = true;
                                 // perform inference, ALL query variables in one go
                                 Variable[] query_arr = new Variable[query_vars.size()];
                                 query_vars.toArray(query_arr);

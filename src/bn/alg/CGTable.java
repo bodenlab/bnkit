@@ -871,6 +871,8 @@ public class CGTable implements QueryResult {
             }
         } else { // atomic, can only be non-enumerables
             JDF jdf = atomicDensity;
+            if (jdf == null)
+                return null;
             Distrib d = jdf.getDistrib(query);
             return d;
         }

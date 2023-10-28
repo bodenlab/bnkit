@@ -93,7 +93,7 @@ public class GMM {
     }
 
     public static void main(String[] args) {
-        int numComponents = 2;
+        int numComponents = 3;
         GMM gmm = new GMM(numComponents);
 
         // Sample data (you should replace this with your actual data)
@@ -107,9 +107,12 @@ public class GMM {
                 {7.7}
         };
 
+        double[][] data2 = {
+                {8.547969513147832}, {11.055365021610807},{9.515919623038354},{7.309429864631631},{5.155113714709337},{5.9934818128526},{9.737441853198932},{5.866697379742977},{8.730212309448154},{5.107871539173301},{7.091657649202554},{6.005496193011316},{5.784554136706749},{7.24665515021407},{7.588302408954381},{4.654811488291314}};
+
         int maxIterations = 100;
         double tolerance = 1e-4;
-        gmm.train(data, maxIterations, tolerance);
+        gmm.train(data2, maxIterations, tolerance);
 
         // Print the learned parameters
         System.out.println("Weights: " + Arrays.toString(gmm.weights));

@@ -3,14 +3,12 @@ package api;
 import asr.Prediction;
 import bn.node.CPT;
 import bn.node.GDT;
+import bn.prob.GaussianDistrib;
 import dat.*;
 import dat.file.FastaReader;
 import dat.file.Newick;
 import dat.file.TSVFile;
-import dat.phylo.IdxTree;
-import dat.phylo.PhyloPlate;
-import dat.phylo.Tree;
-import dat.phylo.TreeInstance;
+import dat.phylo.*;
 import dat.pog.POGraph;
 import json.JSONArray;
 import json.JSONException;
@@ -23,10 +21,7 @@ import org.junit.jupiter.api.Test;
 import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.StringTokenizer;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -767,7 +762,6 @@ class GRequestTest {
             jreq2.put("Command", "InferModes");
             jreq2.put("Auth", "Guest");
             params.put("Distrib", jdistrib);
-            // params.put("Inference", "Marginal");
             params.put("Inference", "Marginal");
             params.put("Leaves-only", false);
             params.put("Latent", true);
@@ -786,6 +780,169 @@ class GRequestTest {
             jresponse = new JSONObject(server_input.readLine());
             System.out.println("Server responded: " + jresponse);
             JSONObject jresult2 = jresponse.getJSONObject("Result");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    @Test
+    void request_InferModes_Lewis() {
+        String folder = "/Users/mikael/simhome/ASR/ReconMode/";
+        try {
+            Set<String> extants = new HashSet<>();
+            Set<String> ancestors = new HashSet<>();
+            TSVFile names = new TSVFile(folder + "ERED_names.tsv", true);
+            Map<String, String> namemap = new HashMap<>();
+            for (Object[] row : names.getRows())
+                namemap.put((String)row[1], (String)row[4]);
+            TSVFile wt = new TSVFile(folder + "s2-2.tsv", true);
+            Map<String, Object[]> propmap = new HashMap<>();
+            for (Object[] row : wt.getRows()) {
+                propmap.put((String) row[0], row);
+                extants.add((String) row[0]);
+            }
+            TSVFile anc = new TSVFile(folder + "s2-1.tsv", true);
+            for (Object[] row : anc.getRows()) {
+                propmap.put((String) row[0], row);
+                ancestors.add((String) row[0]);
+            }
+            String[] extants_arr = new String[extants.size()];
+            String[] ancestors_arr = new String[ancestors.size()];
+            extants.toArray(extants_arr);
+            ancestors.toArray(ancestors_arr);
+            IdxTree tree = Newick.load(folder + "lewis_tree.nwk");
+
+            int NPROTEINS = 20;
+            int NCOMPONENTS = 3;
+            int EM_ROUNDS = 25;
+            int[] percent_ancestors = new int[] {0, 20, 40, 60, 80, 100};
+            Map<Integer, JSONObject> jobs = new HashMap<>();
+            for (int percent : percent_ancestors) {
+                int NANCESTORS = NPROTEINS * percent / 100;
+                int NEXTANTS = NPROTEINS - NANCESTORS;
+                for (int SEED = 0; SEED < 5; SEED += 1) {
+                    Random rand = new Random(SEED);
+                    Set<String> select = new HashSet<>();
+                    while (select.size() < NEXTANTS)
+                        select.add(extants_arr[rand.nextInt(extants_arr.length)]);
+                    while (select.size() < NPROTEINS)
+                        select.add(ancestors_arr[rand.nextInt(ancestors_arr.length)]);
+                    String[] select_arr = new String[select.size()];
+                    select.toArray(select_arr);
+                    Object[][][] data = new Object[1][select_arr.length][1];
+                    for (int i = 0; i < select_arr.length; i ++) {
+                        data[0][i][0] = propmap.get(select_arr[i])[1] ;
+                        if (data[0][i][0] != null)
+                            data[0][i][0] = (((double)((Integer)data[0][i][0]) + i/100.0));
+                    }
+                    Set<Object> queryset = new HashSet<>();
+                    for (Object candidate : extants)
+                        if (!select.contains(candidate))
+                            queryset.add(candidate);
+                    for (Object candidate : ancestors)
+                        if (!select.contains(candidate))
+                            queryset.add(candidate);
+                    String[] unselect = new String[queryset.size()];
+                    queryset.toArray(unselect);
+                    JSONUtils.DataSet ds = new JSONUtils.DataSet(select_arr, new String[] {"Tm"}, data);
+                    GDT gdt = GDT.trainGMM(ds, NCOMPONENTS, EM_ROUNDS, SEED); // this could come from a PhyloPlate BN as well
+                    JSONObject jreq1 = new JSONObject();
+                    jreq1.put("Command", "InferModes");
+                    jreq1.put("Auth", "Guest");
+                    JSONObject params = new JSONObject();
+                    params.put("Tree", tree.toJSON());
+                    params.put("Leaves-only", false);
+                    params.put("Dataset", JSONUtils.toJSON(ds));
+                    PhyloPlate.Modes template = new PhyloPlate.Modes(new Enumerable[] {gdt.getParents().get(0).getDomain()});
+                    PhyloPlate phybn = new PhyloPlate(tree, template);
+                    PhyloPlate.Plate plate1 = phybn.getPlate(0);
+                    plate1.addNode(gdt);
+                    params.put("Distrib", plate1.toJSON());
+                    params.put("Gamma", 1.0);
+                    params.put("Rate", 1.0);
+                    params.put("Inference", "Marginal");
+                    params.put("Leaves-only", false);
+                    params.put("Latent", false);
+                    params.put("Queries", new JSONArray(unselect));
+                    jreq1.put("Params", params);
+                    server_output.println(jreq1);
+                    System.out.println(jreq1);
+                    JSONObject jresponse = new JSONObject(server_input.readLine());
+                    int job = GMessage.fromJSON2Job(jresponse);
+                    System.out.println("Server responded: " + jresponse + " for job " + job);
+                    jobs.put(job, params);
+                }
+            }
+            // done submitting jobs... wait for them to finish
+            Map<Integer, JSONObject> results = new HashMap<>();
+            for (Map.Entry<Integer, JSONObject> entry : jobs.entrySet()) {
+                Integer job = entry.getKey();
+                JSONObject jreq2 = new JSONObject();
+                jreq2.put("Job", job);
+                jreq2.put("Command", "Output");
+                System.out.println("My server-request: " + jreq2);
+                server_output.println(jreq2);
+                JSONObject jresponse = new JSONObject(server_input.readLine());
+                System.out.println("Server responded: " + jresponse);
+                JSONObject result = GMessage.fromJSON2Result(jresponse);
+                while (result == null) {
+                    Thread.sleep(200); // waiting 0.2 secs before checking again job has finished
+                    server_output.println(jreq2);
+                    jresponse = new JSONObject(server_input.readLine());
+                    System.out.println("Server responded: " + jresponse);
+                    result = GMessage.fromJSON2Result(jresponse);
+                }
+                results.put(job, result);
+            }
+            // all results have been collected, now sort them into spreads
+            Object[][] out = new Object[propmap.size() + 1][jobs.size() + 2];
+            Map<String, Map<Integer, Object>> outmap = new HashMap<>();
+            for (Map.Entry<Integer, JSONObject> entry : jobs.entrySet()) {
+                Integer job = entry.getKey();
+                JSONObject params = entry.getValue();
+                JSONUtils.DataSet inp_ds = JSONUtils.DataSet.fromJSON(params.getJSONObject("Dataset"));
+                String[] inp_names = inp_ds.getItems();
+                for (int i = 0; i < inp_names.length; i ++) {
+                    if (!outmap.containsKey(inp_names[i]))
+                        outmap.put(inp_names[i], new HashMap<>());
+                    Map<Integer, Object> valmap = outmap.get(inp_names[i]);
+                    valmap.put(job, inp_ds.getItemisedData()[0][i][0] != null ? -(Double)inp_ds.getItemisedData()[0][i][0] : null);
+                }
+                JSONObject result = results.get(job);
+                JSONUtils.DataSet res_ds = JSONUtils.DataSet.fromJSON(result.getJSONObject("Predict"));
+                String[] out_names = res_ds.getItems();
+                for (int i = 0; i < out_names.length; i ++) {
+                    if (!outmap.containsKey(out_names[i]))
+                        outmap.put(out_names[i], new HashMap<>());
+                    Map<Integer, Object> valmap = outmap.get(out_names[i]);
+                    valmap.put(job, res_ds.getItemisedData()[0][i][0]);
+                }
+            }
+            List<String> alphabetical = new ArrayList<>();
+            alphabetical.addAll(outmap.keySet());
+            Collections.sort(alphabetical);
+            List<Integer> jobsascend = new ArrayList<>();
+            jobsascend.addAll(jobs.keySet());
+            Collections.sort(jobsascend);
+            int row = 1;
+            for (String name : alphabetical) {
+                int col = 2;
+                out[row][0] = name;
+                out[row][1] = propmap.get(name)[1];
+                for (int job : jobsascend) {
+                    if (row == 1)
+                        out[0][col] = job;
+                    Map<Integer, Object> myjobs = outmap.get(name);
+                    out[row][col ++] = myjobs.get(job);
+                }
+                row ++;
+            }
+
+            TSVFile.saveObjects(folder + "results.tsv", out);
+
         } catch (JSONException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
