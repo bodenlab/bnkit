@@ -10,6 +10,7 @@ import dat.phylo.*;
 import org.junit.jupiter.api.Test;
 import util.MilliTimer;
 
+import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -331,5 +332,91 @@ class MaxLhoodJointTest {
             timer.stop("Leaves=" + NLEAVES);
         }
         timer.report(true);
+    }
+
+    int NSEEDs = 100;
+    int NTHREADS = 10;
+    @Test // reconstruction when multithreaded
+    void jointThreaded() {
+        SubstModel model = SubstModel.createModel("LG"); // create a Jukes-Cantor substitution model
+        Enumerable alpha = new Enumerable(model.getDomain().getValues()); // the character states used by the above model (ACGT)
+        // we will create random trees, so the following parameters will control what they look like
+        double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
+        double GAMMA_SCALE = 0.2;
+        double SCALEDIST = 1.0; // calibrate the leaf to root distance to be around 1
+
+        for (int NLEAVES = 3; NLEAVES < 5; NLEAVES ++) { // this is how many leaf nodes each tree will have
+            TreeDecor[] inf = new TreeDecor[NSEEDs];            // number of seeds we try is also how many inferences we will carry out
+            TreeInstance[] treeinstances = new TreeInstance[NSEEDs];
+            Object[][] allstates = new Object[NSEEDs][];
+            for (int SEED = 0; SEED < NSEEDs; SEED++) { // generate a tree for each random seed
+                // make a random tree with N - 1 ancestors for a binary tree, 2 x N - 1 variables in total
+                Tree tree = Tree.Random(NLEAVES, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2);
+                tree.adjustDistances(SCALEDIST);
+                allstates[SEED] = new Object[tree.getSize()];            // holder for states of all nodes (indexed by tree)
+                Object[] instantiated = new Object[tree.getSize()];            // holder for states of instantiated nodes (indexed by tree)
+                int[] leafidxs = tree.getLeaves();      // indices for all leaves
+                // generate a random set of leaf states
+                Random rand = new Random(SEED);
+                Object[] leafstates = new Object[leafidxs.length];          // holder for the subset of "leaf" states
+                for (int i = 0; i < leafstates.length; i++) {              // for each leaf...
+                    leafstates[i] = alpha.get(rand.nextInt(alpha.size()));  // randomly select one of the character states (defined in the JC model)
+                    allstates[SEED][leafidxs[i]] = leafstates[i];                 // patch the holder of all states
+                    instantiated[leafidxs[i]] = leafstates[i];                 // patch the holder of all states
+                }
+                // use bnkit to do the inference...
+                inf[SEED] = new MaxLhoodJoint(tree, model);        //   configure inference
+                treeinstances[SEED] = new TreeInstance(tree, instantiated);
+                // infer the joint prob naively ...
+                int[] ancidxs = treeinstances[SEED].getTree().getAncestors();
+                Object[][] ancstates = new Object[(int) Math.pow(alpha.size(), ancidxs.length)][];   // holds all combinations of ancestor states
+                for (int j = 0; j < ancstates.length; j++)                                        // they are enumerated here...
+                    ancstates[j] = alpha.getWord4Key(j, ancidxs.length);                            // assigned the state...
+                double[] jointp = new double[(int) Math.pow(alpha.size(), ancidxs.length)];          // and each will be assigned a probability based on tree and leaf states
+                // now, main loop: for each ancestor state...
+                int maxidx = 0; // remember which state (by index) has the max prob
+                String[] trace = new String[ancstates.length];  // document the calcs done for each ancestor state combination
+                for (int j = 0; j < ancstates.length; j++) {  //
+                    for (int i = 0; i < ancstates[j].length; i++)   // assign the ancestor state to the holder of all states
+                        allstates[SEED][ancidxs[i]] = ancstates[j][i];    // only ancestor states are over-written (leaf states have been assigned already)
+                    double joint = 1;                               // start calc joint prob of the states
+                    StringBuilder sb = new StringBuilder();         // document the calcs
+                    for (int idx : tree) {  // loop through all nodes in the tree
+                        int child = idx;    // the perspective is that the current node is a child (of a possible parent node)
+                        int parent = tree.getParent(child); // this is the parent
+                        double p;       // determine the probability of the implied substitution
+                        if (parent < 0) {   // no parent, so use a-priori prob of child state...
+                            p = model.getProb(allstates[SEED][child]);    // taken from the substitution model
+                            sb.append(String.format("P(N%d=%s)=%5.3f", child, allstates[SEED][child], p));
+                        } else {            // parent indeed...
+                            double[][] probs = model.getProbs(tree.getDistance(child));     // the model has them all...
+                            p = model.getProb(allstates[SEED][child], allstates[SEED][parent], probs);  // so extract the appropriate substitution
+                            sb.append(String.format("P(N%d=%s|N%d=%s)=%5.3f", child, allstates[SEED][child], parent, allstates[SEED][parent], p));
+                        }
+                        joint *= p; // the prob of the combination of states is the product of their (conditional) probabilities
+                        if (idx < tree.getSize() - 1)
+                            sb.append(" x ");
+                    }
+                    trace[j] = sb.toString();
+                    jointp[j] = joint;              // put the prob in place for the list of all ancestor combinations
+                    if (joint > jointp[maxidx])     // check if max
+                        maxidx = j;
+                } // all ancestor combinations have been calculated...
+                for (int i = 0; i < ancstates[maxidx].length; i++) // place the best combination in "allstates" (which already has the leaf states)
+                    allstates[SEED][ancidxs[i]] = ancstates[maxidx][i];
+            }
+            ThreadedDecorators threadpool = new ThreadedDecorators(inf, treeinstances, NTHREADS);
+            try {
+                Map<Integer, TreeDecor> ret = threadpool.runBatch();
+                for (int SEED = 0; SEED < NSEEDs; SEED++) {           // for each seed...
+                    int[] ancidxs = treeinstances[SEED].getTree().getAncestors();
+                    for (int idx : ancidxs) {                      // for each ancestor...
+                        assertEquals(ret.get(SEED).getDecoration(idx), allstates[SEED][idx]);  //     extract state
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

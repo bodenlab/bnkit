@@ -921,6 +921,8 @@ class GRequestTest {
                     valmap.put(job, res_ds.getItemisedData()[0][i][0]);
                 }
             }
+            Object[][] trn = new Object[out.length][out[0].length];
+            Object[][] tst = new Object[out.length][out[0].length];
             List<String> alphabetical = new ArrayList<>();
             alphabetical.addAll(outmap.keySet());
             Collections.sort(alphabetical);
@@ -931,16 +933,59 @@ class GRequestTest {
             for (String name : alphabetical) {
                 int col = 2;
                 out[row][0] = name;
-                out[row][1] = propmap.get(name)[1];
+                tst[row][0] = name;
+                trn[row][0] = name;
+                out[row][1] = propmap.get(name)[1] == null ? null : Double.parseDouble(propmap.get(name)[1].toString()) ;
+                tst[row][1] = propmap.get(name)[1] == null ? null : Double.parseDouble(propmap.get(name)[1].toString()) ;
+                trn[row][1] = propmap.get(name)[1] == null ? null : Double.parseDouble(propmap.get(name)[1].toString()) ;
                 for (int job : jobsascend) {
-                    if (row == 1)
+                    if (row == 1) {
                         out[0][col] = job;
+                        tst[0][col] = job;
+                        trn[0][col] = job;
+                    }
                     Map<Integer, Object> myjobs = outmap.get(name);
-                    out[row][col ++] = myjobs.get(job);
+                    Object y = myjobs.get(job);
+                    if (y != null) {
+                        if ((Double) y < 0)
+                            trn[row][col] = -(Double) y;
+                        else
+                            tst[row][col] = y;
+                    }
+                    out[row][col ++] = y;
                 }
                 row ++;
             }
+            TSVFile tsv_tst = new TSVFile(tst, true);
+            TSVFile tsv_trn = new TSVFile(trn, true);
+            for (int i = 1; i <= jobs.size(); i ++) {
+                TSVFile.DEFAULT_SHAPE = 2;
+                TSVFile.DEFAULT_FILL = 1;
+                TSVFile.DEFAULT_SIZE = 3;
+                TSVFile.save2iTOL(folder + "test_" + i + ".itol", tsv_tst.getCol(0), tsv_tst.getCol(i+1), "Tm(test)", 12, 35., 65.);
+                TSVFile.DEFAULT_SHAPE = 4;
+                TSVFile.save2iTOL(folder + "trn_" + i + ".itol", tsv_trn.getCol(0), tsv_trn.getCol(i+1), "Tm(trn)", 12, 35., 65.);
+                TSVFile.DEFAULT_SHAPE = 3;
+                TSVFile.DEFAULT_FILL = 1;
+                TSVFile.DEFAULT_SIZE = 5;
+                TSVFile.save2iTOL(folder + "exp_" + i + ".itol", tsv_trn.getCol(0), tsv_trn.getCol(1), "Tm(exp)", 12, 35., 65.);
+                Object[] match = new Boolean[tsv_tst.getCol(0).length];
+                Double[] myexp = new Double[match.length];
+                Double[] mytst = new Double[match.length];
+                int cnt_match = 0;
+                for (int j = 0; j < match.length; j ++) {
+                    myexp[j] = (Double) tsv_trn.getCol(1)[j];
+                    mytst[j] = (Double) tsv_tst.getCol(i + 1)[j];
+                    if (mytst[j] != null && myexp[j] != null) {
+                        match[j] = (Math.abs(myexp[j] - mytst[j]) / myexp[j] < 0.05);
+                        if ((Boolean)match[j])
+                            cnt_match++;
+                    }
+                }
+                System.out.println("Job index " + i + " has " + cnt_match + " matches");
+                TSVFile.save2iTOL(folder + "mat_" + i + ".itol", tsv_trn.getCol(0), match, "Match", 12, 35., 65.);
 
+            }
             TSVFile.saveObjects(folder + "results.tsv", out);
 
         } catch (JSONException e) {

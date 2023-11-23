@@ -60,7 +60,7 @@ public class TSVFile {
                 headers = new HashMap<>();
                 for (int i = 0; i < objects[0].length; i++) {
                     try {
-                        headers.put((String) objects[0][i], i);
+                        headers.put(objects[0][i] == null ? null : objects[0][i].toString(), i);
                     } catch (ClassCastException e) {
                         throw new RuntimeException("Failed to index header: not a text string \"" + objects[0][i] + "\"");
                     }
@@ -328,6 +328,21 @@ public class TSVFile {
     }
 
     /**
+     * Retrieve whole column by index
+     * @param column_index the index of the column
+     * @return values in specified column in order of row
+     */
+    public Object[] getCol(int column_index, boolean remove_header) {
+        if (remove_header && headers != null) {
+            Object[] ret = new Object[rows.size() - 1];
+            for (int i = 1; i < rows.size(); i++)
+                ret[i - 1] = getRow(i)[column_index];
+            return ret;
+        } else
+            return getCol(column_index);
+    }
+
+    /**
      * Retrieve whole columns by index;
      * this is the matrix "transposed"
      * @param column_indices the indices of the columns
@@ -340,6 +355,23 @@ public class TSVFile {
                 ret[j][i] = rows.get(i)[column_indices[j]];
         }
         return ret;
+    }
+
+    /**
+     * Retrieve whole columns by index;
+     * this is the matrix "transposed"
+     * @param column_indices the indices of the columns
+     * @return values in specified columns in order of row
+     */
+    public Object[][] getCols(int[] column_indices, boolean remove_header) {
+        if (remove_header && headers != null) {
+            Object[][] ret = new Object[column_indices.length][rows.size() - 1];
+            for (int i = 1; i < rows.size(); i++) {
+                for (int j = 0; j < column_indices.length; j++)
+                    ret[j][i - 1] = rows.get(i)[column_indices[j]];
+            }
+            return ret;
+        } else return getCols(column_indices);
     }
 
     public static void print(Object[][] rows) {
@@ -440,4 +472,118 @@ public class TSVFile {
         bd.close();
     }
 
+    public static Integer DEFAULT_SHAPE = 2; // #1: rectangle  #2: circle  #3: star  #4: right pointing triangle  #5: left pointing triangle  #6: checkmark
+    public static Integer DEFAULT_SIZE = 3; // #size can be any number. Maximum size in the dataset will be displayed using MAXIMUM_SIZE, while others will be proportionally smaller
+    public static Double DEFAULT_POS = 1.0; // #position is a number between 0 and 1 and defines the position of the symbol on the branch (0 is at the start of node branch, 0.5 is in the middle, and 1 is at the end)
+    public static Integer DEFAULT_FILL = 1; // #fill can be 1 or 0. If set to 0, only the outline of the symbol will be displayed.
+
+    public static void save2iTOL(String filename, Object[] items, Object[] values, String dataset_label, int nbins, Double setmin, Double setmax) throws IOException {
+        BufferedWriter bd = new BufferedWriter(new FileWriter(filename));
+        bd.write("DATASET_SYMBOL"); bd.newLine();
+        bd.write("SEPARATOR SPACE"); bd.newLine();
+        bd.write("DATASET_LABEL " + dataset_label); bd.newLine();
+        bd.write("COLOR #ffff00"); bd.newLine();
+        if (isDouble(values)) {
+            Double max = null, min = null;
+            if (setmin != null)
+                min = setmin;
+            else {
+                for (int i = 0; i < values.length; i ++) {
+                    if (values[i] == null)
+                        continue;
+                    if (min == null)
+                        min = (Double) values[i];
+                    else if (min > (Double) values[i])
+                        min = (Double) values[i];
+                }
+            }
+            if (setmax != null)
+                max = setmax;
+            else {
+                for (int i = 0; i < values.length; i ++) {
+                    if (values[i] == null)
+                        continue;
+                    if (max == null)
+                        max = (Double) values[i];
+                    else if (max < (Double) values[i])
+                        max = (Double) values[i];
+                }
+            }
+            double binrange = (max - min) / nbins;
+            double[] bins = new double[nbins];
+            String[] bhex = new String[nbins];
+            int hexrange = 255 / (nbins - 1);
+            for (int i = 0; i < nbins; i ++) {
+                bins[i] = min + binrange / 2 + binrange * i;
+                bhex[i] = String.format("#" + "%02x", Math.min(2 * (hexrange * i), 255)) + String.format("%02x", Math.max(2 * (hexrange * i) - 255, 0)) + String.format("%02x", Math.max(0, 255 - hexrange * i));
+                // System.out.println(i +"\t" + bhex[i] + "\t" + bins[i]);
+            }
+
+            /*
+            DATASET_SYMBOL
+            SEPARATOR SPACE
+            #label is used in the legend table (can be changed later)
+            DATASET_LABEL example symbols
+            #dataset color (can be changed later)
+            COLOR #ffff00
+            LEGEND_TITLE Tm
+            LEGEND_SHAPES 2 2 2
+            LEGEND_COLORS #ff0000 #880088 #0000ff
+            LEGEND_LABELS 60 45 30
+            #largest symbol will be displayed with this size, others will be proportionally smaller.
+            MAXIMUM_SIZE 10
+            #ID symbol size,color fill position label
+            #symbol should be a number between 1 and 5: #1: rectangle  #2: circle  #3: star  #4: right pointing triangle  #5: left pointing triangle  #6: checkmark
+            #size can be any number. Maximum size in the dataset will be displayed using MAXIMUM_SIZE, while others will be proportionally smaller
+            #color can be in hexadecimal, RGB or RGBA notation. If RGB or RGBA are used, dataset SEPARATOR cannot be comma.
+            #fill can be 1 or 0. If set to 0, only the outline of the symbol will be displayed.
+            #position is a number between 0 and 1 and defines the position of the symbol on the branch (for example, position 0 is exactly at the start of node branch, position 0.5 is in the middle, and position 1 is at the end)
+            DATA
+            ASR01 2 3 #880088 1 1
+            */
+            bd.write("LEGEND_TITLE " + dataset_label); bd.newLine();
+            StringBuffer shapes = new StringBuffer("LEGEND_SHAPES ");
+            StringBuffer colors = new StringBuffer("LEGEND_COLORS ");
+            StringBuffer labels = new StringBuffer("LEGEND_LABELS ");
+            for (int i = 0; i < nbins; i ++) {
+                shapes.append(DEFAULT_SHAPE + " ");
+                colors.append(bhex[i] + " ");
+                labels.append(String.format("%.0f ", bins[i]));
+            }
+            bd.write(shapes.toString()); bd.newLine();
+            bd.write(colors.toString()); bd.newLine();
+            bd.write(labels.toString()); bd.newLine();
+            bd.write("MAXIMUM_SIZE 10"); bd.newLine();
+            bd.write("DATA"); bd.newLine();
+            for (int i = 0; i < values.length; i ++) {
+                if (values[i] == null)
+                    continue;
+                int bin = Math.min (nbins - 1, (int) (( (Double) values[i] + binrange / 2 - min) / binrange));
+                bd.write(items[i] + " " + DEFAULT_SHAPE + " " + DEFAULT_SIZE + " " + bhex[bin] + " " + DEFAULT_FILL + " " + DEFAULT_POS); bd.newLine();
+            }
+        } else { // values is NOT double
+            bd.write("MAXIMUM_SIZE 10"); bd.newLine();
+            bd.write("DATA"); bd.newLine();
+            for (int i = 0; i < values.length; i ++) {
+                if (values[i] == null)
+                    continue;
+                if ((Boolean) values[i]) {
+                    bd.write(items[i] + " " + DEFAULT_SHAPE + " " + DEFAULT_SIZE + " #000000 " + DEFAULT_FILL + " " + DEFAULT_POS);
+                    bd.newLine();
+                }
+            }
+
+        }
+        bd.close();
+    }
+
+    public static void main(String[] args) {
+        Object[] items = new String[] {"WT25", "ASR55", "ASR01", "ASR05", "ASR07"};
+        Double[] values = new Double[] {25., 60., 46., 41., 38.};
+        try {
+            save2iTOL("/Users/mikael/simhome/ASR/ReconMode/test_itol.txt", items, values, "Test_iTOL", 7, 25., 60.);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
