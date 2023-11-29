@@ -37,7 +37,7 @@ public class Analysis {
         pbn = reconstruction.getPbn();
         aln = reconstruction.getAln();
 
-        evolEdges();
+        // evolEdges();
         getDistanceMatrix();
 
         //Write the output
@@ -121,14 +121,8 @@ public class Analysis {
                     //FIXME - issues with gap character
                     System.out.println();
                 } else if (childState == null) { //childState is gap and has to be handled
-                    double[][] probs = aachd.getModel().getProbs(aachd.getTime()); //get probability matrix for node
-                    int index = aachd.getModel().getDomain().getIndex(parentState); //get index of parent state
-                    double[] colProb = probs[index];
-                    for (int i = 0; i < colProb.length; i++) {
-                        if (i == index)
-                            continue;
-                        prob += colProb[i];
-                    }
+                    //FIXME - issues with gap character
+                    System.out.println();
                 } else if (parentState == null){
                     //FIXME - issues with gap character
                     System.out.println();

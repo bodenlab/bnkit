@@ -97,6 +97,14 @@ public abstract class SubstModel {
         Rexp = new Exp(R);
     }
 
+    /**
+     * Return the exponent of the rate matrix, which is always determined when the model is instantiated
+     * @return the exponent of the rate matrix
+     */
+    public Exp getRexp() {
+        return Rexp;
+    }
+
     public JSONObject toJSON() {
         JSONObject json = new JSONObject();
         String knownname = SubstModel.getModelName(this);
@@ -220,7 +228,7 @@ public abstract class SubstModel {
         double[][] p = probscache.get(time);
         if (p == null) {
             synchronized (this) {
-                p = getProbs(time);
+                p = getProbs(time, Rexp);
                 setCache(time, p);
             }
         }
@@ -280,25 +288,24 @@ public abstract class SubstModel {
      * @param time expected distance
      * @return the conditional probabilities of a symbol at time t+time GIVEN a symbol at time t  [row: X(t)][col: X(t+time)]
      */
-    public final double[][] getProbs(double time) {
-        this.time = time;
+    public static double[][] getProbs(double time, Exp Rexp) {
         int i, j, k;
         double temp;
         double[] eval = Rexp.getEigval();
         double[][] ievec = Rexp.getInvEigvec();
         double[][] evec = Rexp.getEigvec();
-        double[][] iexp = new double[R.length][R.length];
-        double[][] prob = new double[R.length][R.length];
-        for (k = 0; k < R.length; k++) {
+        double[][] iexp = new double[eval.length][eval.length];
+        double[][] prob = new double[eval.length][eval.length];
+        for (k = 0; k < eval.length; k++) {
             temp = Math.exp(time * eval[k]);
-            for (j = 0; j < R.length; j++) {
+            for (j = 0; j < eval.length; j++) {
                 iexp[k][j] = ievec[k][j] * temp;
             }
         }
-        for (i = 0; i < R.length; i++) {
-            for (j = 0; j < R.length; j++) {
+        for (i = 0; i < eval.length; i++) {
+            for (j = 0; j < eval.length; j++) {
                 temp = 0.0;
-                for (k = 0; k < R.length; k++) {
+                for (k = 0; k < eval.length; k++) {
                     temp += evec[i][k] * iexp[k][j];
                 }
                 prob[i][j] = Math.abs(temp);
@@ -418,32 +425,32 @@ public abstract class SubstModel {
 
         double time = .1;
         System.out.println("\n\nTransition probabilities of R (Gap) @ time = " + time);
-        double[][] prob = sm_gap.getProbs(time);
+        double[][] prob = sm_gap.getProbs(time, sm_gap.getRexp());
         bn.math.Matrix.print(prob);
 
         System.out.println("\n\nTransition probabilities of R (GLOOME1) @ time = " + time);
-        prob = sm_gloome1.getProbs(time);
+        prob = sm_gloome1.getProbs(time, sm_gloome1.getRexp());
         bn.math.Matrix.print(prob);
 
         System.out.println("\n\nTransition probabilities of R (Yang) @ time = " + time);
-        prob = sm_yang.getProbs(time);
+        prob = sm_yang.getProbs(time, sm_yang.getRexp());
         bn.math.Matrix.print(prob);
 
         System.out.println("\n\nTransition probabilities of R (WAG) @ time = " + time);
-        prob = sm_wag.getProbs(time);
+        prob = sm_wag.getProbs(time, sm_wag.getRexp());
         bn.math.Matrix.print(prob);
 
         System.out.println("\nTransition probabilities of R (LG) @ time = " + time);
-        prob = sm_lg.getProbs(time);
+        prob = sm_lg.getProbs(time, sm_lg.getRexp());
         bn.math.Matrix.print(prob);
         bn.math.Matrix.printLaTeX(prob, sm_lg.getDomain().getValues(), sm_lg.getDomain().getValues());
 
         System.out.println("\nTransition probabilities of R (JTT) @ time = " + time);
-        prob = sm_jtt.getProbs(time);
+        prob = sm_jtt.getProbs(time, sm_jtt.getRexp());
         bn.math.Matrix.print(prob);
 
         System.out.println("\nTransition probabilities of R (Dayhoff) @ time = " + time);
-        prob = sm_dh.getProbs(time);
+        prob = sm_dh.getProbs(time, sm_dh.getRexp());
         bn.math.Matrix.print(prob);
         double p = sm_dh.getProb('K', 'R', time);
         System.out.println("P(K|R) = " + p);

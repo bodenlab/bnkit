@@ -1,17 +1,22 @@
 package asr;
 
+import bn.BNode;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
+import bn.factor.AbstractFactor;
+import bn.factor.Factor;
+import bn.factor.Factorize;
 import bn.prob.EnumDistrib;
 import bn.prob.GaussianDistrib;
+import dat.EnumTable;
 import dat.Enumerable;
+import dat.Variable;
 import dat.file.Newick;
 import dat.phylo.*;
 import org.junit.jupiter.api.Test;
 import util.MilliTimer;
 
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,7 +39,7 @@ class MaxLhoodJointTest {
         return new IdxTree(new BranchPoint[] {root, anc_left, leaf1, leaf2, anc_right, leaf3, leaf4});
     }
 
-    Tree tree = Newick.parse("((Leaf1:0.02,Leaf2:0.12)Anc_left:0.19,(Leaf3:0.18,Leaf4:0.15)Anc_right:0.17)Root;");
+    Tree tree = Newick.parse("((Leaf1:0.02,Leaf2:0.12)Anc_left:0.19,(Leaf3:0.18,Leaf4:0.15)Anc_right:0.191)Root;");
             //createTree();
     Tree mini1 = Newick.parse("((Leaf1:0.09,Leaf2:0.11)N1:0.07,Leaf3:0.12)N0");
     Tree mini2 = Newick.parse("((Leaf1:0.03,Leaf2:0.05)N1:0.13,Leaf3:0.12)N0");
@@ -42,6 +47,105 @@ class MaxLhoodJointTest {
     Object C = 'C';
     Object G = 'G';
     Object T = 'T';
+
+    int NSEEDs = 100;
+    int NPICKS = 3; // how many variables to pick values for
+
+    @Test
+    void infer0() {
+        Tree t = tree;
+        SubstModel model = SubstModel.createModel("WAG");
+        PhyloBN pbn = PhyloBN.create(t, model);
+        MaxLhoodJoint mlj = new MaxLhoodJoint(pbn);
+        for (int SEED = 0; SEED < NSEEDs; SEED ++) {
+            Random rand = new Random(SEED + 1);
+            BNode[] bnodes = new BNode[t.getSize()];
+            List<Integer> mylist = new ArrayList<>();
+            for (int bpidx : t) {
+                bnodes[bpidx] = pbn.getBNode(bpidx);
+                mylist.add(bpidx); // here ordered
+            }
+            Collections.shuffle(mylist, rand);
+            int[] rank = new int[bnodes.length]; // the "rank" of a node
+            int cnt = 0;
+            for (int idx : mylist)
+                rank[idx] = cnt ++;
+
+            // set instances for the variables that have been "picked" (indexed by their node index)
+            Map<Variable, Object> inst4map = new HashMap<>();
+            Object[] inst4arr = new Object[mylist.size()];
+            for (int i = 0; i < NPICKS; i++) {
+                int pick = mylist.get(i);
+                Object inst = model.getDomain().getValues()[rand.nextInt(model.getDomain().size())];
+                inst4map.put(bnodes[pick].getVariable(), inst);
+                inst4arr[pick] = inst;
+            }
+
+            int[] free = new int[bnodes.length - NPICKS];
+            int idx = 0;
+            for (int i = NPICKS; i < bnodes.length; i++) {
+                int not_picked = mylist.get(i);
+                free[idx ++] = not_picked;
+            }
+            TreeInstance ti = new TreeInstance(t, inst4arr);
+            // System.out.println("Input: \t" + ti);
+            MaxLhoodJoint.Inference inf = mlj.infer(ti);
+            // System.out.println("Output:\t" + inf);
+
+            Object[][] states = new Object[(int) Math.pow(model.getDomain().size(), free.length)][]; // holds all combinations of "free" states
+            for (int j = 0; j < states.length; j++)                                                  // they are enumerated here...
+                states[j] = model.getDomain().getWord4Key(j, free.length);                           // assigned the state...
+            double[] jointp = new double[(int) Math.pow(model.getDomain().size(), free.length)];     // and each will be assigned a probability based on tree and leaf states
+
+            int maxp_idx = -1;
+            for (int j = 0; j < jointp.length; j ++) {          // for every possible "free" state...
+                // calculate the joint probability of each permutation of assignments, which is to...
+                jointp[j] = 1;
+                for (int i = 0; i < bnodes.length; i++) { // calculate the product of all conditional probabilities
+                    BNode node = bnodes[i];
+                    int paridx = t.getParent(i);
+                    // Four possibilities
+                    if (inst4arr[i] == null) {
+                        // 1: variable is not set, parent variable is not set (or the node is not conditioned, i.e. root)
+                        Object varinstance = states[j][rank[i] - NPICKS];
+                        if (paridx == -1) { // root (1a)
+                            jointp[j] *= node.get(varinstance);
+                        } else if (inst4arr[paridx] == null) { // not root (1b), and the parent is not set
+                            jointp[j] *= node.get(varinstance, states[j][rank[paridx] - NPICKS]);
+                        } else { //
+                            // 2: variable is not set, but parent is/condition is set
+                            jointp[j] *= node.get(varinstance, inst4arr[paridx]);
+                        }
+                    } else {
+                        // 3: variable is set
+                        Object varinstance = inst4arr[i];
+                        if (paridx == -1) { // root (3a)
+                            jointp[j] *= node.get(varinstance);
+                        } else if (inst4arr[paridx] == null) { // not root (3b), has parent that is not set
+                            jointp[j] *= node.get(varinstance, states[j][rank[paridx] - NPICKS]);
+                        } else {
+                            // 4: variable is set, parent is set
+                            jointp[j] *= node.get(varinstance, inst4arr[paridx]);
+                        }
+                    }
+                }
+                if (maxp_idx == -1)
+                    maxp_idx = j;
+                else if (jointp[j] > jointp[maxp_idx])
+                    maxp_idx = j;
+            }
+            for (int i = 0; i < bnodes.length; i++) { // show values that give the maximum product
+//                System.out.print("Node " + bnodes[i].getName() + " = ");
+                if (inst4arr[i] == null) {
+//                    System.out.println(states[maxp_idx][rank[i] - NPICKS]);
+                    assertEquals(inf.getTreeInstance().getInstance(i), states[maxp_idx][rank[i] - NPICKS]);
+                } else {
+//                    System.out.println(inst4arr[i] + " *");
+                }
+            }
+        }
+    }
+
 
     @Test
     void infer1() {
@@ -229,8 +333,8 @@ class MaxLhoodJointTest {
                             p = model.getProb(allstates[child]);    // taken from the substitution model
                             sb.append(String.format("P(N%d=%s)=%5.3f", child, allstates[child], p));
                         } else {            // parent indeed...
-                            double[][] probs = model.getProbs(tree.getDistance(child));     // the model has them all...
-                            p = model.getProb(allstates[child], allstates[parent], probs);  // so extract the appropriate substitution
+                            //double[][] probs = model.getProbs(tree.getDistance(child));     // the model has them all...
+                            p = model.getProb(allstates[child], allstates[parent], tree.getDistance(child));  // so extract the appropriate substitution
                             sb.append(String.format("P(N%d=%s|N%d=%s)=%5.3f", child, allstates[child], parent, allstates[parent], p));
                         }
                         joint *= p; // the prob of the combination of states is the product of their (conditional) probabilities
@@ -334,7 +438,6 @@ class MaxLhoodJointTest {
         timer.report(true);
     }
 
-    int NSEEDs = 100;
     int NTHREADS = 10;
     @Test // reconstruction when multithreaded
     void jointThreaded() {
@@ -389,8 +492,8 @@ class MaxLhoodJointTest {
                             p = model.getProb(allstates[SEED][child]);    // taken from the substitution model
                             sb.append(String.format("P(N%d=%s)=%5.3f", child, allstates[SEED][child], p));
                         } else {            // parent indeed...
-                            double[][] probs = model.getProbs(tree.getDistance(child));     // the model has them all...
-                            p = model.getProb(allstates[SEED][child], allstates[SEED][parent], probs);  // so extract the appropriate substitution
+                            // double[][] probs = model.getProbs(tree.getDistance(child));     // the model has them all...
+                            p = model.getProb(allstates[SEED][child], allstates[SEED][parent], tree.getDistance(child));  // so extract the appropriate substitution
                             sb.append(String.format("P(N%d=%s|N%d=%s)=%5.3f", child, allstates[SEED][child], parent, allstates[SEED][parent], p));
                         }
                         joint *= p; // the prob of the combination of states is the product of their (conditional) probabilities

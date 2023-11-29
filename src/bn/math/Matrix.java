@@ -58,9 +58,11 @@ public class Matrix {
             ievec = new double[dim][dim];
             Matrix.luinverse(evec, ievec, dim);
         }
+
         public double[][] getExp() {
             return result;
         }
+
         public double[][] getEigvec() {
             return evec;
         }

@@ -76,14 +76,15 @@ public class SubstNode implements BNode {
     public SubstNode(EnumVariable var, EnumVariable parent, SubstModel model, double t) {
         this.var = var;
         this.parent = parent;
+        if (var.getDomain() != model.getDomain() || parent.getDomain() != model.getDomain())
+            throw new RuntimeException("Invalid substitution model for node with variables " + var + " and " + parent);
         this.parentAsList = Collections.singletonList(parent);
         this.time = t;
-        //this.model = model;
         this.modelname = model.getName();
         this.alpha = model.getDomain();
         this.values = this.alpha.getValues();
         this.table = new EnumTable<>(parent);
-        this.probs = model.getProbs(t);
+        this.probs = model.getProbs(t, model.getRexp());
         for (int i = 0; i < this.values.length; i ++) {
             table.setValue(i, new EnumDistrib(this.alpha, probs[i]));
         }
@@ -97,8 +98,10 @@ public class SubstNode implements BNode {
      * @param model substitution model but only the priors are used
      */
     public SubstNode(EnumVariable var, SubstModel model) {
+        if (var.getDomain() != model.getDomain())
+            throw new RuntimeException("Invalid substitution model for node with variable " + var);
         this.var = var;
-        //this.model = model;
+        this.modelname = model.getName();
         this.alpha = model.getDomain();
         this.values = this.alpha.getValues();
         this.table = null;
@@ -144,14 +147,13 @@ public class SubstNode implements BNode {
      * @return
      */
     public double getProb(Object X, Object Y) {
-        int index_X = alpha.getIndex(X);
-        int index_Y = alpha.getIndex(Y);
-        return probs[index_Y][index_X];
-        //return this.table.getValue(index_X).get(index_Y);
+        return getProb(alpha.getIndex(X), alpha.getIndex(Y));
     }
 
     /**
-     * Get conditional probability P(X=x|Y=y,time) by index to value
+     * Get conditional probability P(X=x|Y=y,time) by index to value.
+     * Note that the index is taken from the Enumerable instance of each EnumVariable provided to the constructor;
+     * so use with care but will save individual look-ups internally to this node class.
      * @param index_X
      * @param index_Y
      * @return
@@ -170,6 +172,10 @@ public class SubstNode implements BNode {
         return this.prior.get(index_X);
     }
 
+    public double getProb(int index_X) {
+        return this.prior.get(index_X);
+    }
+
     /**
      * Determine the conditional probability P(X=value|Y=key).
      * @param key the condition Y, one value only
@@ -180,7 +186,6 @@ public class SubstNode implements BNode {
     public Double get(Object[] key, Object value) {
         if (key != null) {
             if (key.length == 1) {
-                //return table.getValue(key).get(value);
                 Object Y = key[0];
                 Object X = value;
                 return getProb(X, Y);
@@ -197,7 +202,6 @@ public class SubstNode implements BNode {
     @Override
     public Double get(Object value) {
         return this.prior.get(value);
-        //return getProb(value);
     }
 
     @Override
@@ -487,7 +491,7 @@ public class SubstNode implements BNode {
             // - parinstance value (null or value from mypar.getDomain()) AND the domain (but NOT the variable name, so use domain hash-code)
             // - varinstance value (null or value from myvar.getDomain()) AND the domain (but NOT the variable name, so use domain hash-code)
             // - the probabilities that are used to set factor
-            // option 1
+            // option 1: this node is not instantiated and has no set condition/parent
             if (varinstance == null && parinstance == null) {
                 if (parent_is_relevant) {
                     // AbstractFactor ft = new DenseFactor(new Variable[] {mypar, myvar});
@@ -517,30 +521,34 @@ public class SubstNode implements BNode {
                     if (!ft.isSet()) {
                         AbstractFactor.FactorFiller ff = ft.getFiller();
                         // F(X) from P(X | Y)
-                        for (Object X : values) {
+                        for (int index_X = 0; index_X < values.length; index_X++) {
+                            // for (Object X : values) {
                             double sum = 0;
-                            for (Object Y : values) // we don't care about the value of Y
-                                sum += getProb(X, Y);
-                            ff.setValue(new Object[]{X}, sum);
+                            for (int index_Y = 0; index_Y < values.length; index_Y++)
+                                // we don't care about the value of Y
+                                sum += getProb(index_X, index_Y);
+                            ff.setValue(index_X, sum);
                         }
                         ft.setValuesByFiller(ff);
                     }
                     return ft;
                 }
             }
-            // option 2
+            // option 2: this node is instantiated but no set condition/parent
             else if (varinstance != null && parinstance == null) {
                 if (parent_is_relevant) {
                     // Need to consider varinstance for hash key; below works but slows overall inference in tests thus disabled
 //                    AbstractFactor ft = isCache() ? CachedFactor.getByDistanceAndDesignation(cache, time, null, mypar, varinstance) : new DenseFactor(new Variable[] {mypar});
                     AbstractFactor ft = new DenseFactor(new Variable[] {mypar});
                     if (!ft.isSet()) {
+                        // FIXME: use key index for factor and sym index for probs
                         AbstractFactor.FactorFiller ff = ft.getFiller();
                         ft.evidenced = true;
                         // F(Y) from P(X = x| Y)
-                        Object X = varinstance; // we know what value X has
-                        for (Object Y : values) // so we tabulate by values in Y
-                            ff.setValue(new Object[]{Y}, getProb(X, Y));
+                        int index_X = var.getIndex(varinstance); // we know what value X has
+                        for (int index_Y = 0; index_Y < values.length; index_Y++)
+                            // so we tabulate by values in Y
+                            ff.setValue(index_Y, getProb(index_X, index_Y));
                         ft.setValuesByFiller(ff);
                     }
                     return ft;
@@ -548,15 +556,15 @@ public class SubstNode implements BNode {
                     AbstractFactor ft = new DenseFactor(); // TODO: investigate if there could be a CachedFactor option here
                     ft.evidenced = true;
                     // F() from P(X = x| Y) and Y is irrelevant to query
-                    Object X = varinstance;
+                    int index_X = var.getIndex(varinstance); // we know what value X has
                     double sum = 0;
-                    for (Object Y : values)
-                        sum += getProb(X, Y);
+                    for (int index_Y = 0; index_Y < values.length; index_Y++)
+                        sum += getProb(index_X, index_Y);
                     ft.setValue(sum);
                     return ft;
                 }
             }
-            // option 3
+            // option 3: this node is not instantiated but is conditioned on a set value/parent
             else if (varinstance == null && parinstance != null) {
                 // TODO: this factor can be cached but not by the current factory methods; note the parent variable is instantiated...
                 AbstractFactor ft = new DenseFactor(new Variable[] {myvar});
@@ -564,9 +572,20 @@ public class SubstNode implements BNode {
                 ft.evidenced = true;
                 // F(X) from P(X | Y)
                 Object Y = parinstance;
-                for (Object X : values)
-                    ff.setValue(new Object[]{X}, getProb(X, Y));
+                int index_Y = parent.getIndex(parinstance); // we know what value Y has
+                for (int index_X = 0; index_X < values.length; index_X++)
+                    ff.setValue(index_X, getProb(index_X, index_Y));
                 ft.setValuesByFiller(ff);
+                return ft;
+            }
+            // option 4: this node is instantiated and is conditioned on a set value/parent
+            else if (varinstance != null && parinstance != null) {
+                AbstractFactor ft = new DenseFactor();
+                ft.evidenced = true;
+                // F() from P(X = x| Y = y)
+                int index_X = var.getIndex(varinstance); // we know what value X has
+                int index_Y = parent.getIndex(parinstance);
+                ft.setValue(getProb(index_X, index_Y));
                 return ft;
             }
             throw new RuntimeException("Invalid setting");
@@ -580,8 +599,8 @@ public class SubstNode implements BNode {
                 AbstractFactor ft = isCache() ? CachedFactor.getByDistance(cache, 0, myvar, null) : new DenseFactor(new Variable[] {myvar});
                 if (!ft.isSet()) {
                     AbstractFactor.FactorFiller ff = ft.getFiller();
-                    for (Object X : values)
-                        ff.setValue(new Object[]{X}, getProb(X));
+                    for (int index_X = 0; index_X < values.length; index_X++)
+                        ff.setValue(index_X, getProb(index_X));
                     ft.setValuesByFiller(ff);
                 }
                 return ft;
@@ -708,20 +727,6 @@ public class SubstNode implements BNode {
         SubstNode node = new SubstNode(nodevar, parvar, mod, jrate);
         return node;
     }
-
-    /**
-     * Recover the (conditioned) substitution node from JSON
-     * @param json JSON representation
-     * @return new substitution node
-     * @throws JSONException if the JSON specification is invalid
-     */
-/*    public static SubstNode fromJSON(JSONObject json, EnumVariable parvar) throws JSONException {
-        String jmod = json.getString("Model");
-        Double jrate = json.optDouble("Rate", 1);
-        SubstModel mod = SubstModel.createModel(jmod);
-        SubstNode node = new SubstNode(nodevar, parvar, mod, jrate);
-        return node;
-    } */
 
     public static void main0(String[] args) {
         // here are all the variables, representing the sequence at a position

@@ -1,10 +1,12 @@
 package asr;
 
+import bn.BNode;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
 import bn.prob.MixtureDistrib;
 import dat.Enumerable;
+import dat.Variable;
 import dat.phylo.IdxTree;
 import dat.phylo.PhyloBN;
 import dat.phylo.Tree;
@@ -13,9 +15,7 @@ import json.JSONObject;
 import org.junit.jupiter.api.Test;
 import util.MilliTimer;
 
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -172,6 +172,7 @@ class MaxLhoodMarginalTest {
             }
         }
     }
+
     @Test
     void getDecoration2b() {
         // Extended nodes on all ancestor nodes
@@ -196,6 +197,118 @@ class MaxLhoodMarginalTest {
         }
         assertTrue(Math.abs(cnt[0] - cnt[1]) <= 1 && Math.abs(cnt[1] - cnt[2]) <= 1);
     }
+
+    int NSEEDs = 1000;
+    int NPICKS = 4; // how many variables to pick values for
+
+    @Test
+    void marginal0() {
+        int NLEAVES = 4; // so 7 nodes in total (assuming a bifurcating tree)
+        double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
+        double GAMMA_SCALE = 0.2;
+        double SCALEDIST = 1.0; // calibrate the leaf to root distance to be around 1
+        SubstModel model = SubstModel.createModel("LG");
+        for (int SEED = 0; SEED < NSEEDs; SEED ++) {
+            // make a random tree with N - 1 ancestors for a binary tree, 2 x N - 1 variables in total
+            Tree t = Tree.Random(NLEAVES, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2);
+            t.adjustDistances(SCALEDIST);
+            Random rand = new Random(SEED + 1);
+            PhyloBN pbn = PhyloBN.create(t, model);
+
+            BNode[] bnodes = new BNode[t.getSize()];
+            List<Integer> mylist = new ArrayList<>();
+            for (int bpidx : t) {
+                bnodes[bpidx] = pbn.getBNode(bpidx);
+                mylist.add(bpidx); // here ordered
+            }
+            Collections.shuffle(mylist, rand);
+            int[] rank = new int[bnodes.length]; // the "rank" of a node
+            int cnt = 0;
+            for (int idx : mylist)
+                rank[idx] = cnt ++;
+
+            // set instances for the variables that have been "picked" (indexed by their node index)
+            Map<Variable, Object> inst4map = new HashMap<>();
+            Object[] inst4arr = new Object[mylist.size()];
+            for (int i = 0; i < NPICKS; i++) {
+                int pick = mylist.get(i);
+                Object inst = model.getDomain().getValues()[rand.nextInt(model.getDomain().size())];
+                inst4map.put(bnodes[pick].getVariable(), inst);
+                inst4arr[pick] = inst;
+            }
+
+            int[] free = new int[bnodes.length - NPICKS];
+            int idx = 0;
+            for (int i = NPICKS; i < bnodes.length; i++) {
+                int not_picked = mylist.get(i);
+                free[idx ++] = not_picked;
+            }
+            int INFER_ME = free[0];
+            MaxLhoodMarginal mlj = new MaxLhoodMarginal(INFER_ME, t, model);         // create inference object
+            TreeInstance ti = new TreeInstance(t, inst4arr);
+            // System.out.println("Input: \t" + ti);
+            mlj.decorate(ti);
+
+            EnumDistrib ed_bnkit = (EnumDistrib) mlj.getDecoration(INFER_ME);
+            // System.out.println("Output:\t" + bnodes[INFER_ME] + "\t = " + ed_bnkit + "(which has max \"" + model.getDomain().get(ed_bnkit.getMaxIndex()) +"\")");
+
+            Object[][] states = new Object[(int) Math.pow(model.getDomain().size(), free.length)][]; // holds all combinations of "free" states
+            for (int j = 0; j < states.length; j++)                                                  // they are enumerated here...
+                states[j] = model.getDomain().getWord4Key(j, free.length);                           // assigned the state...
+            double[] jointp = new double[(int) Math.pow(model.getDomain().size(), free.length)];     // and each will be assigned a probability based on tree and leaf states
+
+            EnumDistrib ed_naive = new EnumDistrib(model.getDomain());
+            double[] count = new double[model.getDomain().size()];
+
+            int maxp_idx = -1;
+            for (int j = 0; j < jointp.length; j ++) {          // for every possible "free" state...
+                // calculate the joint probability of each permutation of assignments, which is to...
+                jointp[j] = 1;
+                for (int i = 0; i < bnodes.length; i++) { // calculate the product of all conditional probabilities
+                    BNode node = bnodes[i];
+                    int paridx = t.getParent(i);
+                    // Four possibilities
+                    if (inst4arr[i] == null) {
+                        // 1: variable is not set, parent variable is not set (or the node is not conditioned, i.e. root)
+                        Object varinstance = states[j][rank[i] - NPICKS];
+                        if (paridx == -1) { // root (1a)
+                            jointp[j] *= node.get(varinstance);
+                        } else if (inst4arr[paridx] == null) { // not root (1b), and the parent is not set
+                            jointp[j] *= node.get(varinstance, states[j][rank[paridx] - NPICKS]);
+                        } else { //
+                            // 2: variable is not set, but parent is/condition is set
+                            jointp[j] *= node.get(varinstance, inst4arr[paridx]);
+                        }
+                    } else {
+                        // 3: variable is set
+                        Object varinstance = inst4arr[i];
+                        if (paridx == -1) { // root (3a)
+                            jointp[j] *= node.get(varinstance);
+                        } else if (inst4arr[paridx] == null) { // not root (3b), has parent that is not set
+                            jointp[j] *= node.get(varinstance, states[j][rank[paridx] - NPICKS]);
+                        } else {
+                            // 4: variable is set, parent is set
+                            jointp[j] *= node.get(varinstance, inst4arr[paridx]);
+                        }
+                    }
+                }
+                if (maxp_idx == -1)
+                    maxp_idx = j;
+                else if (jointp[j] > jointp[maxp_idx])
+                    maxp_idx = j;
+            }
+            // marginalise wrt target variable
+            for (int j = 0; j < jointp.length; j ++)          // for every possible "free" state...
+                count[model.getDomain().getIndex(states[j][0])] += jointp[j];
+            ed_naive.set(count);
+            ed_naive.normalise();
+
+            // System.out.println("Naive:\t" + bnodes[INFER_ME] + "\t = " + ed_naive + "(which has max \"" + model.getDomain().get(ed_naive.getMaxIndex()) +"\")");
+            assertArrayEquals(ed_naive.get(), ed_bnkit.get(), 0.01);
+
+        }
+    }
+
 
     /**
      * Test of exact marginal inference in phylogenetic trees, comparing against a naive product, exhaustively determining the prob of all combinations.
@@ -264,8 +377,8 @@ class MaxLhoodMarginalTest {
                         if (parent < 0) {   // no parent, so use a-priori prob of child state...
                             p = model.getProb(allstates[child]);    // taken from the substitution model
                         } else {            // parent indeed...
-                            double[][] probs = model.getProbs(tree.getDistance(child));     // the model has them all...
-                            p = model.getProb(allstates[child], allstates[parent], probs);  // so extract the appropriate substitution
+                            // double[][] probs = model.getProbs(tree.getDistance(child));     // the model has them all...
+                            p = model.getProb(allstates[child], allstates[parent], tree.getDistance(child));  // so extract the appropriate substitution
                         }
                         joint *= p; // the prob of the combination of states is the product of their (conditional) probabilities
                     }

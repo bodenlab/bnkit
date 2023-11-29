@@ -24,10 +24,16 @@ class SubstModelTest {
     void getProbs() {
         long START_TIME = System.currentTimeMillis();
         for (int i = 0; i < ts.length; i++) {
-            mymod.getProbs(ts[i]);
+            mymod.getProbs(ts[i], mymod.getRexp());
         }
         long ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
         System.out.println(String.format("Done in %d min, %d s or %d ms", TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME),
                 TimeUnit.MILLISECONDS.toSeconds(ELAPSED_TIME) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME)), TimeUnit.MILLISECONDS.toMillis(ELAPSED_TIME)));
+    }
+
+    @Test
+    void getProb() {
+        // TODO: test caching
+
     }
 }
