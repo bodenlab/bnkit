@@ -56,7 +56,8 @@ public class GServer {
      */
     public GServer(String directory) {
         // the command central is where actual jobs are managed; for now, we just create the instance
-        commandCentral = new CommandCentral(this);
+        // commandCentral = new CommandCentral(this);
+        commandCentral = new CommandCentral();
         // as requests come in (via the command central) they may be queued; here we create the job queue
         // TODO: check that the directory exists and/or is writeable
 

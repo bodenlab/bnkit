@@ -26,16 +26,17 @@ import java.util.*;
 
 public class CommandCentral {
 
-    final private GServer server;
+    //final private GServer server;
 
     /**
      * Create a command central, which parses requests formatted as JSON, and creates a GRequest.
      * The GRequest extracts parameters for the job in its constructor, and has a "run" method, which
      * will execute as a thread, once the job has been scheduled by the server.
-     * @param server
+     * // @param server
      */
-    public CommandCentral(GServer server) {
-        this.server = server;
+//    public CommandCentral(GServer server) {
+    public CommandCentral() {
+        // this.server = server;
     }
 
     /**

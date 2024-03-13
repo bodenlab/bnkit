@@ -815,7 +815,7 @@ public class Factorize {
                     for (int x = 0; x < X.getSize(); x++) {
                         double xval = X.getLogValue(x);
                         if (isLOG0(xval)) {
-                            continue; // no point in continuing since product will always be log-zero for entries with this x-value
+                            //continue; // no point in continuing since product will always be log-zero for entries with this x-value
                             // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                         }
                         int y; // there can only be one index in Y (if it is contained in X)
@@ -834,7 +834,7 @@ public class Factorize {
                         }
                         double yval = Y.getLogValue(y);
                         if (isLOG0(yval)) { // <=== Factor check
-                            continue; // the product will be zero no what
+                            //continue; // the product will be zero no what
                             // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                         }
                         double XY = xval + yval; // <=== Factor product in log space
@@ -915,7 +915,7 @@ public class Factorize {
                     for (int y = 0; y < Y.getSize(); y++) {
                         double yval = Y.getLogValue(y);
                         if (isLOG0(yval)) { // <=== Factor check
-                            continue; // no point in continuing since product will always be zero for entries with this x-value
+                            //continue; // no point in continuing since product will always be zero for entries with this x-value
                             // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                         }
                         int x; // there can only be one index in X (if it is contained in Y)
@@ -934,7 +934,7 @@ public class Factorize {
                         }
                         double xval = X.getLogValue(x);
                         if (isLOG0(xval)) { // <=== Factor check
-                            continue; // the product will be zero no what
+                            //continue; // the product will be zero no what
                             // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                         }
                         int idx = y;
@@ -1007,6 +1007,7 @@ public class Factorize {
         // FIXME: needs to disentangle the tracing from the product
 //        if (!dt.isSet()) {
             double[] map = new double[dt.getSize()];
+            // Arrays.fill(map, 0);
             Object[] reskey = new Object[dt.nEVars]; // this will initialise all elements to null
             int[] xcross2dt = new int[X.nEVars]; // map from X index to dt index
             int[] ycross2dt = new int[Y.nEVars]; // map from Y index to dt index
@@ -1017,14 +1018,14 @@ public class Factorize {
                 for (int x = 0; x < X.getSize(); x++) {
                     double xval = X.getLogValue(x);
                     if (isLOG0(xval)) { // <=== Factor check
-                        continue; // no point in continuing since product will always be zero for entries with this x-value
+                        //continue; // no point in continuing since product will always be zero for entries with this x-value
                         // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                     }
                     Object[] xkey = X.getKey(x);
                     for (int y = 0; y < Y.getSize(); y++) {
                         double yval = Y.getLogValue(y);
                         if (isLOG0(yval)) { // <=== Factor check
-                            continue; // the product will be zero no what
+                            //continue; // the product will be zero no what
                             // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                         }
                         Object[] ykey = Y.getKey(y);
@@ -1074,7 +1075,7 @@ public class Factorize {
             for (int x = 0; x < X.getSize(); x++) {
                 double xval = X.getLogValue(x);
                 if (isLOG0(xval)) { // <=== Factor check
-                    continue; // no point in continuing since product will always be zero for entries with this x-value
+                    //continue; // no point in continuing since product will always be zero for entries with this x-value
                     // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                 }
                 Object[] xkey = X.getKey(x);
@@ -1097,7 +1098,7 @@ public class Factorize {
                     for (int y : yindices) {
                         double yval = Y.getLogValue(y);
                         if (isLOG0(yval)) { // <=== Factor check
-                            continue; // the product will be zero no what
+                            //continue; // the product will be zero no what
                             // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                         }
                         Object[] ykey = Y.getKey(y);
@@ -1133,7 +1134,7 @@ public class Factorize {
                         if (Y.isMatch(searchkey, y)) {
                             double yval = Y.getLogValue(y);
                             if (isLOG0(yval)) { // <=== Factor check
-                                continue; // the product will be zero no what
+                                //continue; // the product will be zero no what
                                 // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                             }
                             Object[] ykey = Y.getKey(y);

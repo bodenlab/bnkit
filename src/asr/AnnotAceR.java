@@ -1,12 +1,8 @@
 package asr;
 
-import bn.BNet;
-import bn.BNode;
 import bn.Distrib;
-import bn.alg.EM;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
-import bn.file.BNBuf;
 import bn.prob.EnumDistrib;
 import dat.file.Newick;
 import dat.file.TSVFile;
@@ -18,12 +14,9 @@ import json.JSONObject;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 
-public class BPState {
+public class AnnotAceR {
 
     public static void usage() {
         usage(0, null);
@@ -34,7 +27,7 @@ public class BPState {
             out = System.err;
         if (msg != null)
             out.println(msg + " (Error " + error + ")");
-        out.println("Usage: asr.BPState \n" +
+        out.println("Usage: asr.AnnotAceR \n" +
                 "\t[-nwk <tree-file> -in <input-file> -out <output-file>]\n" +
                 "\t{-model <uniform(default)>}\n" +
                 "\t{-gamma <gamma-value(default 1.0)>}\n" +

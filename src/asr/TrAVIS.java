@@ -7,6 +7,7 @@ import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.AlnWriter;
 import dat.file.FastaWriter;
+import dat.file.Newick;
 import dat.file.TSVFile;
 import dat.phylo.BranchPoint;
 import dat.phylo.PhyloBN;
@@ -59,30 +60,38 @@ public class TrAVIS {
                 "\t[<ancestor-seq>]\n" +
                 "\t[-nwk <tree-file> -out <output-file-or-dir>]\n" +
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
+                "\t{-load}\n" +
+                "\t{-rates <a>}\n" +
                 "\t{-rates <a>}\n" +
                 "\t{-seed <random>}\n" +
                 "\t{-extants <5(default)>}\n" +
                 "\t{-dist <mean-extant-to-root>\n" +
                 "\t{-shape <1.1(default)>}\n" +
                 "\t{-scale <0.2(default)>}\n" +
-                "\t{-indel <param>}\n" +
+                "\t{-indel <1.0(default)>}\n" +
                 "\t{-gap}\n" +
-                "\t{-format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n");
+                "\t{-format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
+                "\t{-verbose}\n" +
+                "\t{-help}\n");
         out.println("where \n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
                 "\toutput-file-or-dir is the filename or name of directory of results\n" +
-                "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n");
+                "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n" +
+                "\t\"-verbose\" means that details of evolutionary events are printed out on standard-output)\n" +
+                "\t\"-help\" prints out the parameters and instructions of how to use this tool\n");
         out.println("Notes: \n" +
                 "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, \n\tLe-Gasquel and Whelan-Goldman; \n" +
                 "\tDNA models include Jukes-Cantor and Yang (general reversible process model).\n" +
                 "\tTree is set to have specified extants and gets distances from the Gamma distribution, with parameters:\n\t\tshape (aka a and K)\n\t\tscale (aka b, where Lambda=1/b)\n" +
                 "\tmean distance to root is used to scale distances in the tree (noting that greater number of extants \n\tindirectly amplifies the time scope of the tree).\n" +
                 "\tPosition-specific evolutionary rates from a Gamma distribution with specified parameter \"a\" and mean 1;\n\t if rate is unspecified, a uniform rate 1 is used.\n" +
+                "\tRates for insertions and deletions are scaled by -indel <multiplier> (multiplier > 1 reduces, multiplier < 1 increases chance of indels).\n" +
                 "\t~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
         System.exit(error);
     }
 
     public static Boolean VERBOSE = false;
+    static Double SCALEINDEL = 1.0;
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
@@ -90,6 +99,7 @@ public class TrAVIS {
         String OUTPUT = null;
         Double RATESGAMMA = null;
         Double SCALEDIST = null;
+        boolean LOADTREE = true;
         long SEED = System.currentTimeMillis();
         int EXTANTS_N = 5;
         double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
@@ -102,8 +112,6 @@ public class TrAVIS {
         // Alphabet is decided by MODEL_IDX
         Enumerable[] ALPHAS = new Enumerable[]{Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
         // Indel approaches:
-        String[] INDELS = new String[]{"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
-        int INDEL_IDX = 0; // default indel approach is that above indexed 0
         boolean GAPPY = false;
         String[] FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "DIR", "RATES"};
         int FORMAT_IDX = 0;
@@ -146,6 +154,7 @@ public class TrAVIS {
                     if (!found_model)
                         usage(1, args[a + 1] + " is not a valid model name");
                 } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
+                    SCALEINDEL = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("format") && args.length > a + 1) {
                     boolean found_format = false;
                     for (int i = 0; i < FORMATS.length; i++) {
@@ -210,14 +219,24 @@ public class TrAVIS {
         if (FORMATS[FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
             GAPPY = true;
 
-        Tree tree = Tree.Random(EXTANTS_N, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, DESCENDANTS_MAX, DESCENDANTS_MIN);
-        if (SCALEDIST != null)
-            tree.adjustDistances(SCALEDIST);
-        if (NEWICK != null) {
+        /* Load or create a tree */
+        Tree tree = null;
+        if (LOADTREE && NEWICK != null) {
             try {
-                tree.save(NEWICK, "nwk");
+                tree = Newick.load(NEWICK);
             } catch (IOException e) {
-                usage(2, "Tree file could not be saved");
+            }
+        }
+        if (tree == null) {
+            tree = Tree.Random(EXTANTS_N, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, DESCENDANTS_MAX, DESCENDANTS_MIN);
+            if (SCALEDIST != null)
+                tree.adjustDistances(SCALEDIST);
+            if (NEWICK != null) {
+                try {
+                    tree.save(NEWICK, "nwk");
+                } catch (IOException e) {
+                    usage(2, "Tree file could not be saved");
+                }
             }
         }
         if (ancseq != null && OUTPUT != null) { // we've got an ancestor to track down the tree
@@ -391,10 +410,10 @@ public class TrAVIS {
                     int i = 0;                                  // idx for parent position
                     while (i < parseq.length) {                 // move through the child by incrementing the idx in the parent
                         // three possibilities: 1. match and potential substitution, 2. deletion/s, and 3. insertion/s
-                        double toss = rand.nextDouble();
+                        double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
                         double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
-                            EnumDistrib d = MODEL.getDistrib(parseq[i], t);
+                            EnumDistrib d = MODEL.getDistrib(parseq[i], (USERATES?rates[paridx][i]:1)*t); // bug fix 13/3/24, prev version did not multiply with site specific rate
                             Object nchar = null;
                             double tossagain = rand.nextDouble();
                             double sump = 0;
