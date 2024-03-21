@@ -62,13 +62,13 @@ public class TrAVIS {
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
                 "\t{-load}\n" +
                 "\t{-rates <a>}\n" +
-                "\t{-rates <a>}\n" +
                 "\t{-seed <random>}\n" +
                 "\t{-extants <5(default)>}\n" +
                 "\t{-dist <mean-extant-to-root>\n" +
                 "\t{-shape <1.1(default)>}\n" +
                 "\t{-scale <0.2(default)>}\n" +
                 "\t{-indel <1.0(default)>}\n" +
+                "\t{-delprop <0.5(default)>}\n" +
                 "\t{-gap}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
                 "\t{-verbose}\n" +
@@ -86,12 +86,14 @@ public class TrAVIS {
                 "\tmean distance to root is used to scale distances in the tree (noting that greater number of extants \n\tindirectly amplifies the time scope of the tree).\n" +
                 "\tPosition-specific evolutionary rates from a Gamma distribution with specified parameter \"a\" and mean 1;\n\t if rate is unspecified, a uniform rate 1 is used.\n" +
                 "\tRates for insertions and deletions are scaled by -indel <multiplier> (multiplier > 1 reduces, multiplier < 1 increases chance of indels).\n" +
+                "\tThe proportion of deletions relative to insertions and deletions is given by -delprop <proportion> (proportion < 0.5 means that insertions will dominate.\n" +
                 "\t~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
         System.exit(error);
     }
 
     public static Boolean VERBOSE = false;
     static Double SCALEINDEL = 1.0;
+    static Double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
@@ -141,7 +143,7 @@ public class TrAVIS {
                     GAPPY = true;
                 } else if (arg.equalsIgnoreCase("verbose")) {
                     VERBOSE = true;
-                } else if (arg.equalsIgnoreCase("help")) {
+                } else if (arg.equalsIgnoreCase("help") || arg.equalsIgnoreCase("h")) {
                     usage();
                 } else if (arg.equalsIgnoreCase("model") && args.length > a + 1) {
                     boolean found_model = false;
@@ -155,6 +157,8 @@ public class TrAVIS {
                         usage(1, args[a + 1] + " is not a valid model name");
                 } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
                     SCALEINDEL = Double.parseDouble(args[++a]);
+                } else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
+                    DELETIONPROP = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("format") && args.length > a + 1) {
                     boolean found_format = false;
                     for (int i = 0; i < FORMATS.length; i++) {
@@ -173,7 +177,7 @@ public class TrAVIS {
 
         Random rand = new Random(SEED);
 
-        if (ANCSEQ == null) { // check standard input for sequence?
+        if (ANCSEQ == null ) { // check standard input for sequence?
             BufferedReader br = null;
             try {
                 br = new BufferedReader(new InputStreamReader(System.in));
@@ -412,6 +416,7 @@ public class TrAVIS {
                         // three possibilities: 1. match and potential substitution, 2. deletion/s, and 3. insertion/s
                         double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
                         double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
+
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
                             EnumDistrib d = MODEL.getDistrib(parseq[i], (USERATES?rates[paridx][i]:1)*t); // bug fix 13/3/24, prev version did not multiply with site specific rate
                             Object nchar = null;
@@ -431,61 +436,64 @@ public class TrAVIS {
                             } else
                                 throw new RuntimeException("Sampling invalid distribution");
                             i += 1;
-                        } else if ((toss - p) < (1.0 - p) / 2.0) { // 2. deletion with prob q = (1 - p)/2, so consider length of deletion
-                            int k = Math.min(poisson.sample(), parseq.length - i); // length, can only delete what is left of the sequence
-                            deletions[idx][i] = k;  // deletions skip characters in the parent
-                            i += k;
-                        } else { // 3. insertion with prob q = (1 - p)/2, so consider length of insertion
-                            // special case at i==0: insertions can happen BEFORE and AFTER the sequence,
-                            // so to avoid introducing a bias for LONGER EXTANTS,
-                            // we place it at either end with a uniform coin toss
-                            int k = poisson.sample(); // length
-                            insertions[idx][i == 0 ? (rand.nextBoolean() ? 0 : parseq.length) : i] += k; // insertions can be on top of another
-                            for (int j = 0; j < k; j ++) {
+                        } else {
+                            double toss2 = rand.nextDouble();
+                            if (toss2 < TrAVIS.DELETIONPROP) { // 2. deletion with prob q = (1 - p)/2, so consider length of deletion
+                                int k = Math.min(poisson.sample(), parseq.length - i); // length, can only delete what is left of the sequence
+                                deletions[idx][i] = k;  // deletions skip characters in the parent
+                                i += k;
+                            } else { // 3. insertion with prob q = (1 - p)/2, so consider length of insertion
+                                // special case at i==0: insertions can happen BEFORE and AFTER the sequence,
+                                // so to avoid introducing a bias for LONGER EXTANTS,
+                                // we place it at either end with a uniform coin toss
+                                int k = poisson.sample(); // length, consider power-law distribution??
+                                insertions[idx][i == 0 ? (rand.nextBoolean() ? 0 : parseq.length) : i] += k; // insertions can be on top of another
+                                for (int j = 0; j < k; j ++) {
+                                    Object nchar = null;
+                                    double tossagain = rand.nextDouble();
+                                    double sump = 0;
+                                    for (Object c : MODEL.getDomain().getValues()) {
+                                        sump += MODEL.getProb(c);
+                                        if (sump >= tossagain) {
+                                            nchar = c;
+                                            break;
+                                        }
+                                    }
+                                    if (nchar != null) {
+                                        if (i==0 && insertions[idx][parseq.length] > 0)
+                                            tail.add(nchar);
+                                        else
+                                            child.add(nchar);
+                                        if (USERATES) {
+                                            if (i == 0 && insertions[idx][parseq.length] > 0)
+                                                tailrates.add(gamma.sample());
+                                            else
+                                                childrates.add(gamma.sample()); // new position means new rate
+                                        }
+                                    } else
+                                        throw new RuntimeException("Sampling invalid distribution");
+                                }
+                                // after an insertion, what do we do with the character? Currently, we enforce a match/substitution
+                                // note that for a before/after insertion, the character concerned is always that at the head of the sequence
+                                EnumDistrib d = MODEL.getDistrib(parseq[i], t);
                                 Object nchar = null;
                                 double tossagain = rand.nextDouble();
                                 double sump = 0;
-                                for (Object c : MODEL.getDomain().getValues()) {
-                                    sump += MODEL.getProb(c);
+                                for (Object c : d.getDomain().getValues()) {
+                                    sump += d.get(c);
                                     if (sump >= tossagain) {
                                         nchar = c;
                                         break;
                                     }
                                 }
                                 if (nchar != null) {
-                                    if (i==0 && insertions[idx][parseq.length] > 0)
-                                        tail.add(nchar);
-                                    else
-                                        child.add(nchar);
-                                    if (USERATES) {
-                                        if (i == 0 && insertions[idx][parseq.length] > 0)
-                                            tailrates.add(gamma.sample());
-                                        else
-                                            childrates.add(gamma.sample()); // new position means new rate
-                                    }
+                                    child.add(nchar);
+                                    if (USERATES)
+                                        childrates.add(rates[paridx][i]); // stays the same
                                 } else
                                     throw new RuntimeException("Sampling invalid distribution");
+                                i += 1;
                             }
-                            // after an insertion, what do we do with the character? Currently, we enforce a match/substitution
-                            // note that for a before/after insertion, the character concerned is always that at the head of the sequence
-                            EnumDistrib d = MODEL.getDistrib(parseq[i], t);
-                            Object nchar = null;
-                            double tossagain = rand.nextDouble();
-                            double sump = 0;
-                            for (Object c : d.getDomain().getValues()) {
-                                sump += d.get(c);
-                                if (sump >= tossagain) {
-                                    nchar = c;
-                                    break;
-                                }
-                            }
-                            if (nchar != null) {
-                                child.add(nchar);
-                                if (USERATES)
-                                    childrates.add(rates[paridx][i]); // stays the same
-                            } else
-                                throw new RuntimeException("Sampling invalid distribution");
-                            i += 1;
                         }
                     }
                     // set character states
