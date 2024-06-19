@@ -7,9 +7,7 @@ import dat.phylo.Tree;
 import dat.pog.Edge;
 import dat.pog.POGraph;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -183,5 +181,22 @@ public class Utils {
             throw new ASRException(exception);
     }
 
+    public static String LoadStringsFrom(String filename) throws IOException {
+        BufferedReader reader = new BufferedReader(new FileReader(filename));
+        String line = reader.readLine();
+        StringBuilder sb = new StringBuilder();
+        // first scan until a line with content is found
+        while (line != null) {
+            sb.append(line);
+            line = reader.readLine();
+        }
+        reader.close();
+        return sb.toString();
+    }
 
+    public static void SaveStringTo(String filename, String contents) throws IOException {
+        BufferedWriter writer = new BufferedWriter(new FileWriter(filename));
+        writer.write(contents);
+        writer.close();
+    }
 }

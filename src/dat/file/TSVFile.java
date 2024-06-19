@@ -4,16 +4,40 @@ import json.JSONObject;
 
 import java.io.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Created by mikael on 2/08/2016. Copied from binfkit March 2019.
+ * Utility class to work with tabulated files, sometimes labeled, sometimes not.
+ * Cells can contain arbitrary datatypes, though different applications may have certain requirements
+ * and this class is featured to deal with some of them.
+ *
+ * Created by mikael on 2/08/2016. Cloned from binfkit March 2019.
+ * Amended and made specific to bnkit from then on.
+ * @author mikael
  */
 public class TSVFile {
+
+    /**
+     * NULLS identify all string tokens that are interpreted as NULL/missing values (in addition to the empty string) when loading an Object matrix from a TSV file
+     */
+    public static String[] NULLS = {"null", "NULL", "nil", "NIL", "none", "None", "NONE"};
 
     List<Object[]> rows = new ArrayList<>();
     int ncols = 0;
     Map<String, Integer> headers = null;
     Map<Integer, Map<Object, int[]>> indexMap = new HashMap<>();
+
+    /**
+     * Read TSV from a file.
+     * @param filename name of file
+     * @param useHeader interpret the first row as headers
+     * @param transpose transpose the cells before evaluating values in cells (including headers)
+     * @throws IOException
+     */
+    public TSVFile(String filename, boolean useHeader, boolean transpose) throws IOException {
+        this(transpose?Transpose(TSVFile.loadObjects(filename)):TSVFile.loadObjects(filename), useHeader);
+    }
 
     /**
      * Read TSV from a file.
@@ -45,7 +69,8 @@ public class TSVFile {
         for (int i = 0; i < headers.length; i++)
             this.headers.put(headers[i], i);
         for (int i = 0; i < objects.length; i++)
-            rows.add(i, objects[i]);
+            if (objects[i] != null)
+                rows.add(i, objects[i]);
     }
 
     /**
@@ -68,7 +93,8 @@ public class TSVFile {
             }
             int index = 0;
             for (int i = (useHeader ? 1 : 0); i < objects.length; i++) { // start at 1 and skip header conditionally
-                rows.add(index ++, objects[i]);
+                if (objects[i] != null)
+                    rows.add(index ++, objects[i]);
             }
         }
     }
@@ -82,10 +108,155 @@ public class TSVFile {
             ncols = objects[0].length;
             for (int i = 0; i < objects.length; i++) { // start at 0, there is no header
                 int index = i;
-                rows.add(index, objects[i]);
+                if (objects[i] != null)
+                    rows.add(index, objects[i]);
             }
         }
     }
+
+    /**
+     * Return transpose of a specified matrix of objects
+     * @param orig original matrix (not modified)
+     * @return transposition of specified matrix
+     */
+    public static Object[][] Transpose(Object[][] orig) {
+        int nrows = orig.length;
+        int ncols = -1;
+        for (int r = 0; r < nrows; r ++) {
+            if (ncols != -1 && ncols != orig[r].length)
+                throw new RuntimeException("Not a valid matrix");
+            ncols = orig[r].length;
+        }
+        Object[][] transp = new Object[ncols][nrows];
+        for (int r = 0; r < nrows; r ++) {
+            for (int c = 0; c < ncols; c ++)
+                transp[c][r] = orig[r][c];
+        }
+        return transp;
+    }
+
+    public static Object[] tokeniseBySep(Object orig, String separator) {
+        // tokenise the semi-colon separated fields within the entry
+        List<String> tokens = new ArrayList<>();
+        StringTokenizer tokenizer = new StringTokenizer(orig.toString(), separator);
+        while (tokenizer.hasMoreTokens())
+            tokens.add(tokenizer.nextToken());
+        Object[] tokarr = new Object[tokens.size()];
+        for (int i = 0; i < tokens.size(); i ++) {
+            Object y = tokens.get(i);
+            try {
+                y = Double.parseDouble(tokens.get(i));
+            } catch (NumberFormatException e1) {
+                try {
+                    y = Integer.parseInt(tokens.get(i));
+                } catch (NumberFormatException e2) {
+                }
+            }
+            tokarr[i] = y;
+        }
+        return tokarr;
+    }
+
+    public static Object[] tokeniseRange(Object orig) {
+        // the observed value is occasionally a "range" with min/max values as a pair separated by hyphen
+        Object[] range = tokeniseBySep(orig, "-");
+        if (range.length >= 2)
+            return range;
+        else
+            return null;
+    }
+
+    public static Object mergeRange(Object[] range) {
+        Object[] tokarr = new Object[range.length];
+        StringBuilder restring = new StringBuilder();
+        Double dsum = null;
+        int dcnt = 0;
+        Integer isum = null;
+        int icnt = 0;
+        boolean disqualify = false;
+        for (int i = 0; i < range.length; i ++) {
+            Object y = range[i];
+            restring.append(range[i].toString());
+            try {
+                y = (Double) range[i];
+                if (dsum == null)
+                    dsum = (Double) y;
+                else
+                    dsum += (Double) y;
+                dcnt += 1;
+            } catch (ClassCastException e1) {
+                try {
+                    y = (Integer) range[i];
+                    if (isum == null)
+                        isum = (Integer) y;
+                    else
+                        isum += (Integer) y;
+                    icnt += 1;
+                } catch (ClassCastException e2) {
+                    disqualify = true;
+                }
+            }
+            restring.append("-");
+        }
+        if (disqualify)
+            return restring.toString();
+        if (dsum != null)
+            return dsum / dcnt;
+        if (isum != null)
+            return isum / icnt;
+        return restring.toString();
+    }
+
+    public static Object[] tokeniseByCount(Object orig) {
+        String search = "_count=";
+        String line = orig.toString();
+        int cidx = line.indexOf(search);
+        List<Object> toklst = new ArrayList<>();
+        if (cidx < 0) {
+            // there is not any "_count" tags...
+            cidx = line.length();
+        }
+        while (cidx >= 0) {
+            String token = line.substring(0, cidx);
+            Object[] separates = tokeniseBySep(token, ";");
+            // ignore everything but the first element
+            Object[] range = tokeniseRange(separates[0]);
+            if (range == null)
+                toklst.add(separates[0]);
+            else
+                toklst.add(mergeRange(range));
+            line = line.substring(Math.min(cidx + search.length(), line.length()));
+            int eidx = line.indexOf(";");
+            if (eidx == -1) { // last count token reached
+                // collect count number?
+                break;
+            } else { // semi-colon found
+                // collect count number?
+                line = line.substring(eidx + 1);
+            }
+            cidx = line.indexOf(search);
+        }
+        Object[] ret = new Object[toklst.size()];
+        toklst.toArray(ret);
+        return ret;
+    }
+
+    /**
+     * Parse the cell as a text string specifying value/values on the BRENDA/Foley format
+     * (as dictated by Gabe Foley's ASR curation pipeline format incorporating data from BRENDA)
+     * @param orig the original object
+     * @return the parsed object with datatype if specified
+     * @throws ClassCastException if the parsing fails
+    Examples:
+        0.13;4-nitrophenyl alpha-D-maltoheptaoside-4,6-O-ethylidene_count=1
+        377.0;starch_count=1;619.0;starch_count=2;880.0;starch_count=3
+        7.2-7.5_count=1
+        34_count=1;55_count=3
+        SM00642;SM00632;
+     */
+//    public static Object tokeniseBRENDA(Object orig) throws ClassCastException {
+//    }
+
 
     /**
      * Save the present values to a TSV file.
@@ -330,16 +501,35 @@ public class TSVFile {
     /**
      * Retrieve whole column by index
      * @param column_index the index of the column
-     * @return values in specified column in order of row
+     * @param parser parser (e.g. Double, BRENDA)
+     * @return values in specified column in order of row, that all conform to type
      */
-    public Object[] getCol(int column_index, boolean remove_header) {
-        if (remove_header && headers != null) {
-            Object[] ret = new Object[rows.size() - 1];
-            for (int i = 1; i < rows.size(); i++)
-                ret[i - 1] = getRow(i)[column_index];
-            return ret;
-        } else
-            return getCol(column_index);
+    public Object[] getCol(int column_index, String parser) {
+        Object[] ret = new Object[rows.size()];
+        for (int i = 0; i < rows.size(); i ++) {
+            ret[i] = getRow(i)[column_index];
+            if (ret[i] != null) {
+                if (parser != null) {
+                    if (parser.equals("BRENDA")) {
+                        Object[] tokens = tokeniseByCount(ret[i]);
+                        ret[i] = tokens[0];
+                    } else if (parser.equals("Double")) {
+                        try {
+                            ret[i] = Double.parseDouble(ret[i].toString());
+                        } catch (NumberFormatException e1) {
+                            try {
+                                ret[i] = (double) Integer.parseInt(ret[i].toString());
+                            } catch (NumberFormatException e2) {
+                                ret[i] = null;
+                            }
+                        }
+                    } else {
+                        // unknown parser
+                    }
+                }
+            }
+        }
+        return ret;
     }
 
     /**
@@ -355,23 +545,6 @@ public class TSVFile {
                 ret[j][i] = rows.get(i)[column_indices[j]];
         }
         return ret;
-    }
-
-    /**
-     * Retrieve whole columns by index;
-     * this is the matrix "transposed"
-     * @param column_indices the indices of the columns
-     * @return values in specified columns in order of row
-     */
-    public Object[][] getCols(int[] column_indices, boolean remove_header) {
-        if (remove_header && headers != null) {
-            Object[][] ret = new Object[column_indices.length][rows.size() - 1];
-            for (int i = 1; i < rows.size(); i++) {
-                for (int j = 0; j < column_indices.length; j++)
-                    ret[j][i - 1] = rows.get(i)[column_indices[j]];
-            }
-            return ret;
-        } else return getCols(column_indices);
     }
 
     public static void print(Object[][] rows) {
@@ -403,7 +576,14 @@ public class TSVFile {
                         try {
                             values[i] = Double.valueOf(tokens[i]); // value is a double
                         } catch (NumberFormatException e2) {
-                            if (tokens[i].isBlank() || tokens[i].equalsIgnoreCase("null") || tokens[i].equalsIgnoreCase("nil"))
+                            boolean isnull = false;
+                            for (String NULL : NULLS) {
+                                if (tokens[i].equals(NULL)) {
+                                    isnull = true;
+                                    break;
+                                }
+                            }
+                            if (isnull || tokens[i].isBlank())
                                 values[i] = null;
                             else
                                 values[i] = tokens[i]; // value is a string
@@ -415,10 +595,17 @@ public class TSVFile {
             line = br.readLine();
         }
         data = new Object[alldata.size()][];
+        int ncols = -1; // figure out how many cols we need
         for (int k = 0; k < data.length; k++) {
-            data[k] = new Object[alldata.get(k).length];
-            for (int j = 0; j < data[k].length; j++) {
-                data[k][j] = alldata.get(k)[j];
+            if (ncols == -1)
+                ncols = alldata.get(k).length;
+            else if (ncols != alldata.get(k).length) {
+                // could throw error, or just allocate the exact number;
+                // but, we ignore to make sure the data is a proper matrix
+            }
+            data[k] = new Object[ncols];
+            for (int j = 0; j < ncols; j++) {
+                data[k][j] = (j < alldata.get(k).length ? alldata.get(k)[j] : null);
             }
         }
         br.close();
@@ -477,13 +664,18 @@ public class TSVFile {
     public static Double DEFAULT_POS = 1.0; // #position is a number between 0 and 1 and defines the position of the symbol on the branch (0 is at the start of node branch, 0.5 is in the middle, and 1 is at the end)
     public static Integer DEFAULT_FILL = 1; // #fill can be 1 or 0. If set to 0, only the outline of the symbol will be displayed.
 
+    /**
+     * By Sasha Trubetskoy, from https://sashamaps.net/docs/resources/20-colors/ excluding white
+     */
+    public static String[] NONWHITE_COLORS = {"#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe", "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000", "#aaffc3", "#808000", "#ffd8b1", "#000075", "#808080", "#000000"};
+
     public static void save2iTOL(String filename, Object[] items, Object[] values, String dataset_label, int nbins, Double setmin, Double setmax) throws IOException {
         BufferedWriter bd = new BufferedWriter(new FileWriter(filename));
         bd.write("DATASET_SYMBOL"); bd.newLine();
         bd.write("SEPARATOR SPACE"); bd.newLine();
         bd.write("DATASET_LABEL " + dataset_label); bd.newLine();
         bd.write("COLOR #ffff00"); bd.newLine();
-        if (isDouble(values)) {
+        if (isDouble(values)) { // values are doubles
             Double max = null, min = null;
             if (setmin != null)
                 min = setmin;
@@ -548,7 +740,9 @@ public class TSVFile {
             for (int i = 0; i < nbins; i ++) {
                 shapes.append(DEFAULT_SHAPE + " ");
                 colors.append(bhex[i] + " ");
-                labels.append(String.format("%.0f ", bins[i]));
+                // FIXME: figure out suitable number of decimal places,
+                //  e.g. range is 0 - 100 and 10 bins, 0 decimals, range is -3 to -2.5 and 10 bins, 2 decimals
+                labels.append(String.format("%.2f ", bins[i]));
             }
             bd.write(shapes.toString()); bd.newLine();
             bd.write(colors.toString()); bd.newLine();
@@ -561,20 +755,47 @@ public class TSVFile {
                 int bin = Math.min (nbins - 1, (int) (( (Double) values[i] + binrange / 2 - min) / binrange));
                 bd.write(items[i] + " " + DEFAULT_SHAPE + " " + DEFAULT_SIZE + " " + bhex[bin] + " " + DEFAULT_FILL + " " + DEFAULT_POS); bd.newLine();
             }
-        } else { // values is NOT double
+        } else { // values are NOT doubles
+            Map<Object, String> possible = new HashMap<>();
+            Set<Object> valueset = new HashSet<>();
+
+            for (int i = 0; i < values.length; i ++) {
+                if (values[i] == null)
+                    continue;
+                valueset.add(values[i]);
+            }
+            int j = 0;
+            for (Object value : valueset)
+                possible.put(value, NONWHITE_COLORS[j ++]);
+            bd.write("LEGEND_TITLE " + dataset_label); bd.newLine();
+            StringBuffer shapes = new StringBuffer("LEGEND_SHAPES ");
+            StringBuffer colors = new StringBuffer("LEGEND_COLORS ");
+            StringBuffer labels = new StringBuffer("LEGEND_LABELS ");
+            for (Map.Entry<Object, String> entry : possible.entrySet()) {
+                shapes.append(DEFAULT_SHAPE + " ");
+                colors.append(entry.getValue() + " ");
+                labels.append(String.format("%s ", entry.getKey()));
+            }
+            bd.write(shapes.toString()); bd.newLine();
+            bd.write(colors.toString()); bd.newLine();
+            bd.write(labels.toString()); bd.newLine();
             bd.write("MAXIMUM_SIZE 10"); bd.newLine();
             bd.write("DATA"); bd.newLine();
             for (int i = 0; i < values.length; i ++) {
                 if (values[i] == null)
                     continue;
-                if ((Boolean) values[i]) {
-                    bd.write(items[i] + " " + DEFAULT_SHAPE + " " + DEFAULT_SIZE + " #000000 " + DEFAULT_FILL + " " + DEFAULT_POS);
-                    bd.newLine();
-                }
+                bd.write(items[i] + " " + DEFAULT_SHAPE + " " + DEFAULT_SIZE + " " + possible.get(values[i]) + " " + DEFAULT_FILL + " " + DEFAULT_POS); bd.newLine();
             }
-
         }
         bd.close();
+    }
+
+    public static void save2iTOL(String filename, Object[] items, Object[] values, String dataset_label, int nbins) throws IOException {
+        save2iTOL(filename, items, values, dataset_label, nbins, null, null);
+    }
+
+    public static void save2iTOL(String filename, Object[] items, Object[] values, String dataset_label) throws IOException {
+        save2iTOL(filename, items, values, dataset_label, 10, null, null);
     }
 
     public static void main(String[] args) {
@@ -585,5 +806,9 @@ public class TSVFile {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public static class Filter {
+
     }
 }

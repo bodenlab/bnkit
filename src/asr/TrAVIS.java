@@ -10,11 +10,11 @@ import dat.file.FastaWriter;
 import dat.file.Newick;
 import dat.file.TSVFile;
 import dat.phylo.BranchPoint;
-import dat.phylo.PhyloBN;
 import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
 import stats.Poisson;
+import stats.ZeroTruncatedPoisson;
 
 import java.io.*;
 import java.util.*;
@@ -69,6 +69,8 @@ public class TrAVIS {
                 "\t{-scale <0.2(default)>}\n" +
                 "\t{-indel <1.0(default)>}\n" +
                 "\t{-delprop <0.5(default)>}\n" +
+                "\t{-indelmodel <zero-truncated-poisson(default)|poisson>"+
+                "\t{-lambda  <1(default)>}\n"+
                 "\t{-gap}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
                 "\t{-verbose}\n" +
@@ -87,6 +89,7 @@ public class TrAVIS {
                 "\tPosition-specific evolutionary rates from a Gamma distribution with specified parameter \"a\" and mean 1;\n\t if rate is unspecified, a uniform rate 1 is used.\n" +
                 "\tRates for insertions and deletions are scaled by -indel <multiplier> (multiplier > 1 reduces, multiplier < 1 increases chance of indels).\n" +
                 "\tThe proportion of deletions relative to insertions and deletions is given by -delprop <proportion> (proportion < 0.5 means that insertions will dominate.\n" +
+                "\tThe mean rate of occurrence in the Poisson distribution of the indel length by lambda" +
                 "\t~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
         System.exit(error);
     }
@@ -94,6 +97,9 @@ public class TrAVIS {
     public static Boolean VERBOSE = false;
     static Double SCALEINDEL = 1.0;
     static Double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
+    static Double LAMBDALENGTH = 1.0;
+    static int IN_MODEL_IDX = 0;
+    static String[] INDELMODELS = new String[]{"ZEROTRUNCATEDPOISSON", "POISSON"};
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
@@ -159,6 +165,18 @@ public class TrAVIS {
                     SCALEINDEL = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
+                } else if (arg.equalsIgnoreCase("lambda") && args.length > a + 1){
+                    LAMBDALENGTH = Double.parseDouble(args[++a]);
+                } else if (arg.equalsIgnoreCase("indelmodel") && args.length > a + 1){
+                    boolean found_indelmodel = false;
+                    for (int i = 0; i < INDELMODELS.length; i++) {
+                        if (args[a + 1].equalsIgnoreCase(INDELMODELS[i])) {
+                            IN_MODEL_IDX = i;
+                            found_indelmodel = true;
+                        }
+                    }
+                    if (!found_indelmodel)
+                        usage(1, args[a + 1] + " is not a valid model name");
                 } else if (arg.equalsIgnoreCase("format") && args.length > a + 1) {
                     boolean found_format = false;
                     for (int i = 0; i < FORMATS.length; i++) {
@@ -357,6 +375,9 @@ public class TrAVIS {
         Poisson poisson = null;
         GammaDistrib gamma = null;
 
+        ZeroTruncatedPoisson zeroTruncatedPoisson = null;
+        Poisson poisson2 = null;
+
         public final Tree tree;
         private final TreeInstance ti_seqs;
         private EnumNode[][] enumNodes = null;
@@ -379,6 +400,12 @@ public class TrAVIS {
             USERATES = (ratesgamma >= 0); // check if we will generate position specific rates; if not, use a constant rate 1
             rand = new Random(SEED);
             poisson = new Poisson(1.0, SEED); // lambda = 1
+            switch (IN_MODEL_IDX) {
+                case 0 : zeroTruncatedPoisson  = new ZeroTruncatedPoisson(LAMBDALENGTH,SEED); break;
+                case 1 : poisson2  = new Poisson(1.0, SEED); break;
+                default : throw new IllegalArgumentException("Invalid model index");
+            }
+
             if (USERATES) {
                 gamma = new GammaDistrib(ratesgamma, ratesgamma); // mean is a/b so setting b=a
                 gamma.setSeed(SEED);
@@ -438,15 +465,26 @@ public class TrAVIS {
                             i += 1;
                         } else {
                             double toss2 = rand.nextDouble();
+
                             if (toss2 < TrAVIS.DELETIONPROP) { // 2. deletion with prob q = (1 - p)/2, so consider length of deletion
-                                int k = Math.min(poisson.sample(), parseq.length - i); // length, can only delete what is left of the sequence
+                                int k;
+                                if (IN_MODEL_IDX == 0) { // length, can only delete what is left of the sequence
+                                    k = Math.min(zeroTruncatedPoisson.sample(), parseq.length - i);
+                                } else {
+                                    k = Math.min(poisson2.sample(), parseq.length - i); // length select from poisson or zeroTruncatedPoisson
+                                }
                                 deletions[idx][i] = k;  // deletions skip characters in the parent
                                 i += k;
                             } else { // 3. insertion with prob q = (1 - p)/2, so consider length of insertion
                                 // special case at i==0: insertions can happen BEFORE and AFTER the sequence,
                                 // so to avoid introducing a bias for LONGER EXTANTS,
                                 // we place it at either end with a uniform coin toss
-                                int k = poisson.sample(); // length, consider power-law distribution??
+                                int k;
+                                if (IN_MODEL_IDX == 0) { // length, can only delete what is left of the sequence
+                                    k = zeroTruncatedPoisson.sample(); // length, consider power-law distribution??
+                                } else {
+                                    k = poisson2.sample(); // length select from poisson or zeroTruncatedPoisson
+                                }
                                 insertions[idx][i == 0 ? (rand.nextBoolean() ? 0 : parseq.length) : i] += k; // insertions can be on top of another
                                 for (int j = 0; j < k; j ++) {
                                     Object nchar = null;

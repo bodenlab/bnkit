@@ -48,9 +48,9 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    public final int VARIANCE_UNTIED = 0;
-    public final int VARIANCE_TIED_MAX = 1;
-    public final int VARIANCE_TIED_POOLED = 2;
+    public static final int VARIANCE_UNTIED = 0;
+    public static final int VARIANCE_TIED_MAX = 1;
+    public static final int VARIANCE_TIED_POOLED = 2;
 
 //    private int tieVariances = VARIANCE_TIED_POOLED;
     private int tieVariances = VARIANCE_UNTIED;

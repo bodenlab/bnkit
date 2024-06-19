@@ -1,11 +1,17 @@
 package asr;
 
+import bn.BNode;
 import bn.Distrib;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
+import bn.node.GDT;
 import bn.prob.EnumDistrib;
+import bn.prob.GaussianDistrib;
+import bn.prob.MixtureDistrib;
+import dat.Enumerable;
 import dat.file.Newick;
 import dat.file.TSVFile;
+import dat.file.Utils;
 import dat.phylo.PhyloBN;
 import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
@@ -14,7 +20,10 @@ import json.JSONObject;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.Set;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
 
 public class AnnotAceR {
 
@@ -28,33 +37,41 @@ public class AnnotAceR {
         if (msg != null)
             out.println(msg + " (Error " + error + ")");
         out.println("Usage: asr.AnnotAceR \n" +
-                "\t[-nwk <tree-file> -in <input-file> -out <output-file>]\n" +
+                "\t[-nwk <tree-file> -in {<label>{:<parser>}@}<input-file> -out <output-file>]\n" +
                 "\t{-model <uniform(default)>}\n" +
                 "\t{-gamma <gamma-value(default 1.0)>}\n" +
-                "\t{-params <JSON-string-no-spaces>}\n" +
+                "\t{-params <JSON-file>}\n" +
                 "\t{-latent <#states>}\n" +
-                "\t{-internal }\n" +
+                "\t{-internal}\n" +
                 "\t{-learn}\n" +
+                "\t{-tied} \n" +
                 "\t{-seed <seed>} \n" +
-                "\t{-joint (default) | -marg <branchpoint-id>} \n" +
-                "\t{-format <TSV(default), TREE, STDOUT>}\n");
+                "\t{-joint (default) | -marg {<branchpoint-id>} } \n" +
+                "\t{-format <TSV(default), TREE, STDOUT, ITOL>}\n" +
+                "\t{-help|-h}\n" +
+                "\t{-verbose|-v}\n");
         out.println("where \n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
-                "\tinput-file is a table headed with sequence or ancestor names, and corresponding values (empty implies not assigned) on TSV format\n" +
+                "\tinput-file is a table with sequence or ancestor names in the first column, and corresponding values\n\t(empty or None or null implies not assigned) on TSV format\n" +
+                "\tlabel flags that a header is used in the input-file and identifies the column with values to be modelled;\n\tif no label is given, headers are assumed absent and values from the second column will be modelled\n" +
+                "\tparser identifies a parser to use on the column with values (e.g. BRENDA).\n" +
                 "\toutput-file will contain:\n" +
-                "\t- inferred branch point states on specified format (TSV by default, TREE is a labelled tree on Newick format), or\n" +
+                "\t- inferred branch point states on specified format (TSV by default, TREE is a labelled tree on Newick format, ITOL is a dataset to decorate trees in iTOL.embl.de), or\n" +
                 "\tgamma-value is parameter to the uniform model (n-state generalisation of Jukes-Cantor)\n" +
-                "\tJSON-string specifies distribution on leaf nodes (if latent mode is used)\n" +
+                "\tJSON-file contains a JSON string specifying the distribution for latent nodes (if latent mode is used)\n" +
                 "\tlatent indicates that the tree consists of latent values only (latent mode), with specified values as extensions to the leaves.\n" +
                     "\t- #states is the number of latent states to learn (should not exceed 25, labelled A-Z).\n" +
                 "\tinternal indicates that internal nodes are also extended with user-specified or learned distributions (default leaves-only).\n" +
                 "\tlearn excludes inference and instead prompts EM learning of parameters, using input data as training data.\n" +
-                "\tInference is either joint (default) or marginal (marginal requires a branch-point to be nominated)\n");
+                "\ttied implies that the variance learned is the same across the latent states (only applicable when EM-learning GDTs; default is off).\n" +
+                "\thelp prints out commandline arguments (this screen).\n" +
+                "\tverbose completes the requested steps while printing out messages about the process.\n");
         out.println("Notes:\n" +
                 "\tEvolutionary models of substitution are currently limited to uniform, which is an adaptation of Jukes-Cantor for arbitrary number of states.\n" +
                     "\t- gamma-value is used by this model\n" +
                 "\tIf specified values are real, a conditional Gaussian mixture distribution conditioned on latent state is learned.\n" +
-                "\tIf specified values are discrete, a multinomial distribution conditioned on latent state is learned.\n");
+                "\tIf specified values are discrete, a multinomial distribution conditioned on latent state is learned.\n" +
+                "\tInference is either joint (default) or marginal (marginal allows a branch-point to be nominated; \n\tif one is not given all uninstantiated nodes are inferred)\n");
         System.exit(error);
     }
 
@@ -64,16 +81,21 @@ public class AnnotAceR {
         String NEWICK = null;
         String OUTPUT = null;
         String INPUT = null;
+        String LABEL = null; // the label to model in the datafile, if null/not specified assume first column
+        String COLPARSER = null; // the parser for the column (in turn identified by LABEL)
+        String PARAMS_FILE = null; // the name of the file from which parameters are read and/or written
 
         String[] MODELS = new String[] {"uniform"};
         int MODEL_IDX = 0; // default model is that above indexed 0
         SubstModel SUBST_MODEL = null;
-        String[] FORMATS = new String[] {"TSV", "TREE", "STDOUT"};
+        String[] FORMATS = new String[] {"TSV", "TREE", "STDOUT", "ITOL"};
         int FORMAT_IDX = 0;
         asr.GRASP.Inference INFERENCE_MODE = asr.GRASP.Inference.JOINT;
         MODEL_MODE mode = MODEL_MODE.DIRECT; // not latent, discrete labels
+        boolean VERBOSE = false; // print out various messages during processing to inform the user
         boolean LEARN = false; // train (when true) or infer (when false, default)
         boolean LEAVES_ONLY = true; // leaves-only are equipped with distributions (when true, default), or all nodes including internal (when false)
+        boolean TIED_VARIANCE = false;
         Object MARG_LABEL = null;
         Double GAMMA = 1.0;
         Long SEED = 1L;
@@ -89,22 +111,38 @@ public class AnnotAceR {
                     OUTPUT = args[++a];
                 } else if (arg.equalsIgnoreCase("in") && args.length > a + 1) {
                     INPUT = args[++a];
+                    int atsign = INPUT.indexOf('@');
+                    if (atsign >= 0) { // there is a label to extract
+                        LABEL = INPUT.substring(0, Math.max(0, atsign));
+                        int colon = LABEL.indexOf(':');
+                        if (colon >= 0) {
+                            COLPARSER = LABEL.substring(colon + 1);
+                            LABEL = LABEL.substring(0, Math.max(0, colon));
+                        }
+                        INPUT = INPUT.substring(atsign + 1);
+                    }
+                } else if (arg.equalsIgnoreCase("tied")) {
+                    TIED_VARIANCE = true;
                 } else if (arg.equalsIgnoreCase("joint")) {
                     INFERENCE_MODE = asr.GRASP.Inference.JOINT;
-                } else if (arg.equalsIgnoreCase("marg") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("marg")) {
                     INFERENCE_MODE = asr.GRASP.Inference.MARGINAL;
-                    String NODE_LABEL = args[++a];
-                    if (NODE_LABEL.startsWith("N")) {
-                        try {
-                            MARG_LABEL = Integer.parseInt(NODE_LABEL.substring(1));
-                        } catch (NumberFormatException e) { // failed to assign an internal ancestor node number
-                            MARG_LABEL = NODE_LABEL;        // so this is probably just an extant
-                        }
-                    } else {
-                        try {
-                            MARG_LABEL = Integer.parseInt(NODE_LABEL);
-                        } catch (NumberFormatException e) { // failed to assign an internal ancestor node number
-                            MARG_LABEL = NODE_LABEL;        // so this is probably just an extant
+                    if (args.length > a + 1) { // possibly there is a specification of node
+                        if (!args[a + 1].startsWith("-")) {
+                            String NODE_LABEL = args[++a];
+                            if (NODE_LABEL.startsWith("N")) {
+                                try {
+                                    MARG_LABEL = Integer.parseInt(NODE_LABEL.substring(1));
+                                } catch (NumberFormatException e) { // failed to assign an internal ancestor node number
+                                    MARG_LABEL = NODE_LABEL;        // so this is probably just an extant
+                                }
+                            } else {
+                                try {
+                                    MARG_LABEL = Integer.parseInt(NODE_LABEL);
+                                } catch (NumberFormatException e) { // failed to assign an internal ancestor node number
+                                    MARG_LABEL = NODE_LABEL;        // so this is probably just an extant
+                                }
+                            }
                         }
                     }
                 } else if (arg.equalsIgnoreCase("gamma") && args.length > a + 1) {
@@ -131,13 +169,19 @@ public class AnnotAceR {
                         usage(10, args[a + 1] + " is not a valid seed value (must be a valid long integer)");
                     }
                 } else if (arg.equalsIgnoreCase("params") && args.length > a + 1) {
+                    PARAMS_FILE = args[a + 1];
+                    String contents = null;
                     try {
-                        PARAMS = new JSONObject(args[a + 1]);
+                        Path path = Paths.get(PARAMS_FILE);
+                        if (Files.exists(path)) {
+                            contents = Utils.LoadStringsFrom(PARAMS_FILE);
+                            PARAMS = new JSONObject(contents);
+                        }
+                    } catch (IOException e) {
+                        usage(11, "Invalid JSON file for external nodes: " + args[a + 1]);
                     } catch (JSONException e) {
-                        usage(9, "Invalid JSON specification of distribution for external nodes: " + PARAMS);
+                        usage(9, "Invalid JSON specification of distribution for external nodes: " + contents);
                     }
-                    if (PARAMS == null)
-                        usage(9, "Invalid JSON specification of distribution for external nodes: " + PARAMS);
                 } else if (arg.equalsIgnoreCase("model") && args.length > a + 1) {
                     boolean found_model = false;
                     for (int i = 0; i < MODELS.length; i++) {
@@ -162,51 +206,93 @@ public class AnnotAceR {
                     LEARN = true;
                 } else if (arg.equalsIgnoreCase("internal")) {
                     LEAVES_ONLY = false;
-                } else if (arg.equalsIgnoreCase("help")) {
+                } else if ((arg.equalsIgnoreCase("help"))  || (arg.equalsIgnoreCase("h"))) {
                     usage();
+                } else if ((arg.equalsIgnoreCase("verbose")) || (arg.equalsIgnoreCase("v"))) {
+                    VERBOSE = true;
                 }
             }
         }
 
-        if (INPUT != null && NEWICK != null) {
+        /*************************************************************
+        Commandline arguments are set, now check if we're good to go
+         *************************************************************/
+
+        if (INPUT != null && NEWICK != null) { // should be OK to load tree and input at least
             Object[][] inputs = null;
             Tree tree = null;
             try {
-                inputs = TSVFile.loadObjects(INPUT);
-                tree = Tree.load(NEWICK, "newick");
+                inputs = TSVFile.loadObjects(INPUT); // load table with known annotations (for testing or training)
+                tree = Tree.load(NEWICK, "newick"); // load tree
             } catch (IOException e) {
                 usage(5, inputs == null ? "Failed to load the input-file " + INPUT : "Failed to load the tree-file " + NEWICK);
             }
-            TSVFile tsv = new TSVFile(inputs, true); // put data in TSV instance, allowing for header
-            Set observed;
-            String[] xalpha = null;
+            TSVFile tsv = new TSVFile(inputs, LABEL != null ? true : false); // put data in TSV instance, allowing for header if a LABEL has been specified
+
+            /********************************************************************************
+             Two modes: direct and latent; set models accordingly (and do appropriate checks)
+             ********************************************************************************/
+            Set observed; // this is for (the set of) observed values (as established through the complete list of values across all entries)
+            int valcol = 1; // column with values, 1 being the default if no label is specified
+            String[] xalpha = null; // if applicable, nominated discrete values conditioned on latent states
+
+            if (LABEL != null) {
+                valcol = tsv.getColumn(LABEL); // label is given so make sure to adjust column
+                if (valcol == -1)
+                    usage(13, "Invalid name of column: " + LABEL);
+            }
+            Object[] ENTRIES_OBJ = tsv.getCol(0);       // entry-names as an array of Object (perhaps a mix of String and Integer, since GRASP uses numeric ancestor IDs)
+            String[] ENTRIES = new String[ENTRIES_OBJ.length];      // entry-names as an array of String
+            for (int i = 0; i < ENTRIES.length; i ++)
+                ENTRIES[i] = ENTRIES_OBJ[i].toString();
+            Object[] ENTRY_VALUES = tsv.getCol(valcol, COLPARSER);             // values associated with entries
+
+            //
+            // mode is "LATENT",
+            // so invent latent variable with NSTATES values
             if (mode == MODEL_MODE.LATENT) {
-                Object[] alpha = new Object[NSTATES];
-                for (int i = 0; i < alpha.length; i ++)
-                    alpha[i] = Character.valueOf((char)('A' + i));
-                SUBST_MODEL = new JC(GAMMA, alpha);
-                if (TSVFile.isDouble(tsv.getRow(0))) { // the first row of data is all Double
-                    observed = null;
-                    System.out.println("Detected real values in data--using Gaussian mixtures with " + NSTATES + " components");
-                } else { // the column has discrete values (not real)
-                    observed = tsv.getValues();
-                    Object[] extalpha = new Object[observed.size()];
-                    observed.toArray(extalpha);
-                    xalpha = new String[extalpha.length];
-                    for (int i = 0; i < extalpha.length; i ++)
-                        xalpha[i] = extalpha[i].toString();
-                    System.out.println("Detected " + xalpha.length + " discrete values in data--using multi-nomial distributions conditioned on " + NSTATES + " states");
+                Object[] alpha = new Object[NSTATES]; // alphabet (symbols that are used to represent states)
+                // label the latent states; use A, B, ... if no LABEL has been given
+                if (LABEL == null) { // no LABEL specified so values/latent states will be A1, A2, ...
+                    for (int i = 0; i < alpha.length; i++)
+                        alpha[i] = Character.valueOf((char) ('A' + i));
+                } else { // use the given LABEL plus underscore then a number, e.g. kcat_1, kcat_2, ...
+                    for (int i = 0; i < alpha.length; i++)
+                        alpha[i] = LABEL + "_" + (i + 1);
                 }
+                SUBST_MODEL = new JC(GAMMA, alpha); // set the evolutionary model (based on user specified params and the alphabet established above)
+                /* values are either real or discrete; we establish this from the user-provided table */
+                if (TSVFile.isDouble(ENTRY_VALUES)) { // the first col of data is all Double (real), hence must use latent states for nodes in tree
+                    observed = null;
+                    if (VERBOSE)
+                        System.out.println("Detected real values in data--using Gaussian mixture with " + NSTATES + " components");
+                } else { // the column has discrete values (not real)
+                    observed = new HashSet();
+                    for (int i = 0; i < ENTRY_VALUES.length; i ++)
+                        if (ENTRY_VALUES[i] != null)
+                            observed.add(ENTRY_VALUES[i]);
+                    xalpha = new String[observed.size()];
+                    observed.toArray(xalpha);
+                    if (VERBOSE)
+                        System.out.println("Detected " + xalpha.length + " discrete values in data--using multi-nomial distributions conditioned on " + NSTATES + " states");
+                }
+            //
+            // mode is "DIRECT",
+            // so reject real values (if nominated), and
+            // consolidate discrete values to nominate what states are possible
             } else if (mode == MODEL_MODE.DIRECT) {
-                if (TSVFile.isDouble(tsv.getRow(0))) { // the column is all Double
+                if (TSVFile.isDouble(ENTRY_VALUES)) { // the col of data is all Double (real), hence must use latent states for nodes in tree
                     usage(8, "Real-value data requires (discrete) latent states; please specify number of latent states.");
                 } else { // the column has discrete values (not real)
-                    observed = tsv.getValues();
+                    observed = new HashSet();
+                    for (int i = 0; i < ENTRY_VALUES.length; i ++)
+                        if (ENTRY_VALUES[i] != null)
+                            observed.add(ENTRY_VALUES[i]);
                     NSTATES = observed.size();
                     if (MODELS[MODEL_IDX].equals("uniform")) {
-                        Object[] alpha = new Object[observed.size()];
-                        observed.toArray(alpha);
-                        SUBST_MODEL = new JC(GAMMA, alpha);
+                        Object[] xxalpha = new Object[NSTATES];
+                        observed.toArray(xxalpha);
+                        SUBST_MODEL = new JC(GAMMA, xxalpha);
                     } else { // some other model
                         SUBST_MODEL = SubstModel.createModel(MODELS[MODEL_IDX]);
                         for (Object v : observed) {
@@ -216,124 +302,292 @@ public class AnnotAceR {
                     }
                 }
             }
-            if (SUBST_MODEL == null) {
+            // We should now have a working model, so check this is the case...
+            if (SUBST_MODEL == null)
                 usage(1, "Model " + MODELS[MODEL_IDX] + " could not be created");
-            }
-            String[] headers = tsv.getHeaders();
-            Object[][] rows = tsv.getRows();
-            TreeInstance ti = tree.getInstance(headers, rows[0]);
+            // Other checks...
+            if (LEARN && PARAMS_FILE == null)
+                usage(12, "Learning needs to save to a parameter file, which is not specified");
+            else if (!LEARN && OUTPUT == null)
+                usage(13, "Inference needs to save to an output file, which is not specified");
+
+            /**********************************************************************************
+             * Processes (options):
+             * -- Direct mode, joint recon inference (only discrete)
+             * -- Direct mode, marginal recon inference (only discrete)
+             * -- Latent mode,
+             *      --learning (both discrete and real)
+             *      --marginal recon inference (both discrete and real)
+             *      --joint recon inference (both discrete and real)
+             **********************************************************************************/
+
+            TreeInstance ti = tree.getInstance(ENTRIES_OBJ, ENTRY_VALUES);  // create a tree with values attached to name-matched nodes
+            // now decide type of operation...
             if (mode == MODEL_MODE.DIRECT && INFERENCE_MODE == GRASP.Inference.JOINT) {
+                /* ---------- Direct, joint recon inference ----------
+                 * Create an inference instance based on tree (with values attached) and model.
+                 * (Checks that values are valid and discrete already done.)
+                 */
                 MaxLhoodJoint inf = new MaxLhoodJoint(tree, SUBST_MODEL);
-                inf.decorate(ti);
-                Object[][] save = new Object[tree.getSize()][2];
-                Object[] vals = new Object[tree.getSize()];
+                inf.decorate(ti); // attach states to instantiated nodes and perform (joint) inference (based on model and tree)
+                Object[][] save = new Object[tree.getSize()][2]; // matrix to store all entry-names and their states as values
                 for (int bpidx : tree) {
-                    Object state = inf.getDecoration(bpidx);
-                    save[bpidx][0] = tree.getLabel(bpidx);
+                    Object state = inf.getDecoration(bpidx); // retrieve the already inferred state for the specified node
+                    save[bpidx][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx); // if ancestor attach N-prefix
                     save[bpidx][1] = state;
-                    vals[bpidx] = state;
                     if (FORMAT_IDX == 2)
-                        System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" + state);
+                        System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + state);
                 }
-                if (FORMAT_IDX == 0) {
-                    try {
-                        TSVFile.saveObjects(OUTPUT, save);
-                    } catch (IOException e) {
-                        usage(6, "Failed to save output to " + OUTPUT);
+                TSVFile tmptsv = new TSVFile(new String[] {tsv.getHeader(0), tsv.getHeader(valcol)}, save);
+                try {
+                    switch (FORMAT_IDX) {
+                        case 0: // TSV
+                            tmptsv.save(OUTPUT); break;
+                        case 1: // TREE
+                            Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
+                        case 3: // ITOL
+                            Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
+                            TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;
                     }
-                } else if (FORMAT_IDX == 1) { // TREE
-                    try {
-                        Newick.save(tree, OUTPUT, vals);
-                    } catch (IOException e) {
-                        usage(6, "Failed to save output to " + OUTPUT);
-                    }
+                } catch (IOException e) {
+                    usage(6, "Failed to save output to " + OUTPUT + " using format " + FORMATS[FORMAT_IDX]);
                 }
+
             } else if (mode == MODEL_MODE.DIRECT && INFERENCE_MODE == GRASP.Inference.MARGINAL) {
-                int bpidx = tree.getIndex(MARG_LABEL);
-                if (bpidx < 0) {
-                    usage(5, "Invalid branch point name " + MARG_LABEL);
-                }
-                MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal(bpidx, tree, SUBST_MODEL);
-                inf.decorate(ti);
-                EnumDistrib distrib = inf.getDecoration(bpidx);
-                Object[][] save = new Object[2][1 + distrib.getDomain().size()];
-                save[0][0] = "";
-                save[1][0] = tree.getLabel(bpidx);
-                Object[] vals = distrib.getDomain().getValues();
-                for (int i = 0; i < vals.length; i ++)
-                    save[0][1 + i] = vals[i];
-                for (int i = 0; i < vals.length; i ++)
-                    save[1][1 + i] = distrib.get(i);
-                if (FORMAT_IDX == 2)
-                    System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" + distrib);
-                else if (FORMAT_IDX == 0) {
-                    try {
-                        TSVFile.saveObjects(OUTPUT, save);
-                    } catch (IOException e) {
-                        usage(6, "Failed to save output to " + OUTPUT);
-                    }
-                }
-            } else if (mode == MODEL_MODE.LATENT) {
-                // System.out.println(tree.toJSON());
-                // create a Bayesian network from a phylogenetic tree
-                PhyloBN pbn;
-                if (xalpha == null)  // specified values are "real", so equip "ext" nodes as GDTs
-                    pbn = PhyloBN.withGDTs(tree, SUBST_MODEL, 1, LEAVES_ONLY, SEED);
-                else  // specified values are discrete and nominated as strings in "xalpha", so add multi-nomial CPTs
-                    pbn = PhyloBN.withCPTs(tree, SUBST_MODEL, xalpha, 1, LEAVES_ONLY, SEED);
-                if (PARAMS != null) {
-                    pbn.overrideMasterJSON(PARAMS);
-                    System.out.println("Using pre-set distribution: " + pbn.toString());
-                }
-                if (LEARN) { // learn, do not infer
-                    // train the BN; headers correspond to labels of leaves or any other node that has been nominated in the TSV file
-                    pbn.trainEM(headers, rows, 1L);
-                    // training done
-                    System.out.println("Learned parameters specified as:");
-                    System.out.println("\t-params " + pbn.getMasterJSON().toString());
-                } else if (INFERENCE_MODE == GRASP.Inference.MARGINAL) { // inference
+                /* ---------- Direct, marginal recon inference ----------
+                 * Create an inference instance based on tree (with values attached) and model.
+                 * Need to check nominated ancestor ID or extant name from the commandline (that has been stripped from an optional N-prefix).
+                 * (Checks that values are valid and discrete already done.)
+                 */
+                int[] bpidxs = null;
+                if (MARG_LABEL != null) { // node label provided, so perform ONE round of inference
                     // retrieve the branchpoint index for the nominated ancestors
                     int bpidx = tree.getIndex(MARG_LABEL);
                     if (bpidx < 0) // did not find it...
                         usage(5, "Invalid branch point name " + MARG_LABEL);
+                    bpidxs = new int[]{bpidx};
+                } else { // perform inference for ALL nodes
+                    bpidxs = new int[tree.getSize()];
+                    int i = 0;
+                    for (int bpidx : tree)
+                        bpidxs[i++] = bpidx;
+                }
+                Object[][] save = new Object[tree.getSize()][]; // matrix to store all entry-names and their distributions
+                String[] myheaders = null;
+                int bpcnt = 0;
+                for (int bpidx : bpidxs) {
+                    if (ti.getInstance(bpidx) != null)
+                        continue;
                     // inference below; first create the inference instance
-                    MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal(bpidx, pbn);
-                    // perform marginal inference
-                    inf.decorate(ti);
-                    // retrieve the distribution at the node previously nominated
-                    Distrib anydistrib = inf.getDecoration(bpidx);
-                    Object[][] save = null;
-                    try {
-                        EnumDistrib distrib = (EnumDistrib) anydistrib; // if this cast succeeds, it is a discrete distribution
-                        if (FORMAT_IDX == 2)
-                            System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" + distrib);
-                        else if (FORMAT_IDX == 0) {
-                            save = new Object[2][1 + distrib.getDomain().size()];
-                            save[0][0] = "";
-                            save[1][0] = tree.getLabel(bpidx);
-                            Object[] vals = distrib.getDomain().getValues();
-                            for (int i = 0; i < vals.length; i++)
-                                save[0][1 + i] = vals[i];
-                            for (int i = 0; i < vals.length; i++)
-                                save[1][1 + i] = distrib.get(i);
+                    MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal(bpidx, tree, SUBST_MODEL);
+                    inf.decorate(ti); // attach states to instantiated nodes and perform (marginal) inference for ONE ancestor or extant (based on model and tree)
+                    EnumDistrib distrib = inf.getDecoration(bpidx); // retrieve the distribution for the nominated ancestor or extant
+                    if (distrib != null) {
+                        if (myheaders == null) {
+                            myheaders = new String[1 + distrib.getDomain().size()];
+                            myheaders[0] = tsv.getHeader(0);
+                            for (int i = 0; i < distrib.getDomain().size(); i++)
+                                myheaders[1 + i] = distrib.getDomain().get(i).toString();
                         }
-                    } catch (ClassCastException e) { // GDT probably
                         if (FORMAT_IDX == 2)
-                            System.out.println(bpidx + "\t" + tree.getLabel(bpidx) + "\t" +anydistrib);
-                        else if (FORMAT_IDX == 0) {
-                            save = new Object[1][2];
-                            save[0][0] = tree.getLabel(bpidx);
-                            save[0][1] = anydistrib;
-                        }
-                    }
-                    try {
-                        TSVFile.saveObjects(OUTPUT, save);
-                    } catch (IOException e) {
-                        usage(6, "Failed to save output to " + OUTPUT);
+                            System.out.println(tree.getLabel(bpidx) + "\t" + tree.getLabel(bpidx) + "\t" + distrib);
+                        save[bpcnt] = new Object[1 + distrib.getDomain().size()];
+                        save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                        for (int i = 0; i < distrib.getDomain().size(); i++)
+                            save[bpcnt][1 + i] = distrib.get(i);
+                        bpcnt += 1;
                     }
                 }
+                TSVFile tmptsv = new TSVFile(myheaders, save);
+                try {
+                    switch (FORMAT_IDX) {
+                        case 0: // TSV
+                            tmptsv.save(OUTPUT); break;
+                        case 1: // TREE
+                            Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
+                        case 3: // ITOL
+                            Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
+                            TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;
+                    }
+                } catch (IOException e) {
+                    usage(6, "Failed to save output to " + OUTPUT + " using format " + FORMATS[FORMAT_IDX]);
+                }
+
+            } else if (mode == MODEL_MODE.LATENT) {
+                /* ---------- Latent states (all options) ---------- */
+                PhyloBN pbn;
+                if (xalpha == null) { // specified values are "real", so equip "ext" nodes as GDTs
+                    pbn = PhyloBN.withGDTs(tree, SUBST_MODEL, 1, LEAVES_ONLY, SEED);
+                    GDT gdt = pbn.getMasterGDT();
+                    gdt.setTieVariances(TIED_VARIANCE ? GDT.VARIANCE_TIED_POOLED : GDT.VARIANCE_UNTIED);
+                    gdt.randomize(ENTRY_VALUES, SEED.intValue());
+                } else  // specified values are discrete and nominated as strings in "xalpha", so add multi-nomial CPTs
+                    pbn = PhyloBN.withCPTs(tree, SUBST_MODEL, xalpha, 1, LEAVES_ONLY, SEED);
+                if (PARAMS != null) {
+                    pbn.overrideMasterJSON(PARAMS);
+                    if (VERBOSE)
+                        System.out.println("Using pre-set distribution: " + pbn.toString());
+                }
+                if (LEARN) { // learn, do not infer
+                    // train the BN; headers correspond to labels of leaves or any other node that has been nominated in the input TSV file
+                    pbn.trainEM(ENTRIES, new Object[][] {ENTRY_VALUES}, SEED);
+                    // training done
+                    if (VERBOSE) {
+                        System.out.println("Learned parameters specified as:");
+                        System.out.println("\t-params " + pbn.getMasterJSON().toString());
+                    }
+                    if (FORMAT_IDX == 3 && OUTPUT != null) {
+                        Object[][] tsave = new Object[2][ENTRIES.length];
+                        for (int i = 0; i < ENTRIES.length; i ++) {
+                            int bpidx = tree.getIndex(ENTRIES[i]);
+                            if (bpidx == -1)
+                                continue;
+                            tsave[0][i] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                            if (ENTRY_VALUES[i] != null)
+                                tsave[1][i] = ENTRY_VALUES[i];
+                        }
+                        try {
+                            TSVFile.save2iTOL(OUTPUT, tsave[0], tsave[1], tsv.getHeader(valcol));
+                        } catch (IOException e) {
+                            usage(6, "Failed to save output to " + OUTPUT + " using format " + FORMATS[FORMAT_IDX]);
+                        }
+                    }
+                    if (PARAMS_FILE != null) { // save parameters
+                        try {
+                            Utils.SaveStringTo(PARAMS_FILE, pbn.getMasterJSON().toString());
+                        } catch (IOException e) {
+                            usage(12, "Failed to save parameters to " + PARAMS_FILE);
+                        }
+                    }
+                } else if (INFERENCE_MODE == GRASP.Inference.MARGINAL) {
+                    // marginal inference of ONE or ALL nodes in the tree
+                    int[] bpidxs = null; // put node indices to be inferred in an array...
+                    if (MARG_LABEL != null) { // node label provided, so perform ONE round of inference
+                        // retrieve the branchpoint index for the nominated ancestors
+                        int bpidx = tree.getIndex(MARG_LABEL);
+                        if (bpidx < 0) // did not find it...
+                            usage(5, "Invalid branch point name " + MARG_LABEL);
+                        bpidxs = new int[]{bpidx};
+                    } else { // perform inference for ALL nodes
+                        bpidxs = new int[tree.getSize()];
+                        int i = 0;
+                        for (int bpidx : tree)
+                            bpidxs[i++] = bpidx;
+                    }
+                    Object[][] save = null; // the matrix in which all results are stored, incl the entry-name then the probability distribution (or sample thereof)
+                    BNode example = null;
+                    for (int bpidx : bpidxs) { // find one node which has a distribution to check what kind it is
+                        example = pbn.getExtNode(bpidx);
+                        if (example != null) // found one
+                            break;
+                    }
+                    if (example == null)
+                        throw new RuntimeException("Invalid setting with latent nodes for marginal inference (external nodes not set)");
+                    String[] myheaders = null;
+                    if (pbn.getMasterCPT() == null && pbn.getMasterGDT() != null) { // Gaussian, so real value
+                        myheaders = new String[] {tsv.getHeader(0), tsv.getHeader(1)}; // which means only one value is available (that is the average of multiple samples)
+                    } else if (pbn.getMasterCPT() != null && pbn.getMasterGDT() == null) { // Discrete
+                        Enumerable ed = (Enumerable) example.getVariable().getDomain(); // extract possible values so that we work out what probs/states that are available
+                        myheaders = new String[1 + ed.size()];
+                        myheaders[0] = tsv.getHeader(0);
+                        for (int i = 0; i < ed.size(); i++)
+                            myheaders[1 + i] = ed.get(i).toString(); // header to use for column
+                    } else {
+                        throw new RuntimeException("Invalid setting with latent nodes for marginal inference (type not defined)");
+                    }
+                    save = new Object[bpidxs.length][myheaders.length];
+                    int bpcnt = 0; // count nodes that are inferred (excl those that are null)
+                    for (int bpidx : bpidxs) { // go through all nodes to be inferred
+                        // inference below; first create the inference instance
+                        MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal(bpidx, pbn);
+                        // perform marginal inference
+                        inf.decorate(ti);
+                        // retrieve the distribution at the node previously nominated
+                        Distrib anydistrib = inf.getDecoration(bpidx);
+                        if (anydistrib != null) {
+                            try {
+                                EnumDistrib distrib = (EnumDistrib) anydistrib; // if this cast succeeds, it is a discrete distribution
+                                if (FORMAT_IDX == 2)
+                                    System.out.println(tree.getLabel(bpidx) + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + distrib);
+                                save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                                for (int i = 0; i < distrib.getDomain().size(); i++)
+                                    save[bpcnt][1 + i] = distrib.get(i);
+                            } catch (ClassCastException e) { // Mixture of Gaussians, probably
+                                try {
+                                    double sum = 0;
+                                    for (int i = 0; i < 500; i++)
+                                        sum += (Double) anydistrib.sample();
+                                    if (FORMAT_IDX == 2)
+                                        System.out.println(tree.getLabel(bpidx) + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + sum / 500.0);
+                                    save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                                    save[bpcnt][1] = sum / 500.0;
+                                } catch (ClassCastException ee) {
+                                    if (FORMAT_IDX == 2)
+                                        System.out.println(tree.getLabel(bpidx) + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + anydistrib);
+                                    save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                                    save[bpcnt][1] = anydistrib;
+                                }
+                            }
+                            bpcnt += 1;
+                        } else { // anydistrib == null; this happens when the node is instantiated, so retrieve the value accordingly
+                            Object instance = pbn.getExtNode(bpidx).getInstance();
+                            if (FORMAT_IDX == 2)
+                                System.out.println(tree.getLabel(bpidx) + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + instance);
+                            save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                            save[bpcnt][1] = instance;
+                            bpcnt += 1;
+                        }
+                    }
+                    TSVFile tmptsv = new TSVFile(myheaders, save);
+                    try {
+                        switch (FORMAT_IDX) {
+                            case 0: // TSV
+                                tmptsv.save(OUTPUT); break;
+                            case 1: // TREE
+                                Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
+                            case 3: // ITOL
+                                Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
+                                TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;
+                        }
+                    } catch (IOException e) {
+                        usage(6, "Failed to save output to " + OUTPUT + " using format " + FORMATS[FORMAT_IDX]);
+                    }
+
+                } else if (INFERENCE_MODE == GRASP.Inference.JOINT) {
+                    // joint inference of ALL nodes in the tree
+                    MaxLhoodJoint mlj = new MaxLhoodJoint(pbn);
+                    mlj.decorate(ti);
+                    String[] myheaders = null;
+                    myheaders = new String[] {tsv.getHeader(0), tsv.getHeader(1)};
+                    Object[][] save = new Object[tree.getSize()][myheaders.length];
+                    Map<String, Object> mlvalues = new HashMap<>();
+                    int bpcnt = 0;
+                    for (int bpidx : tree) {
+                        Object d = mlj.getDecoration(bpidx);
+                        if (d != null) {
+                            save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                            save[bpcnt][1] = d;
+                            bpcnt += 1;
+                        }
+                    }
+                    TSVFile tmptsv = new TSVFile(myheaders, save);
+                    try {
+                        switch (FORMAT_IDX) {
+                            case 0: // TSV
+                                tmptsv.save(OUTPUT); break;
+                            case 1: // TREE
+                                Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
+                            case 3: // ITOL
+                                Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
+                                TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;
+                        }
+                    } catch (IOException e) {
+                        usage(6, "Failed to save output to " + OUTPUT + " using format " + FORMATS[FORMAT_IDX]);
+                    }
+
+                }
             }
-        } else {
+        } else { // we can't do anything without an input and a tree
             usage(4, "Both an input-file and a tree-file are required");
         }
     }

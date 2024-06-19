@@ -452,12 +452,14 @@ public class PhyloBN {
                 }
             }
         }
+        if (datidxlist.isEmpty() || varidxlist.isEmpty())
+            throw new RuntimeException("No variables are instantiated when training with EM");
         Object[][] dats = new Object[data.length][datidxlist.size()];
         Variable[] vars = new Variable[varidxlist.size()];
         for (int i = 0; i < varidxlist.size(); i ++) {
             int varidx = varidxlist.get(i);
             int datidx = datidxlist.get(i);
-            vars[i] = bp2ext == null ? bp2node[varidx].getVariable() : bp2ext[varidx].getVariable();
+            vars[i] = bp2ext[varidx] == null ? bp2node[varidx].getVariable() : bp2ext[varidx].getVariable();
             for (int k = 0; k < data.length; k ++)
                 dats[k][i] = data[k][datidx];
         }
