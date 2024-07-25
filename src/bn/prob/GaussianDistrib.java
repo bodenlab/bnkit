@@ -141,13 +141,6 @@ public class GaussianDistrib implements Distrib, Serializable {
         return Double.valueOf(mu + (sigma * Math.sin(2 * Math.PI * V) * Math.sqrt((-2 * Math.log(U)))));
     }
 
-    public Double sampleN(int N) {
-        double sum = 0;
-        for (int i = 0; i < N; i ++)
-            sum += sample();
-        return sum / (double)N;
-    }
-
     public void setMean(double mean) {
         mu = mean;
     }

@@ -669,38 +669,51 @@ public class TSVFile {
      */
     public static String[] NONWHITE_COLORS = {"#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe", "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000", "#aaffc3", "#808000", "#ffd8b1", "#000075", "#808080", "#000000"};
 
+    public static Double getMin(Object[] dblvals) {
+        Double min = null;
+        for (int i = 0; i < dblvals.length; i ++) {
+            if (dblvals[i] == null)
+                continue;
+            if (min == null)
+                min = (Double) dblvals[i];
+            else if (min > (Double) dblvals[i])
+                min = (Double) dblvals[i];
+        }
+        return min;
+    }
+    public static Double getMax(Object[] dblvals) {
+        Double max = null;
+        for (int i = 0; i < dblvals.length; i ++) {
+            if (dblvals[i] == null)
+                continue;
+            if (max == null)
+                max = (Double) dblvals[i];
+            else if (max < (Double) dblvals[i])
+                max = (Double) dblvals[i];
+        }
+        return max;
+    }
+
     public static void save2iTOL(String filename, Object[] items, Object[] values, String dataset_label, int nbins, Double setmin, Double setmax) throws IOException {
+        save2iTOL(filename, items, values, null, dataset_label, nbins, setmin, setmax);
+    }
+
+    public static void save2iTOL(String filename, Object[] items, Object[] values, Object[] confid, String dataset_label, int nbins, Double setmin, Double setmax) throws IOException {
         BufferedWriter bd = new BufferedWriter(new FileWriter(filename));
         bd.write("DATASET_SYMBOL"); bd.newLine();
         bd.write("SEPARATOR SPACE"); bd.newLine();
         bd.write("DATASET_LABEL " + dataset_label); bd.newLine();
         bd.write("COLOR #ffff00"); bd.newLine();
         if (isDouble(values)) { // values are doubles
-            Double max = null, min = null;
+            Double min = null, max = null;
             if (setmin != null)
                 min = setmin;
-            else {
-                for (int i = 0; i < values.length; i ++) {
-                    if (values[i] == null)
-                        continue;
-                    if (min == null)
-                        min = (Double) values[i];
-                    else if (min > (Double) values[i])
-                        min = (Double) values[i];
-                }
-            }
+            else
+                min = getMin(values);
             if (setmax != null)
                 max = setmax;
-            else {
-                for (int i = 0; i < values.length; i ++) {
-                    if (values[i] == null)
-                        continue;
-                    if (max == null)
-                        max = (Double) values[i];
-                    else if (max < (Double) values[i])
-                        max = (Double) values[i];
-                }
-            }
+            else
+                max = getMax(values);
             double binrange = (max - min) / nbins;
             double[] bins = new double[nbins];
             String[] bhex = new String[nbins];
@@ -710,7 +723,30 @@ public class TSVFile {
                 bhex[i] = String.format("#" + "%02x", Math.min(2 * (hexrange * i), 255)) + String.format("%02x", Math.max(2 * (hexrange * i) - 255, 0)) + String.format("%02x", Math.max(0, 255 - hexrange * i));
                 // System.out.println(i +"\t" + bhex[i] + "\t" + bins[i]);
             }
-
+            int[] USE_SIZE = new int[values.length];
+            Arrays.fill(USE_SIZE, DEFAULT_SIZE);
+            if (confid != null) { // there are values for expressing confidence too;
+                if (isDouble(confid)) { // confid values are doubles; presently, standard deviation
+                    Double cmin = null, cmax = null;
+                    cmin = getMin(confid);
+                    cmax = getMax(confid);
+                    double cbinrange = (cmax - cmin) / 3;
+                    double[] cbins = new double[3];
+                    Integer[] cbint = new Integer[3]; // the SIZE to use, e.g. 3, 2 and 1
+                    for (int i = 0; i < 3; i++) {
+                        cbint[i] = Math.min(3, DEFAULT_SIZE) - i;
+                        cbins[i] = cmin + cbinrange / 2 + cbinrange * i; // middle value
+                    }
+                    for (int i = 0; i < confid.length; i++) {
+                        if (confid[i] == null)
+                            USE_SIZE[i] = DEFAULT_SIZE;
+                        else {
+                            int cbin = Math.min(3 - 1, (int) (((Double) confid[i] + cbinrange / 2 - cmin) / cbinrange));
+                            USE_SIZE[i] = cbint[cbin];
+                        }
+                    }
+                }
+            }
             /*
             DATASET_SYMBOL
             SEPARATOR SPACE
@@ -753,7 +789,11 @@ public class TSVFile {
                 if (values[i] == null)
                     continue;
                 int bin = Math.min (nbins - 1, (int) (( (Double) values[i] + binrange / 2 - min) / binrange));
-                bd.write(items[i] + " " + DEFAULT_SHAPE + " " + DEFAULT_SIZE + " " + bhex[bin] + " " + DEFAULT_FILL + " " + DEFAULT_POS); bd.newLine();
+                if (confid != null) {
+                    bd.write(items[i] + " " + DEFAULT_SHAPE + " " + USE_SIZE[i] + " " + bhex[bin] + " " + DEFAULT_FILL + " " + DEFAULT_POS + " " + (confid[i] != null ? String.format("%.3f±%.3f", values[i], confid[i]) : String.format("%.3f", values[i]))); bd.newLine();
+                } else {
+                    bd.write(items[i] + " " + DEFAULT_SHAPE + " " + DEFAULT_SIZE + " " + bhex[bin] + " " + DEFAULT_FILL + " " + DEFAULT_POS + " " + String.format("%.3f", values[i])); bd.newLine();
+                }
             }
         } else { // values are NOT doubles
             Map<Object, String> possible = new HashMap<>();

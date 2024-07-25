@@ -68,6 +68,20 @@ public abstract class SubstModel {
      *                  false if the IRM is the "Q" matrix as often provided in papers
      */
     public SubstModel(double[] F, double[][] IRM, Enumerable alphabet, boolean symmetric) {
+        this(F, IRM, alphabet, symmetric, true);
+    }
+
+    /**
+     * Create evolutionary model.
+     * @param F stationary base frequencies
+     * @param IRM Instantaneous rate matrix
+     * @param alphabet the values that substitutable variables can take, listed strictly in the order of the array and matrix
+     * @param symmetric set to true if the IRM is unscaled and symmetric (Sij == Sji) as per PAML format, or
+     *                  false if the IRM is the "Q" matrix as often provided in papers
+     * @param normalise set to true if the IRM should be normalised
+     *                  (i.e. the sum of each row is zero and the matrix is scaled to one expected substitution per unit time)
+     */
+    public SubstModel(double[] F, double[][] IRM, Enumerable alphabet, boolean symmetric, boolean normalise) {
         if (IRM.length != F.length)
             throw new IllegalArgumentException("Invalid size of either IRM or F");
         if (alphabet.size() != F.length)
@@ -93,7 +107,8 @@ public abstract class SubstModel {
         }
         this.alpha = alphabet;
         SubstModel.makeValid(R);
-        SubstModel.normalize(F, R);
+        if (normalise)
+            SubstModel.normalize(F, R);
         Rexp = new Exp(R);
     }
 

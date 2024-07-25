@@ -12,11 +12,13 @@ import dat.Enumerable;
 import dat.file.Newick;
 import dat.file.TSVFile;
 import dat.file.Utils;
+import dat.phylo.IdxTree;
 import dat.phylo.PhyloBN;
 import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
 import json.JSONException;
 import json.JSONObject;
+import stats.ZScore;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -101,6 +103,8 @@ public class AnnotAceR {
         Long SEED = 1L;
         Integer NSTATES = null; // number of states if continuous; if discrete, the same as the number of used values in the input file
         JSONObject PARAMS = null; // optional parameters as JSON
+        int NBINS = 10; // ITOL save double vals binned in this many
+        int NSAMPLES = 500; // when estimating mean and variance of inferred mixture of Gaussians
 
         for (int a = 0; a < args.length; a ++) {
             if (args[a].startsWith("-")) {
@@ -243,8 +247,11 @@ public class AnnotAceR {
             }
             Object[] ENTRIES_OBJ = tsv.getCol(0);       // entry-names as an array of Object (perhaps a mix of String and Integer, since GRASP uses numeric ancestor IDs)
             String[] ENTRIES = new String[ENTRIES_OBJ.length];      // entry-names as an array of String
-            for (int i = 0; i < ENTRIES.length; i ++)
+            Set<Object> ENTRIES_SET = new HashSet<>();
+            for (int i = 0; i < ENTRIES.length; i ++) {
                 ENTRIES[i] = ENTRIES_OBJ[i].toString();
+                ENTRIES_SET.add(ENTRIES_OBJ[i]);
+            }
             Object[] ENTRY_VALUES = tsv.getCol(valcol, COLPARSER);             // values associated with entries
 
             //
@@ -305,6 +312,9 @@ public class AnnotAceR {
             // We should now have a working model, so check this is the case...
             if (SUBST_MODEL == null)
                 usage(1, "Model " + MODELS[MODEL_IDX] + " could not be created");
+            else if (VERBOSE) {
+                System.out.println(SUBST_MODEL.toJSON());
+            }
             // Other checks...
             if (LEARN && PARAMS_FILE == null)
                 usage(12, "Learning needs to save to a parameter file, which is not specified");
@@ -331,12 +341,16 @@ public class AnnotAceR {
                 MaxLhoodJoint inf = new MaxLhoodJoint(tree, SUBST_MODEL);
                 inf.decorate(ti); // attach states to instantiated nodes and perform (joint) inference (based on model and tree)
                 Object[][] save = new Object[tree.getSize()][2]; // matrix to store all entry-names and their states as values
+                int bpcnt = 0;
                 for (int bpidx : tree) {
-                    Object state = inf.getDecoration(bpidx); // retrieve the already inferred state for the specified node
-                    save[bpidx][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx); // if ancestor attach N-prefix
-                    save[bpidx][1] = state;
-                    if (FORMAT_IDX == 2)
-                        System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + state);
+                    if (!ENTRIES_SET.contains(tree.getLabel(bpidx))) {
+                        Object state = inf.getDecoration(bpidx); // retrieve the already inferred state for the specified node
+                        save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx); // if ancestor attach N-prefix
+                        save[bpcnt][1] = state;
+                        if (FORMAT_IDX == 2)
+                            System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + state);
+                        bpcnt += 1;
+                    }
                 }
                 TSVFile tmptsv = new TSVFile(new String[] {tsv.getHeader(0), tsv.getHeader(valcol)}, save);
                 try {
@@ -359,18 +373,22 @@ public class AnnotAceR {
                  * Need to check nominated ancestor ID or extant name from the commandline (that has been stripped from an optional N-prefix).
                  * (Checks that values are valid and discrete already done.)
                  */
-                int[] bpidxs = null;
+                Integer[] bpidxs = null;
                 if (MARG_LABEL != null) { // node label provided, so perform ONE round of inference
                     // retrieve the branchpoint index for the nominated ancestors
                     int bpidx = tree.getIndex(MARG_LABEL);
                     if (bpidx < 0) // did not find it...
                         usage(5, "Invalid branch point name " + MARG_LABEL);
-                    bpidxs = new int[]{bpidx};
-                } else { // perform inference for ALL nodes
-                    bpidxs = new int[tree.getSize()];
-                    int i = 0;
-                    for (int bpidx : tree)
-                        bpidxs[i++] = bpidx;
+                    bpidxs = new Integer[]{bpidx};
+                } else { // perform inference for ALL nodes, EXCEPT those instantiated
+                    List<Integer> arrlst = new ArrayList<>();
+                    for (int bpidx : tree) {
+                        Object label = tree.getLabel(bpidx);
+                        if (!ENTRIES_SET.contains(label))
+                            arrlst.add(bpidx);
+                    }
+                    bpidxs = new Integer[arrlst.size()];
+                    arrlst.toArray(bpidxs);
                 }
                 Object[][] save = new Object[tree.getSize()][]; // matrix to store all entry-names and their distributions
                 String[] myheaders = null;
@@ -461,18 +479,22 @@ public class AnnotAceR {
                     }
                 } else if (INFERENCE_MODE == GRASP.Inference.MARGINAL) {
                     // marginal inference of ONE or ALL nodes in the tree
-                    int[] bpidxs = null; // put node indices to be inferred in an array...
+                    Integer[] bpidxs = null; // put node indices to be inferred in an array...
                     if (MARG_LABEL != null) { // node label provided, so perform ONE round of inference
                         // retrieve the branchpoint index for the nominated ancestors
                         int bpidx = tree.getIndex(MARG_LABEL);
                         if (bpidx < 0) // did not find it...
                             usage(5, "Invalid branch point name " + MARG_LABEL);
-                        bpidxs = new int[]{bpidx};
-                    } else { // perform inference for ALL nodes
-                        bpidxs = new int[tree.getSize()];
-                        int i = 0;
-                        for (int bpidx : tree)
-                            bpidxs[i++] = bpidx;
+                        bpidxs = new Integer[]{bpidx};
+                    } else { // perform inference for ALL nodes, EXCEPT those instantiated
+                        List<Integer> arrlst = new ArrayList<>();
+                        for (int bpidx : tree) {
+                            Object label = tree.getLabel(bpidx);
+                            if (!ENTRIES_SET.contains(label))
+                                arrlst.add(bpidx);
+                        }
+                        bpidxs = new Integer[arrlst.size()];
+                        arrlst.toArray(bpidxs);
                     }
                     Object[][] save = null; // the matrix in which all results are stored, incl the entry-name then the probability distribution (or sample thereof)
                     BNode example = null;
@@ -485,7 +507,7 @@ public class AnnotAceR {
                         throw new RuntimeException("Invalid setting with latent nodes for marginal inference (external nodes not set)");
                     String[] myheaders = null;
                     if (pbn.getMasterCPT() == null && pbn.getMasterGDT() != null) { // Gaussian, so real value
-                        myheaders = new String[] {tsv.getHeader(0), tsv.getHeader(1)}; // which means only one value is available (that is the average of multiple samples)
+                        myheaders = new String[] {tsv.getHeader(0), tsv.getHeader(1)+" (Mean)", tsv.getHeader(1)+" (SD)"}; // which means only one value is available (that is the average of multiple samples)
                     } else if (pbn.getMasterCPT() != null && pbn.getMasterGDT() == null) { // Discrete
                         Enumerable ed = (Enumerable) example.getVariable().getDomain(); // extract possible values so that we work out what probs/states that are available
                         myheaders = new String[1 + ed.size()];
@@ -508,22 +530,29 @@ public class AnnotAceR {
                             try {
                                 EnumDistrib distrib = (EnumDistrib) anydistrib; // if this cast succeeds, it is a discrete distribution
                                 if (FORMAT_IDX == 2)
-                                    System.out.println(tree.getLabel(bpidx) + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + distrib);
+                                    System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + distrib);
                                 save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                                 for (int i = 0; i < distrib.getDomain().size(); i++)
                                     save[bpcnt][1 + i] = distrib.get(i);
                             } catch (ClassCastException e) { // Mixture of Gaussians, probably
                                 try {
+                                    double[] samples = new double[NSAMPLES];
                                     double sum = 0;
-                                    for (int i = 0; i < 500; i++)
-                                        sum += (Double) anydistrib.sample();
+                                    for (int i = 0; i < NSAMPLES; i++) {
+                                        samples[i] = (Double) anydistrib.sample();
+                                        sum += samples[i];
+                                    }
+                                    GaussianDistrib gd = GaussianDistrib.estimate(samples);
                                     if (FORMAT_IDX == 2)
-                                        System.out.println(tree.getLabel(bpidx) + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + sum / 500.0);
+                                        System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + gd.getMean() + "\t" + Math.sqrt(gd.getVariance()) + "\t" + anydistrib);
                                     save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
-                                    save[bpcnt][1] = sum / 500.0;
+                                    save[bpcnt][1] = gd.getMean();
+                                    save[bpcnt][2] = Math.sqrt(gd.getVariance()); // standard deviation
+//                                    save[bpcnt][2] = anydistrib.get(save[bpcnt][1]); // density at mean of mixture
+//                                    save[bpcnt][2] = gd.get(save[bpcnt][1]); // density at mean of Gaussian
                                 } catch (ClassCastException ee) {
                                     if (FORMAT_IDX == 2)
-                                        System.out.println(tree.getLabel(bpidx) + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + anydistrib);
+                                        System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + anydistrib);
                                     save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                                     save[bpcnt][1] = anydistrib;
                                 }
@@ -532,7 +561,7 @@ public class AnnotAceR {
                         } else { // anydistrib == null; this happens when the node is instantiated, so retrieve the value accordingly
                             Object instance = pbn.getExtNode(bpidx).getInstance();
                             if (FORMAT_IDX == 2)
-                                System.out.println(tree.getLabel(bpidx) + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + instance);
+                                System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + instance);
                             save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                             save[bpcnt][1] = instance;
                             bpcnt += 1;
@@ -544,10 +573,10 @@ public class AnnotAceR {
                             case 0: // TSV
                                 tmptsv.save(OUTPUT); break;
                             case 1: // TREE
-                                Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
+                                Newick.save(tree, OUTPUT, tmptsv.getCol(0), tmptsv.getCol(1)); break;
                             case 3: // ITOL
                                 Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
-                                TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;
+                                TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], matrix[2], tsv.getHeader(valcol), NBINS, TSVFile.getMin(ENTRY_VALUES), TSVFile.getMax(ENTRY_VALUES)); break;
                         }
                     } catch (IOException e) {
                         usage(6, "Failed to save output to " + OUTPUT + " using format " + FORMATS[FORMAT_IDX]);
@@ -563,11 +592,13 @@ public class AnnotAceR {
                     Map<String, Object> mlvalues = new HashMap<>();
                     int bpcnt = 0;
                     for (int bpidx : tree) {
-                        Object d = mlj.getDecoration(bpidx);
-                        if (d != null) {
-                            save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
-                            save[bpcnt][1] = d;
-                            bpcnt += 1;
+                        if (!ENTRIES_SET.contains(tree.getLabel(bpidx))) {
+                            Object d = mlj.getDecoration(bpidx);
+                            if (d != null) {
+                                save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                                save[bpcnt][1] = d;
+                                bpcnt += 1;
+                            }
                         }
                     }
                     TSVFile tmptsv = new TSVFile(myheaders, save);

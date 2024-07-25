@@ -6,10 +6,7 @@ import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Collection of utility methods for operating on data relevant to Newick files, and serving the phylo.Tree class.
@@ -219,6 +216,42 @@ public class Newick {
             if (bp.getID() == null) // if leaf, and label is not set, OR if ancestor and ancestor ID is not set
                 bp.setAncestor(count ++);
         }
+        Set<Integer> ancset1 = new HashSet<>();
+        List<BranchPoint> unnamed = new ArrayList<>();
+        for (BranchPoint bp : all) {
+            Object label = bp.getLabel();
+            if (label != null && bp.isParent()) { // ancestor that has a manually set label
+                try {
+                    String name = (String) label;
+                    if (name.startsWith("N")) {
+                        Integer number = Integer.parseInt(name.substring(1));
+                        if (ancset1.contains(number)) {
+                            throw new RuntimeException("Duplicate ancestor name/number: " + name);
+                        } else {
+                            ancset1.add(number);
+                            bp.setAncestor(number);
+                        }
+                    } else
+                        unnamed.add(bp);
+                } catch (NumberFormatException e1) {
+                    throw new RuntimeException("Invalid ancestor name: " + label + ". Needs to follow N<number> format.");
+                } catch (ClassCastException e2) {
+                    unnamed.add(bp);
+                }
+            } else
+                unnamed.add(bp);
+        }
+        count = 0;
+        for (BranchPoint bp : unnamed) {
+            Integer ancid = bp.getAncestor();
+            if (ancid != null) {
+                while (ancset1.contains(count))
+                    count += 1;
+                ancid = count ++;
+                ancset1.add(ancid);
+                bp.setAncestor(ancid);
+            }
+        }
         Tree t = new Tree(root);
         return t;
     }
@@ -366,6 +399,19 @@ public class Newick {
                 bw.close();
             }
         }
+    }
+
+    public static void save(IdxTree tree, String filename, Object[] names, Object[] values) throws IOException {
+        if (names.length == values.length) { //
+            Object[] instances = new Object[tree.getSize()];
+            for (int i = 0; i < names.length; i ++) {
+                int idx = tree.getIndex(names[i]);
+                if (idx >= 0)
+                    instances[idx] = values[i];
+            }
+            save(tree, filename, instances);
+        } else
+            throw new RuntimeException("Invalid specification of node names and values");
     }
 
 }
