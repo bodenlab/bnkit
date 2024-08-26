@@ -1,7 +1,7 @@
 package stats;
 
 import java.util.Random;
-public class ZeroTruncatedPoisson {
+public class ZeroTruncatedPoisson implements IndelModel {
 
     private double lambda;
     private Random rand = null;

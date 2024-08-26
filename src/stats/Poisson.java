@@ -6,7 +6,7 @@ import java.util.Random;
  * The discrete Poisson distribution
  * Created by mikael on 31/3/17.
  */
-public class Poisson {
+public class Poisson implements IndelModel {
 
     private double lambda;
     private Random rand = null;

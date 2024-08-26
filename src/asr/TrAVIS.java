@@ -13,8 +13,7 @@ import dat.phylo.BranchPoint;
 import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
-import stats.Poisson;
-import stats.ZeroTruncatedPoisson;
+import stats.*;
 
 import java.io.*;
 import java.util.*;
@@ -44,6 +43,7 @@ import java.util.*;
  * Ultimately, tree and alignment files are saved.
  *
  * @author Mikael Boden
+ * @author Chongting Zhao
  */
 public class TrAVIS {
     public static void usage() {
@@ -69,7 +69,7 @@ public class TrAVIS {
                 "\t{-scale <0.2(default)>}\n" +
                 "\t{-indel <1.0(default)>}\n" +
                 "\t{-delprop <0.5(default)>}\n" +
-                "\t{-indelmodel <zero-truncated-poisson(default)|poisson>"+
+                "\t{-indelmodel <ZeroTruncatedPoisson(default)|Poisson|Zipf|PowerLaw|Lavalette>"+
                 "\t{-lambda  <1(default)>}\n"+
                 "\t{-gap}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
@@ -87,9 +87,10 @@ public class TrAVIS {
                 "\tTree is set to have specified extants and gets distances from the Gamma distribution, with parameters:\n\t\tshape (aka a and K)\n\t\tscale (aka b, where Lambda=1/b)\n" +
                 "\tmean distance to root is used to scale distances in the tree (noting that greater number of extants \n\tindirectly amplifies the time scope of the tree).\n" +
                 "\tPosition-specific evolutionary rates from a Gamma distribution with specified parameter \"a\" and mean 1;\n\t if rate is unspecified, a uniform rate 1 is used.\n" +
-                "\tRates for insertions and deletions are scaled by -indel <multiplier> (multiplier > 1 reduces, multiplier < 1 increases chance of indels).\n" +
+                "\tRates for insertions and deletions are scaled by -indel <factor> (factor > 1 reduces, factor < 1 increases chance of indels).\n" +
                 "\tThe proportion of deletions relative to insertions and deletions is given by -delprop <proportion> (proportion < 0.5 means that insertions will dominate.\n" +
-                "\tThe mean rate of occurrence in the Poisson distribution of the indel length by lambda" +
+                "\tThe indel length models for proteins include ZeroTruncatedPoisson, Poisson, Zipf, PowerLaw and Lavalette\n" +
+                "\tThe sole parameter of each indel length model is specified by lambda\n" +
                 "\t~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
         System.exit(error);
     }
@@ -99,7 +100,6 @@ public class TrAVIS {
     static Double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
     static Double LAMBDALENGTH = 1.0;
     static int IN_MODEL_IDX = 0;
-    static String[] INDELMODELS = new String[]{"ZEROTRUNCATEDPOISSON", "POISSON"};
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
@@ -115,7 +115,8 @@ public class TrAVIS {
         int DESCENDANTS_MAX = 2, DESCENDANTS_MIN = 2; // Max and min of tree branching
 
         String[] MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
-        int MODEL_IDX = 0; // default model is that above indexed 0
+        int MODEL_IDX = 0; // default model is that above indexed
+        String[] INDELMODELS = new String[]{"ZeroTruncatedPoisson", "Poisson","Zipf","PowerLaw","Lavalette"};
         SubstModel MODEL = null;
         // Alphabet is decided by MODEL_IDX
         Enumerable[] ALPHAS = new Enumerable[]{Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
@@ -372,11 +373,9 @@ public class TrAVIS {
     static class TrackTree {
 
         Enumerable myType = null;
-        Poisson poisson = null;
         GammaDistrib gamma = null;
 
-        ZeroTruncatedPoisson zeroTruncatedPoisson = null;
-        Poisson poisson2 = null;
+        IndelModel indelmodel = null;
 
         public final Tree tree;
         private final TreeInstance ti_seqs;
@@ -399,11 +398,13 @@ public class TrAVIS {
         public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma) {
             USERATES = (ratesgamma >= 0); // check if we will generate position specific rates; if not, use a constant rate 1
             rand = new Random(SEED);
-            poisson = new Poisson(1.0, SEED); // lambda = 1
-            switch (IN_MODEL_IDX) {
-                case 0 : zeroTruncatedPoisson  = new ZeroTruncatedPoisson(LAMBDALENGTH,SEED); break;
-                case 1 : poisson2  = new Poisson(1.0, SEED); break;
-                default : throw new IllegalArgumentException("Invalid model index");
+            switch (IN_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"
+                case 0 -> indelmodel  = new ZeroTruncatedPoisson(LAMBDALENGTH,SEED);
+                case 1 -> indelmodel  = new Poisson(LAMBDALENGTH, SEED);
+                case 2 -> indelmodel  = new Zipf(LAMBDALENGTH,SEED,1000);
+                case 3 -> indelmodel  = new PowerLaw(LAMBDALENGTH,SEED,1000);
+                case 4 -> indelmodel  = new Lavalette(LAMBDALENGTH,SEED,1000);
+                default -> throw new IllegalArgumentException("Invalid model index");
             }
 
             if (USERATES) {
@@ -468,11 +469,7 @@ public class TrAVIS {
 
                             if (toss2 < TrAVIS.DELETIONPROP) { // 2. deletion with prob q = (1 - p)/2, so consider length of deletion
                                 int k;
-                                if (IN_MODEL_IDX == 0) { // length, can only delete what is left of the sequence
-                                    k = Math.min(zeroTruncatedPoisson.sample(), parseq.length - i);
-                                } else {
-                                    k = Math.min(poisson2.sample(), parseq.length - i); // length select from poisson or zeroTruncatedPoisson
-                                }
+                                k = Math.min(indelmodel.sample(), parseq.length - i);// length, can only delete what is left of the sequence
                                 deletions[idx][i] = k;  // deletions skip characters in the parent
                                 i += k;
                             } else { // 3. insertion with prob q = (1 - p)/2, so consider length of insertion
@@ -480,11 +477,7 @@ public class TrAVIS {
                                 // so to avoid introducing a bias for LONGER EXTANTS,
                                 // we place it at either end with a uniform coin toss
                                 int k;
-                                if (IN_MODEL_IDX == 0) { // length, can only delete what is left of the sequence
-                                    k = zeroTruncatedPoisson.sample(); // length, consider power-law distribution??
-                                } else {
-                                    k = poisson2.sample(); // length select from poisson or zeroTruncatedPoisson
-                                }
+                                k = indelmodel.sample(); // length, can only delete what is left of the sequence
                                 insertions[idx][i == 0 ? (rand.nextBoolean() ? 0 : parseq.length) : i] += k; // insertions can be on top of another
                                 for (int j = 0; j < k; j ++) {
                                     Object nchar = null;
