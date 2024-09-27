@@ -55,9 +55,8 @@ public class Lavalette implements IndelModel {
     }
 
     public static void main(String[] args) {
-        // 示例：使用不同的 a 和 maxK 值
         for (double a = 1.0; a < 5.5; a += 0.5) {
-            Lavalette lavalette = new Lavalette(a, 1, 1000); // 设置 maxK 为 1000
+            Lavalette lavalette = new Lavalette(a, 0, 100);
             System.out.println("a = " + a);
             int[] cnt = new int[lavalette.maxK + 1];
             for (int i = 0; i < 1000; i++) {

@@ -67,9 +67,9 @@ public class TrAVIS {
                 "\t{-dist <mean-extant-to-root>\n" +
                 "\t{-shape <1.1(default)>}\n" +
                 "\t{-scale <0.2(default)>}\n" +
-                "\t{-indel <1.0(default)>}\n" +
+                "\t{-indel <2.0(default)>}\n" +
                 "\t{-delprop <0.5(default)>}\n" +
-                "\t{-indelmodel <ZeroTruncatedPoisson(default)|Poisson|Zipf|PowerLaw|Lavalette>"+
+                "\t{-indelmodel <ZeroTruncatedPoisson(default)|Poisson|Zipf|Lavalette>"+
                 "\t{-lambda  <1(default)>}\n"+
                 "\t{-gap}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
@@ -89,8 +89,8 @@ public class TrAVIS {
                 "\tPosition-specific evolutionary rates from a Gamma distribution with specified parameter \"a\" and mean 1;\n\t if rate is unspecified, a uniform rate 1 is used.\n" +
                 "\tRates for insertions and deletions are scaled by -indel <factor> (factor > 1 reduces, factor < 1 increases chance of indels).\n" +
                 "\tThe proportion of deletions relative to insertions and deletions is given by -delprop <proportion> (proportion < 0.5 means that insertions will dominate.\n" +
-                "\tThe indel length models for proteins include ZeroTruncatedPoisson, Poisson, Zipf, PowerLaw and Lavalette\n" +
-                "\tThe sole parameter of each indel length model is specified by lambda\n" +
+                "\tThe indel length models for proteins include ZeroTruncatedPoisson, Poisson, Zipf and Lavalette\n" +
+                "\tThe parameter of the indel length model controlled by lambda\n" +
                 "\t~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
         System.exit(error);
     }
@@ -116,7 +116,7 @@ public class TrAVIS {
 
         String[] MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
         int MODEL_IDX = 0; // default model is that above indexed
-        String[] INDELMODELS = new String[]{"ZeroTruncatedPoisson", "Poisson","Zipf","PowerLaw","Lavalette"};
+        String[] INDELMODELS = new String[]{"ZeroTruncatedPoisson", "Poisson", "Zipf", "Lavalette"};
         SubstModel MODEL = null;
         // Alphabet is decided by MODEL_IDX
         Enumerable[] ALPHAS = new Enumerable[]{Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
@@ -401,9 +401,8 @@ public class TrAVIS {
             switch (IN_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"
                 case 0 -> indelmodel  = new ZeroTruncatedPoisson(LAMBDALENGTH,SEED);
                 case 1 -> indelmodel  = new Poisson(LAMBDALENGTH, SEED);
-                case 2 -> indelmodel  = new Zipf(LAMBDALENGTH,SEED,1000);
-                case 3 -> indelmodel  = new PowerLaw(LAMBDALENGTH,SEED,1000);
-                case 4 -> indelmodel  = new Lavalette(LAMBDALENGTH,SEED,1000);
+                case 2 -> indelmodel  = new Zipf(LAMBDALENGTH,SEED,100);
+                case 3 -> indelmodel  = new Lavalette(LAMBDALENGTH,SEED,100);
                 default -> throw new IllegalArgumentException("Invalid model index");
             }
 
@@ -411,6 +410,7 @@ public class TrAVIS {
                 gamma = new GammaDistrib(ratesgamma, ratesgamma); // mean is a/b so setting b=a
                 gamma.setSeed(SEED);
             }
+            double fixed_rate = USERATES ? gamma.sample() : 1;
             myType = ancseq.getType();
             this.tree = tree;
             int[][] deletions  = new int[tree.getSize()][];
@@ -425,11 +425,13 @@ public class TrAVIS {
                         rates[0] = new double[ancseq.length()];
                         for (int i = 0; i < ancseq.length(); i++)
                             rates[0][i] = USERATES ? gamma.sample() : 1;
+                            //rates[0][i] =  fixed_rate;
                     }
                 } else { // branchpoint has parents, all of which have been instantiated (iterator order ensures this, starting with branchpoint idx 0)
                     int paridx = tree.getParent(idx);           // idx of parent
                     Object[] parseq = bpseqs[paridx].get();     // sequence of parent
                     double t = tree.getDistance(idx);           // distance from parent to child
+                    //double t = tree.getDistance(1);
                     insertions[idx] = new int[parseq.length+1]; // insertions at this branchpoint relative to parent indices; note that insertions can happen before or after a sequence
                     deletions[idx] = new int[parseq.length];    // deletions at this branchpoint relative to parent indices
                     rates[idx] = new double[parseq.length];     // rates at this branchpoint relative to parent indices; note that insertion rate for before and after is shared
@@ -440,9 +442,9 @@ public class TrAVIS {
                     List<Double> tailrates = new ArrayList<>(); // collect character rates for the tail of the child; intended for tailing insertions
                     // note: we don't yet know how many indices are required for child so use list before moving to array
                     int i = 0;                                  // idx for parent position
+                    double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
                     while (i < parseq.length) {                 // move through the child by incrementing the idx in the parent
                         // three possibilities: 1. match and potential substitution, 2. deletion/s, and 3. insertion/s
-                        double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
                         double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
 
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
