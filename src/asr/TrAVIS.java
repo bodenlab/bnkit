@@ -67,7 +67,7 @@ public class TrAVIS {
                 "\t{-dist <mean-extant-to-root>\n" +
                 "\t{-shape <1.1(default)>}\n" +
                 "\t{-scale <0.2(default)>}\n" +
-                "\t{-indel <2.0(default)>}\n" +
+                "\t{-indel <1.0(default)>}\n" +
                 "\t{-delprop <0.5(default)>}\n" +
                 "\t{-indelmodel <ZeroTruncatedPoisson(default)|Poisson|Zipf|Lavalette>"+
                 "\t{-lambda  <1(default)>}\n"+
