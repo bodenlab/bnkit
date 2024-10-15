@@ -22,6 +22,10 @@ public class Zipf implements IndelModel {
         this.maxK = maxK;
     }
 
+    public String toString() {
+        return "Zipf(lambda=" + s + ", seed=" + seed + ", maxK=" + maxK + ")";
+    }
+
     /**
      * Probability mass function (PMF)
      *

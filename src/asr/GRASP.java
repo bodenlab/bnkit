@@ -2,21 +2,24 @@ package asr;
 
 import bn.ctmc.SubstModel;
 import bn.prob.EnumDistrib;
+import bn.prob.GammaDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.*;
+import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.pog.IdxGraph;
 import dat.pog.POAGraph;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import json.JSONObject;
+import stats.IndelModel;
+import stats.Lavalette;
+import stats.Poisson;
+import stats.Zipf;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -27,7 +30,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "27-Sep-2024";
+    public static String VERSION = "15-Oct-2024";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -66,7 +69,7 @@ public class GRASP {
                 "\t{--nogap}\n" +
                 "\t{--nonibble}\n" +
                 "\t{--exclude-noedge}\n" +
-                "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES)\n" +
+                "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES TrAVIS)\n" +
                 "\t{--save-all} (saves reconstruction with ALL formats)\n" +
                 "\t{--save-tree} (bypasses inference and re-saves the tree with ancestor nodes labelled as per GRASP's\n\tdepth-first labelling scheme starting with N0)\n" +
                 "\t{--save-poag { <branchpoint-id> } (bypasses inference and saves the input alignment as a POAG\n\t(partial order alignment graph of extant sequences under specified ancestor [default N0])\n" +
@@ -103,7 +106,8 @@ public class GRASP {
                 "\tDISTRIB: character distributions for each position (indexed by POG, only available for marginal reconstruction)\n" +
                 "\tASR: complete reconstruction as JSON, incl. POGs of ancestors and extants, and tree (ASR.json)\n" +
                 "\tDOT: partial-order graphs of ancestors in DOT format\n" +
-                "\tTREES: position-specific trees with ancestor states labelled\n");
+                "\tTREES: position-specific trees with ancestor states labelled\n" +
+                "\tTrAVIS: Produce a report for reconstruction\n");
         out.println("Indel-methods: \n" +
                 "\tBEP: bi-directional edge (maximum) parsimony\n" +
                 "\tBEML: bi-directional edge maximum likelihood (uses uniform evolutionary model akin to JC)\n" +
@@ -154,11 +158,11 @@ public class GRASP {
         // output formats
         boolean SAVE_AS = false;
         boolean INCLUDE_EXTANTS = false;
-        String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "MATLAB", "LATEX", "POAG"};
+        String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "MATLAB", "LATEX", "POAG", "TrAVIS"};
         // select these, default for "joint reconstruction"
         boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
         // select to compute consensus path for these output formats
-        boolean[] CONSENSUS = new boolean[]  {true,    false,     true,      false,  false, false, false,   false,    false,   false  };
+        boolean[] CONSENSUS = new boolean[]  {true,    false,     true,      false,  false, false, false,   false,    false,   false,  true  };
         // default inference mode
         Inference MODE = Inference.JOINT;
         // ancestor to reconstruct if inference mode is "marginal"
@@ -361,6 +365,7 @@ public class GRASP {
         Prediction indelpred = null;
         EnumSeq.Alignment aln = null;
         Tree tree = null;
+        POGTree pogtree = null;
 
         try {
             if (INPUT != null) {
@@ -384,7 +389,7 @@ public class GRASP {
 
         if (!BYPASS && indelpred == null) {
             // if we are past the above, we can assume that the data are good to process
-            POGTree pogtree = new POGTree(aln, tree);
+            pogtree = new POGTree(aln, tree);
             switch (INDEL_IDX) {
                 case 0:
                     indelpred = Prediction.PredictByBidirEdgeParsimony(pogtree);
@@ -473,7 +478,7 @@ public class GRASP {
             for (int i = 0; i < SAVE_AS_IDX.length; i++) {
                 if (!SAVE_AS_IDX[i])
                     continue;
-                switch (i) { // {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX"};
+                switch (i) { // {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX", "POAG", "TRAVIS"};
                     case 0: // FASTA
                         if (!BYPASS && MODE != null) {
                             FastaWriter fw = null;
@@ -606,11 +611,118 @@ public class GRASP {
                             poag.saveToDOT(OUTPUT + "/" + PREFIX + "_POAGunderN" + MARG_NODE + ".dot");
                         }
                         break;
+
+                    case 10: // TrAVIS
+                        if (!BYPASS) {
+                            if (MODE == Inference.JOINT) {
+                                IdxTree mytree = indelpred.getTree();
+                                Set<Double> dists = new HashSet<>();
+                                Map <String, Integer> extmap = aln.getMap();
+                                String[] names = aln.getNames();
+                                int[] ins_total = new int[0];
+                                int[] del_total = new int[0];
+                                for (int idx : mytree) {
+                                    int parent = mytree.getParent(idx);
+                                    if (parent != -1) { // not root
+                                        dists.add(mytree.getDistance(idx));
+                                        Object[] pseq = ancseqs_gappy[(Integer)mytree.getLabel(parent)];
+                                        Object[] cseq = null;
+                                        if (mytree.isLeaf(idx)) {
+                                            EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(idx)));
+                                            cseq = seq.get();
+                                        } else {
+                                            ;
+                                            cseq = ancseqs_gappy[(Integer)mytree.getLabel(idx)];
+                                        }
+                                        int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
+                                        int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
+                                        int[] ins_tmp = new int[Math.max(insertions.length, ins_total.length)];
+                                        for (int j = 0; j < ins_tmp.length; j++) {
+                                            ins_tmp[j] += j < insertions.length ? insertions[j] : 0;
+                                            ins_tmp[j] += j < ins_total.length ? ins_total[j] : 0;
+                                        }
+                                        ins_total = ins_tmp;
+                                        int[] del_tmp = new int[Math.max(deletions.length, del_total.length)];
+                                        for (int j = 0; j < del_tmp.length; j++) {
+                                            del_tmp[j] += j < deletions.length ? deletions[j] : 0;
+                                            del_tmp[j] += j < del_total.length ? del_total[j] : 0;
+                                        }
+                                        del_total = del_tmp;
+                                    }
+                                }
+                                int[] indel_total = new int[Math.max(ins_total.length, del_total.length)];
+                                for (int j = 0; j < indel_total.length; j++) {
+                                    indel_total[j] += j < ins_total.length ? ins_total[j] : 0;
+                                    indel_total[j] += j < del_total.length ? del_total[j] : 0;
+                                }
+                                // Now we can fit the indel distribution to the lengths of insertions and deletions
+                                // ...
+                                System.out.println("Indels\tInsertions\tDeletions");
+                                System.out.println("Len\tCnt\tCnt\tCnt");
+                                for (int j = 0; j < indel_total.length; j ++) {
+                                    System.out.println((j + 1) + "\t" + indel_total[j] + "\t" + (j < ins_total.length ? ins_total[j] : 0) + "\t" + (j < del_total.length ? del_total[j] : 0));
+                                }
+                                /*
+                                Zipf        1, 2, 5, 15
+                                Lavalette   1, 2, 5, 15
+                                Poisson     0.01, 0.1, 1, 2
+                                 */
+                                int SEED = 1;
+                                IndelModel[] indelmodels = new IndelModel[] {
+                                        new Zipf(1, SEED, 100),
+                                        new Zipf(2, SEED, 100),
+                                        new Zipf(5, SEED, 100),
+                                        new Zipf(15, SEED, 100),
+                                        new Lavalette(1, SEED, 100),
+                                        new Lavalette(2, SEED, 100),
+                                        new Lavalette(5, SEED, 100),
+                                        new Lavalette(15, SEED, 100),
+                                        new Poisson(0.01, SEED),
+                                        new Poisson(0.1, SEED),
+                                        new Poisson(1.0, SEED),
+                                        new Poisson(2.0, SEED)
+                                };
+                                IndelModel bestsofar = null;
+                                double bestscore = 0;
+                                for (IndelModel model : indelmodels) {
+                                    double sum = 0;
+                                    for (int j = 0; j < indel_total.length; j ++) {
+                                        sum += model.p(j + 1) * indel_total[j];
+                                    }
+                                    if (sum > bestscore) {
+                                        bestsofar = model;
+                                        bestscore = sum;
+                                    }
+                                    System.out.println("\t" + model.toString() + " at p= " +sum);
+                                }
+                                System.out.println("Best model: " + bestsofar.toString() + " at p= " +bestscore);
+                                //
+                                double[] dists_arr = new double[dists.size()];
+                                int k = 0;
+                                for (double d : dists)
+                                    dists_arr[k ++] = d;
+                                double alpha = GammaDistrib.getAlpha(dists_arr);
+                                double beta = GammaDistrib.getBeta(dists_arr, alpha);
+                                System.out.println("Gamma alpha= " + alpha + " beta= " + beta);
+                                StringBuilder n0 = new StringBuilder();
+                                for (int j = 0; j < ancseqs_nogap[0].length; j++)
+                                    n0.append(ancseqs_nogap[0][j]);
+                                System.out.println("N0= " + n0.toString());
+                                if (RATES != null) {
+                                    double rates_alpha = GammaDistrib.getAlpha(RATES);
+                                    double rates_beta = GammaDistrib.getBeta(RATES, rates_alpha);
+                                    System.out.println("Rates alpha= " + rates_alpha + " beta= " + rates_beta);
+                                }
+                            } else if (MODE == Inference.MARGINAL)
+                                usage(23, "TrAVIS reports must be based on joint reconstructions");
+                        }
+                        break;
+
                 }
                 ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
                 if (VERBOSE || TIME) {
-                    System.out.println(String.format("Done in %d min, %d sec", TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME),
-                            TimeUnit.MILLISECONDS.toSeconds(ELAPSED_TIME) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME))));
+                    System.out.printf("Done in %d min, %d sec%n", TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME),
+                            TimeUnit.MILLISECONDS.toSeconds(ELAPSED_TIME) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME)));
                 }
             }
         } catch (ASRException e) {

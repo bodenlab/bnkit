@@ -57,10 +57,12 @@ public class TrAVIS {
         if (msg != null)
             out.println(msg + " (Error " + error + ")");
         out.println("Usage: asr.TrAVIS \n" +
-                "\t[<ancestor-seq>]\n" +
+                "\t[-n0 <ancestor-seq>]\n" +
                 "\t[-nwk <tree-file> -out <output-file-or-dir>]\n" +
+                "\t{-rf <rates-file>}\n" +
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
-                "\t{-load}\n" +
+                "\t{--recon <tree-file> <alignment-file>}\n" +
+                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
                 "\t{-rates <a>}\n" +
                 "\t{-seed <random>}\n" +
                 "\t{-extants <5(default)>}\n" +
@@ -103,11 +105,13 @@ public class TrAVIS {
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
-        String NEWICK = null;
+        String OUTPUTTREE = null;
+        String INPUTTREE = null; // if reconstruction is requested
+        String INPUTALN = null; // if reconstruction is requested
         String OUTPUT = null;
         Double RATESGAMMA = null;
         Double SCALEDIST = null;
-        boolean LOADTREE = true;
+        boolean LOADTREE = false;
         long SEED = System.currentTimeMillis();
         int EXTANTS_N = 5;
         double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
@@ -124,6 +128,8 @@ public class TrAVIS {
         boolean GAPPY = false;
         String[] FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "DIR", "RATES"};
         int FORMAT_IDX = 0;
+        String[] INDEL_METHODS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
+        int INDEL_IDX = 0; // default indel approach is that above indexed 0
 
         for (int a = 0; a < args.length; a++) {
             if (!args[a].startsWith("-") && ANCSEQ == null) { // ancestor sequence
@@ -131,7 +137,7 @@ public class TrAVIS {
             } else if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
                 if (arg.equalsIgnoreCase("nwk") && args.length > a + 1) {
-                    NEWICK = args[++a];
+                    OUTPUTTREE = args[++a];
                 } else if (arg.equalsIgnoreCase("out") && args.length > a + 1) {
                     OUTPUT = args[++a];
                 } else if (arg.equalsIgnoreCase("rates") && args.length > a + 1) {
@@ -162,6 +168,19 @@ public class TrAVIS {
                     }
                     if (!found_model)
                         usage(1, args[a + 1] + " is not a valid model name");
+                } else if (arg.equalsIgnoreCase("-recon") && args.length > a + 2) {
+                    INPUTTREE = args[++a];
+                    INPUTALN = args[++a];
+                } else if (arg.equalsIgnoreCase("-indel-method") && args.length > a + 1) {
+                    boolean found_indel = false;
+                    for (int i = 0; i < INDEL_METHODS.length; i++) {
+                        if (args[a + 1].startsWith(INDEL_METHODS[i])) {
+                            INDEL_IDX = i;
+                            found_indel = true;
+                        }
+                    }
+                    if (!found_indel)
+                        usage(3, args[a + 1] + " is not a valid indel approach for option --indel-method");
                 } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
                     SCALEINDEL = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
@@ -244,9 +263,9 @@ public class TrAVIS {
 
         /* Load or create a tree */
         Tree tree = null;
-        if (LOADTREE && NEWICK != null) {
+        if (LOADTREE && OUTPUTTREE != null) {
             try {
-                tree = Newick.load(NEWICK);
+                tree = Newick.load(OUTPUTTREE);
             } catch (IOException e) {
             }
         }
@@ -254,9 +273,9 @@ public class TrAVIS {
             tree = Tree.Random(EXTANTS_N, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, DESCENDANTS_MAX, DESCENDANTS_MIN);
             if (SCALEDIST != null)
                 tree.adjustDistances(SCALEDIST);
-            if (NEWICK != null) {
+            if (OUTPUTTREE != null) {
                 try {
-                    tree.save(NEWICK, "nwk");
+                    tree.save(OUTPUTTREE, "nwk");
                 } catch (IOException e) {
                     usage(2, "Tree file could not be saved");
                 }
@@ -359,6 +378,111 @@ public class TrAVIS {
             }
         }
     }
+
+    /**
+     * Calculates the counts of insertions between two sequences.
+     *
+     * This method compares two sequences and determines the number of insertions
+     * at each position. It returns an array where the index represents the length
+     * of the insertion and the value at that index represents the count of such
+     * insertions.
+     *
+     * @param seq1 the first sequence to compare (parent sequence)
+     * @param seq2 the second sequence to compare (child sequence)
+     * @return an array where the index represents the length of the insertion and
+     *         the value at that index represents the count of such insertions, or
+     *         null if the sequences are of different lengths
+     */
+    static int[] getInsertionCounts(Object[] seq1, Object[] seq2) {
+        if (seq1.length != seq2.length)
+            return null;
+        Map<Integer, Integer> ins = new HashMap<>(); // map with insert length as key and count as value
+        boolean seq2ins = false;
+        int seq2cnt = 0;
+        for (int i = 0; i < seq1.length; i++) {
+            if (seq1[i] == null && seq2[i] == null)
+                continue;
+            if (seq1[i] == null && seq2[i] != null) {
+                seq2cnt++;
+                seq2ins = true;
+            } else {
+                if (seq2ins) {
+                    if (ins.containsKey(seq2cnt))
+                        ins.put(seq2cnt, ins.get(seq2cnt) + 1);
+                    else
+                        ins.put(seq2cnt, 1);
+                    seq2ins = false;
+                    seq2cnt = 0;
+                }
+            }
+        }
+        int max = 0;
+        for (int cnt : ins.keySet()) {
+            if (cnt > max)
+                max = cnt;
+        }
+        int[] ret = new int[max];
+        for (int i = 0; i < max; i++) {
+            if (ins.containsKey(i + 1))
+                ret[i] = ins.get(i + 1);
+            else
+                ret[i] = 0;
+        }
+        return ret;
+    }
+
+    /**
+     * Calculates the counts of deletions between two sequences.
+     *
+     * This method compares two sequences and determines the number of deletions
+     * at each position. It returns an array where the index represents the length
+     * of the deletion and the value at that index represents the count of such
+     * deletions.
+     *
+     * @param seq1 the first sequence to compare (parent sequence)
+     * @param seq2 the second sequence to compare (child sequence)
+     * @return an array where the index represents the length of the deletion and
+     *         the value at that index represents the count of such deletions, or
+     *         null if the sequences are of different lengths
+     */
+    static int[] getDeletionCounts(Object[] seq1, Object[] seq2) {
+        if (seq1.length != seq2.length)
+            return null;
+        Map<Integer, Integer> del = new HashMap<>(); // map with insert length as key and count as value
+        boolean seq2del = false;
+        int seq2len = 0; // length of current deletion
+        for (int i = 0; i < seq1.length; i++) {
+            if (seq1[i] == null && seq2[i] == null) // both parent and child are gaps, so nothing changes
+                continue;
+            if (seq2[i] == null && seq1[i] != null) { // parent has content, but child has gap so start/continue deletion
+                seq2len ++;
+                seq2del = true; // start/continue current deletion
+            } else { // parent is gap, child has content, or both have content; either way, we're ending deletion (if current)
+                if (seq2del) {
+                    if (del.containsKey(seq2len))
+                        del.put(seq2len, del.get(seq2len) + 1);
+                    else
+                        del.put(seq2len, 1);
+                    seq2del = false;
+                    seq2len = 0;
+                }
+            }
+        }
+        int max = 0;
+        for (int cnt : del.keySet()) {
+            if (cnt > max)
+                max = cnt;
+        }
+        int[] ret = new int[max];
+        for (int i = 0; i < max; i++) {
+            if (del.containsKey(i + 1))
+                ret[i] = del.get(i + 1);
+            else
+                ret[i] = 0;
+        }
+        return ret;
+    }
+
 
     /**
      * Class to track ancestor sequence to extants via intermediate ancestors.

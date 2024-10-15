@@ -15,6 +15,9 @@ public class Lavalette implements IndelModel {
         this.rand = new Random(seed);
     }
 
+    public String toString() {
+        return "Lavalette(lambda=" + a + ", seed=" + seed + ", maxK=" + maxK + ")";
+    }
     // Probability mass function (PMF) for Lavalette distribution
     public double p(int r) {
         return Math.pow(maxK + 1 - r, a) * Math.pow(r, -a) / lavaletteZeta();

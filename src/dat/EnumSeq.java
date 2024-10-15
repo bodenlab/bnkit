@@ -27,10 +27,7 @@ import json.JSONString;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.Buffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 /**
  *
@@ -502,6 +499,16 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
             return names;
         }
 
+
+        public Map<String, Integer> getMap() {
+            Map<String, Integer> map = new HashMap<>();
+            for (int i = 0; i < seqs.size(); i++) {
+                EnumSeq.Gappy<E> seq = seqs.get(i);
+                map.put(seq.getName(), i);
+            }
+            return map;
+        }
+
         /**
          * Get the column of enumerable values for a given column, indexed from 0 up to alignment width - 1.
          * @param col column
@@ -563,6 +570,14 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
                 return count;
             }
             return 0;
+        }
+
+        public int getIndex(Object label) {
+            for (int i = 0; i < seqs.size(); i++) {
+                if (seqs.get(i).getName().equals(label))
+                    return i;
+            }
+            return -1;
         }
     }
     

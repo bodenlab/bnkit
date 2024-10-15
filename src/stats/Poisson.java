@@ -33,6 +33,10 @@ public class Poisson implements IndelModel {
         this.seed = seed;
     }
 
+    public String toString() {
+        return "Poisson(lambda=" + lambda + ", seed=" + seed + ")";
+    }
+
     /**
      * The probability mass function
      * @param k the number of events in the interval
