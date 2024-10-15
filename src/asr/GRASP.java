@@ -683,11 +683,11 @@ public class GRASP {
                                         new Poisson(2.0, SEED)
                                 };
                                 IndelModel bestsofar = null;
-                                double bestscore = 0;
+                                double bestscore = Double.NEGATIVE_INFINITY;
                                 for (IndelModel model : indelmodels) {
                                     double sum = 0;
                                     for (int j = 0; j < indel_total.length; j ++) {
-                                        sum += model.p(j + 1) * indel_total[j];
+                                        sum += Math.log(model.p(j + 1)+0.0001 * indel_total[j]);
                                     }
                                     if (sum > bestscore) {
                                         bestsofar = model;
