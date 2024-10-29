@@ -21,4 +21,10 @@ public interface IndelModel {
      */
     double cdf(int k);
 
+    /**
+     * Returns a string representation of the distribution as it should be specified on the TrAVIS command line
+     * @return the text string
+     */
+    String getTrAVIS();
+
 }

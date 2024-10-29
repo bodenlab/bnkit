@@ -26,6 +26,11 @@ public class Zipf implements IndelModel {
         return "Zipf(lambda=" + s + ", seed=" + seed + ", maxK=" + maxK + ")";
     }
 
+    @Override
+    public String getTrAVIS() {
+        return "Zipf " + s;
+    }
+
     /**
      * Probability mass function (PMF)
      *

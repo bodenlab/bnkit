@@ -57,6 +57,11 @@ public class Lavalette implements IndelModel {
         return sum;
     }
 
+    @Override
+    public String getTrAVIS() {
+        return "Lavalette " + a;
+    }
+
     public static void main(String[] args) {
         for (double a = 1.0; a < 5.5; a += 0.5) {
             Lavalette lavalette = new Lavalette(a, 0, 100);

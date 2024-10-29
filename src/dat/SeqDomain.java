@@ -103,7 +103,43 @@ public class SeqDomain<E extends Domain> implements Domain {
         System.out.println(seq.isValid(new Character[] {'A','A','A','G','G','Q','T','C','C','C','A','C','T'}));
         
     }
-    
+
+    /**
+     * Count the number of null elements in the sequence.
+     *
+     * @return the number of null elements in the sequence
+     */
+    public int getNNulls() {
+        int cnt = 0;
+        for (int i = 0; i < arr.length; i ++) {
+            if (arr[i] == null)
+                cnt += 1;
+        }
+        return cnt;
+    }
+
+    /**
+     * Counts the number of null sequences that start in the array.
+     *
+     * This method iterates through the array and counts the number of times
+     * a null sequence starts. A null sequence is considered started when a
+     * null element is encountered.
+     *
+     * @return the number of null sequences that start in the array
+     */
+    public int getNNullStarts() {
+        int cnt = 0;
+        boolean inGap = false;
+        for (int i = 0; i < arr.length; i ++) {
+            if (arr[i] == null && !inGap) {
+                cnt += 1;
+                inGap = true;
+            } else
+                inGap = false;
+        }
+        return cnt;
+    }
+
     public String toString() {
         StringBuilder sb = new StringBuilder();
         for (Object val : get())

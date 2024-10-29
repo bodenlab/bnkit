@@ -28,6 +28,16 @@ public class ZeroTruncatedPoisson implements IndelModel {
         this.seed = seed;
     }
 
+    public String toString() {
+        return "ZeroTruncatedPoisson(lambda=" + lambda + ", seed=" + seed + ")";
+    }
+
+    @Override
+    public String getTrAVIS() {
+        return "ZeroTruncatedPoisson " + lambda;
+    }
+
+
     /**
      * The probability mass function
      * @param k the number of events in the interval

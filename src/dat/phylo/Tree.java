@@ -189,7 +189,7 @@ public class Tree extends IdxTree {
         throw new TreeRuntimeException("Could not create tree: invalid input");
     }
 
-    public static void main(String[] args) {
+    public static void main0(String[] args) {
         Tree phyloTree = Newick.parse("((A:0.6,((B:3.3,(C:1.0,D:2.5)cd:1.8)bcd:5,((E:3.9,F:4.5)ef:2.5,G:0.3)efg:7)X:3.2)Y:0.5,H:1.1)I:0.2");
         System.out.println(phyloTree.root);
         phyloTree.setInternalLabels();
@@ -206,6 +206,128 @@ public class Tree extends IdxTree {
         }
     }
 
+    private static void usage() {
+        usage(0, null);
+    }
+    private static void usage(int errno, String errmsg) {
+        if (errmsg != null && errno > 0)
+            System.err.println("Error " + errno + ": " + errmsg);
+        System.out.println("Usage: phylotree [options]");
+        System.out.println("Options:");
+        System.out.println("  -l, --load <String>>      Specify the file name");
+        System.out.println("  -a, --alpha <Double>      Specify the alpha parameter for the Gamma distribution");
+        System.out.println("  -b, --beta <Double>       Specify the beta parameter for the Gamma distribution");
+        System.out.println("  -n, --nleaves <Integer>   Specify the number of leaves");
+        System.out.println("  -d, --meandist <Double>   Specify the mean distance to root");
+        System.out.println("  -s, --seed <Integer>      Specify the random seed");
+        System.out.println("  -v, --verbose             Enable verbose mode");
+        System.out.println("  -h, --help                Show this help message");
+        System.exit(errno);
+    }
+
+    static boolean VERBOSE = false;
+    static long SEED = 0;
+    static Double alpha = null, beta = null;
+    static Integer nLeaves = null;
+    static Double MEANDIST = null;
+
+    public static void main(String[] args) {
+        Tree tree1 = null, tree2 = null;
+        for (int i = 0; i < args.length; i ++) {
+            switch (args[i]) {
+                case "-h":
+                case "--help":
+                    usage();
+                    break;
+                case "-a":
+                case "--alpha":
+                    if (i + 1 < args.length) {
+                        alpha = Double.parseDouble(args[++i]);
+                    } else {
+                        usage(5, "Missing ALPHA[double] after " + args[i]);
+                    }
+                    break;
+                case "-b":
+                case "--beta":
+                    if (i + 1 < args.length) {
+                        beta = Double.parseDouble(args[++i]);
+                    } else {
+                        usage(6, "Missing BETA[double] after " + args[i]);
+                    }
+                    break;
+                case "-n":
+                case "--nleaves":
+                    if (i + 1 < args.length) {
+                        nLeaves = Integer.parseInt(args[++i]);
+                    } else {
+                        usage(7, "Missing NLEAVES[int] after " + args[i]);
+                    }
+                    break;
+                case "-d":
+                case "--meandist":
+                    if (i + 1 < args.length) {
+                        MEANDIST = Double.parseDouble(args[++i]);
+                    } else {
+                        usage(8, "Missing MEANDIST[double] after " + args[i]);
+                    }
+                    break;
+                case "-l":
+                case "--load":
+                    if (i + 1 < args.length) {
+                        String filename = args[++i];
+                        try {
+                            tree1 = Newick.load(filename);
+                        } catch (IOException ex) {
+                            usage(1, "Could not load file " + filename);
+                        }
+                    } else {
+                        usage(2, "Missing FILE[String] after " + args[i]);
+                    }
+                    break;
+                case "-s":
+                case "--seed":
+                    if (i + 1 < args.length) {
+                        SEED = Long.parseLong(args[++i]);
+                    } else {
+                        usage(4, "Missing SEED[long] after " + args[i]);
+                    }
+                    break;
+                case "-v":
+                case "--verbose":
+                    VERBOSE = true;
+                    break;
+                default:
+                    usage(3, "Aborting because unknown argument " + args[i]);
+                    break;
+            }
+        }
+
+        if (tree1 != null) { // if tree was loaded already...
+            if (VERBOSE) {
+                System.out.println("Loaded tree: size = " + tree1.getSize() + "\tMean distance to root = " + tree1.getMeanDistanceToRoot());
+            }
+        } else if (alpha != null && nLeaves != null) {
+            if (beta == null) // if beta is not set...
+                beta = alpha; // mean of gamma is 1.0
+            tree1 = Tree.Random(nLeaves, SEED, alpha, beta, 2, 2);
+            if (MEANDIST != null)
+                tree1.adjustDistances(MEANDIST);
+            if (VERBOSE) {
+                System.out.println("Simulated tree (seed " + SEED + "): size = " + tree1.getSize() + "\tMean distance to root = " + tree1.getMeanDistanceToRoot());
+            }
+        }
+        if (tree1 != null) {
+            double[] gamma1 = tree1.getGammaParams();
+            System.out.println("Estimated Gamma distribution: alpha = " + gamma1[0] + "\tbeta = " + gamma1[1] + "\ttheta = " + 1.0 / gamma1[1]);
+            tree2 = Tree.Random(tree1.getNLeaves(), SEED, gamma1[0], 1.0/gamma1[1], 2, 2);
+            if (VERBOSE) {
+                System.out.println("Generated tree (seed "+ SEED + "): size = " + tree2.getSize() + "\tMean distance to root = " + tree2.getMeanDistanceToRoot());
+            }
+            double[] gamma2 = tree2.getGammaParams();
+            System.out.println("Estimated Gamma distribution: alpha = " + gamma2[0] + "\tbeta = " + gamma2[1] + "\ttheta = " + 1.0/gamma2[1]);
+        }
+        System.out.println("Done.");
+    }
 
 }
 

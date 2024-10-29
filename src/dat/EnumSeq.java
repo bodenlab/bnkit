@@ -572,6 +572,54 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
             return 0;
         }
 
+        /**
+         * Counts the total number of gaps (null values) in all sequences.
+         *
+         * This method iterates through all sequences and counts the number of null values,
+         * which represent gaps in the sequences.
+         *
+         * @return the total number of gaps (null values) in all sequences
+         */
+        public int getGapCount() {
+            int count = 0;
+            for (EnumSeq<E> seq : seqs)
+                count += seq.getNNulls();
+            return count;
+        }
+
+        /**
+         * Calculates the mean length of gaps (null values) in all sequences.
+         *
+         * This method iterates through all sequences and calculates the mean length
+         * of gaps by dividing the total number of gaps by the number of gap starts.
+         *
+         * @return the mean length of gaps (null values) in all sequences
+         */
+        public double getMeanGapLength() {
+            int cntstarts = 0;
+            int cnt = 0;
+            for (EnumSeq<E> seq : seqs) {
+                cntstarts += seq.getNNullStarts();
+                cnt += seq.getNNulls();
+            }
+            return (double) cnt / (double)cntstarts;
+        }
+
+        /**
+         * Counts the number of gap starts (sequence sections that starts with a null value).
+         *
+         * This method iterates through all sequences and counts the number of times
+         * each sequence introduces a gap.
+         *
+         * @return the number of gap starts
+         */
+        public int getGapStartCount() {
+            int count = 0;
+            for (EnumSeq<E> seq : seqs)
+                count += seq.getNNullStarts();
+            return count;
+        }
+
         public int getIndex(Object label) {
             for (int i = 0; i < seqs.size(); i++) {
                 if (seqs.get(i).getName().equals(label))

@@ -80,6 +80,12 @@ public class PowerLaw implements IndelModel {
         return sum;
     }
 
+    @Override
+    public String getTrAVIS() {
+        return "PowerLaw " + alpha;
+    }
+
+
     public static void main(String[] args) {
         // Example usage with different alpha and maxK values
         for (double alpha = 1.0; alpha < 5.5; alpha += 0.5) {

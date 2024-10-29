@@ -13,10 +13,7 @@ import dat.pog.POAGraph;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import json.JSONObject;
-import stats.IndelModel;
-import stats.Lavalette;
-import stats.Poisson;
-import stats.Zipf;
+import stats.*;
 
 import java.io.*;
 import java.util.*;
@@ -30,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "15-Oct-2024";
+    public static String VERSION = "25-Oct-2024";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -615,6 +612,16 @@ public class GRASP {
                     case 10: // TrAVIS
                         if (!BYPASS) {
                             if (MODE == Inference.JOINT) {
+                                double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
+                                double gap_open_prop = (double) aln.getGapStartCount() / (double) (aln.getWidth() * aln.getHeight());
+                                double gap_length = aln.getMeanGapLength();
+                                double indel_factor = 10; // FIXME: this is the default value
+                                if (VERBOSE) {
+                                    System.out.println("Gap proportion= " + gap_prop);
+                                    System.out.println("Gap opening proportion= " + gap_open_prop);
+                                    System.out.println("Mean gap length= " + gap_length);
+                                }
+
                                 IdxTree mytree = indelpred.getTree();
                                 Set<Double> dists = new HashSet<>();
                                 Map <String, Integer> extmap = aln.getMap();
@@ -631,7 +638,6 @@ public class GRASP {
                                             EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(idx)));
                                             cseq = seq.get();
                                         } else {
-                                            ;
                                             cseq = ancseqs_gappy[(Integer)mytree.getLabel(idx)];
                                         }
                                         int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
@@ -657,12 +663,22 @@ public class GRASP {
                                 }
                                 // Now we can fit the indel distribution to the lengths of insertions and deletions
                                 // ...
-                                System.out.println("Indels\tInsertions\tDeletions");
-                                System.out.println("Len\tCnt\tCnt\tCnt");
-                                for (int j = 0; j < indel_total.length; j ++) {
-                                    System.out.println((j + 1) + "\t" + indel_total[j] + "\t" + (j < ins_total.length ? ins_total[j] : 0) + "\t" + (j < del_total.length ? del_total[j] : 0));
+                                int ninsertions = 0, ndeletions = 0;
+                                for (int j = 0; j < indel_total.length; j++) {
+                                    ninsertions += (j < ins_total.length ? ins_total[j] : 0);
+                                    ndeletions += (j < del_total.length ? del_total[j] : 0);
                                 }
-                                /*
+                                if (VERBOSE) {
+                                    System.out.println("Indels\tInsertions\tDeletions");
+                                    System.out.println("Len\tCnt\tCnt\tCnt");
+                                    for (int j = 0; j < indel_total.length; j++) {
+                                        System.out.println((j + 1) + "\t" + indel_total[j] + "\t" + (j < ins_total.length ? ins_total[j] : 0) + "\t" + (j < del_total.length ? del_total[j] : 0));
+                                    }
+                                }
+                                double delprop = (double) ndeletions / (double) (ninsertions + ndeletions);
+                                if (VERBOSE)
+                                    System.out.println("Deletion proportion= " + delprop);
+                                /* Trying the following distributions (with params)
                                 Zipf        1, 2, 5, 15
                                 Lavalette   1, 2, 5, 15
                                 Poisson     0.01, 0.1, 1, 2
@@ -677,42 +693,59 @@ public class GRASP {
                                         new Lavalette(2, SEED, 100),
                                         new Lavalette(5, SEED, 100),
                                         new Lavalette(15, SEED, 100),
-                                        new Poisson(0.01, SEED),
-                                        new Poisson(0.1, SEED),
-                                        new Poisson(1.0, SEED),
-                                        new Poisson(2.0, SEED)
+                                        new ZeroTruncatedPoisson(0.01, SEED),
+                                        new ZeroTruncatedPoisson(0.1, SEED),
+                                        new ZeroTruncatedPoisson(1.0, SEED),
+                                        new ZeroTruncatedPoisson(2.0, SEED)
                                 };
-                                IndelModel bestsofar = null;
-                                double bestscore = Double.NEGATIVE_INFINITY;
+                                IndelModel[] bestsofar = new IndelModel[3];
+                                double[] bestscore = new double[3];
+                                Arrays.fill(bestscore, Double.NEGATIVE_INFINITY);
                                 for (IndelModel model : indelmodels) {
-                                    double sum = 0;
+                                    double[] sum = new double[3];
                                     for (int j = 0; j < indel_total.length; j ++) {
-                                        sum += Math.log(model.p(j + 1)+0.0001) * indel_total[j];
+                                        double y = Math.log(model.p(j + 1)+0.0001);
+                                        sum[0] += y * indel_total[j];
+                                        sum[1] += y * (ins_total.length > j ? ins_total[j] : 0);
+                                        sum[2] += y * (del_total.length > j ? del_total[j] : 0);
                                     }
-                                    if (sum > bestscore) {
-                                        bestsofar = model;
-                                        bestscore = sum;
+                                    for (int k = 0; k < 3; k++) {
+                                        if (sum[k] > bestscore[k]) {
+                                            bestscore[k] = sum[k];
+                                            bestsofar[k] = model;
+                                        }
                                     }
-                                    System.out.println("\t" + model.toString() + " at p= " +sum);
+                                    //System.out.println("\t" + model.toString() + " for indel= " + sum[0] + " ins= " + sum[1] + " del= " + sum[2]);
                                 }
-                                System.out.println("Best model: " + bestsofar.toString() + " at p= " +bestscore);
+                                if (VERBOSE) {
+                                    System.out.println("Best indelmodel: " + bestsofar[0].toString() + " at p= " + bestscore[0]);
+                                    System.out.println("Best inmodel: " + bestsofar[1].toString() + " at p= " + bestscore[1]);
+                                    System.out.println("Best delmodel: " + bestsofar[2].toString() + " at p= " + bestscore[2]);
+                                    System.out.println("Longest indel= " + indel_total.length);
+                                }
                                 //
-                                double[] dists_arr = new double[dists.size()];
-                                int k = 0;
-                                for (double d : dists)
-                                    dists_arr[k ++] = d;
-                                double alpha = GammaDistrib.getAlpha(dists_arr);
-                                double beta = GammaDistrib.getBeta(dists_arr, alpha);
-                                System.out.println("Gamma alpha= " + alpha + " beta= " + beta);
+                                double[] gamma = mytree.getGammaParams();
+                                double alpha = gamma[0];
+                                double beta = gamma[1];
+                                if (VERBOSE)
+                                    System.out.println("Tree distance Gamma shape= " + alpha + " scale= " + 1.0/beta);
                                 StringBuilder n0 = new StringBuilder();
                                 for (int j = 0; j < ancseqs_nogap[0].length; j++)
                                     n0.append(ancseqs_nogap[0][j]);
-                                System.out.println("N0= " + n0.toString());
-                                if (RATES != null) {
-                                    double rates_alpha = GammaDistrib.getAlpha(RATES);
-                                    double rates_beta = GammaDistrib.getBeta(RATES, rates_alpha);
-                                    System.out.println("Rates alpha= " + rates_alpha + " beta= " + rates_beta);
+                                if (VERBOSE)
+                                    System.out.println("N0= " + n0.toString());
+                                Double rates_alpha = null;
+                                if (RATES != null) { // position-specific rates available
+                                    rates_alpha = GammaDistrib.getAlpha(RATES);
+                                    if (VERBOSE)
+                                        System.out.println("Position-specific rates Gamma shape= " + rates_alpha + " scale= " + 1.0/rates_alpha);
                                 }
+                                System.out.println("To reproduce pseudo-biological properties of current reconstruction, use TrAVIS with the following parameters:");
+                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -indelmodel " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor);
+                                System.out.println("Or:");
+                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -inmodel " + bestsofar[1].getTrAVIS() + " -delmodel " + bestsofar[2].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor);
+                                System.out.println("Alternatively, consider specifying:");
+                                System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);
                             } else if (MODE == Inference.MARGINAL)
                                 usage(23, "TrAVIS reports must be based on joint reconstructions");
                         }

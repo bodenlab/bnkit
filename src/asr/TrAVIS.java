@@ -59,10 +59,8 @@ public class TrAVIS {
         out.println("Usage: asr.TrAVIS \n" +
                 "\t[-n0 <ancestor-seq>]\n" +
                 "\t[-nwk <tree-file> -out <output-file-or-dir>]\n" +
-                "\t{-rf <rates-file>}\n" +
+//                "\t{-rf <rates-file>}\n" +
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
-                "\t{--recon <tree-file> <alignment-file>}\n" +
-                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
                 "\t{-rates <a>}\n" +
                 "\t{-seed <random>}\n" +
                 "\t{-extants <5(default)>}\n" +
@@ -71,8 +69,10 @@ public class TrAVIS {
                 "\t{-scale <0.2(default)>}\n" +
                 "\t{-indel <1.0(default)>}\n" +
                 "\t{-delprop <0.5(default)>}\n" +
-                "\t{-indelmodel <ZeroTruncatedPoisson(default)|Poisson|Zipf|Lavalette>"+
-                "\t{-lambda  <1(default)>}\n"+
+                "\t{-indelmodel <ZeroTruncatedPoisson(default)|Poisson|Zipf|Lavalette> <model-param>}\n"+
+                "\t{-delmodel <ZeroTruncatedPoisson|Poisson|Zipf|Lavalette> <model-param>}\n"+
+                "\t{-inmodel <ZeroTruncatedPoisson|Poisson|Zipf|Lavalette> <model-param>}\n"+
+                "\t{-maxindel <max-indel-length>}\n"+
                 "\t{-gap}\n" +
                 "\t{-format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
                 "\t{-verbose}\n" +
@@ -80,7 +80,12 @@ public class TrAVIS {
         out.println("where \n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
                 "\toutput-file-or-dir is the filename or name of directory of results\n" +
+//                "\trates-file is a tabulated file with relative, position-specific rates\n\t\tAs an example, IQ-TREE produces rates on the accepted format\n" +
                 "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n" +
+                "\t\"-indelmodel\" specifies the indel length distribution function, which serves to model both deletions and insertions\n" +
+                "\t\"-delmodel\" specifies the deletion length distribution, which overrides that specified with \"-indelmodel\"\n" +
+                "\t\"-inmodel\" specifies the insertion length distribution, which overrides that specified with \"-indelmodel\"\n" +
+                "\t\"-maxindel\" specifies the maximum length of an indel\n" +
                 "\t\"-verbose\" means that details of evolutionary events are printed out on standard-output)\n" +
                 "\t\"-help\" prints out the parameters and instructions of how to use this tool\n");
         out.println("Notes: \n" +
@@ -91,8 +96,7 @@ public class TrAVIS {
                 "\tPosition-specific evolutionary rates from a Gamma distribution with specified parameter \"a\" and mean 1;\n\t if rate is unspecified, a uniform rate 1 is used.\n" +
                 "\tRates for insertions and deletions are scaled by -indel <factor> (factor > 1 reduces, factor < 1 increases chance of indels).\n" +
                 "\tThe proportion of deletions relative to insertions and deletions is given by -delprop <proportion> (proportion < 0.5 means that insertions will dominate.\n" +
-                "\tThe indel length models for proteins include ZeroTruncatedPoisson, Poisson, Zipf and Lavalette\n" +
-                "\tThe parameter of the indel length model controlled by lambda\n" +
+                "\tThe parameter for indel/deletion/insertion length distribution models for proteins are provided as an argument.\n" +
                 "\t~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
         System.exit(error);
     }
@@ -100,14 +104,14 @@ public class TrAVIS {
     public static Boolean VERBOSE = false;
     static Double SCALEINDEL = 1.0;
     static Double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
-    static Double LAMBDALENGTH = 1.0;
-    static int IN_MODEL_IDX = 0;
+    static Double LAMBDA_OF_INMODEL = 1.0;
+    static Double LAMBDA_OF_DELMODEL = 1.0;
+    static int DEL_MODEL_IDX = 0, IN_MODEL_IDX = 0;
+    static Integer MAX_INDEL_LENGTH = 100;
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
         String OUTPUTTREE = null;
-        String INPUTTREE = null; // if reconstruction is requested
-        String INPUTALN = null; // if reconstruction is requested
         String OUTPUT = null;
         Double RATESGAMMA = null;
         Double SCALEDIST = null;
@@ -136,7 +140,9 @@ public class TrAVIS {
                 ANCSEQ = args[a];
             } else if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
-                if (arg.equalsIgnoreCase("nwk") && args.length > a + 1) {
+                if (arg.equalsIgnoreCase("n0") && args.length > a + 1) {
+                    ANCSEQ = args[++a];
+                } else if (arg.equalsIgnoreCase("nwk") && args.length > a + 1) {
                     OUTPUTTREE = args[++a];
                 } else if (arg.equalsIgnoreCase("out") && args.length > a + 1) {
                     OUTPUT = args[++a];
@@ -168,35 +174,37 @@ public class TrAVIS {
                     }
                     if (!found_model)
                         usage(1, args[a + 1] + " is not a valid model name");
-                } else if (arg.equalsIgnoreCase("-recon") && args.length > a + 2) {
-                    INPUTTREE = args[++a];
-                    INPUTALN = args[++a];
-                } else if (arg.equalsIgnoreCase("-indel-method") && args.length > a + 1) {
-                    boolean found_indel = false;
-                    for (int i = 0; i < INDEL_METHODS.length; i++) {
-                        if (args[a + 1].startsWith(INDEL_METHODS[i])) {
-                            INDEL_IDX = i;
-                            found_indel = true;
-                        }
-                    }
-                    if (!found_indel)
-                        usage(3, args[a + 1] + " is not a valid indel approach for option --indel-method");
                 } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
                     SCALEINDEL = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("lambda") && args.length > a + 1){
-                    LAMBDALENGTH = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("indelmodel") && args.length > a + 1){
+                } else if (arg.equalsIgnoreCase("lambda") && args.length > a + 1) {
+                    LAMBDA_OF_DELMODEL = LAMBDA_OF_INMODEL = Double.parseDouble(args[++a]);
+                } else if (arg.equalsIgnoreCase("maxindel") && args.length > a + 1) {
+                    MAX_INDEL_LENGTH = Integer.parseInt(args[++a]);
+                } else if ((arg.equalsIgnoreCase("indelmodel") || arg.equalsIgnoreCase("inmodel") || arg.equalsIgnoreCase("delmodel")) && args.length > a + 2) {
                     boolean found_indelmodel = false;
                     for (int i = 0; i < INDELMODELS.length; i++) {
                         if (args[a + 1].equalsIgnoreCase(INDELMODELS[i])) {
-                            IN_MODEL_IDX = i;
-                            found_indelmodel = true;
+                            try {
+                                if (!arg.equalsIgnoreCase("delmodel")) {
+                                    IN_MODEL_IDX = i;
+                                    LAMBDA_OF_INMODEL = Double.parseDouble(args[a + 2]);
+                                }
+                                if (!arg.equalsIgnoreCase("inmodel")) {
+                                    DEL_MODEL_IDX = i;
+                                    LAMBDA_OF_DELMODEL = Double.parseDouble(args[a + 2]);
+                                }
+                                found_indelmodel = true;
+                            } catch (NumberFormatException e) {
+                                usage(1, args[a + 2] + " is not a valid parameter for model " + args[a + 1]);
+                            }
                         }
                     }
                     if (!found_indelmodel)
                         usage(1, args[a + 1] + " is not a valid model name");
+                    else
+                        a += 2;
                 } else if (arg.equalsIgnoreCase("format") && args.length > a + 1) {
                     boolean found_format = false;
                     for (int i = 0; i < FORMATS.length; i++) {
@@ -499,7 +507,8 @@ public class TrAVIS {
         Enumerable myType = null;
         GammaDistrib gamma = null;
 
-        IndelModel indelmodel = null;
+        IndelModel inmodel = null;
+        IndelModel delmodel = null;
 
         public final Tree tree;
         private final TreeInstance ti_seqs;
@@ -523,10 +532,17 @@ public class TrAVIS {
             USERATES = (ratesgamma >= 0); // check if we will generate position specific rates; if not, use a constant rate 1
             rand = new Random(SEED);
             switch (IN_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"
-                case 0 -> indelmodel  = new ZeroTruncatedPoisson(LAMBDALENGTH,SEED);
-                case 1 -> indelmodel  = new Poisson(LAMBDALENGTH, SEED);
-                case 2 -> indelmodel  = new Zipf(LAMBDALENGTH,SEED,100);
-                case 3 -> indelmodel  = new Lavalette(LAMBDALENGTH,SEED,100);
+                case 0 -> inmodel  = new ZeroTruncatedPoisson(LAMBDA_OF_INMODEL, SEED);
+                case 1 -> inmodel  = new Poisson(LAMBDA_OF_INMODEL, SEED);
+                case 2 -> inmodel  = new Zipf(LAMBDA_OF_INMODEL, SEED, MAX_INDEL_LENGTH);
+                case 3 -> inmodel  = new Lavalette(LAMBDA_OF_INMODEL, SEED, MAX_INDEL_LENGTH);
+                default -> throw new IllegalArgumentException("Invalid model index");
+            }
+            switch (DEL_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"
+                case 0 -> delmodel  = new ZeroTruncatedPoisson(LAMBDA_OF_DELMODEL, SEED + 1);
+                case 1 -> delmodel  = new Poisson(LAMBDA_OF_DELMODEL, SEED + 1);
+                case 2 -> delmodel  = new Zipf(LAMBDA_OF_DELMODEL, SEED + 1, MAX_INDEL_LENGTH);
+                case 3 -> delmodel  = new Lavalette(LAMBDA_OF_DELMODEL, SEED + 1, MAX_INDEL_LENGTH);
                 default -> throw new IllegalArgumentException("Invalid model index");
             }
 
@@ -595,7 +611,7 @@ public class TrAVIS {
 
                             if (toss2 < TrAVIS.DELETIONPROP) { // 2. deletion with prob q = (1 - p)/2, so consider length of deletion
                                 int k;
-                                k = Math.min(indelmodel.sample(), parseq.length - i);// length, can only delete what is left of the sequence
+                                k = Math.min(delmodel.sample(), parseq.length - i);// length, can only delete what is left of the sequence
                                 deletions[idx][i] = k;  // deletions skip characters in the parent
                                 i += k;
                             } else { // 3. insertion with prob q = (1 - p)/2, so consider length of insertion
@@ -603,7 +619,7 @@ public class TrAVIS {
                                 // so to avoid introducing a bias for LONGER EXTANTS,
                                 // we place it at either end with a uniform coin toss
                                 int k;
-                                k = indelmodel.sample(); // length, can only delete what is left of the sequence
+                                k = inmodel.sample(); // length, can only delete what is left of the sequence
                                 insertions[idx][i == 0 ? (rand.nextBoolean() ? 0 : parseq.length) : i] += k; // insertions can be on top of another
                                 for (int j = 0; j < k; j ++) {
                                     Object nchar = null;

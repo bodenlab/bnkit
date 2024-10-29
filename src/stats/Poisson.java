@@ -37,6 +37,12 @@ public class Poisson implements IndelModel {
         return "Poisson(lambda=" + lambda + ", seed=" + seed + ")";
     }
 
+    @Override
+    public String getTrAVIS() {
+        return "Poisson " + lambda;
+    }
+
+
     /**
      * The probability mass function
      * @param k the number of events in the interval

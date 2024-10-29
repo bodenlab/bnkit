@@ -1,5 +1,6 @@
 package dat.phylo;
 
+import bn.prob.GammaDistrib;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
@@ -806,6 +807,32 @@ public class IdxTree implements Iterable<Integer> {
         double multiplier = target2root / mu;
         for (int idx = 1; idx < bpoints.length; idx ++)
             setDistance(idx, getDistance(idx)*multiplier);
+    }
+
+    /**
+     * Calculates the parameters of a Gamma distribution based on the distances between branch points in the tree.
+     *
+     * This method collects all positive distances between branch points, then calculates the alpha and beta parameters
+     * of the Gamma distribution that best fits these distances.
+     *
+     * @return an array containing the alpha and beta parameters of the Gamma distribution
+     */
+    public double[] getGammaParams() {
+        Set<Double> dists = new HashSet<>();
+        for (int idx : this) {
+            if (idx == 0)
+                continue;
+            Double dist = getDistance(idx);
+            if (dist > 0)
+                dists.add(dist);
+        }
+        double[] dists_arr = new double[dists.size()];
+        int k = 0;
+        for (double d : dists)
+            dists_arr[k ++] = d;
+        double alpha1 = GammaDistrib.getAlpha(dists_arr);
+        double beta1 = GammaDistrib.getBeta(dists_arr, alpha1);
+        return new double[] {alpha1, beta1};
     }
 
     /**
