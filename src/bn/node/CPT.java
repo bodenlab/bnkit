@@ -131,6 +131,19 @@ public class CPT implements BNode, TiedNode<CPT>, Serializable {
         this.count = new CountTable(cond);
     }
 
+    public int getSize() {
+        if (table != null) {
+            return table.getSize();
+        }
+        return 1;
+    }
+
+    public void setPseudoCounts(double pseudo) {
+        if (count != null) {
+            for (int i = 0; i < count.getSize(); i++)
+                count.put(i, pseudo);
+        }
+    }
     /**
      * Create a CPT from a JPT. The variable in the JPT var is the variable
      * conditioned on in the CPT.

@@ -191,7 +191,8 @@ public class VarElim implements Inference {
         CGQuery q = (CGQuery) query;
         Variable[] qarr = new Variable[q.Q.size()];
         q.Q.toArray(qarr);
-        //BNet rel_bn = bn.getRelevant(qarr);
+        Set<BNode> relevant = bn.getRelevantAndSome(qarr);
+        // Set<BNode> dconnected = new HashSet<>(bn.getDconnected(qarr));
         List<Bucket> buckets = new ArrayList<>();
         Bucket first_bucket = new Bucket(q.Q);
         buckets.add(first_bucket);
@@ -210,28 +211,30 @@ public class VarElim implements Inference {
         Map<Variable, Object> relmap = q.getVariableScope();
         for (Variable var : relmap.keySet()) {
             BNode node = bn.getNode(var);
-            // next call is causing delays with threading
-            AbstractFactor ft = node.makeDenseFactor(relmap); // forces new makeFactor method to be used on only relevant nodes
-            // make sure we trace values of variables at the factor table level for MPE queries
-            //ft.setTraced(q.getStatus() == STATUS_MPE);
-            boolean added = false;
-            if (!ft.hasEnumVars()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
-                buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
-                added = true;
-                continue;
-            }
-            // go through buckets in reverse order, choosing the first (from end) which "matches" the variables of the FT
-            for (int i = nBuckets - 1; i >= 0 && !added; i--) {
-                Bucket b = buckets.get(i);
-                if (b.match(ft)) {
-                    b.put(ft);
+            if (relevant.contains(node)) { // only relevant nodes are considered
+                // next call is causing delays with threading
+                AbstractFactor ft = node.makeDenseFactor(relmap); // forces new makeFactor method to be used on only relevant nodes
+                // make sure we trace values of variables at the factor table level for MPE queries
+                //ft.setTraced(q.getStatus() == STATUS_MPE);
+                boolean added = false;
+                if (!ft.hasEnumVars()) { // // the FT is empty of enumerable variables, hence will only "scale" factors
+                    buckets.get(0).put(ft); // we will need to keep non-enumerable variables for later though
                     added = true;
-                    break;
+                    continue;
                 }
-            }
-            if (!added) { // if not added as per sum-out variable
-                // FT is somehow corrupt, e.g. no variables
-                throw new VarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
+                // go through buckets in reverse order, choosing the first (from end) which "matches" the variables of the FT
+                for (int i = nBuckets - 1; i >= 0 && !added; i--) {
+                    Bucket b = buckets.get(i);
+                    if (b.match(ft)) {
+                        b.put(ft);
+                        added = true;
+                        break;
+                    }
+                }
+                if (!added) { // if not added as per sum-out variable
+                    // FT is somehow corrupt, e.g. no variables
+                    throw new VarElimRuntimeException("Node can not be eliminated in inference: " + node.getName());
+                }
             }
         }
         timer.stop("factors");

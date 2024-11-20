@@ -135,6 +135,36 @@ public class TSVFile {
         return transp;
     }
 
+    /**
+     * Concatenates two matrices of objects horizontally.
+     * The matrices must have the same number of rows.
+     *
+     * @param a the first matrix to concatenate
+     * @param b the second matrix to concatenate
+     * @return a new matrix that is the result of concatenating the two input matrices
+     * @throws RuntimeException if the matrices do not have the same number of rows
+     */
+    public static Object[][] concat(Object[][] a, Object[][] b) {
+        if (a.length != b.length)
+            throw new RuntimeException("Matrices must have the same number of rows");
+        Object[][] c = new Object[a.length][a[0].length + b[0].length];
+        for (int i = 0; i < a.length; i ++) {
+            for (int j = 0; j < a[0].length; j ++)
+                c[i][j] = a[i][j];
+            for (int j = 0; j < b[0].length; j ++)
+                c[i][j + a[0].length] = b[i][j];
+        }
+        return c;
+    }
+
+    public static TSVFile concat(TSVFile a, TSVFile b) {
+        String[] headers = new String[a.ncols + b.ncols];
+        String[] aheaders = a.getHeaders();
+        String[] bheaders = b.getHeaders();
+        for (int i = 0; i < headers.length; i ++)
+            headers[i] = i < a.ncols ? aheaders[i] : bheaders[i - a.ncols];
+        return new TSVFile(headers, concat(a.getRows(), b.getRows()));
+    }
     public static Object[] tokeniseBySep(Object orig, String separator) {
         // tokenise the semi-colon separated fields within the entry
         List<String> tokens = new ArrayList<>();

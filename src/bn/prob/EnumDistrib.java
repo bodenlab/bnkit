@@ -255,6 +255,11 @@ public class EnumDistrib implements Distrib, Domain {
         return distrib[index];
     }
 
+    /**
+     * Retrieve the probability distribution
+     *
+     * @return the probability distribution
+     */
     public double[] get() {
         if (!isNormalised()) {
             normalise();

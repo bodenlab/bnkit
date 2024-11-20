@@ -2,6 +2,8 @@ package bn.prob;
 
 
 import bn.Distrib;
+import dat.Enumerable;
+
 import java.io.Serializable;
 import java.util.*;
 
@@ -35,11 +37,16 @@ public class GammaDistrib implements Distrib, Serializable {
     /**
      * Creates a new Gamma distribution with parameters k and lambda.
      * @param k shape (same as a)
-     * @param lambda rate, which is the inverse of scale (or 1/b)
+     * @param lambda rate or scale, which is 1/beta
      */
     public GammaDistrib(double k, double lambda) {
         this.k = k;
         this.lambda = lambda;
+    }
+
+    public String toString() {
+        return "Gamma(alpha=" + k + ", beta=" + 1/lambda + " or scale=" + lambda + ")";
+//        return "Gamma(k=" + k + ", lambda=" + lambda + ")";
     }
 
     /**
@@ -160,7 +167,8 @@ public class GammaDistrib implements Distrib, Serializable {
     public void setAlpha(double alpha) {
         k = alpha;
     }
-    
+
+
     /**
      * The log likelihood of the data X given the gamma distribution.
      * Based on Thomas Minka "Estimating a Gamma distribution" 2002.
@@ -182,7 +190,18 @@ public class GammaDistrib implements Distrib, Serializable {
         log_x_mean /= n;
         return n * (a - 1.0) * log_x_mean - n * lgamma(a) - n * a * Math.log(b) - n * x_mean / b;
     }
-    
+
+    /**
+     * The likelihood of the data X given the gamma distribution.
+     * Based on Thomas Minka "Estimating a Gamma distribution" 2002.
+     * http://research.microsoft.com/en-us/um/people/minka/papers/minka-gamma.pdf
+     * @param X data
+     * @return the likelihood of the data; log p(X|alpha, beta); beware that the likelihood can be very small, so prefer #logLikelihood
+     */
+    public double likelihood(double[] X) {
+        return Math.exp(logLikelihood(X));
+    }
+
     /**
      * Estimate the parameters of a gamma distribution from data.
      * Specifically the implementation estimates alpha, and beta is given by
@@ -235,7 +254,40 @@ public class GammaDistrib implements Distrib, Serializable {
         x_mean /= n;
         return x_mean / alpha;
     }
-    
+
+    /**
+     * Estimates the parameters of a Gamma distribution using Maximum Likelihood Estimation (MLE).
+     *
+     * This method calculates the alpha and beta parameters of the Gamma distribution
+     * that best fit the given data using MLE.
+     *
+     * @param X the data from which to estimate the Gamma distribution parameters
+     * @return a GammaDistrib object with the estimated parameters
+     */
+    public static GammaDistrib MLE(double[] X) {
+        double alpha = getAlpha(X);
+        double beta = getBeta(X, alpha);
+        return new GammaDistrib(alpha, 1.0/beta);
+    }
+
+    /**
+     * Estimates the parameters of a Gamma distribution using Maximum Likelihood Estimation (MLE).
+     *
+     * This method calculates the alpha and beta parameters of the Gamma distribution
+     * that best fit the given data using MLE.
+     *
+     * @param X the collection of data from which to estimate the Gamma distribution parameters
+     * @return a GammaDistrib object with the estimated parameters
+     */
+    public static GammaDistrib MLE(Collection<Double> X) {
+        double[] x = new double[X.size()];
+        int i = 0;
+        for (Double d : X) {
+            x[i++] = d;
+        }
+        return MLE(x);
+    }
+
     /*
     The following two methods: digamma and trigamma are ...
 
@@ -315,8 +367,19 @@ public class GammaDistrib implements Distrib, Serializable {
         }
         return trigamma(x + 1) + 1 / (x * x);
     }
-    
-    public static void main(String[] args) {
+
+    /**
+     * Generates a mixture of Gamma distributions.
+     *
+     * @param ncomponents the number of components in the mixture
+     * @return an array of GammaDistrib objects representing the mixture
+     */
+    public static GammaDistrib[] getMixture(int ncomponents) {
+        // Implementation needed here
+        return new GammaDistrib[ncomponents];
+    }
+
+    public static void main0(String[] args) {
         double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5};
         double alpha = GammaDistrib.getAlpha(X);
         double beta = GammaDistrib.getBeta(X, alpha);
@@ -342,6 +405,102 @@ public class GammaDistrib implements Distrib, Serializable {
 //            System.out.println("\tDi Gamma(" + xx + ") = " + digamma(xx));
 //            System.out.println("\tTri Gamma(" + xx + ") = " + trigamma(xx));
 //        }
+    }
+
+    /**
+     * Example that finds a mixture of Gammas using Gibbs sampling.
+     * @param args
+     */
+    public static void main(String[] args) {
+        int clusters = 3;
+        Enumerable label = new Enumerable(clusters);
+        EnumDistrib C = EnumDistrib.random(label); // mixture distrib
+        GammaDistrib[] Q = new GammaDistrib[clusters];
+        double[] X = {0.13, 0.21, 0.09, 0.3, 0.14, 0.45, 0.03, 0.06, 0.01, 0.05, 0.04, 0.07, 0.35, 0.08, 0.18, 0.08, 0.38};
+        Arrays.sort(X);
+
+        // initialisation
+        Random r = new Random();
+
+        int[] Z_sample = new int[X.length];
+        EnumDistrib[] Z = new EnumDistrib[X.length];
+        for (int k = 0; k < clusters; k ++) {
+            double[] x = new double[X.length/clusters];
+            for (int i = 0; i < x.length; i ++) {
+                x[i] = X[k * x.length + i];
+            }
+            Q[k] = GammaDistrib.MLE(x);
+            System.out.println("P(Q|Z = " + k + ") = " + Q[k]);
+        }
+        double[] counts = new double[clusters];
+
+        for (int i = 0; i < X.length; i ++) {
+            Z[i] = new EnumDistrib(label);
+            for (int k = 0; k < clusters; k ++)
+                Z[i].set(k, Q[k].get(X[i]));
+            Z[i].normalise();
+            //Z_sample[i] = r.nextInt(clusters);
+            Z_sample[i] = Z[i].getMaxIndex();
+            counts[Z_sample[i]] += 1.0;
+            System.out.println("X_" + i + " = " + X[i] + ": Z = " + Z_sample[i]);
+        }
+        C.set(counts);
+        for (int k = 0; k < clusters; k ++) {
+            System.out.println("P(Z = " + k + ") = " + C.get(k));
+        }
+
+        // training
+        for (int round = 0; round < 1000; round ++) {
+            int i_z = r.nextInt(X.length);
+            //System.out.println("Hold-out X_" + i_z + " = " + X[i_z]);
+            // Check each cluster
+            for (int k = 0; k < clusters; k ++) {
+                // collect the members of the cluster
+                List<Double> members = new ArrayList<Double>();
+                for (int i = 0; i < X.length; i ++) {
+                    if (i != i_z && k == Z_sample[i])
+                        members.add(X[i]);
+                }
+                if (members.size() > 3)
+                    Q[k] = GammaDistrib.MLE(members);
+                //System.out.println("\t\tNew P(Q|Z = " + k + ") = " + Q[k]);
+            }
+
+            for (int i = 0; i < X.length; i ++) {
+                double[] p = new double[clusters];
+                for (int k = 0; k < clusters; k++) {
+                    Double q = Q[k].get(X[i]);
+                    if (q.isNaN())
+                        p[k] = 0.0;
+//                        System.out.println("\t\tP(Q = " + X[i] + "|Z = " + k + ") = " + q);
+                    else
+                        p[k] = q;
+                }
+                Z[i].set(p);
+                Z[i].normalise();
+            }
+
+            counts = new double[clusters];
+            for (int i = 0; i < X.length; i ++) {
+                try {
+                    Z_sample[i] = (int) Z[i].sample();
+                } catch (RuntimeException e) {
+                    // System.err.println(e.getMessage());
+                }
+                counts[Z_sample[i]] += 1.0;
+                //if (i == i_z)
+                    //System.out.println("\tX_" + i_z + " = " + X[i_z] + ": P(Z|Q = " + X[i_z] + ") = " + Z[i_z] + " =sample=> " + Z_sample[i_z]);
+            }
+            C.set(counts);
+        }
+
+        System.out.println("RESULT:");
+        for (int i = 0; i < X.length; i ++) {
+            System.out.println("X_" + i + " = " + X[i] + ": P(Z|Q = " + X[i] + ") = " + Z[i] + " \t=sample=> " + Z_sample[i] + " \t=max=> " + Z[i].getMaxIndex());
+        }
+        for (int k = 0; k < clusters; k ++) {
+            System.out.println("P(Z = " + k + ") = " + C.get(k));
+        }
     }
 
 }

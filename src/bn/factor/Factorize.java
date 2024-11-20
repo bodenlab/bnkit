@@ -1098,7 +1098,7 @@ public class Factorize {
                     for (int y : yindices) {
                         double yval = Y.getLogValue(y);
                         if (isLOG0(yval)) { // <=== Factor check
-                            //continue; // the product will be zero no what
+                            // continue; // the product will be zero no what
                             // Note: it is OK to leave the cell in the factortable un-set since it was initialised to LOG0
                         }
                         Object[] ykey = Y.getKey(y);

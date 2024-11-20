@@ -76,6 +76,10 @@ public class CountTable implements Serializable {
         }
     }
 
+    public int getSize() {
+        return table.getSize();
+    }
+
     public boolean hasParents() {
         return (table != null);
     }

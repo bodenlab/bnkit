@@ -166,6 +166,7 @@ public class GaussianDistrib implements Distrib, Serializable {
     public void setSeed(long seed) {
         rand = new Random(seed);
     }
+
     /**
      * Create a density resembling those in the specified samples.
      * @param samples samples

@@ -1,9 +1,13 @@
 package dat.phylo;
 
 import bn.prob.GammaDistrib;
+import bn.prob.GaussianDistrib;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
+import smile.stat.distribution.ExponentialFamilyMixture;
+import smile.stat.distribution.GammaDistribution;
+import smile.stat.distribution.Mixture;
 
 import java.util.*;
 
@@ -31,6 +35,201 @@ public class IdxTree implements Iterable<Integer> {
         children = new int[bpoints.length][];
         index = new HashMap<>();
         distance = (usedistances ? new double[bpoints.length] : null);
+    }
+
+    /**
+     * Calculates the depth of each branch point in the tree.
+     * The depth is defined as the number of edges from the root to the branch point.
+     *
+     * @return an array where each element represents the depth of the corresponding branch point
+     */
+    public int[] getDepth() {
+        int[] depth = new int[parent.length];
+        for (int i = 0; i < parent.length; i ++) { // go through all indices
+            int myparent = parent[i];   // parent of the current index
+            if (myparent == -1)         // if root, depth is 0
+                depth[i] = 0;
+            else
+                depth[i] = depth[myparent] + 1;
+        }
+        return depth;
+    }
+
+    /**
+     * Calculates the width at each branch point in the tree.
+     * The width is defined as the number of leaves under the branch point.
+     *
+     * @return an array where each element represents the width of the corresponding branch point
+     */
+    public int[] getWidth() {
+        int[] width = new int[parent.length];
+        for (int i = 0; i < parent.length; i++) {
+            width[i] = countLeaves(i);
+        }
+        return width;
+    }
+
+    /**
+     * Calculates the whole-number log2 width at each branch point in the tree.
+     * The width is defined as the number of leaves under the branch point.
+     *
+     * @return an array where each element is the log2 of the width of the corresponding branch point
+     */
+    public double[] getLog2Width() {
+        double[] width = new double[parent.length];
+        for (int i = 0; i < parent.length; i++) {
+            int nleaves = countLeaves(i);
+            width[i] = Math.log(nleaves)/Math.log(2);
+        }
+        return width;
+    }
+
+    public double[] getLog2WidthThresholds(int nbins, double[] log2width) {
+        double[] log2sorted = Arrays.copyOf(log2width, log2width.length);
+        Arrays.sort(log2sorted);
+        double[] thresholds = new double[Math.max(nbins, 2)];
+        thresholds[0] = 0; // all leaf nodes are in the first bin
+        thresholds[1] = 1; // all ancestors with two leaves are in the second bin
+        // if only two bins, we are done because we include all ancestors in the second bin
+        if (nbins > 2) { // three bins or more, we'll have to figure out what other thresholds to us
+            int start = 0;
+            while (log2sorted[start] == 0 || log2sorted[start] == 1)
+                start++;
+            int binsize = (log2width.length - start) / (nbins - 2);
+            for (int t = 2; t < thresholds.length; t++)
+                thresholds[t] = log2sorted[start + (t - 2) * binsize];
+        }
+        return thresholds;
+    }
+
+    public int[] getBinned(double[] thresholds, double[] values2bin) {
+        int[] binned = new int[parent.length];
+        for (int i = 0; i < parent.length; i++) {
+            for (int j = 0; j < thresholds.length; j++) {
+                if (values2bin[i] <= thresholds[j]) {
+                    binned[i] = j;
+                    break;
+                }
+            }
+        }
+        return binned;
+    }
+
+    public int[] getBinned(int nbins, double[] values2bin) {
+        double[] thresholds = getLog2WidthThresholds(nbins, values2bin);
+        return getBinned(thresholds, values2bin);
+    }
+
+    /**
+     * Recursively counts the number of leaves under a given branch point.
+     *
+     * @param idx the index of the branch point
+     * @return the number of leaves under the branch point
+     */
+    private int countLeaves(int idx) {
+        if (isLeaf(idx)) {
+            return 1;
+        }
+        int count = 0;
+        for (int child : getChildren(idx)) {
+            count += countLeaves(child);
+        }
+        return count;
+    }
+
+    /**
+     * Get the indices of the leaves in the tree that are connected to the given leaf;
+     * limit the search to a given level (0 for root, 1 for the next level of sub-trees, etc.)
+     *
+     * @param leafcnt the left-to-right count of the leaf
+     * @param level the level of the search
+     * @param dmat  the distance matrix
+     * @return an array of count indices of the connected leaves
+     */
+    public static int[] getConnected(int leafcnt, int level, Double[][] dmat) {
+        List<Integer> idxs = new ArrayList<>();
+        int skip = 0; // number of skipped columns (corresponds to level)
+        int select = -1;
+        for (int b = 0; b < dmat[leafcnt].length; b ++) {
+            if (skip == level && dmat[leafcnt][b] != null) {
+                select = b;
+                break;
+            }
+            if (dmat[leafcnt][b] != null)
+                skip += 1;
+        }
+        if (select > 0) { // valid
+            for (int j = 0; j < dmat.length; j ++) {
+                if (dmat[j][select] != null && j != leafcnt)
+                    idxs.add(j);
+            }
+        }
+        int[] connected = new int[idxs.size()];
+        int cnt = 0;
+        for (Integer i : idxs)
+            connected[cnt ++] = i;
+        return connected;
+    }
+
+    /**
+     * Calculate the root-to-leaf distances for each leaf in the tree.
+     * @param dmat the distance matrix
+     * @return  an array of distances from the root to each leaf
+     */
+    protected static double[] getLeafDistances(Double[][] dmat) {
+        double[] leafdist = new double[dmat.length];
+        for (int i = 0; i < dmat.length; i ++) { // each row is a leaf
+            for (int j = 0; j < dmat[i].length; j ++) // each col is a branch (with a node idx)
+                leafdist[i] += dmat[i][j] == null ? 0 : dmat[i][j];
+        }
+        return leafdist;
+    }
+
+    protected static GaussianDistrib getLeafDistanceDistribution(Double[][] dmat) {
+        double[] leafdist = getLeafDistances(dmat);
+        return GaussianDistrib.estimate(leafdist);   // estimate distribution
+    }
+
+    /**
+     * Constructs a matrix of distances from each leaf node to the root.
+     * The matrix is represented as a 2D array where each row corresponds to a leaf node,
+     * and each column contains the distance from that leaf node to the root.
+     *
+     * @return a 2D array where each element represents the distance from a leaf node to the root
+     */
+    public Double[][] getDistance2RootMatrix() {
+        int[] leaves = getLeaves();
+        Double[][] distmat = new Double[leaves.length][distance.length];
+        for (int cnt = 0; cnt < leaves.length; cnt ++) {
+            int idx = leaves[cnt];
+            int parent = getParent(idx);
+            distmat[cnt][idx] = getDistance(idx);
+            while (parent != -1) {
+                distmat[cnt][parent] = getDistance(parent);
+                parent = getParent(parent);
+            }
+        }
+        return distmat;
+    }
+
+    /**
+     * Sets the distances from each leaf node to the root based on the given matrix.
+     * The matrix is represented as a 2D array where each row corresponds to a leaf node,
+     * and each column contains the distance from that leaf node to the root.
+     *
+     * @param distmat a 2D array where each element represents the distance from a leaf node to the root
+     */
+    public void setDistance2RootMatrix(Double[][] distmat) {
+        int[] leaves = getLeaves();
+        for (int cnt = 0; cnt < leaves.length; cnt ++) {
+            int idx = leaves[cnt];
+            int parent = getParent(idx);
+            setDistance(idx, distmat[cnt][idx]);
+            while (parent != -1 && distmat[cnt][parent] != null) {
+                setDistance(parent, distmat[cnt][parent]);
+                parent = getParent(parent);
+            }
+        }
     }
 
     @Override
@@ -710,6 +909,20 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
+     * Determines the leaf states of the tree.
+     * A leaf state is true if the branch point is a leaf (i.e., has no children), and false otherwise.
+     *
+     * @return a boolean array where each element represents the leaf state of the corresponding branch point
+     */
+    public boolean[] getLeafStates() {
+        boolean[] state = new boolean[children.length];
+        for (int i = 0; i < children.length; i ++)  // go through all indices
+            state[i] = isLeaf(i);
+        return state;
+    }
+
+
+    /**
      * Get the branch point indices for all nodes in this tree that are NOT leaves,
      * i.e. ancestors.
      * @return the indices of all ancestor nodes
@@ -810,15 +1023,11 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
-     * Calculates the parameters of a Gamma distribution based on the distances between branch points in the tree.
-     *
-     * This method collects all positive distances between branch points, then calculates the alpha and beta parameters
-     * of the Gamma distribution that best fits these distances.
-     *
-     * @return an array containing the alpha and beta parameters of the Gamma distribution
+     * Collect distances from all branches in the tree (except for the root, and those which are 0)
+     * @return the distances in an array
      */
-    public double[] getGammaParams() {
-        Set<Double> dists = new HashSet<>();
+    public double[] getValidDistances() {
+        List<Double> dists = new ArrayList<>();
         for (int idx : this) {
             if (idx == 0)
                 continue;
@@ -830,6 +1039,19 @@ public class IdxTree implements Iterable<Integer> {
         int k = 0;
         for (double d : dists)
             dists_arr[k ++] = d;
+        return dists_arr;
+    }
+
+    /**
+     * Calculates the parameters of a Gamma distribution based on the distances between branch points in the tree.
+     *
+     * This method collects all positive distances between branch points, then calculates the alpha and beta parameters
+     * of the Gamma distribution that best fits these distances.
+     *
+     * @return an array containing the alpha and beta parameters of the Gamma distribution
+     */
+    public double[] getGammaParams() {
+        double[] dists_arr = getValidDistances();
         double alpha1 = GammaDistrib.getAlpha(dists_arr);
         double beta1 = GammaDistrib.getBeta(dists_arr, alpha1);
         return new double[] {alpha1, beta1};
