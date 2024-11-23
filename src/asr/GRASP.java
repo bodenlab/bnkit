@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "20-Nov-2024";
+    public static String VERSION = "23-Nov-2024";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
