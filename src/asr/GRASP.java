@@ -745,7 +745,7 @@ public class GRASP {
                                 System.out.println("Or:");
                                 System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -inmodel " + bestsofar[1].getTrAVIS() + " -delmodel " + bestsofar[2].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor);
                                 System.out.println("Alternatively, consider specifying:");
-                                System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);
+                                System.out.println("Gap opening proportion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);
                             } else if (MODE == Inference.MARGINAL)
                                 usage(23, "TrAVIS reports must be based on joint reconstructions");
                         }
