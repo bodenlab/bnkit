@@ -43,7 +43,7 @@ import java.util.*;
  * Ultimately, tree and alignment files are saved.
  *
  * @author Mikael Boden
- * @author Chongting Zhao
+ * @author Chongting Zhaoo
  */
 public class TrAVIS {
     public static void usage() {
