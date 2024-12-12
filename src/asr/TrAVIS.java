@@ -43,7 +43,7 @@ import java.util.*;
  * Ultimately, tree and alignment files are saved.
  *
  * @author Mikael Boden
- * @author Chongting Zhaoo
+ * @author Chongting Zhao
  */
 public class TrAVIS {
     public static void usage() {
@@ -62,6 +62,7 @@ public class TrAVIS {
 //                "\t{-rf <rates-file>}\n" +
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
                 "\t{-rates <a>}\n" +
+                "\t{-indelrate <0.1(default)>}\n"+
                 "\t{-seed <random>}\n" +
                 "\t{-extants <5(default)>}\n" +
                 "\t{-dist <mean-extant-to-root>\n" +
@@ -108,6 +109,7 @@ public class TrAVIS {
     static Double LAMBDA_OF_DELMODEL = 1.0;
     static int DEL_MODEL_IDX = 0, IN_MODEL_IDX = 0;
     static Integer MAX_INDEL_LENGTH = 100;
+    static Double indelrate = 0.1;
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
@@ -176,7 +178,9 @@ public class TrAVIS {
                         usage(1, args[a + 1] + " is not a valid model name");
                 } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
                     SCALEINDEL = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("indelrate") && args.length > a + 1) {
+                    indelrate = Double.parseDouble(args[++a]);
+                }else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("lambda") && args.length > a + 1) {
                     LAMBDA_OF_DELMODEL = LAMBDA_OF_INMODEL = Double.parseDouble(args[++a]);
@@ -582,11 +586,15 @@ public class TrAVIS {
                     List<Double> tailrates = new ArrayList<>(); // collect character rates for the tail of the child; intended for tailing insertions
                     // note: we don't yet know how many indices are required for child so use list before moving to array
                     int i = 0;                                  // idx for parent position
-                    double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
-                    while (i < parseq.length) {                 // move through the child by incrementing the idx in the parent
-                        // three possibilities: 1. match and potential substitution, 2. deletion/s, and 3. insertion/s
-                        double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
+                    while (i < parseq.length) {
+                        // make sure the toss is different in each sites
+                        double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
 
+                        // move through the child by incrementing the idx in the parent
+                        // three possibilities: 1. match and potential substitution, 2. deletion/s, and 3. insertion/s
+                        //double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
+                        //change indel rate into a seperate rate
+                        double p = Math.exp(-(TrAVIS.indelrate*t));
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
                             EnumDistrib d = MODEL.getDistrib(parseq[i], (USERATES?rates[paridx][i]:1)*t); // bug fix 13/3/24, prev version did not multiply with site specific rate
                             Object nchar = null;
