@@ -32,7 +32,7 @@ import static stats.PowerLawCon.estimateAlpha;
  */
 public class GRASP {
 
-    public static String VERSION = "23-Nov-2024";
+    public static String VERSION = "16-Jan-2025";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
