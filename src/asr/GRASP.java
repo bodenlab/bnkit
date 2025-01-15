@@ -19,6 +19,11 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static bn.prob.GammaDistrib.getAlpha;
+import static bn.prob.GammaDistrib.getBeta;
+import static stats.PowerLawCon.computeMinMax;
+import static stats.PowerLawCon.estimateAlpha;
+
 /**
  * Command line version of GRASP.
  * @author mikael
@@ -628,10 +633,12 @@ public class GRASP {
                                 String[] names = aln.getNames();
                                 int[] ins_total = new int[0];
                                 int[] del_total = new int[0];
+                                List<Double> rList = new ArrayList<>();
                                 for (int idx : mytree) {
                                     int parent = mytree.getParent(idx);
                                     if (parent != -1) { // not root
-                                        dists.add(mytree.getDistance(idx));
+                                        double dist = mytree.getDistance(idx);
+                                        dists.add(dist);
                                         Object[] pseq = ancseqs_gappy[(Integer)mytree.getLabel(parent)];
                                         Object[] cseq = null;
                                         if (mytree.isLeaf(idx)) {
@@ -642,6 +649,9 @@ public class GRASP {
                                         }
                                         int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
                                         int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
+                                        int[] Events = TrAVIS.calculateIndelAndEvents(pseq, cseq);
+                                        double rate = TrAVIS.calculateRForNodes(Events,dist);
+                                        rList.add(rate);
                                         int[] ins_tmp = new int[Math.max(insertions.length, ins_total.length)];
                                         for (int j = 0; j < ins_tmp.length; j++) {
                                             ins_tmp[j] += j < insertions.length ? insertions[j] : 0;
@@ -668,6 +678,13 @@ public class GRASP {
                                     ninsertions += (j < ins_total.length ? ins_total[j] : 0);
                                     ndeletions += (j < del_total.length ? del_total[j] : 0);
                                 }
+                                //we fit the indel rate model
+                                double[] Minmax = computeMinMax(rList);
+                                double rhoAlpha = estimateAlpha(rList,Minmax[0]);
+                                double[] rarray = rList.stream().mapToDouble(Double::doubleValue).toArray();
+                                double rhoshape = getAlpha(rarray);
+                                double rhobeta = getBeta(rarray,rhoshape);
+
                                 if (VERBOSE) {
                                     System.out.println("Indels\tInsertions\tDeletions");
                                     System.out.println("Len\tCnt\tCnt\tCnt");
@@ -675,7 +692,9 @@ public class GRASP {
                                         System.out.println((j + 1) + "\t" + indel_total[j] + "\t" + (j < ins_total.length ? ins_total[j] : 0) + "\t" + (j < del_total.length ? del_total[j] : 0));
                                     }
                                 }
+
                                 double delprop = (double) ndeletions / (double) (ninsertions + ndeletions);
+
                                 if (VERBOSE)
                                     System.out.println("Deletion proportion= " + delprop);
                                 /* Trying the following distributions (with params)
@@ -736,16 +755,16 @@ public class GRASP {
                                     System.out.println("N0= " + n0.toString());
                                 Double rates_alpha = null;
                                 if (RATES != null) { // position-specific rates available
-                                    rates_alpha = GammaDistrib.getAlpha(RATES);
+                                    rates_alpha = getAlpha(RATES);
                                     if (VERBOSE)
                                         System.out.println("Position-specific rates Gamma shape= " + rates_alpha + " scale= " + 1.0/rates_alpha);
                                 }
                                 System.out.println("To reproduce pseudo-biological properties of current reconstruction, use TrAVIS with the following parameters:");
-                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -indelmodel " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor);
+                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -indelmodel " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor + " -rhomodel powerlaw " + rhoAlpha + " " + Minmax[1] + " -rhomodel gamma " + rhoshape + " " + 1.0/rhobeta);
                                 System.out.println("Or:");
-                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -inmodel " + bestsofar[1].getTrAVIS() + " -delmodel " + bestsofar[2].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor);
+                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -inmodel " + bestsofar[1].getTrAVIS() + " -delmodel " + bestsofar[2].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor +  " -rhomodel powerlaw " + rhoAlpha + " " + Minmax[1] + " -rhomodel gamma " + rhoshape + " " + 1.0/rhobeta);
                                 System.out.println("Alternatively, consider specifying:");
-                                System.out.println("Gap opening proportion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);
+                                System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);
                             } else if (MODE == Inference.MARGINAL)
                                 usage(23, "TrAVIS reports must be based on joint reconstructions");
                         }

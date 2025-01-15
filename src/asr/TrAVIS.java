@@ -62,7 +62,7 @@ public class TrAVIS {
 //                "\t{-rf <rates-file>}\n" +
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
                 "\t{-rates <a>}\n" +
-                "\t{-indelrate <0.1(default)>}\n"+
+                "\t{-Rhomodel <powerlaw|gamma><model-param1> <model-param2>}\n"+
                 "\t{-seed <random>}\n" +
                 "\t{-extants <5(default)>}\n" +
                 "\t{-dist <mean-extant-to-root>\n" +
@@ -109,7 +109,9 @@ public class TrAVIS {
     static Double LAMBDA_OF_DELMODEL = 1.0;
     static int DEL_MODEL_IDX = 0, IN_MODEL_IDX = 0;
     static Integer MAX_INDEL_LENGTH = 100;
-    static Double indelrate = 0.1;
+    static Double Rhoparam1 = 1.5;
+    static Double Rhoparam2 = 100.0;
+    static String Rhomodel = "powerlaw";
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
@@ -178,8 +180,10 @@ public class TrAVIS {
                         usage(1, args[a + 1] + " is not a valid model name");
                 } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
                     SCALEINDEL = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("indelrate") && args.length > a + 1) {
-                    indelrate = Double.parseDouble(args[++a]);
+                } else if (arg.equalsIgnoreCase("Rhomodel") && args.length > a + 3) {
+                    Rhomodel = args[a+1];
+                    Rhoparam1 = Double.parseDouble(args[a+2]);
+                    Rhoparam2 = Double.parseDouble(args[a+3]);
                 }else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("lambda") && args.length > a + 1) {
@@ -495,6 +499,63 @@ public class TrAVIS {
         return ret;
     }
 
+    /**
+     * Calculate indels, matches, and mismatches between a parent and a child sequence.
+     *
+     * @param seq1 The sequence of the parent node.
+     * @param seq2  The sequence of the child node.
+     * @return An array of three integers: indels, matches, and mismatches.
+     */
+    public static int[] calculateIndelAndEvents(Object[] seq1, Object[] seq2) {
+        int indels = 0;
+        int matches = 0;
+        int mismatches = 0;
+
+        int length = Math.min(seq1.length, seq2.length);
+        for (int i = 0; i < length; i++) {
+            if (seq1[i] == null &&  seq2[i] != null) {
+                indels++;  // Insertion
+            } else if (seq2[i] == null && seq1[i] != null) {
+                indels++;  // Deletion
+            } else if (seq1[i] == seq2[i] && seq1[i] != null && seq2[i] != null) {
+                matches++;  // Match
+            } else if (seq1[i] != seq2[i] && seq1[i] != null && seq2[i] != null) {
+                mismatches++;  // Mismatch
+            }
+        }
+
+        return new int[]{indels, matches, mismatches};
+    }
+
+    /**
+     * Calculate the relative indel rate (r) for each node in a tree.
+     *
+     * @param Events    indel, match mismatch
+     * @param branchLength Branch lengths from parent to child.
+     * @return indel rates for a node.
+     */
+    public static Double calculateRForNodes(int[]Events,double branchLength) {
+
+
+        double rs = 0;
+        int indels = Events[0];
+        int matches = Events[1];
+        int mismatches = Events[2];
+
+        // Total alignment events (B)
+        double B = matches + mismatches + indels;
+        // Calculate r using the formula
+        if (B > 0 && branchLength > 0) {
+            rs = -Math.log(1 - (double) indels / B) / branchLength;
+        }
+
+        if (rs ==0) {
+            rs =1e-3;
+            };
+
+        return rs;
+    }
+
 
     /**
      * Class to track ancestor sequence to extants via intermediate ancestors.
@@ -513,6 +574,8 @@ public class TrAVIS {
 
         IndelModel inmodel = null;
         IndelModel delmodel = null;
+        PowerLawCon rhomodelpower = null;
+        GammaDistrib rhomodelgamma = null;
 
         public final Tree tree;
         private final TreeInstance ti_seqs;
@@ -548,6 +611,12 @@ public class TrAVIS {
                 case 2 -> delmodel  = new Zipf(LAMBDA_OF_DELMODEL, SEED + 1, MAX_INDEL_LENGTH);
                 case 3 -> delmodel  = new Lavalette(LAMBDA_OF_DELMODEL, SEED + 1, MAX_INDEL_LENGTH);
                 default -> throw new IllegalArgumentException("Invalid model index");
+            }
+
+            if (Rhomodel.equalsIgnoreCase("powerlaw")){
+                rhomodelpower = new PowerLawCon(Rhoparam1,SEED,0.001,Rhoparam2);
+            } else if (Rhomodel.equalsIgnoreCase("gamma")) {
+                rhomodelgamma = new GammaDistrib(Rhoparam1,Rhoparam2);
             }
 
             if (USERATES) {
@@ -586,15 +655,22 @@ public class TrAVIS {
                     List<Double> tailrates = new ArrayList<>(); // collect character rates for the tail of the child; intended for tailing insertions
                     // note: we don't yet know how many indices are required for child so use list before moving to array
                     int i = 0;                                  // idx for parent position
+
+                    double Rho = 0;
+                    if (Rhomodel.equalsIgnoreCase("powerlaw")){
+                        Rho = rhomodelpower.sample();
+                    } else if (Rhomodel.equalsIgnoreCase("gamma")) {
+                        Rho = rhomodelgamma.sample();
+                    }
                     while (i < parseq.length) {
                         // make sure the toss is different in each sites
-                        double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
-
                         // move through the child by incrementing the idx in the parent
                         // three possibilities: 1. match and potential substitution, 2. deletion/s, and 3. insertion/s
                         //double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
                         //change indel rate into a seperate rate
-                        double p = Math.exp(-(TrAVIS.indelrate*t));
+                        double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
+
+                        double p = Math.exp(-(Rho*t));
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
                             EnumDistrib d = MODEL.getDistrib(parseq[i], (USERATES?rates[paridx][i]:1)*t); // bug fix 13/3/24, prev version did not multiply with site specific rate
                             Object nchar = null;
@@ -733,6 +809,8 @@ public class TrAVIS {
         public TreeInstance getTreeWithInsertions() {
             return ti_insertions;
         }
+
+
 
         public EnumSeq[] getSequences() {
             Object[] oseqs = ti_seqs.getInstance();
