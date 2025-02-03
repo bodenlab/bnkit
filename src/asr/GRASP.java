@@ -243,7 +243,7 @@ public class GRASP {
 
             return mixture;
         } catch (StackOverflowError e) {
-            return null; // EM 失败返回 null
+            return null; 
         }
     }
 
