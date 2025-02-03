@@ -500,8 +500,6 @@ public class GRASP {
         for (int i = 0; i < ncomponents; i++) {
             GammaDistribution gamma = new GammaDistribution(alphas[i], betas[i]);
             gammaComponents[i] = new Mixture.Component(weights[i], gamma);
-
-            // 打印每个分量的参数
             System.out.printf("Component %d -> Shape (α): %.4f, Scale (β): %.4f, Weight: %.4f%n",
                     i + 1, alphas[i], betas[i], weights[i]);
         }
