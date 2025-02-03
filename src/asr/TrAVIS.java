@@ -13,8 +13,10 @@ import dat.phylo.BranchPoint;
 import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
+import smile.stat.distribution.Distribution;
+import smile.stat.distribution.GammaDistribution;
 import stats.*;
-
+import smile.stat.distribution.Mixture;
 import java.io.*;
 import java.util.*;
 
@@ -48,6 +50,16 @@ import java.util.*;
 public class TrAVIS {
     public static void usage() {
         usage(0, null);
+    }
+
+    // Method to parse a string like "[1,2,3]" into a double array
+    private static double[] parseArray(String input) {
+        // Remove brackets and split by comma
+        String cleaned = input.replaceAll("[\\[\\]]", "");
+        String[] parts = cleaned.split(",");
+
+        // Convert string parts to double values
+        return Arrays.stream(parts).mapToDouble(Double::parseDouble).toArray();
     }
 
     public static void usage(int error, String msg) {
@@ -94,7 +106,7 @@ public class TrAVIS {
                 "\tDNA models include Jukes-Cantor and Yang (general reversible process model).\n" +
                 "\tTree is set to have specified extants and gets distances from the Gamma distribution, with parameters:\n\t\tshape (aka a and K)\n\t\tscale (aka b, where Lambda=1/b)\n" +
                 "\tmean distance to root is used to scale distances in the tree (noting that greater number of extants \n\tindirectly amplifies the time scope of the tree).\n" +
-                "\tPosition-specific evolutionary rates from a Gamma distribution with specified parameter \"a\" and mean 1;\n\t if rate is unspecified, a uniform rate 1 is used.\n" +
+                "\tPosition-specific substitution rates from a Gamma distribution with specified parameter \"a\" and mean 1;\n\t if rate is unspecified, a uniform rate 1 is used.\n" +
                 "\tRates for insertions and deletions are scaled by -indel <factor> (factor > 1 reduces, factor < 1 increases chance of indels).\n" +
                 "\tThe proportion of deletions relative to insertions and deletions is given by -delprop <proportion> (proportion < 0.5 means that insertions will dominate.\n" +
                 "\tThe parameter for indel/deletion/insertion length distribution models for proteins are provided as an argument.\n" +
@@ -111,7 +123,10 @@ public class TrAVIS {
     static Integer MAX_INDEL_LENGTH = 100;
     static Double Rhoparam1 = 1.5;
     static Double Rhoparam2 = 100.0;
-    static String Rhomodel = "powerlaw";
+    static String Rhomodel = "other";
+    static double[] gammashape = new double[2];
+    static double[] gammascale = new double[2];
+    static double[] gammaweight = new double[2];
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
@@ -125,6 +140,7 @@ public class TrAVIS {
         double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
         double GAMMA_SCALE = 0.2;
         int DESCENDANTS_MAX = 2, DESCENDANTS_MIN = 2; // Max and min of tree branching
+
 
         String[] MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
         int MODEL_IDX = 0; // default model is that above indexed
@@ -184,6 +200,10 @@ public class TrAVIS {
                     Rhomodel = args[a+1];
                     Rhoparam1 = Double.parseDouble(args[a+2]);
                     Rhoparam2 = Double.parseDouble(args[a+3]);
+                }else if (arg.equalsIgnoreCase("gammamix") && args.length > a + 3) {
+                    gammashape = parseArray(args[a + 1]);
+                    gammascale = parseArray(args[a + 2]);
+                    gammaweight = parseArray(args[a + 3]);
                 }else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("lambda") && args.length > a + 1) {
@@ -550,7 +570,7 @@ public class TrAVIS {
         }
 
         if (rs ==0) {
-            rs =1e-3;
+            rs =1e-4;
             };
 
         return rs;
@@ -576,6 +596,7 @@ public class TrAVIS {
         IndelModel delmodel = null;
         PowerLawCon rhomodelpower = null;
         GammaDistrib rhomodelgamma = null;
+        Mixture mixture = null;
 
         public final Tree tree;
         private final TreeInstance ti_seqs;
@@ -618,6 +639,13 @@ public class TrAVIS {
             } else if (Rhomodel.equalsIgnoreCase("gamma")) {
                 rhomodelgamma = new GammaDistrib(Rhoparam1,Rhoparam2);
             }
+            if (gammashape[0]!=0 || gammashape[1]!=0){
+                Distribution gamma1 = new GammaDistribution(gammashape[0], gammascale[0]);
+                Distribution gamma2 = new GammaDistribution(gammashape[1], gammascale[1]);
+
+                Mixture.Component component1 = new Mixture.Component(gammaweight[0], gamma1);
+                Mixture.Component component2 = new Mixture.Component(gammaweight[1], gamma2);
+                mixture = new Mixture(component1, component2);}
 
             if (USERATES) {
                 gamma = new GammaDistrib(ratesgamma, ratesgamma); // mean is a/b so setting b=a
@@ -661,7 +689,8 @@ public class TrAVIS {
                         Rho = rhomodelpower.sample();
                     } else if (Rhomodel.equalsIgnoreCase("gamma")) {
                         Rho = rhomodelgamma.sample();
-                    }
+                    } else {
+                        Rho = mixture.rand();}
                     while (i < parseq.length) {
                         // make sure the toss is different in each sites
                         // move through the child by incrementing the idx in the parent
@@ -704,6 +733,7 @@ public class TrAVIS {
                                 // we place it at either end with a uniform coin toss
                                 int k;
                                 k = inmodel.sample(); // length, can only delete what is left of the sequence
+
                                 insertions[idx][i == 0 ? (rand.nextBoolean() ? 0 : parseq.length) : i] += k; // insertions can be on top of another
                                 for (int j = 0; j < k; j ++) {
                                     Object nchar = null;
@@ -903,6 +933,7 @@ public class TrAVIS {
             getAlignment();
             return alignedrates;
         }
+
 
         private void build(int idx, EnumNode start, EnumNode[] nodes, EnumNode end, Set<EnumEdge> edges) {
             enumNodes[idx] = nodes;
