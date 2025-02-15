@@ -142,164 +142,7 @@ public class GRASP {
             out.println("\n" + msg + " (Error " + error + ")");
         System.exit(error);
     }
-    /**
-     * Estimates the weight of each component in the mixture for a given dataset.
-     *
-     * @param mixture The mixture of Gamma distributions
-     * @param data The input data to estimate component weights
-     * @return An array containing the estimated weights for each component
-     */
-    public static double[] estimateComponentWeights(Mixture mixture, double[] data) {
-        int numComponents = mixture.size();
-        double[] componentWeights = new double[numComponents];
 
-        // Iterate over each data point
-        for (double x : data) {
-            double[] posteriori = mixture.posteriori(x); // Compute posterior probabilities
-            for (int i = 0; i < numComponents; i++) {
-                componentWeights[i] += posteriori[i]; // Accumulate posterior probabilities
-            }
-        }
-
-        // Normalize component weights
-        double totalWeight = Arrays.stream(componentWeights).sum();
-        for (int i = 0; i < numComponents; i++) {
-            componentWeights[i] /= totalWeight;
-        }
-        // **打印 componentWeights**
-        System.out.println("Component Weights: " + Arrays.toString(componentWeights));
-        return componentWeights;
-    }
-
-    /**
-     * Extracts a sub-mixture from a given mixture by filtering components
-     * whose weights exceed a given threshold.
-     *
-     * @param mixture The original mixture of Gamma distributions
-     * @param componentWeights The weights of each component in the mixture
-     * @param threshold The minimum weight required to retain a component
-     * @return A new Mixture containing only the significant components
-     */
-    public static Mixture extractSubMixture(Mixture mixture, double[] componentWeights, double threshold) {
-        List<Mixture.Component> subComponents = new ArrayList<>();
-
-        // Retain only components whose weight exceeds the threshold
-        for (int i = 0; i < componentWeights.length; i++) {
-            if (componentWeights[i] > threshold) {
-                subComponents.add(mixture.components[i]);
-            }
-        }
-
-        // Re-normalize weights
-        double totalWeight = subComponents.stream().mapToDouble(c -> c.priori).sum();
-        for (int i = 0; i < subComponents.size(); i++) {
-            Mixture.Component c = subComponents.get(i);
-            subComponents.set(i, new Mixture.Component(c.priori / totalWeight, c.distribution));
-        }
-
-        // Return the new sub-mixture
-        return new Mixture(subComponents.toArray(new Mixture.Component[0]));
-    }
-
-
-
-    public static Mixture getGammaMixture(double[] data, int ncomponents) {
-        if (data == null || data.length == 0) {
-            throw new IllegalArgumentException("Input data cannot be null or empty");
-        }
-
-        for (double d : data) {
-            if (d < 0 || Double.isNaN(d) || Double.isInfinite(d)) {
-                throw new IllegalArgumentException("Gamma distribution requires non-negative data");
-            }
-        }
-
-        Arrays.sort(data);
-
-        int subsetSize = data.length / ncomponents;
-        GammaDistribution[] gammas = new GammaDistribution[ncomponents];
-        Mixture.Component[] components = new Mixture.Component[ncomponents];
-
-        for (int i = 0; i < ncomponents; i++) {
-            int start = i * subsetSize;
-            int end = (i == ncomponents - 1) ? data.length : start + subsetSize;
-            double[] subset = Arrays.copyOfRange(data, start, end);
-
-            gammas[i] = GammaDistribution.fit(subset);
-            components[i] = new Mixture.Component(1.0 / ncomponents, gammas[i]);
-        }
-
-        try {
-            Mixture mixture = ExponentialFamilyMixture.fit(data, components, 0, 200, 1E-4);
-
-            System.out.println("Fitted Gamma Mixture Model:");
-            for (int i = 0; i < ncomponents; i++) {
-                GammaDistribution g = (GammaDistribution) mixture.components[i].distribution;
-                double shape = g.theta;
-                double scale = g.k;
-                double weight = mixture.components[i].priori;
-                System.out.printf("Component %d -> Shape: %.4f, Scale: %.4f, Weight: %.4f%n", i + 1, shape, scale, weight);
-            }
-
-            return mixture;
-        } catch (StackOverflowError e) {
-            return null; 
-        }
-    }
-
-
-    /**
-     * Fits a mixture of Gaussian (Normal) distributions to the given data.
-     *
-     * @param data The input data (double array) to be fitted
-     * @param ncomponents The number of Gaussian distributions in the mixture
-     * @return The fitted mixture of Gaussian distributions
-     */
-    public static Mixture getGaussianMixture(double[] data, int ncomponents) {
-        if (data == null || data.length == 0) {
-            throw new IllegalArgumentException("Input data cannot be null or empty");
-        }
-
-        // Sort data for stable processing
-        Arrays.sort(data);
-
-        // Split data into ncomponents subsets
-        int subsetSize = data.length / ncomponents;
-        GaussianDistribution[] gaussians = new GaussianDistribution[ncomponents];
-        Mixture.Component[] components = new Mixture.Component[ncomponents];
-
-        for (int i = 0; i < ncomponents; i++) {
-            int start = i * subsetSize;
-            int end = (i == ncomponents - 1) ? data.length : start + subsetSize;
-            double[] subset = Arrays.copyOfRange(data, start, end);
-
-            // Fit each subset to a Gaussian distribution
-            gaussians[i] = GaussianDistribution.fit(subset);
-            components[i] = new Mixture.Component(1.0 / ncomponents, gaussians[i]);
-        }
-
-        // Perform Expectation-Maximization (EM) to refine the mixture
-        try {
-            Mixture mixture = ExponentialFamilyMixture.fit(data, components, 0, 200, 1E-4);
-
-            System.out.println("Fitted Gaussian Mixture Model:");
-            for (int i = 0; i < ncomponents; i++) {
-                GaussianDistribution g = (GaussianDistribution) mixture.components[i].distribution;
-                double mean = g.mu;
-                double stdDev = g.sigma;
-                double weight = mixture.components[i].priori;
-                double variance = stdDev * stdDev;
-                double alpha = (mean * mean) / variance;
-                double beta = variance / mean;
-                System.out.printf("Component %d -> Mean: %.4f, Std Dev: %.4f, Weight: %.4f%n", i + 1, mean, stdDev, weight);
-                System.out.printf("Converted Gamma -> Shape (α): %.4f, Scale (β): %.4f%n", alpha, beta);
-            }
-
-            return mixture;
-        } catch (StackOverflowError e) {
-            return null; // Return null if EM fails
-        }
-    }
 
     public static void main(String[] args) {
 
@@ -473,38 +316,8 @@ public class GRASP {
                 }
             }
         }
-        /**
-        try {
-            String content = new String(Files.readAllBytes(Paths.get("rate_list_results.json")));
-
-            JSONArray jsonArray = new JSONArray(content);
 
 
-            double[] parsedArray = DoubleStream.iterate(0, i -> i + 1)
-                    .limit(jsonArray.length())
-                    .map(i -> jsonArray.getDouble((int) i))
-                    .toArray();
-
-            Mixture mixture = getGaussianMixture(parsedArray,2);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-         */
-
-        double[] alphas = {100.000, 0.9182}; // 形状参数 α
-        double[] betas = {0.000001, 0.0899};  // 尺度参数 β
-        double[] weights = {0.7813, 0.2187}; // 权重
-        int ncomponents = alphas.length;
-        Mixture.Component[] gammaComponents = new Mixture.Component[ncomponents];
-
-        for (int i = 0; i < ncomponents; i++) {
-            GammaDistribution gamma = new GammaDistribution(alphas[i], betas[i]);
-            gammaComponents[i] = new Mixture.Component(weights[i], gamma);
-            System.out.printf("Component %d -> Shape (α): %.4f, Scale (β): %.4f, Weight: %.4f%n",
-                    i + 1, alphas[i], betas[i], weights[i]);
-        }
-
-        Mixture gammaMixture = new Mixture(gammaComponents);
 
         if (ALIGNMENT == null && INPUT == null)
             usage(3, "Must specify alignment (--aln <Clustal or FASTA file>) or previously saved folder (--input-folder <folder>");
@@ -819,7 +632,7 @@ public class GRASP {
                                 double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
                                 double gap_open_prop = (double) aln.getGapStartCount() / (double) (aln.getWidth() * aln.getHeight());
                                 double gap_length = aln.getMeanGapLength();
-                                double indel_factor = 10; // FIXME: this is the default value
+                                //double indel_factor = 10; // FIXME: this is the default value
                                 if (VERBOSE) {
                                     System.out.println("Gap proportion= " + gap_prop);
                                     System.out.println("Gap opening proportion= " + gap_open_prop);
@@ -877,14 +690,7 @@ public class GRASP {
                                     ninsertions += (j < ins_total.length ? ins_total[j] : 0);
                                     ndeletions += (j < del_total.length ? del_total[j] : 0);
                                 }
-                                //we fit the indel rate model
-                                double[] Minmax = computeMinMax(rList);
-                                double rhoAlpha = estimateAlpha(rList,Minmax[0]);
-                                double[] rarray = rList.stream().mapToDouble(Double::doubleValue).toArray();
-                                double rhoshape = getAlpha(rarray);
-                                double rhobeta = getBeta(rarray,rhoshape);
-                                double[] arr = rList.stream().mapToDouble(Double::doubleValue).toArray();
-                                double[] weight = estimateComponentWeights(gammaMixture,arr);
+
 
 
                                 if (VERBOSE) {
@@ -896,6 +702,12 @@ public class GRASP {
                                 }
 
                                 double delprop = (double) ndeletions / (double) (ninsertions + ndeletions);
+
+                                double[] rarray = rList.stream().mapToDouble(Double::doubleValue).toArray();
+                                ZeroInflatedGamma zig = ZeroInflatedGamma.fit(rarray);
+                                double rhoP = zig.getP();
+                                double rhoShape = zig.getShape();
+                                double rhoScale = zig.getScale();
 
                                 if (VERBOSE)
                                     System.out.println("Deletion proportion= " + delprop);
@@ -962,9 +774,9 @@ public class GRASP {
                                         System.out.println("Position-specific rates Gamma shape= " + rates_alpha + " scale= " + 1.0/rates_alpha);
                                 }
                                 System.out.println("To reproduce pseudo-biological properties of current reconstruction, use TrAVIS with the following parameters:");
-                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -indelmodel " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor + " -rhomodel powerlaw " + rhoAlpha + " " + Minmax[1] + " -rhomodel gamma " + rhoshape + " " + 1.0/rhobeta);
+                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -indelmodel " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -rhoP " + rhoP + " -rhoShape " + rhoShape + " -rhoScale " + rhoScale);
                                 System.out.println("Or:");
-                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -inmodel " + bestsofar[1].getTrAVIS() + " -delmodel " + bestsofar[2].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor +  " -rhomodel powerlaw " + rhoAlpha + " " + Minmax[1] + " -rhomodel gamma " + rhoshape + " " + 1.0/rhobeta);
+                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -inmodel " + bestsofar[1].getTrAVIS() + " -delmodel " + bestsofar[2].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop  + " -rhoP " + rhoP + " -rhoShape " + rhoShape + " -rhoScale " + rhoScale);
                                 System.out.println("Alternatively, consider specifying:");
                                 System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);
                             } else if (MODE == Inference.MARGINAL)
