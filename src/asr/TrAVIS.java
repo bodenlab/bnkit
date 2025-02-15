@@ -74,7 +74,7 @@ public class TrAVIS {
 //                "\t{-rf <rates-file>}\n" +
                 "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
                 "\t{-rates <a>}\n" +
-                "\t{-Rhomodel <powerlaw|gamma><model-param1> <model-param2>}\n"+
+                "\t{-Rhomodel <p> <shape> <scale>}\n"+
                 "\t{-seed <random>}\n" +
                 "\t{-extants <5(default)>}\n" +
                 "\t{-dist <mean-extant-to-root>\n" +
@@ -98,7 +98,9 @@ public class TrAVIS {
                 "\t\"-indelmodel\" specifies the indel length distribution function, which serves to model both deletions and insertions\n" +
                 "\t\"-delmodel\" specifies the deletion length distribution, which overrides that specified with \"-indelmodel\"\n" +
                 "\t\"-inmodel\" specifies the insertion length distribution, which overrides that specified with \"-indelmodel\"\n" +
-                "\t\"-maxindel\" specifies the maximum length of an indel\n" +
+                "\t\"-Rhomodel\" the model for indel rate with a zero inflated gamma input the probaility of zero, the shape and scale of the gamma\n"+
+                "\t\"-maxindel\" specifies the maximum length of an indel\n"+
+                "\t\"-dist\" it can scale the distances of the tree only works when tree is not provide\n" +
                 "\t\"-verbose\" means that details of evolutionary events are printed out on standard-output)\n" +
                 "\t\"-help\" prints out the parameters and instructions of how to use this tool\n");
         out.println("Notes: \n" +
@@ -121,12 +123,10 @@ public class TrAVIS {
     static Double LAMBDA_OF_DELMODEL = 1.0;
     static int DEL_MODEL_IDX = 0, IN_MODEL_IDX = 0;
     static Integer MAX_INDEL_LENGTH = 100;
-    static Double Rhoparam1 = 1.5;
-    static Double Rhoparam2 = 100.0;
-    static String Rhomodel = "other";
-    static double[] gammashape = new double[2];
-    static double[] gammascale = new double[2];
-    static double[] gammaweight = new double[2];
+    static Double RhoShape = 1.0;
+    static Double RhoScale = 1.0;
+    static Double RhoP = 0.5;
+
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
@@ -197,13 +197,9 @@ public class TrAVIS {
                 } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
                     SCALEINDEL = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("Rhomodel") && args.length > a + 3) {
-                    Rhomodel = args[a+1];
-                    Rhoparam1 = Double.parseDouble(args[a+2]);
-                    Rhoparam2 = Double.parseDouble(args[a+3]);
-                }else if (arg.equalsIgnoreCase("gammamix") && args.length > a + 3) {
-                    gammashape = parseArray(args[a + 1]);
-                    gammascale = parseArray(args[a + 2]);
-                    gammaweight = parseArray(args[a + 3]);
+                    RhoP = Double.parseDouble(args[a+1]);
+                    RhoShape = Double.parseDouble(args[a+2]);
+                    RhoScale = Double.parseDouble(args[a+3]);
                 }else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("lambda") && args.length > a + 1) {
@@ -569,9 +565,9 @@ public class TrAVIS {
             rs = -Math.log(1 - (double) indels / B) / branchLength;
         }
 
-        if (rs ==0) {
-            rs =1e-4;
-            };
+        //if (rs ==0) {
+            //rs =1e-4;
+            //};
 
         return rs;
     }
@@ -594,9 +590,7 @@ public class TrAVIS {
 
         IndelModel inmodel = null;
         IndelModel delmodel = null;
-        PowerLawCon rhomodelpower = null;
-        GammaDistrib rhomodelgamma = null;
-        Mixture mixture = null;
+        ZeroInflatedGamma rhomodel = null;
 
         public final Tree tree;
         private final TreeInstance ti_seqs;
@@ -634,18 +628,7 @@ public class TrAVIS {
                 default -> throw new IllegalArgumentException("Invalid model index");
             }
 
-            if (Rhomodel.equalsIgnoreCase("powerlaw")){
-                rhomodelpower = new PowerLawCon(Rhoparam1,SEED,0.001,Rhoparam2);
-            } else if (Rhomodel.equalsIgnoreCase("gamma")) {
-                rhomodelgamma = new GammaDistrib(Rhoparam1,Rhoparam2);
-            }
-            if (gammashape[0]!=0 || gammashape[1]!=0){
-                Distribution gamma1 = new GammaDistribution(gammashape[0], gammascale[0]);
-                Distribution gamma2 = new GammaDistribution(gammashape[1], gammascale[1]);
-
-                Mixture.Component component1 = new Mixture.Component(gammaweight[0], gamma1);
-                Mixture.Component component2 = new Mixture.Component(gammaweight[1], gamma2);
-                mixture = new Mixture(component1, component2);}
+            rhomodel = new ZeroInflatedGamma(RhoP,RhoShape,RhoScale,SEED);
 
             if (USERATES) {
                 gamma = new GammaDistrib(ratesgamma, ratesgamma); // mean is a/b so setting b=a
@@ -683,14 +666,7 @@ public class TrAVIS {
                     List<Double> tailrates = new ArrayList<>(); // collect character rates for the tail of the child; intended for tailing insertions
                     // note: we don't yet know how many indices are required for child so use list before moving to array
                     int i = 0;                                  // idx for parent position
-
-                    double Rho = 0;
-                    if (Rhomodel.equalsIgnoreCase("powerlaw")){
-                        Rho = rhomodelpower.sample();
-                    } else if (Rhomodel.equalsIgnoreCase("gamma")) {
-                        Rho = rhomodelgamma.sample();
-                    } else {
-                        Rho = mixture.rand();}
+                    double Rho = rhomodel.sample();
                     while (i < parseq.length) {
                         // make sure the toss is different in each sites
                         // move through the child by incrementing the idx in the parent
