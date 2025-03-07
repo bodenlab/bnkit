@@ -20,6 +20,8 @@ import smile.stat.distribution.Mixture;
 import java.io.*;
 import java.util.*;
 
+import static bn.prob.GammaDistrib.getAlpha;
+
 /**
  * Track Ancestor Via Indels and Substitutions.
  *
@@ -72,37 +74,40 @@ public class TrAVIS {
                 "\t[-n0 <ancestor-seq>]\n" +
                 "\t[-nwk <tree-file> -out <output-file-or-dir>]\n" +
 //                "\t{-rf <rates-file>}\n" +
-                "\t{-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
-                "\t{-rates <a>}\n" +
-                "\t{-Rhomodel <p> <shape> <scale>}\n"+
-                "\t{-seed <random>}\n" +
-                "\t{-extants <5(default)>}\n" +
-                "\t{-dist <mean-extant-to-root>\n" +
-                "\t{-shape <1.1(default)>}\n" +
-                "\t{-scale <0.2(default)>}\n" +
-                "\t{-indel <1.0(default)>}\n" +
-                "\t{-delprop <0.5(default)>}\n" +
-                "\t{-indelmodel <ZeroTruncatedPoisson(default)|Poisson|Zipf|Lavalette> <model-param>}\n"+
-                "\t{-delmodel <ZeroTruncatedPoisson|Poisson|Zipf|Lavalette> <model-param>}\n"+
-                "\t{-inmodel <ZeroTruncatedPoisson|Poisson|Zipf|Lavalette> <model-param>}\n"+
-                "\t{-maxindel <max-indel-length>}\n"+
-                "\t{-gap}\n" +
-                "\t{-format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
-                "\t{-verbose}\n" +
-                "\t{-help}\n");
+                "\t{-m <Substitution model(JTT(default)|Dayhoff|LG|WAG|JC|Yang)>{substitution-rate}}\n" +
+//                "\t{-rates <a>}\n" +
+                "\t{-rf <subtitution-rates-file>}\n" +
+                "\t{--indelmodel <p> <shape> <scale>}\n"+
+                "\t{--seed <random>}\n" +
+                "\t{--extants <5(default)>}\n" +
+                "\t{-d <brdist_shape,brdist_scale,avg_treedist>}\n"+
+ //               "\t{-dist <mean-extant-to-root>\n" +
+//                "\t{-shape <1.1(default)>}\n" +
+//                "\t{-scale <0.2(default)>}\n" +
+//                "\t{-indel <1.0(default)>}\n" +
+                "\t{--delprop <0.5(default)>}\n" +
+//                "\t{--indelsize <ZeroTruncatedPoisson(default)|Poisson|Zipf|Lavalette> <model-param>}\n"+
+                "\t{--delsize <ZeroTruncatedPoisson|Poisson|Zipf|Lavalette> <model-param>}\n"+
+                "\t{--inssize <ZeroTruncatedPoisson|Poisson|Zipf|Lavalette> <model-param>}\n"+
+                "\t{--maxdellen <max-del-length>}\n"+
+                "\t{--maxinslen <max-del-length>}\n"+
+                "\t{--gap}\n" +
+                "\t{--format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
+                "\t{--verbose}\n" +
+                "\t{--help}\n");
         out.println("where \n" +
                 "\ttree-file is a phylogenetic tree on Newick format\n" +
                 "\toutput-file-or-dir is the filename or name of directory of results\n" +
 //                "\trates-file is a tabulated file with relative, position-specific rates\n\t\tAs an example, IQ-TREE produces rates on the accepted format\n" +
-                "\t\"-gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n" +
-                "\t\"-indelmodel\" specifies the indel length distribution function, which serves to model both deletions and insertions\n" +
-                "\t\"-delmodel\" specifies the deletion length distribution, which overrides that specified with \"-indelmodel\"\n" +
-                "\t\"-inmodel\" specifies the insertion length distribution, which overrides that specified with \"-indelmodel\"\n" +
-                "\t\"-Rhomodel\" the model for indel rate with a zero inflated gamma input the probaility of zero, the shape and scale of the gamma\n"+
-                "\t\"-maxindel\" specifies the maximum length of an indel\n"+
-                "\t\"-dist\" it can scale the distances of the tree only works when tree is not provide\n" +
-                "\t\"-verbose\" means that details of evolutionary events are printed out on standard-output)\n" +
-                "\t\"-help\" prints out the parameters and instructions of how to use this tool\n");
+                "\t\"--gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n" +
+                "\t\"--indelmodel\" specifies the indel length distribution function, which serves to model both deletions and insertions\n" +
+                "\t\"--delmodel\" specifies the deletion length distribution, which overrides that specified with \"-indelmodel\"\n" +
+                "\t\"--inmodel\" specifies the insertion length distribution, which overrides that specified with \"-indelmodel\"\n" +
+//                "\t\"--Rhomodel\" the model for indel rate with a zero inflated gamma input the probaility of zero, the shape and scale of the gamma\n"+
+                "\t\"--maxindel\" specifies the maximum length of an indel\n"+
+ //               "\t\"-dist\" it can scale the distances of the tree only works when tree is not provide\n" +
+                "\t\"--verbose\" means that details of evolutionary events are printed out on standard-output)\n" +
+                "\t\"--help\" prints out the parameters and instructions of how to use this tool\n");
         out.println("Notes: \n" +
                 "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, \n\tLe-Gasquel and Whelan-Goldman; \n" +
                 "\tDNA models include Jukes-Cantor and Yang (general reversible process model).\n" +
@@ -118,15 +123,7 @@ public class TrAVIS {
 
     public static Boolean VERBOSE = false;
     static Double SCALEINDEL = 1.0;
-    static Double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
-    static Double LAMBDA_OF_INMODEL = 1.0;
-    static Double LAMBDA_OF_DELMODEL = 1.0;
-    static int DEL_MODEL_IDX = 0, IN_MODEL_IDX = 0;
-    static Integer MAX_INDEL_LENGTH = 100;
-    static Double RhoShape = 1.0;
-    static Double RhoScale = 1.0;
-    static Double RhoP = 0.5;
-
+     // proportion of DELETIONS v INSERTIONS
 
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
@@ -135,12 +132,22 @@ public class TrAVIS {
         Double RATESGAMMA = null;
         Double SCALEDIST = null;
         boolean LOADTREE = false;
+        String SRATESFILE = null;
+        double[] SRATES = null;
         long SEED = System.currentTimeMillis();
         int EXTANTS_N = 5;
         double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
         double GAMMA_SCALE = 0.2;
         int DESCENDANTS_MAX = 2, DESCENDANTS_MIN = 2; // Max and min of tree branching
-
+        int DEL_MODEL_IDX = 0, IN_MODEL_IDX = 0;
+        double LAMBDA_OF_INMODEL = 1.0;
+        double LAMBDA_OF_DELMODEL = 1.0;
+        int MAX_IN_LENGTH = 10;
+        int MAX_DE_LENGTH = 10;
+        double DELETIONPROP = 0.5;
+        double RhoShape = 1.0;
+        double RhoScale = 1.0;
+        double RhoP = 0.5;
 
         String[] MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
         int MODEL_IDX = 0; // default model is that above indexed
@@ -166,25 +173,23 @@ public class TrAVIS {
                     OUTPUTTREE = args[++a];
                 } else if (arg.equalsIgnoreCase("out") && args.length > a + 1) {
                     OUTPUT = args[++a];
-                } else if (arg.equalsIgnoreCase("rates") && args.length > a + 1) {
-                    RATESGAMMA = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("dist") && args.length > a + 1) {
-                    SCALEDIST = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("seed") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("-seed") && args.length > a + 1) {
                     SEED = Integer.parseInt(args[++a]);
-                } else if (arg.equalsIgnoreCase("extants") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("-extants") && args.length > a + 1) {
                     EXTANTS_N = Integer.parseInt(args[++a]);
-                } else if (arg.equalsIgnoreCase("shape") && args.length > a + 1) {
-                    GAMMA_SHAPE = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("scale") && args.length > a + 1) {
-                    GAMMA_SCALE = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("gap")) {
+                } else if (arg.equalsIgnoreCase("d") && args.length > a + 2) {
+                    GAMMA_SHAPE = Double.parseDouble(args[a+1]);
+                    GAMMA_SCALE = Double.parseDouble(args[a+2]);
+                    if (args.length > a + 3 && !args[a + 3].startsWith("-")) {
+                        SCALEDIST = Double.parseDouble(args[a+3]);// brdist_scale
+                    }
+                } else if (arg.equalsIgnoreCase("-gap")) {
                     GAPPY = true;
-                } else if (arg.equalsIgnoreCase("verbose")) {
+                } else if (arg.equalsIgnoreCase("-verbose")) {
                     VERBOSE = true;
-                } else if (arg.equalsIgnoreCase("help") || arg.equalsIgnoreCase("h")) {
+                } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
                     usage();
-                } else if (arg.equalsIgnoreCase("model") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("m") && args.length > a + 1){
                     boolean found_model = false;
                     for (int i = 0; i < MODELS.length; i++) {
                         if (args[a + 1].equalsIgnoreCase(MODELS[i])) {
@@ -194,28 +199,33 @@ public class TrAVIS {
                     }
                     if (!found_model)
                         usage(1, args[a + 1] + " is not a valid model name");
-                } else if (arg.equalsIgnoreCase("indel") && args.length > a + 1) {
+                    if ( args.length > a +2) {
+                            RATESGAMMA = Double.parseDouble(args[a + 2]);
+                    }
+                } else if ((arg.equalsIgnoreCase("rf") && args.length > a + 1)) {
+                    SRATESFILE = args[++a];
+                } else if (arg.equalsIgnoreCase("-indel") && args.length > a + 1) {
                     SCALEINDEL = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("Rhomodel") && args.length > a + 3) {
+                } else if (arg.equalsIgnoreCase("-indelmodel") && args.length > a + 3) {
                     RhoP = Double.parseDouble(args[a+1]);
                     RhoShape = Double.parseDouble(args[a+2]);
                     RhoScale = Double.parseDouble(args[a+3]);
-                }else if (arg.equalsIgnoreCase("delprop") && args.length > a + 1) {
+                }else if (arg.equalsIgnoreCase("-delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("lambda") && args.length > a + 1) {
-                    LAMBDA_OF_DELMODEL = LAMBDA_OF_INMODEL = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("maxindel") && args.length > a + 1) {
-                    MAX_INDEL_LENGTH = Integer.parseInt(args[++a]);
-                } else if ((arg.equalsIgnoreCase("indelmodel") || arg.equalsIgnoreCase("inmodel") || arg.equalsIgnoreCase("delmodel")) && args.length > a + 2) {
+                }  else if (arg.equalsIgnoreCase("-maxdellen") && args.length > a + 1) {
+                    MAX_IN_LENGTH = Integer.parseInt(args[++a]);
+                }  else if (arg.equalsIgnoreCase("-maxinslen") && args.length > a + 1) {
+                    MAX_DE_LENGTH = Integer.parseInt(args[++a]);
+                }  else if ((arg.equalsIgnoreCase("-inssize") || arg.equalsIgnoreCase("-indelsize") || arg.equalsIgnoreCase("-delsize")) && args.length > a + 2) {
                     boolean found_indelmodel = false;
                     for (int i = 0; i < INDELMODELS.length; i++) {
                         if (args[a + 1].equalsIgnoreCase(INDELMODELS[i])) {
                             try {
-                                if (!arg.equalsIgnoreCase("delmodel")) {
+                                if (!arg.equalsIgnoreCase("delsize")) {
                                     IN_MODEL_IDX = i;
                                     LAMBDA_OF_INMODEL = Double.parseDouble(args[a + 2]);
                                 }
-                                if (!arg.equalsIgnoreCase("inmodel")) {
+                                if (!arg.equalsIgnoreCase("inssize")) {
                                     DEL_MODEL_IDX = i;
                                     LAMBDA_OF_DELMODEL = Double.parseDouble(args[a + 2]);
                                 }
@@ -229,7 +239,7 @@ public class TrAVIS {
                         usage(1, args[a + 1] + " is not a valid model name");
                     else
                         a += 2;
-                } else if (arg.equalsIgnoreCase("format") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("-format") && args.length > a + 1) {
                     boolean found_format = false;
                     for (int i = 0; i < FORMATS.length; i++) {
                         if (args[a + 1].equalsIgnoreCase(FORMATS[i])) {
@@ -239,12 +249,39 @@ public class TrAVIS {
                     }
                     if (!found_format)
                         usage(1, args[a + 1] + " is not a valid format name");
-                } else if (arg.equalsIgnoreCase("help") && arg.equalsIgnoreCase("h")) {
+                } else if (arg.equalsIgnoreCase("-help") && arg.equalsIgnoreCase("h")) {
                     usage();
                 }
             }
         }
+        if (SRATESFILE != null) {
+            try {
+                TSVFile ratesfile = new TSVFile(SRATESFILE, true);
+                int rates_col = ratesfile.getColumn("Rate");
+                int index_col = ratesfile.getColumn("Site");
+                if (rates_col == -1)  // not there
+                    rates_col = 0;
+                Object[] rateobjs = ratesfile.getCol(rates_col);
+                Object[] idxobjs = null;
+                if (index_col != -1)
+                    idxobjs = ratesfile.getCol(index_col);
+                SRATES = new double[rateobjs.length];
+                for (int i = 0; i < SRATES.length; i++) {
+                    try {
+                        int index = index_col == -1 ? i : (Integer) idxobjs[i] - 1; // starts with 1, so subtract "1" to use as position index
+                        SRATES[index] = (Double) rateobjs[i];
+                    } catch (NumberFormatException e0) {
+                        usage(23, "Rates file has invalid number format:" + rateobjs[i]);
+                    }
+                }
+            } catch (IOException e) {
+                usage(24, "Rates file could not be opened or read: " + SRATESFILE);
+            }
+        }
 
+        if (SRATES != null) { // position-specific rates available
+            RATESGAMMA = getAlpha(SRATES);
+        }
         Random rand = new Random(SEED);
 
         if (ANCSEQ == null ) { // check standard input for sequence?
@@ -314,7 +351,7 @@ public class TrAVIS {
             }
         }
         if (ancseq != null && OUTPUT != null) { // we've got an ancestor to track down the tree
-            TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED, RATESGAMMA==null?-1:RATESGAMMA);
+            TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED, RATESGAMMA==null?-1:RATESGAMMA,DEL_MODEL_IDX,IN_MODEL_IDX,LAMBDA_OF_INMODEL,LAMBDA_OF_DELMODEL,MAX_IN_LENGTH ,MAX_DE_LENGTH,DELETIONPROP,RhoP,RhoShape,RhoScale);
             EnumSeq[] seqs = tracker.getSequences();
             switch (FORMAT_IDX) {
                 case 0: // FASTA
@@ -607,24 +644,24 @@ public class TrAVIS {
         public boolean USERATES;
 
         public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED) {
-            this(tree, ancseq, MODEL, SEED, -1);
+            this(tree, ancseq, MODEL, SEED, -1,0,0,1,1,10,10,0.5,1,1,0.5);
         }
 
-        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma) {
+        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma,int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH,double DELETIONPROP,double RhoP,double RhoShape,double RhoScale) {
             USERATES = (ratesgamma >= 0); // check if we will generate position specific rates; if not, use a constant rate 1
             rand = new Random(SEED);
             switch (IN_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"
                 case 0 -> inmodel  = new ZeroTruncatedPoisson(LAMBDA_OF_INMODEL, SEED);
                 case 1 -> inmodel  = new Poisson(LAMBDA_OF_INMODEL, SEED);
-                case 2 -> inmodel  = new Zipf(LAMBDA_OF_INMODEL, SEED, MAX_INDEL_LENGTH);
-                case 3 -> inmodel  = new Lavalette(LAMBDA_OF_INMODEL, SEED, MAX_INDEL_LENGTH);
+                case 2 -> inmodel  = new Zipf(LAMBDA_OF_INMODEL, SEED, MAX_IN_LENGTH);
+                case 3 -> inmodel  = new Lavalette(LAMBDA_OF_INMODEL, SEED, MAX_IN_LENGTH);
                 default -> throw new IllegalArgumentException("Invalid model index");
             }
             switch (DEL_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"
                 case 0 -> delmodel  = new ZeroTruncatedPoisson(LAMBDA_OF_DELMODEL, SEED + 1);
                 case 1 -> delmodel  = new Poisson(LAMBDA_OF_DELMODEL, SEED + 1);
-                case 2 -> delmodel  = new Zipf(LAMBDA_OF_DELMODEL, SEED + 1, MAX_INDEL_LENGTH);
-                case 3 -> delmodel  = new Lavalette(LAMBDA_OF_DELMODEL, SEED + 1, MAX_INDEL_LENGTH);
+                case 2 -> delmodel  = new Zipf(LAMBDA_OF_DELMODEL, SEED + 1, MAX_DE_LENGTH);
+                case 3 -> delmodel  = new Lavalette(LAMBDA_OF_DELMODEL, SEED + 1, MAX_DE_LENGTH);
                 default -> throw new IllegalArgumentException("Invalid model index");
             }
 
@@ -667,6 +704,9 @@ public class TrAVIS {
                     // note: we don't yet know how many indices are required for child so use list before moving to array
                     int i = 0;                                  // idx for parent position
                     double Rho = rhomodel.sample();
+                    //if (Rho != 0){
+                    //System.out.println(Rho);
+                    //}
                     while (i < parseq.length) {
                         // make sure the toss is different in each sites
                         // move through the child by incrementing the idx in the parent
@@ -674,8 +714,8 @@ public class TrAVIS {
                         //double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
                         //change indel rate into a seperate rate
                         double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
-
                         double p = Math.exp(-(Rho*t));
+
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
                             EnumDistrib d = MODEL.getDistrib(parseq[i], (USERATES?rates[paridx][i]:1)*t); // bug fix 13/3/24, prev version did not multiply with site specific rate
                             Object nchar = null;
@@ -697,8 +737,7 @@ public class TrAVIS {
                             i += 1;
                         } else {
                             double toss2 = rand.nextDouble();
-
-                            if (toss2 < TrAVIS.DELETIONPROP) { // 2. deletion with prob q = (1 - p)/2, so consider length of deletion
+                            if (toss2 < DELETIONPROP) { // 2. deletion with prob q = (1 - p)/2, so consider length of deletion
                                 int k;
                                 k = Math.min(delmodel.sample(), parseq.length - i);// length, can only delete what is left of the sequence
                                 deletions[idx][i] = k;  // deletions skip characters in the parent
@@ -707,6 +746,7 @@ public class TrAVIS {
                                 // special case at i==0: insertions can happen BEFORE and AFTER the sequence,
                                 // so to avoid introducing a bias for LONGER EXTANTS,
                                 // we place it at either end with a uniform coin toss
+
                                 int k;
                                 k = inmodel.sample(); // length, can only delete what is left of the sequence
 

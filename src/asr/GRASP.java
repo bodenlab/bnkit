@@ -767,18 +767,84 @@ public class GRASP {
                                     n0.append(ancseqs_nogap[0][j]);
                                 if (VERBOSE)
                                     System.out.println("N0= " + n0.toString());
-                                Double rates_alpha = null;
+                                Double rates_alpha = 0.01;
                                 if (RATES != null) { // position-specific rates available
                                     rates_alpha = getAlpha(RATES);
                                     if (VERBOSE)
                                         System.out.println("Position-specific rates Gamma shape= " + rates_alpha + " scale= " + 1.0/rates_alpha);
                                 }
                                 System.out.println("To reproduce pseudo-biological properties of current reconstruction, use TrAVIS with the following parameters:");
-                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -indelmodel " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -rhoP " + rhoP + " -rhoShape " + rhoShape + " -rhoScale " + rhoScale);
+                                System.out.println("-d " + alpha + " " + 1.0/beta + " -indelSize " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indelmodel " + rhoP + " " + rhoShape + " " + rhoScale);
                                 System.out.println("Or:");
-                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -inmodel " + bestsofar[1].getTrAVIS() + " -delmodel " + bestsofar[2].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop  + " -rhoP " + rhoP + " -rhoShape " + rhoShape + " -rhoScale " + rhoScale);
+                                System.out.println("-d" + alpha + " " + 1.0/beta + " -inssize " + bestsofar[1].getTrAVIS() + " -delSize " + bestsofar[2].getTrAVIS() + " -maxdellen " + del_total.length + " -maxinslen " + ins_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop  + "-indelmodel " + rhoP + " " + rhoShape + " " + rhoScale);
                                 System.out.println("Alternatively, consider specifying:");
-                                System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);
+                                System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);// 如果有祖先序列且提供了输出路径
+                                String[] INDELMODELS = new String[]{"ZeroTruncatedPoisson", "Poisson", "Zipf", "Lavalette"};
+                                int spaceIndex = bestsofar[1].getTrAVIS().indexOf(" ");
+                                String firstPart = (spaceIndex != -1) ? bestsofar[1].getTrAVIS().substring(0, spaceIndex) : bestsofar[1].getTrAVIS();
+                                int IN_MODEL_IDX = 0;
+                                int DEL_MODEL_IDX = 0;
+                                for (int l = 0; l < INDELMODELS.length; l++) {
+                                    if (firstPart.equalsIgnoreCase(INDELMODELS[l]))
+                                    { IN_MODEL_IDX = l; } }
+                                String numberPart = bestsofar[1].getTrAVIS().substring(spaceIndex + 1).trim();
+                                double LAMBDA_OF_INMODEL = Double.parseDouble(numberPart);
+
+                                int spaceIndex2 = bestsofar[2].getTrAVIS().indexOf(" ");
+                                String firstPart2 = (spaceIndex != -1) ? bestsofar[2].getTrAVIS().substring(0, spaceIndex) : bestsofar[2].getTrAVIS();
+                                for (int l = 0; l < INDELMODELS.length; l++) {
+                                    if (firstPart2.equalsIgnoreCase(INDELMODELS[l]))
+                                    { DEL_MODEL_IDX = l; } }
+                                String numberPart2 =  bestsofar[2].getTrAVIS().substring(spaceIndex2 + 1).trim();
+                                double LAMBDA_OF_DELMODEL = Double.parseDouble(numberPart2);
+                                //System.out.println(DEL_MODEL_IDX);
+
+                                TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(tree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED,
+                                            rates_alpha,
+                                            DEL_MODEL_IDX, IN_MODEL_IDX,
+                                            LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
+                                            ins_total.length, del_total.length,
+                                            delprop,  rhoP , rhoShape , rhoScale);
+                                EnumSeq[] seqs = tracker.getSequences();
+                                EnumSeq[] aseqs = tracker.getAlignment();
+                                POAGraph poaGraph = tracker.getPOAG();
+
+                                try {
+                                    File file = new File(OUTPUT);
+                                    if (!file.exists()) {
+                                        file.mkdirs();
+                                    }
+
+                                    FastaWriter fw = new FastaWriter(OUTPUT + "/travis.fa");
+                                    fw.save(GAPPY ? aseqs : seqs);
+                                    fw.close();
+
+                                    AlnWriter aw = new AlnWriter(OUTPUT + "/travis.aln");
+                                    aw.save(aseqs);
+                                    aw.close();
+
+                                    poaGraph.saveToDOT(OUTPUT + "/travis.dot");
+                                    poaGraph.saveToMatrix(OUTPUT + "/travis.m");
+
+                                    tree.save(OUTPUT + "/travis.nwk", "nwk");
+
+                                    if (rates_alpha != null) {
+                                        double[] rates = tracker.getRates();
+                                        Object[][] data = new Object[rates.length + 1][2];
+                                        for (int l = 0; l <= rates.length; l++) {
+                                            if (l == 0) {
+                                                data[0] = new Object[]{"Site", "Rate"};
+                                            } else {
+                                                data[l] = new Object[]{l, rates[l - 1]};
+                                            }
+                                        }
+                                        TSVFile ratesfile = new TSVFile(data, true);
+                                        ratesfile.save(OUTPUT + "/travis.tsv");
+                                    }
+                                } catch (IOException e) {
+                                    usage(7, "Something went wrong saving files in directory");
+                                }
+
                             } else if (MODE == Inference.MARGINAL)
                                 usage(23, "TrAVIS reports must be based on joint reconstructions");
                         }
