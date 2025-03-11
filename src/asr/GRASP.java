@@ -774,9 +774,7 @@ public class GRASP {
                                         System.out.println("Position-specific rates Gamma shape= " + rates_alpha + " scale= " + 1.0/rates_alpha);
                                 }
                                 System.out.println("To reproduce pseudo-biological properties of current reconstruction, use TrAVIS with the following parameters:");
-                                System.out.println("-d " + alpha + " " + 1.0/beta + " -indelSize " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indelmodel " + rhoP + " " + rhoShape + " " + rhoScale);
-                                System.out.println("Or:");
-                                System.out.println("-d" + alpha + " " + 1.0/beta + " -inssize " + bestsofar[1].getTrAVIS() + " -delSize " + bestsofar[2].getTrAVIS() + " -maxdellen " + del_total.length + " -maxinslen " + ins_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop  + "-indelmodel " + rhoP + " " + rhoShape + " " + rhoScale);
+                                System.out.println("-d " + alpha + " " + 1.0/beta + " --inssize " + bestsofar[1].getTrAVIS() + " --delsize " + bestsofar[2].getTrAVIS() + " --maxdellen " + del_total.length + " --maxinslen " + ins_total.length + " -n0 " + n0.toString() + " -m " + MODEL.getName() + " "+ rates_alpha + " --gap --extants " + aln.getHeight() + " --delprop " + delprop  + "--indelmodel " + rhoP + " " + rhoShape + " " + 1/rhoScale);
                                 System.out.println("Alternatively, consider specifying:");
                                 System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);// 如果有祖先序列且提供了输出路径
                                 String[] INDELMODELS = new String[]{"ZeroTruncatedPoisson", "Poisson", "Zipf", "Lavalette"};
@@ -804,7 +802,7 @@ public class GRASP {
                                             DEL_MODEL_IDX, IN_MODEL_IDX,
                                             LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
                                             ins_total.length, del_total.length,
-                                            delprop,  rhoP , rhoShape , rhoScale);
+                                            delprop,  rhoP , rhoShape , 1/rhoScale);
                                 EnumSeq[] seqs = tracker.getSequences();
                                 EnumSeq[] aseqs = tracker.getAlignment();
                                 POAGraph poaGraph = tracker.getPOAG();

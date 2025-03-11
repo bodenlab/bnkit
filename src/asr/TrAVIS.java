@@ -199,7 +199,7 @@ public class TrAVIS {
                     }
                     if (!found_model)
                         usage(1, args[a + 1] + " is not a valid model name");
-                    if ( args.length > a +2) {
+                    if ( args.length > a +2 && !args[a + 2].startsWith("-")) {
                             RATESGAMMA = Double.parseDouble(args[a + 2]);
                     }
                 } else if ((arg.equalsIgnoreCase("rf") && args.length > a + 1)) {
