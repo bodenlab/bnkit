@@ -405,6 +405,23 @@ public class TSVFile {
         }
     }
 
+    public static boolean isDoubleOrInt(Object[] col) {
+        for (int i = 0; i < col.length; i ++) {
+
+            try {
+                Double x = (Double) col[i];
+            } catch (ClassCastException e) {
+                try {
+                    Integer y = (Integer) col[i];
+                } catch (ClassCastException e2) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     /**
      * Check if all values are either cast-able to double or null.
      * @param rows

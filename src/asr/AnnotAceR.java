@@ -27,6 +27,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
+
+
 public class AnnotAceR {
 
     public static void usage() {
@@ -78,6 +80,11 @@ public class AnnotAceR {
     }
 
     public enum MODEL_MODE {DIRECT, LATENT};
+    private static final int TSV = 0;
+    private static final int TREE = 1;
+    private static final int STDOUT = 2;
+    private static final int ITOL = 3;
+
 
     public static void main(String[] args) {
         String NEWICK = null;
@@ -92,7 +99,7 @@ public class AnnotAceR {
         SubstModel SUBST_MODEL = null;
         String[] FORMATS = new String[] {"TSV", "TREE", "STDOUT", "ITOL"};
         int FORMAT_IDX = 0;
-        asr.GRASP.Inference INFERENCE_MODE = asr.GRASP.Inference.JOINT;
+        asr.GRASP.Inference INFERENCE_MODE = null; // If LEARN is not specified, this will default to Joint
         MODEL_MODE mode = MODEL_MODE.DIRECT; // not latent, discrete labels
         boolean VERBOSE = false; // print out various messages during processing to inform the user
         boolean LEARN = false; // train (when true) or infer (when false, default)
@@ -110,7 +117,7 @@ public class AnnotAceR {
             if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
                 if (arg.equalsIgnoreCase("nwk") && args.length > a + 1) {
-                    NEWICK = args[++ a];
+                    NEWICK = args[++a];
                 } else if (arg.equalsIgnoreCase("out") && args.length > a + 1) {
                     OUTPUT = args[++a];
                 } else if (arg.equalsIgnoreCase("in") && args.length > a + 1) {
@@ -252,12 +259,14 @@ public class AnnotAceR {
                 ENTRIES[i] = ENTRIES_OBJ[i].toString();
                 ENTRIES_SET.add(ENTRIES_OBJ[i]);
             }
-            Object[] ENTRY_VALUES = tsv.getCol(valcol, COLPARSER);             // values associated with entries
+            Object[] ENTRY_VALUES = tsv.getCol(valcol, COLPARSER); // values associated with entries
 
-            //
             // mode is "LATENT",
             // so invent latent variable with NSTATES values
             if (mode == MODEL_MODE.LATENT) {
+                if (NSTATES == null) {
+                    usage(14, "-latent <NSTATES> must be specified");
+                }
                 Object[] alpha = new Object[NSTATES]; // alphabet (symbols that are used to represent states)
                 // label the latent states; use A, B, ... if no LABEL has been given
                 if (LABEL == null) { // no LABEL specified so values/latent states will be A1, A2, ...
@@ -269,7 +278,7 @@ public class AnnotAceR {
                 }
                 SUBST_MODEL = new JC(GAMMA, alpha); // set the evolutionary model (based on user specified params and the alphabet established above)
                 /* values are either real or discrete; we establish this from the user-provided table */
-                if (TSVFile.isDouble(ENTRY_VALUES)) { // the first col of data is all Double (real), hence must use latent states for nodes in tree
+                if (TSVFile.isDoubleOrInt(ENTRY_VALUES)) { // the first col of data is all Double (real), hence must use latent states for nodes in tree
                     observed = null;
                     if (VERBOSE)
                         System.out.println("Detected real values in data--using Gaussian mixture with " + NSTATES + " components");
@@ -279,7 +288,13 @@ public class AnnotAceR {
                         if (ENTRY_VALUES[i] != null)
                             observed.add(ENTRY_VALUES[i]);
                     xalpha = new String[observed.size()];
-                    observed.toArray(xalpha);
+                    try {
+                        observed.toArray(xalpha);
+
+                    } catch (ArrayStoreException e) {
+                        usage(15, "Discrete values cannot contain integers");
+                    }
+
                     if (VERBOSE)
                         System.out.println("Detected " + xalpha.length + " discrete values in data--using multi-nomial distributions conditioned on " + NSTATES + " states");
                 }
@@ -288,7 +303,7 @@ public class AnnotAceR {
             // so reject real values (if nominated), and
             // consolidate discrete values to nominate what states are possible
             } else if (mode == MODEL_MODE.DIRECT) {
-                if (TSVFile.isDouble(ENTRY_VALUES)) { // the col of data is all Double (real), hence must use latent states for nodes in tree
+                if (TSVFile.isDoubleOrInt(ENTRY_VALUES)) { // the col of data is all Double (real), hence must use latent states for nodes in tree
                     usage(8, "Real-value data requires (discrete) latent states; please specify number of latent states.");
                 } else { // the column has discrete values (not real)
                     observed = new HashSet();
@@ -318,9 +333,10 @@ public class AnnotAceR {
             // Other checks...
             if (LEARN && PARAMS_FILE == null)
                 usage(12, "Learning needs to save to a parameter file, which is not specified");
-            else if (!LEARN && OUTPUT == null)
+            else if (INFERENCE_MODE != null && OUTPUT == null)
                 usage(13, "Inference needs to save to an output file, which is not specified");
-
+            else if (LEARN && INFERENCE_MODE != null)
+                usage(16, "-learn and -marg/-joint cannot be used together. Learning and inference must be performed in separate steps");
             /**********************************************************************************
              * Processes (options):
              * -- Direct mode, joint recon inference (only discrete)
@@ -330,8 +346,9 @@ public class AnnotAceR {
              *      --marginal recon inference (both discrete and real)
              *      --joint recon inference (both discrete and real)
              **********************************************************************************/
-
+            if (INFERENCE_MODE == null) INFERENCE_MODE = GRASP.Inference.JOINT; // assign default inference mode if not specified
             TreeInstance ti = tree.getInstance(ENTRIES_OBJ, ENTRY_VALUES);  // create a tree with values attached to name-matched nodes
+
             // now decide type of operation...
             if (mode == MODEL_MODE.DIRECT && INFERENCE_MODE == GRASP.Inference.JOINT) {
                 /* ---------- Direct, joint recon inference ----------
@@ -355,11 +372,11 @@ public class AnnotAceR {
                 TSVFile tmptsv = new TSVFile(new String[] {tsv.getHeader(0), tsv.getHeader(valcol)}, save);
                 try {
                     switch (FORMAT_IDX) {
-                        case 0: // TSV
+                        case TSV:
                             tmptsv.save(OUTPUT); break;
-                        case 1: // TREE
+                        case TREE:
                             Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
-                        case 3: // ITOL
+                        case ITOL:
                             Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
                             TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;
                     }
@@ -419,11 +436,11 @@ public class AnnotAceR {
                 TSVFile tmptsv = new TSVFile(myheaders, save);
                 try {
                     switch (FORMAT_IDX) {
-                        case 0: // TSV
+                        case TSV:
                             tmptsv.save(OUTPUT); break;
-                        case 1: // TREE
+                        case TREE:
                             Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
-                        case 3: // ITOL
+                        case ITOL:
                             Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
                             TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;
                     }
@@ -441,11 +458,17 @@ public class AnnotAceR {
                     gdt.randomize(ENTRY_VALUES, SEED.intValue());
                 } else  // specified values are discrete and nominated as strings in "xalpha", so add multi-nomial CPTs
                     pbn = PhyloBN.withCPTs(tree, SUBST_MODEL, xalpha, 1, LEAVES_ONLY, SEED);
+
                 if (PARAMS != null) {
-                    pbn.overrideMasterJSON(PARAMS);
+                    if (!LEARN) {
+                        // only override if inference is being performed
+                        pbn.overrideMasterJSON(PARAMS);
+                    }
+
                     if (VERBOSE)
                         System.out.println("Using pre-set distribution: " + pbn.toString());
                 }
+
                 if (LEARN) { // learn, do not infer
                     // train the BN; headers correspond to labels of leaves or any other node that has been nominated in the input TSV file
                     pbn.trainEM(ENTRIES, new Object[][] {ENTRY_VALUES}, SEED);
@@ -454,7 +477,7 @@ public class AnnotAceR {
                         System.out.println("Learned parameters specified as:");
                         System.out.println("\t-params " + pbn.getMasterJSON().toString());
                     }
-                    if (FORMAT_IDX == 3 && OUTPUT != null) {
+                    if (FORMAT_IDX == ITOL && OUTPUT != null) {
                         Object[][] tsave = new Object[2][ENTRIES.length];
                         for (int i = 0; i < ENTRIES.length; i ++) {
                             int bpidx = tree.getIndex(ENTRIES[i]);
@@ -526,30 +549,39 @@ public class AnnotAceR {
                         inf.decorate(ti);
                         // retrieve the distribution at the node previously nominated
                         Distrib anydistrib = inf.getDecoration(bpidx);
+
                         if (anydistrib != null) {
                             try {
                                 EnumDistrib distrib = (EnumDistrib) anydistrib; // if this cast succeeds, it is a discrete distribution
-                                if (FORMAT_IDX == 2)
+                                if (FORMAT_IDX == STDOUT)
                                     System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + distrib);
                                 save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                                 for (int i = 0; i < distrib.getDomain().size(); i++)
                                     save[bpcnt][1 + i] = distrib.get(i);
                             } catch (ClassCastException e) { // Mixture of Gaussians, probably
                                 try {
+
                                     double[] samples = new double[NSAMPLES];
                                     double sum = 0;
+
                                     for (int i = 0; i < NSAMPLES; i++) {
                                         samples[i] = (Double) anydistrib.sample();
                                         sum += samples[i];
                                     }
                                     GaussianDistrib gd = GaussianDistrib.estimate(samples);
-                                    if (FORMAT_IDX == 2)
+                                    if (FORMAT_IDX == STDOUT)
                                         System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + gd.getMean() + "\t" + Math.sqrt(gd.getVariance()) + "\t" + anydistrib);
                                     save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                                     save[bpcnt][1] = gd.getMean();
                                     save[bpcnt][2] = Math.sqrt(gd.getVariance()); // standard deviation
 //                                    save[bpcnt][2] = anydistrib.get(save[bpcnt][1]); // density at mean of mixture
 //                                    save[bpcnt][2] = gd.get(save[bpcnt][1]); // density at mean of Gaussian
+                                    MixtureDistrib distribs = (MixtureDistrib) anydistrib;
+                                    for (int i = 0; i < distribs.getMixtureSize(); ++i) {
+                                        System.out.println(distribs.getDistrib(i) + "*" + distribs.getWeights(i));
+                                    }
+
+
                                 } catch (ClassCastException ee) {
                                     if (FORMAT_IDX == 2)
                                         System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + anydistrib);

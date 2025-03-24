@@ -20,6 +20,7 @@ package bn.prob;
 
 import bn.Distrib;
 import json.JSONObject;
+import smile.stat.distribution.GaussianDistribution;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -346,6 +347,28 @@ public class MixtureDistrib implements Distrib {
             throw new RuntimeException("Invalid MixtureDistrib");
         return current.sample();
     }
+
+    /**
+     *
+     * Cumulative distribution function of mixtures. That is the probability to the left of x
+     * @param x value of the random variable.
+     * @return the probability
+     */
+    public double cdf(double x) {
+
+        double cumulative_cdf = 0.0;
+        for (int i = 0; i < weights.size(); ++i) {
+            try {
+                double weight_i = weights.get(i);
+                GaussianDistrib gaussianDistrib = (GaussianDistrib) getDistrib(i);
+                cumulative_cdf += weight_i * gaussianDistrib.cdf(x);
+            } catch (ClassCastException e) {
+                throw new RuntimeException("Can only compute CDF on with GaussianDistrib");
+            }
+        }
+
+        return cumulative_cdf;
+    }
     
 //    @Override
 //    public String toString() {
@@ -379,29 +402,39 @@ public class MixtureDistrib implements Distrib {
     
     public static void main(String[] args) {
     	
-        GaussianDistrib gd1 = new GaussianDistrib(0, 1.0);
+        GaussianDistrib gd1 = new GaussianDistrib(12, 1.0);
         System.out.println("gd1 = " + gd1);
-        GaussianDistrib gd2 = new GaussianDistrib(1, 0.5);
+        GaussianDistrib gd2 = new GaussianDistrib(20, 0.2);
         System.out.println("gd2 = " + gd2);
-        GaussianDistrib gd3 = new GaussianDistrib(-2, 2.5);
+        GaussianDistrib gd3 = new GaussianDistrib(15, 5);
         System.out.println("gd3 = " + gd3);
-        
-        MixtureDistrib md1 = new MixtureDistrib(gd1, 1.0);
-        md1.addDistrib(gd2, 2);
-        md1.addDistrib(gd2, 0.5);
-        System.out.println("md1 is gd1*1.0 + gd2*2.5 : \n" + md1);
-        
-        MixtureDistrib md2 = new MixtureDistrib(md1, 1.0);
-        System.out.println("mds2 is md1*1.0 : \n" + md2);
-        md2.addDistrib(gd1, 0.5);
-        System.out.println("md2 += gd1*0.5 : \n" + md2);
-        md2.addDistrib(gd3, 2);
-        System.out.println("md2 += gd3*2.0 : \n" + md2);
-        md2.addDistrib(md1, 2.0);
-        System.out.println("md2 += md1*2.0 : \n" + md2);
-        md2.addDistrib(gd1, 1.5);
-        
-        System.out.println("md2 += gd1*1.5 : \n" + md2);
-        System.out.println("density = " + md2.density);
+
+        MixtureDistrib md1 = new MixtureDistrib(gd1, 0.4);
+        md1.addDistrib(gd2, 0.2);
+        md1.addDistrib(gd3, 0.4);
+
+        System.out.println("md1 = " + md1);
+        System.out.println(md1.cdf(25));
+        System.out.println(md1.cdf(15));
+        System.out.println(md1.cdf(25) - md1.cdf(15));
+
+        //md1.addDistrib(gd2, 0.5);
+        //System.out.println("md1 is gd1*1.0 + gd2*2.5 : \n" + md1);
+//
+//        MixtureDistrib md2 = new MixtureDistrib(md1, 1.0);
+//        //System.out.println("mds2 is md1*1.0 : \n" + md2);
+//        md2.addDistrib(gd1, 0.5);
+//        System.out.println("md2 += gd1*0.5 : \n" + md2);
+//        md2.addDistrib(gd3, 2);
+//        System.out.println("md2 += gd3*2.0 : \n" + md2);
+//        md2.addDistrib(md1, 2.0);
+//        System.out.println("md2 += md1*2.0 : \n" + md2);
+//        md2.addDistrib(gd1, 1.5);
+
+
+//
+//        System.out.println("md2 += gd1*1.5 : \n" + md2);
+//        System.out.println("density = " + md2.density);
+
     }
 }
