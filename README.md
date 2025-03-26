@@ -27,13 +27,12 @@ This version is essentially a command-line interface to the backend features of 
 It is worth noting that the web-based version has the advantage of a visual user interface, but that it 
 may lack the latest functionality.
 
-If you want to use `asr.GRASP`, go [here](https://bodenlab.github.io/GRASP-suite/project/graspcmd/) or download 
-the [JAR file](https://bodenlab.github.io/GRASP-suite/project/graspcmd/archive/bnkit.jar).
+If you want to use `asr.GRASP`, go [here](docs/graspcmd.md).
 
 ## JSON API to GRASP
 
 Another way to interact with GRASP is to use the JSON API of `asr.GServer`, 
-documented [here](https://github.com/bodenlab/bnkit/blob/main/docs/json-api.md).
+documented [here](docs/json-api.md).
 
 ## Configuring GRASP to run in IntelliJ
 - Open IntelliJ IDEA
@@ -51,4 +50,4 @@ documented [here](https://github.com/bodenlab/bnkit/blob/main/docs/json-api.md).
 ## Generate an external JAR using Maven
 - Click on Maven (on the far right vertical bar)
 - Click on bnkit > Lifecycle > package
-- A jar will be created in the <directory>/target/bnkit-1.0.jar
+- A jar will be created in the <directory>/target/bnkit.jar
