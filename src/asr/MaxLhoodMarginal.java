@@ -103,7 +103,9 @@ public class MaxLhoodMarginal <E extends Distrib> implements TreeDecor<E> {
                 throw new ASRRuntimeException("Marginal inference of invalid branchpoint: " + bpidx);
             Query q = ve.makeQuery(querynode.getVariable());
             CGTable r1 = (CGTable) ve.infer(q);
+            Distrib test = r1.getDistrib(querynode.getVariable());
             value = (E)r1.query(querynode.getVariable());
+
         } // else the BN is incapable of performing inference, so just leave values as they are
     }
 

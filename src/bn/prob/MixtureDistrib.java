@@ -349,7 +349,6 @@ public class MixtureDistrib implements Distrib {
     }
 
     /**
-     *
      * Cumulative distribution function of mixtures. That is the probability to the left of x
      * @param x value of the random variable.
      * @return the probability
@@ -363,13 +362,13 @@ public class MixtureDistrib implements Distrib {
                 GaussianDistrib gaussianDistrib = (GaussianDistrib) getDistrib(i);
                 cumulative_cdf += weight_i * gaussianDistrib.cdf(x);
             } catch (ClassCastException e) {
-                throw new RuntimeException("Can only compute CDF on with GaussianDistrib");
+                throw new RuntimeException("Can only compute CDF with GaussianDistrib");
             }
         }
 
         return cumulative_cdf;
     }
-    
+
 //    @Override
 //    public String toString() {
 //        StringBuilder sb = new StringBuilder("mixture size: " + distribs.size() + "\n");
