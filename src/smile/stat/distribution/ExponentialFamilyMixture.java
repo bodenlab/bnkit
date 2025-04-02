@@ -116,11 +116,11 @@ public class ExponentialFamilyMixture extends Mixture {
                 Component c = components[i];
 
                 for (int j = 0; j < n; j++) {
-                    posteriori[i][j] = c.priori * c.distribution.p(x[j]);
+                    posteriori[i][j] = c.priori * c.distribution.p(x[j]); // numerator_c = P(C=c) * P(X|C=c)
                 }
             }
 
-            // Normalize posteriori probability.
+            // Normalize posteriori probability. // P(X=x) = numerator_c / Sum_{c \in C} numerator_c
             for (int j = 0; j < n; j++) {
                 double p = 0.0;
 

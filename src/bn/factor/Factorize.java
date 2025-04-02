@@ -999,13 +999,15 @@ public class Factorize {
             }
         }
         // Failing the above, we must construct a table which is an amalgamate of the two.
-        AbstractFactor dt = customFactor(X, Y, getConcat(getConcat(X.evars, Y.evars), getConcat(X.nvars, Y.nvars)));
-        if (X.isTraced() || Y.isTraced()) {
-            dt.setTraced(true);
-        }
-        // next loooong section can partly be avoided if factor is in cache, which is indicated by a pre-calc map
-        // FIXME: needs to disentangle the tracing from the product
-//        if (!dt.isSet()) {
+        // This can go wrong if the factor gets too big...
+        try {
+            AbstractFactor dt = customFactor(X, Y, getConcat(getConcat(X.evars, Y.evars), getConcat(X.nvars, Y.nvars)));
+            if (X.isTraced() || Y.isTraced()) {
+                dt.setTraced(true);
+            }
+            // next loooong section can partly be avoided if factor is in cache, which is indicated by a pre-calc map
+            // FIXME: needs to disentangle the tracing from the product
+        //        if (!dt.isSet()) {
             double[] map = new double[dt.getSize()];
             // Arrays.fill(map, 0);
             Object[] reskey = new Object[dt.nEVars]; // this will initialise all elements to null
@@ -1050,11 +1052,11 @@ public class Factorize {
                             dt.setJDF(idx, Y.getJDF(y));
                         }
                         if (X.isTraced()) {
-//                            dt.addAssign(idx, X.getAssign(x));
+        //                            dt.addAssign(idx, X.getAssign(x));
                             dt.addAssign(idx, X, x);
                         }
                         if (Y.isTraced()) {
-//                            dt.addAssign(idx, Y.getAssign(y));
+        //                            dt.addAssign(idx, Y.getAssign(y));
                             dt.addAssign(idx, Y, y);
                         }
                     }
@@ -1117,11 +1119,11 @@ public class Factorize {
                             dt.setJDF(idx, Y.getJDF(y));
                         }
                         if (X.isTraced()) {
-//                            dt.addAssign(idx, X.getAssign(x));
+        //                            dt.addAssign(idx, X.getAssign(x));
                             dt.addAssign(idx, X, x);
                         }
                         if (Y.isTraced()) {
-//                            dt.addAssign(idx, Y.getAssign(y));
+        //                            dt.addAssign(idx, Y.getAssign(y));
                             dt.addAssign(idx, Y, y);
                         }
                     }
@@ -1153,11 +1155,11 @@ public class Factorize {
                                 dt.setJDF(idx, Y.getJDF(y));
                             }
                             if (X.isTraced()) {
-//                            dt.addAssign(idx, X.getAssign(x));
+        //                            dt.addAssign(idx, X.getAssign(x));
                                 dt.addAssign(idx, X, x);
                             }
                             if (Y.isTraced()) {
-//                            dt.addAssign(idx, Y.getAssign(y));
+        //                            dt.addAssign(idx, Y.getAssign(y));
                                 dt.addAssign(idx, Y, y);
                             }
                         }
@@ -1177,11 +1179,14 @@ public class Factorize {
                 }
             }
             dt.setLogValues(map);
-//        }
-        if (VERBOSE) {
-            System.err.println("DT: Generic case: " + X.toString() + " x " + Y.toString() + " Option = " + option + " (Option 0 took " + total0 + "ns. Option 1 took " + total1 + "ns.)");
+        //        }
+            if (VERBOSE) {
+                System.err.println("DT: Generic case: " + X.toString() + " x " + Y.toString() + " Option = " + option + " (Option 0 took " + total0 + "ns. Option 1 took " + total1 + "ns.)");
+            }
+            return dt;
+        } catch (FactorRuntimeException e) { //
+            throw new FactorRuntimeException(e.getMessage());
         }
-        return dt;
     }
 
     /**

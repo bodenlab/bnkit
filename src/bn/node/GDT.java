@@ -686,7 +686,7 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
     public double[] GMM_WEIGHTS = null;
 
     /**
-     * Find the best parameter setting for the observed data.
+     * Find the parameter setting to best reproduce the observed data.
      * Note that this uses observed Double:s which are looked at directly, and 
      * observed Distrib:s which are used to stochastically generate samples. 
      * We cannot use distributions directly since they can be of any kind, as 

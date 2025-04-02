@@ -271,17 +271,21 @@ public class VarElim implements Inference {
                 // Perform product of all factors in bucket
                 AbstractFactor result = null;
                 timer.start("product");
-                if (nFactors == 1) {
-//                    nprods[0] += 1;
-                    result = b.factors.get(0);
-                } else if (nFactors == 2) {
-//                    nprods[1] += 1;
-                    result = Factorize.getProduct(b.factors.get(0), b.factors.get(1));
-                } else {
-//                    nprods[2] += 1;
-                    AbstractFactor[] fs = new AbstractFactor[b.factors.size()];
-                    b.factors.toArray(fs);
-                    result = Factorize.getProduct(fs);
+                try {
+                    if (nFactors == 1) {
+                        //                    nprods[0] += 1;
+                        result = b.factors.get(0);
+                    } else if (nFactors == 2) {
+                        //                    nprods[1] += 1;
+                        result = Factorize.getProduct(b.factors.get(0), b.factors.get(1));
+                    } else {
+                        //                    nprods[2] += 1;
+                        AbstractFactor[] fs = new AbstractFactor[b.factors.size()];
+                        b.factors.toArray(fs);
+                        result = Factorize.getProduct(fs);
+                    }
+                } catch (RuntimeException e) {
+                    throw new VarElimRuntimeException(e.getMessage());
                 }
                 timer.stop("product");
                 if (i > 0) { // not the last bucket, so normal operation
