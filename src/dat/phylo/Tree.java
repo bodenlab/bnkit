@@ -757,6 +757,44 @@ public class Tree extends IdxTree {
     static Integer NCOMP = 3;
     static Integer NITER = 100;
 
+
+    public static Tree generateTreeFromMixture(Tree tree1,  int NCOMP, long SEED, int NITER) {
+        // First we process an already loaded tree or synthesise a new tree
+        GaussianDistrib gds1 = null;
+        gds1 = IdxTree.getLeafDistanceDistribution(tree1.getDistance2RootMatrix());
+
+
+        // Now we are estimating a mixture of Gamma distributions from the first/source tree (loaded or synthesised)
+        // 1. ONE mixture of a specified number of Gamma distributions
+        Mixture mixture = null;
+        mixture = tree1.getGammaMixture(NCOMP); // find mixture and weights for each component
+
+        int compwmax = 0;
+        double[] shapes = new double[NCOMP];
+        double[] scales = new double[NCOMP];
+        double[] priors = new double[NCOMP];
+        GammaDistrib[] gds = new GammaDistrib[NCOMP];
+        for (int i = 0; i < NCOMP; i++) {
+            double a = shapes[i] = ((GammaDistribution) (mixture.components[i].distribution)).k;
+            double b = scales[i] = ((GammaDistribution) (mixture.components[i].distribution)).theta;
+            gds[i] = new GammaDistrib(shapes[i], 1 / scales[i]);
+            double weight = priors[i] = mixture.components[i].priori;
+            if (weight > mixture.components[compwmax].priori)
+                compwmax = i;
+        }
+
+        // 2. Generate a new tree based on the above mixture of Gamma distributions
+        //   a) assume that branch lengths are uniformly distributed across topology
+        Tree tree2 = Tree.RandomMixture(tree1.getNLeaves(), SEED, gds, priors, 2, 2);
+
+
+        //   b) adjust the placement of distances to better fit the original distribution
+        tree2.fitDistances(NITER, gds1, SEED + 202);
+
+        return tree2;
+    }
+
+
     public static void main(String[] args) {
         Tree tree1 = null, tree2 = null;
         for (int i = 0; i < args.length; i ++) {
