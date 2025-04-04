@@ -78,6 +78,7 @@ public class GRASP {
                 "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
                 "\t{--supported-path <methodname>} (select one from DIJKSTRA(default) ASTAR)\n" +
                 "\t{--nogap}\n" +
+                "\t{--seed <seed>}\n" +
                 "\t{--nonibble}\n" +
                 "\t{--exclude-noedge}\n" +
                 "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES TrAVIS)\n" +
@@ -179,6 +180,7 @@ public class GRASP {
         Inference MODE = Inference.JOINT;
         // ancestor to reconstruct if inference mode is "marginal"
         Integer MARG_NODE = null;
+        int SEED = new Random().nextInt();
 
         long START_TIME = System.currentTimeMillis(), ELAPSED_TIME;
 
@@ -197,6 +199,8 @@ public class GRASP {
                     PREFIX = args[++ a];
                 } else if ((arg.equalsIgnoreCase("-rates-file") || arg.equalsIgnoreCase("rf")) && args.length > a + 1) {
                     RATESFILE = args[++a];
+                } else if ((arg.equalsIgnoreCase("-seed")  && args.length > a + 1)) {
+                    SEED = Integer.parseInt(args[++a]);
                 } else if (arg.equalsIgnoreCase("-joint") || arg.equalsIgnoreCase("j")) {
                     MODE = Inference.JOINT;
                 } else if ((arg.equalsIgnoreCase("-marginal") || arg.equalsIgnoreCase("m")) && args.length > a + 1) {
@@ -629,7 +633,7 @@ public class GRASP {
                     case 10: // TrAVIS
                         if (!BYPASS) {
                             if (MODE == Inference.JOINT) {
-                                int SEED = new Random().nextInt();
+
                                 double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
                                 double gap_open_prop = (double) aln.getGapStartCount() / (double) (aln.getWidth() * aln.getHeight());
                                 double gap_length = aln.getMeanGapLength();
@@ -804,7 +808,7 @@ public class GRASP {
                                 System.out.println("To reproduce pseudo-biological properties of current reconstruction, use TrAVIS with the following parameters:");
                                 //System.out.println("-d " + alpha + " " + 1.0/beta + " -indelSize " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indelmodel " + rhoP + " " + rhoShape + " " + rhoScale);
                                 //System.out.println("Or:");
-                                System.out.println("-d " + alpha + " " + beta + " --inssize " + bestsofar[1].getTrAVIS() + " --delSize " + bestsofar[2].getTrAVIS() + " --maxdellen " + del_total.length + " --maxinslen " + ins_total.length + " -n0 " + n0.toString() + " -m JTT " + rates_alpha + " --gap --extants " + aln.getHeight() + " --delprop " + delprop  + " --indelmodel " + rhoP + " " + rhoShape + " " + rhoScale);
+                                System.out.println("-d " + alpha + " " + beta + " --inssize " + bestsofar[1].getTrAVIS() + " --delsize " + bestsofar[2].getTrAVIS() + " --maxdellen " + del_total.length + " --maxinslen " + ins_total.length + " -n0 " + n0.toString() + " -m " +MODELS[MODEL_IDX] +" " + rates_alpha + " --gap --extants " + aln.getHeight() + " --delprop " + delprop  + " --indelmodel " + rhoP + " " + rhoShape + " " + rhoScale + " --seed " + SEED);
                                 //System.out.println("Alternatively, consider specifying:");
                                 //System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);// 如果有祖先序列且提供了输出路径
                                 String[] INDELMODELS = new String[]{"ZeroTruncatedPoisson", "Poisson", "Zipf", "Lavalette"};
@@ -828,13 +832,12 @@ public class GRASP {
                                 //System.out.println(DEL_MODEL_IDX);
                                 String filenamePrefix = (PREFIX == null || PREFIX.isEmpty()) ? "result" : PREFIX;
                                 String out = OUTPUT + "/" + filenamePrefix;
-
                                 TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED,
                                             rates_alpha,
                                             DEL_MODEL_IDX, IN_MODEL_IDX,
                                             LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
                                             ins_total.length, del_total.length,
-                                            delprop,  rhoP , rhoShape , rhoScale,false,out);
+                                            delprop,  rhoP , rhoShape , rhoScale,true,out);
                                 EnumSeq[] seqs = tracker.getSequences();
                                 EnumSeq[] aseqs = tracker.getAlignment();
 

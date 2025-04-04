@@ -106,7 +106,7 @@ public class TrAVIS {
 //                "\t\"--Rhomodel\" the model for indel rate with a zero inflated gamma input the probaility of zero, the shape and scale of the gamma\n"+
                 "\t\"--maxindel\" specifies the maximum length of an indel\n"+
  //               "\t\"-dist\" it can scale the distances of the tree only works when tree is not provide\n" +
-                "\t\"--verbose\" means that details of evolutionary events are printed out on standard-output)\n" +
+                "\t\"--verbose\" means that details of evolutionary events are printed out on standard-output and generate a txt file)\n" +
                 "\t\"--help\" prints out the parameters and instructions of how to use this tool\n");
         out.println("Notes: \n" +
                 "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, \n\tLe-Gasquel and Whelan-Goldman; \n" +
@@ -827,6 +827,7 @@ public class TrAVIS {
             ti_seqs = new TreeInstance(tree, bpseqs);
 
             if (verbose) {
+
                 String outputFile = output  +"_travis_report.txt";
 
                 try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
