@@ -67,6 +67,7 @@ public class AnnotAceR {
                     "\t- #states is the number of latent states to learn (should not exceed 25, labelled A-Z).\n" +
                 "\tinternal indicates that internal nodes are also extended with user-specified or learned distributions (default leaves-only).\n" +
                 "\tlearn excludes inference and instead prompts EM learning of parameters, using input data as training data.\n" +
+                "\tiwd Calculates the integral weighted distance between instantiated values and their estimate. Only applies to marginal inference for real values. \n" +
                 "\ttied implies that the variance learned is the same across the latent states (only applicable when EM-learning GDTs; default is off).\n" +
                 "\thelp prints out commandline arguments (this screen).\n" +
                 "\tverbose completes the requested steps while printing out messages about the process.\n");
@@ -85,9 +86,10 @@ public class AnnotAceR {
     private static final int STDOUT = 2;
     private static final int ITOL = 3;
     private static final int NODE = 0;
+    private static final int VALUE = 1;
     private static final int MEAN = 1;
     private static final int SD = 2;
-    private static final int IWD = 3;
+    private static final int IWD_VAL = 3;
 
 
     public static void main(String[] args) {
@@ -109,6 +111,7 @@ public class AnnotAceR {
         boolean LEARN = false; // train (when true) or infer (when false, default)
         boolean LEAVES_ONLY = true; // leaves-only are equipped with distributions (when true, default), or all nodes including internal (when false)
         boolean TIED_VARIANCE = false;
+        boolean IWD = false; // if true, calculate the integral weighted distance
         Object MARG_LABEL = null;
         Double GAMMA = 1.0;
         Long SEED = 1L;
@@ -221,6 +224,8 @@ public class AnnotAceR {
                     LEARN = true;
                 } else if (arg.equalsIgnoreCase("internal")) {
                     LEAVES_ONLY = false;
+                } else if (arg.equalsIgnoreCase("iwd")){
+                    IWD = true;
                 } else if ((arg.equalsIgnoreCase("help"))  || (arg.equalsIgnoreCase("h"))) {
                     usage();
                 } else if ((arg.equalsIgnoreCase("verbose")) || (arg.equalsIgnoreCase("v"))) {
@@ -286,7 +291,7 @@ public class AnnotAceR {
                 }
                 SUBST_MODEL = new JC(GAMMA, alpha); // set the evolutionary model (based on user specified params and the alphabet established above)
                 /* values are either real or discrete; we establish this from the user-provided table */
-                if (TSVFile.isDoubleOrInt(ENTRY_VALUES)) { // the first col of data is all Double (real), hence must use latent states for nodes in tree
+                if (TSVFile.isDouble(ENTRY_VALUES)) { // the first col of data is all Double (real), hence must use latent states for nodes in tree
                     observed = null;
                     if (VERBOSE)
                         System.out.println("Detected real values in data--using Gaussian mixture with " + NSTATES + " components");
@@ -311,7 +316,7 @@ public class AnnotAceR {
             // so reject real values (if nominated), and
             // consolidate discrete values to nominate what states are possible
             } else if (mode == MODEL_MODE.DIRECT) {
-                if (TSVFile.isDoubleOrInt(ENTRY_VALUES)) { // the col of data is all Double (real), hence must use latent states for nodes in tree
+                if (TSVFile.isDouble(ENTRY_VALUES)) { // the col of data is all Double (real), hence must use latent states for nodes in tree
                     usage(8, "Real-value data requires (discrete) latent states; please specify number of latent states.");
                 } else { // the column has discrete values (not real)
                     observed = new HashSet();
@@ -340,9 +345,9 @@ public class AnnotAceR {
             }
             // Other checks...
             if (LEARN && PARAMS_FILE == null)
-                usage(12, "Learning needs to save to a parameter file, which is not specified");
+                usage(12, "Learnt distribution must be saved to a parameter file, use -params to specify parameter file");
             else if (INFERENCE_MODE != null && OUTPUT == null)
-                usage(13, "Inference needs to save to an output file, which is not specified");
+                usage(13, "Inference needs to save to an output file, use -out to specify output file.");
             else if (LEARN && INFERENCE_MODE != null)
                 usage(16, "-learn and -marg/-joint cannot be used together. Learning and inference must be performed in separate steps");
             /**********************************************************************************
@@ -370,9 +375,9 @@ public class AnnotAceR {
                 for (int bpidx : tree) {
                     if (!ENTRIES_SET.contains(tree.getLabel(bpidx))) {
                         Object state = inf.getDecoration(bpidx); // retrieve the already inferred state for the specified node
-                        save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx); // if ancestor attach N-prefix
-                        save[bpcnt][1] = state;
-                        if (FORMAT_IDX == 2)
+                        save[bpcnt][NODE] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx); // if ancestor attach N-prefix
+                        save[bpcnt][VALUE] = state;
+                        if (FORMAT_IDX == STDOUT)
                             System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + state);
                         bpcnt += 1;
                     }
@@ -435,7 +440,7 @@ public class AnnotAceR {
                         if (FORMAT_IDX == STDOUT)
                             System.out.println(tree.getLabel(bpidx) + "\t" + tree.getLabel(bpidx) + "\t" + distrib);
                         save[bpcnt] = new Object[1 + distrib.getDomain().size()];
-                        save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                        save[bpcnt][NODE] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                         for (int i = 0; i < distrib.getDomain().size(); i++)
                             save[bpcnt][1 + i] = distrib.get(i);
                         bpcnt += 1;
@@ -468,13 +473,15 @@ public class AnnotAceR {
                     pbn = PhyloBN.withCPTs(tree, SUBST_MODEL, xalpha, 1, LEAVES_ONLY, SEED);
 
                 if (PARAMS != null) {
-
                     if (!LEARN) {
                         // only override if inference is being performed
                         pbn.overrideMasterJSON(PARAMS);
                         if (VERBOSE)
                             System.out.println("Using pre-set distribution: " + pbn.toString());
                     }
+
+                    if (VERBOSE)
+                        System.out.println("Using initial distribution: " + pbn.toString());
                 }
 
                 if (LEARN) { // learn, do not infer
@@ -511,7 +518,6 @@ public class AnnotAceR {
                 } else if (INFERENCE_MODE == GRASP.Inference.MARGINAL) {
                     // marginal inference of ONE or ALL nodes in the tree
                     Integer[] bpidxs = null; // put node indices to be inferred in an array...
-                    Integer[] instan_bpidxs = null; // node indices that already have annotations
                     if (MARG_LABEL != null) { // node label provided, so perform ONE round of inference
                         // retrieve the branchpoint index for the nominated ancestors
                         int bpidx = tree.getIndex(MARG_LABEL);
@@ -521,9 +527,6 @@ public class AnnotAceR {
                     } else { // perform inference for ALL nodes,
                         List<Integer> arrlst = new ArrayList<>(); // unknown nodes
                         for (int bpidx : tree) {
-//                            Object label = tree.getLabel(bpidx);
-//                            if (!ENTRIES_SET.contains(label))
-//                                arrlst.add(bpidx);
                             arrlst.add(bpidx);
                         }
 
@@ -541,7 +544,12 @@ public class AnnotAceR {
                         throw new RuntimeException("Invalid setting with latent nodes for marginal inference (external nodes not set)");
                     String[] myheaders = null;
                     if (pbn.getMasterCPT() == null && pbn.getMasterGDT() != null) { // Gaussian, so real value
-                        myheaders = new String[] {tsv.getHeader(0), tsv.getHeader(1)+" (Mean)", tsv.getHeader(1)+" (SD)", tsv.getHeader(1)+" (IWD)"}; // which means only one value is available (that is the average of multiple samples)
+                        if (IWD) {
+                            myheaders = new String[] {tsv.getHeader(0), tsv.getHeader(1)+" (Mean)", tsv.getHeader(1)+" (SD)", tsv.getHeader(1)+" (IWD)"}; // which means only one value is available (that is the average of multiple samples)
+                        } else {
+                            myheaders = new String[] {tsv.getHeader(0), tsv.getHeader(1)+" (Mean)", tsv.getHeader(1)+" (SD)"};
+                        }
+
                     } else if (pbn.getMasterCPT() != null && pbn.getMasterGDT() == null) { // Discrete
                         Enumerable ed = (Enumerable) example.getVariable().getDomain(); // extract possible values so that we work out what probs/states that are available
                         myheaders = new String[1 + ed.size()];
@@ -557,6 +565,7 @@ public class AnnotAceR {
                     for (int bpidx : bpidxs) { // go through all nodes to be inferred
                         // inference below; first create the inference instance
                         MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal(bpidx, pbn);
+
                         // perform marginal inference
                         inf.decorate(ti);
                         // retrieve the distribution at the node previously nominated
@@ -587,22 +596,6 @@ public class AnnotAceR {
                                     save[bpcnt][MEAN] = gd.getMean();
                                     save[bpcnt][SD] = Math.sqrt(gd.getVariance()); // standard deviation
 
-                                    Object label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
-                                    if (ENTRIES_SET.contains(label)) { // calc IWD on instantiated nodes
-                                        double entry_val;
-                                        int val_idx = ENTRY_TO_VAL.get(label);
-                                        if (ENTRY_VALUES[val_idx] instanceof Integer) {
-                                            entry_val = ((Integer) ENTRY_VALUES[val_idx]).doubleValue();
-                                        } else {
-                                            entry_val = (Double) ENTRY_VALUES[val_idx];
-                                        }
-
-                                        // cast under assumption using a Ga
-                                        MixtureDistrib mixtureDistrib = (MixtureDistrib) anydistrib;
-                                        double abs_error = Math.abs(entry_val - gd.getMean());
-                                        double iwd = mixtureDistrib.cdf(gd.getMean() + abs_error) - mixtureDistrib.cdf(gd.getMean() - abs_error);
-                                        save[bpcnt][IWD] = iwd;
-                                    }
 
                                 } catch (ClassCastException ee) {
                                     if (FORMAT_IDX == 2)
@@ -612,26 +605,63 @@ public class AnnotAceR {
                                 }
                             }
                             bpcnt += 1;
-                        } else { // anydistrib == null; this happens when an external node is instantiated, so retrieve the value accordingly
+                        } else { // anydistrib == null; this happens when a node is instantiated, so retrieve the value accordingly
                             Object instance = pbn.getExtNode(bpidx).getInstance();
+
+                            if (IWD) {
+                                double instance_dub = (Double) instance;
+                                MaxLhoodMarginal<EnumDistrib> instan_inf = new MaxLhoodMarginal(bpidx, pbn);
+                                ti.setInstance(bpidx, null); // remove evidence, treat as uninstantiated
+
+                                // perform marginal inference
+                                instan_inf.decorate(ti);
+                                // retrieve the distribution at the node previously nominated
+                                Distrib instan_anydistrib = instan_inf.getDecoration(bpidx);
+
+                                ti.setInstance(bpidx, instance); // replace the value in the tree
+
+                                // cast under assumption using a Gaussian mixture
+                                MixtureDistrib mixtureDistrib = (MixtureDistrib) instan_anydistrib;
+
+                                double[] samples = new double[NSAMPLES];
+                                double sum = 0;
+                                for (int i = 0; i < NSAMPLES; i++) {
+                                    samples[i] = (Double) instan_anydistrib.sample();
+                                    sum += samples[i];
+                                }
+
+                                GaussianDistrib gd = GaussianDistrib.estimate(samples);
+
+                                double abs_error = Math.abs(instance_dub - gd.getMean());
+                                double iwd = mixtureDistrib.cdf(gd.getMean() + abs_error) - mixtureDistrib.cdf(gd.getMean() - abs_error);
+                                save[bpcnt][IWD_VAL] = iwd;
+
+                            }
+
+                            save[bpcnt][NODE] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                            save[bpcnt][MEAN] = instance; // here this is not actually the mean, but the instantiated value
 
                             if (FORMAT_IDX == STDOUT)
                                 System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + instance);
-                            save[bpcnt][0] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
-                            save[bpcnt][1] = instance;
+
                             bpcnt += 1;
                         }
                     }
                     TSVFile tmptsv = new TSVFile(myheaders, save);
                     try {
                         switch (FORMAT_IDX) {
-                            case 0: // TSV
+                            case TSV:
                                 tmptsv.save(OUTPUT); break;
-                            case 1: // TREE
+                            case TREE:
                                 Newick.save(tree, OUTPUT, tmptsv.getCol(0), tmptsv.getCol(1)); break;
-                            case 3: // ITOL
+                            case ITOL:
                                 Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
-                                TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], matrix[2], tsv.getHeader(valcol), NBINS, TSVFile.getMin(ENTRY_VALUES), TSVFile.getMax(ENTRY_VALUES)); break;
+
+                                if (IWD) {
+                                    TSVFile.save2iTOL("IWD_" + OUTPUT, matrix[NODE], matrix[MEAN], matrix[IWD_VAL], tsv.getHeader(valcol), NBINS, TSVFile.getMin(ENTRY_VALUES), TSVFile.getMax(ENTRY_VALUES));
+                                }
+
+                                TSVFile.save2iTOL(OUTPUT, matrix[NODE], matrix[MEAN], matrix[SD], tsv.getHeader(valcol), NBINS, TSVFile.getMin(ENTRY_VALUES), TSVFile.getMax(ENTRY_VALUES)); break;
                         }
                     } catch (IOException e) {
                         usage(6, "Failed to save output to " + OUTPUT + " using format " + FORMATS[FORMAT_IDX]);

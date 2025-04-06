@@ -214,6 +214,15 @@ public class TreeInstance {
     }
 
     /**
+     * Set a value at a branch point
+     * @param index the index of the branch point in tree
+     * @param value the value to place at that branch point
+     */
+    public void setInstance(int index, Object value) {
+        instance[index] = value;
+    }
+
+    /**
      * Retrieve the values at all branch points, indexed by the associated IdxTree
      * @return instance values (assigned or inferred)
      */
