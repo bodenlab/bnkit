@@ -249,8 +249,15 @@ public class AnnotAceR {
             String[] ENTRIES = new String[ENTRIES_OBJ.length];      // entry-names as an array of String
             Set<Object> ENTRIES_SET = new HashSet<>();
             for (int i = 0; i < ENTRIES.length; i ++) {
-                ENTRIES[i] = ENTRIES_OBJ[i].toString();
-                ENTRIES_SET.add(ENTRIES_OBJ[i]);
+//                int bpidx = tree.getIndex(ENTRIES_OBJ[i]); // this search for branchpoint, does not care if ancestor is specified as string with "N" prefix or as ancestor number (Integer)
+//                if (bpidx < 0) { // not found
+//                    System.err.println("No node in tree with label or ancestor ID \"" + ENTRIES_OBJ[i] + "\". Ignored.");
+                    ENTRIES[i] = ENTRIES_OBJ[i].toString();
+                    ENTRIES_SET.add(ENTRIES_OBJ[i]);
+//                } else {
+//                    ENTRIES[i] = tree.getLabel(bpidx).toString(); //
+//                    ENTRIES_SET.add(tree.getLabel(bpidx));
+//                }
             }
             Object[] ENTRY_VALUES = tsv.getCol(valcol, COLPARSER);             // values associated with entries
 
@@ -269,8 +276,9 @@ public class AnnotAceR {
                 }
                 SUBST_MODEL = new JC(GAMMA, alpha); // set the evolutionary model (based on user specified params and the alphabet established above)
                 /* values are either real or discrete; we establish this from the user-provided table */
-                if (TSVFile.isDouble(ENTRY_VALUES)) { // the first col of data is all Double (real), hence must use latent states for nodes in tree
+                if (TSVFile.isDoubleOrInt(new Object[][] {ENTRY_VALUES})) { // the first col of data is all Double (real), hence must use latent states for nodes in tree
                     observed = null;
+                    ENTRY_VALUES = TSVFile.getDouble(ENTRY_VALUES);
                     if (VERBOSE)
                         System.out.println("Detected real values in data--using Gaussian mixture with " + NSTATES + " components");
                 } else { // the column has discrete values (not real)

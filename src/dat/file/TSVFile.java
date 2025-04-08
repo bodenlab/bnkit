@@ -424,6 +424,29 @@ public class TSVFile {
     }
 
     /**
+     * Return a column as just Doubles even though they are Integers, leave null values untouched
+     * @param col
+     * @return null if values cannot be cast as Double or Integer
+     */
+    public static Double[] getDouble(Object[] col) {
+        Double[] ret = new Double[col.length];
+        for (int i = 0; i < col.length; i ++) {
+            if (col[i] != null) {
+                try {
+                    ret[i] = (Double) col[i];
+                } catch (ClassCastException e) {
+                    try {
+                        ret[i] = ((Integer) col[i]).doubleValue();
+                    } catch (ClassCastException e2) {
+                        return null;
+                    }
+                }
+            }
+        }
+        return ret;
+    }
+
+    /**
      * Check if all values are either cast-able to double, int or null.
      * @param rows
      * @return
@@ -431,13 +454,15 @@ public class TSVFile {
     public static boolean isDoubleOrInt(Object[][] rows) {
         for (int i = 0; i < rows.length; i ++) {
             for (int j = 0; j < rows[i].length; j ++) {
-                try {
-                    Double y = (Double) rows[i][j];
-                } catch (ClassCastException e) {
+                if (rows[i][j] != null) {
                     try {
-                        Integer y = (Integer) rows[i][j];
-                    } catch (ClassCastException e2) {
-                        return false;
+                        Double y = (Double) rows[i][j];
+                    } catch (ClassCastException e) {
+                        try {
+                            Integer y = (Integer) rows[i][j];
+                        } catch (ClassCastException e2) {
+                                return false;
+                        }
                     }
                 }
             }

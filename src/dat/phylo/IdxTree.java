@@ -623,7 +623,7 @@ public class IdxTree implements Iterable<Integer> {
         for (Map.Entry<Object, Object> entry : values.entrySet()) {
             Object val = entry.getValue();
             if (val != null) {
-                Integer idx = index.get(entry.getKey());
+                Integer idx = getIndex(entry.getKey());
                 if (idx != null)
                     idxvals.put(idx, val);
             }
