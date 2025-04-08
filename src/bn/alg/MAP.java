@@ -149,11 +149,15 @@ public class MAP extends LearningAlg {
 					node.setInstance(values[i][j]);
 			}
 			Query q = ve.makeMPE();
-			CGTable r = (CGTable) ve.infer(q);
-			Variable.Assignment[] as = r.getMPE();
-			for (Variable.Assignment a : as)
-				System.out.println("\t" + a);
-			System.out.println("------------------------------------");
+			try {
+				CGTable r = (CGTable) ve.infer(q);
+				Variable.Assignment[] as = r.getMPE();
+				for (Variable.Assignment a : as)
+					System.out.println("\t" + a);
+				System.out.println("------------------------------------");
+			} catch (VarElim.VarElimRuntimeException e) {
+				System.err.println("Failed to infer " + q.toString().substring(0, 100) + (q.toString().length() > 100 ? "..." : "") + " because of exception " + e.getMessage());
+			}
 		}
 	}
 

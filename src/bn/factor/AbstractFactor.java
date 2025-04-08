@@ -19,7 +19,6 @@ package bn.factor;
 
 import bn.Distrib;
 import bn.JDF;
-import dat.EnumTable;
 import dat.EnumVariable;
 import dat.Enumerable;
 import dat.Variable;
@@ -42,10 +41,9 @@ import java.util.*;
  * natural logarithm of each factor, so that operations can be performed entirely in log space,
  * to avoid numerical issues, e.g. underflow.
  * 
- * TODO: Consider improving efficiency further to exploit the fact that now all variables are sorted
- * in the constructor. (Currently, some code does not assume order.)
- * TODO: Choose type of implementation when new factors are constructed as a result of operations,
- * informed of their likely requirements.
+ * TODO: Consider improving efficiency further to exploit the fact that now all variables are sorted in the constructor. (Currently, some code does not assume order.)
+ * TODO: Choose type of implementation when new factors are constructed as a result of operations, informed of their likely requirements.
+ * TODO: Break factor table into multiple, independent (non-overlapping) tables that can form the complete table by permutation
  *
  * @author mikael
  */
@@ -164,7 +162,10 @@ public abstract class AbstractFactor implements Iterable<Integer> {
             int parent = nEVars - i - 1;
             this.domsize[parent] = evars[parent].size();
             this.step[parent] = prod;
-            prod *= this.domsize[parent];
+            long longprod = (long) prod * (long) this.domsize[parent];
+            if (longprod > (long) Integer.MAX_VALUE)
+                throw new AbstractFactorRuntimeException("Factor has too many entries to index: " + this);
+            prod = (int) longprod;
             this.period[parent] = prod;
         }
     }
@@ -196,7 +197,10 @@ public abstract class AbstractFactor implements Iterable<Integer> {
             int parent = nEVars - i - 1;
             this.domsize[parent] = evars[parent].size();
             this.step[parent] = prod;
-            prod *= this.domsize[parent];
+            long longprod = (long) prod * (long) this.domsize[parent];
+            if (longprod > (long) Integer.MAX_VALUE)
+                throw new AbstractFactorRuntimeException("Factor has too many entries to index: " + this);
+            prod = (int) longprod;
             this.period[parent] = prod;
         }
     }
@@ -366,7 +370,13 @@ public abstract class AbstractFactor implements Iterable<Integer> {
     public int getSize() {
         if (period != null)
             if (period.length > 0)
-                return period[0];
+                if (period[0] > 0)
+                    return period[0];
+                else {
+                    for (int p : period)
+                        if (p > 0)
+                            return p;
+                }
         return 1;
     }
 
@@ -450,8 +460,8 @@ public abstract class AbstractFactor implements Iterable<Integer> {
      * @return the values of the key corresponding to the entry with the index
      */
     public Object[] getKey(int index) {
-        if (index >= getSize() || index < 0 || this.getSize() == 1)
-            throw new AbstractFactorRuntimeException("Invalid index for factor");
+        if (index >= getSize() || index < 0 || this.getSize() <= 1)
+            throw new AbstractFactorRuntimeException("Invalid index " + index + " for factor " + this.toString());
         int remain = index;
         Object[] key = new Object[nEVars];
         for (int i = 0; i < nEVars; i++) {
@@ -1093,12 +1103,12 @@ public abstract class AbstractFactor implements Iterable<Integer> {
 
 }
 
-class AbstractFactorRuntimeException extends RuntimeException {
+class AbstractFactorRuntimeException extends FactorRuntimeException {
 
     private static final long serialVersionUID = -6465152863174383970L;
     String message;
 
     public AbstractFactorRuntimeException(String string) {
-        message = string;
+        super(string);
     }
 }

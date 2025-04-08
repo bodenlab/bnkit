@@ -41,7 +41,7 @@ import smile.stat.distribution.ExponentialFamilyMixture;
  */
 public class GRASP {
 
-    public static String VERSION = "04-Feb-2025";
+    public static String VERSION = "8-Apr-2025";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -78,6 +78,7 @@ public class GRASP {
                 "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
                 "\t{--supported-path <methodname>} (select one from DIJKSTRA(default) ASTAR)\n" +
                 "\t{--nogap}\n" +
+                "\t{--seed <seed>}\n" +
                 "\t{--nonibble}\n" +
                 "\t{--exclude-noedge}\n" +
                 "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES TrAVIS)\n" +
@@ -179,6 +180,7 @@ public class GRASP {
         Inference MODE = Inference.JOINT;
         // ancestor to reconstruct if inference mode is "marginal"
         Integer MARG_NODE = null;
+        int SEED = new Random().nextInt();
 
         long START_TIME = System.currentTimeMillis(), ELAPSED_TIME;
 
@@ -197,6 +199,8 @@ public class GRASP {
                     PREFIX = args[++ a];
                 } else if ((arg.equalsIgnoreCase("-rates-file") || arg.equalsIgnoreCase("rf")) && args.length > a + 1) {
                     RATESFILE = args[++a];
+                } else if ((arg.equalsIgnoreCase("-seed")  && args.length > a + 1)) {
+                    SEED = Integer.parseInt(args[++a]);
                 } else if (arg.equalsIgnoreCase("-joint") || arg.equalsIgnoreCase("j")) {
                     MODE = Inference.JOINT;
                 } else if ((arg.equalsIgnoreCase("-marginal") || arg.equalsIgnoreCase("m")) && args.length > a + 1) {
@@ -629,6 +633,7 @@ public class GRASP {
                     case 10: // TrAVIS
                         if (!BYPASS) {
                             if (MODE == Inference.JOINT) {
+
                                 double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
                                 double gap_open_prop = (double) aln.getGapStartCount() / (double) (aln.getWidth() * aln.getHeight());
                                 double gap_length = aln.getMeanGapLength();
@@ -638,6 +643,7 @@ public class GRASP {
                                     System.out.println("Gap opening proportion= " + gap_open_prop);
                                     System.out.println("Mean gap length= " + gap_length);
                                 }
+                                Tree newrtree = Tree.generateTreeFromMixture(tree,3,SEED,100);
 
                                 IdxTree mytree = indelpred.getTree();
                                 Set<Double> dists = new HashSet<>();
@@ -716,46 +722,72 @@ public class GRASP {
                                 Lavalette   1, 2, 5, 15
                                 Poisson     0.01, 0.1, 1, 2
                                  */
-                                int SEED = 1;
-                                IndelModel[] indelmodels = new IndelModel[] {
-                                        new Zipf(1, SEED, 100),
-                                        new Zipf(2, SEED, 100),
-                                        new Zipf(5, SEED, 100),
-                                        new Zipf(15, SEED, 100),
-                                        new Lavalette(1, SEED, 100),
-                                        new Lavalette(2, SEED, 100),
-                                        new Lavalette(5, SEED, 100),
-                                        new Lavalette(15, SEED, 100),
+
+                                IndelModel[] inmodels = new IndelModel[] {
+                                        new Zipf(1, SEED, ins_total.length),
+                                        new Zipf(2, SEED, ins_total.length),
+                                        new Zipf(5, SEED, ins_total.length),
+                                        new Zipf(15, SEED, ins_total.length),
+                                        new Lavalette(1, SEED, ins_total.length),
+                                        new Lavalette(2, SEED, ins_total.length),
+                                        new Lavalette(5, SEED, ins_total.length),
+                                        new Lavalette(15, SEED, ins_total.length),
                                         new ZeroTruncatedPoisson(0.01, SEED),
                                         new ZeroTruncatedPoisson(0.1, SEED),
                                         new ZeroTruncatedPoisson(1.0, SEED),
                                         new ZeroTruncatedPoisson(2.0, SEED)
                                 };
+                                IndelModel[] delmodels = new IndelModel[] {
+                                        new Zipf(1, SEED, del_total.length),
+                                        new Zipf(2, SEED, del_total.length),
+                                        new Zipf(5, SEED, del_total.length),
+                                        new Zipf(15, SEED, del_total.length),
+                                        new Lavalette(1, SEED, del_total.length),
+                                        new Lavalette(2, SEED, del_total.length),
+                                        new Lavalette(5, SEED, del_total.length),
+                                        new Lavalette(15, SEED, del_total.length),
+                                        new ZeroTruncatedPoisson(0.01, SEED),
+                                        new ZeroTruncatedPoisson(0.1, SEED),
+                                        new ZeroTruncatedPoisson(1.0, SEED),
+                                        new ZeroTruncatedPoisson(2.0, SEED)
+                                };
+
                                 IndelModel[] bestsofar = new IndelModel[3];
                                 double[] bestscore = new double[3];
                                 Arrays.fill(bestscore, Double.NEGATIVE_INFINITY);
-                                for (IndelModel model : indelmodels) {
-                                    double[] sum = new double[3];
-                                    for (int j = 0; j < indel_total.length; j ++) {
-                                        double y = Math.log(model.p(j + 1)+0.0001);
-                                        sum[0] += y * indel_total[j];
-                                        sum[1] += y * (ins_total.length > j ? ins_total[j] : 0);
-                                        sum[2] += y * (del_total.length > j ? del_total[j] : 0);
+                                for (IndelModel model : inmodels) {
+                                    double sumIns = 0.0;
+                                    for (int j = 0; j < ins_total.length; j++) {
+                                        double y = Math.log(model.p(j + 1) + 0.0001);
+                                        sumIns += y * ins_total[j];
                                     }
-                                    for (int k = 0; k < 3; k++) {
-                                        if (sum[k] > bestscore[k]) {
-                                            bestscore[k] = sum[k];
-                                            bestsofar[k] = model;
-                                        }
+                                    // 更新 bestscore[1] = 用于“ins”的最优分
+                                    if (sumIns > bestscore[1]) {
+                                        bestscore[1] = sumIns;
+                                        bestsofar[1] = model;
                                     }
-                                    //System.out.println("\t" + model.toString() + " for indel= " + sum[0] + " ins= " + sum[1] + " del= " + sum[2]);
                                 }
-                                if (VERBOSE) {
-                                    System.out.println("Best indelmodel: " + bestsofar[0].toString() + " at p= " + bestscore[0]);
-                                    System.out.println("Best inmodel: " + bestsofar[1].toString() + " at p= " + bestscore[1]);
-                                    System.out.println("Best delmodel: " + bestsofar[2].toString() + " at p= " + bestscore[2]);
-                                    System.out.println("Longest indel= " + indel_total.length);
+
+                                for (IndelModel model : delmodels) {
+                                    double sumDel = 0.0;
+                                    for (int j = 0; j < del_total.length; j++) {
+                                        double y = Math.log(model.p(j + 1) + 0.0001);
+                                        sumDel += y * del_total[j];
+                                    }
+                                    // 更新 bestscore[2] = 用于“del”的最优分
+                                    if (sumDel > bestscore[2]) {
+                                        bestscore[2] = sumDel;
+                                        bestsofar[2] = model;
+                                    }
                                 }
+
+
+                                //if (VERBOSE) {
+                                    //System.out.println("Best indelmodel: " + bestsofar[0].toString() + " at p= " + bestscore[0]);
+                                    //System.out.println("Best inmodel: " + bestsofar[1].toString() + " at p= " + bestscore[1]);
+                                    //System.out.println("Best delmodel: " + bestsofar[2].toString() + " at p= " + bestscore[2]);
+                                    //System.out.println("Longest indel= " + indel_total.length);
+                                //}
                                 //
                                 double[] gamma = mytree.getGammaParams();
                                 double alpha = gamma[0];
@@ -774,9 +806,11 @@ public class GRASP {
                                         System.out.println("Position-specific rates Gamma shape= " + rates_alpha + " scale= " + 1.0/rates_alpha);
                                 }
                                 System.out.println("To reproduce pseudo-biological properties of current reconstruction, use TrAVIS with the following parameters:");
-                                System.out.println("-d " + alpha + " " + 1.0/beta + " --inssize " + bestsofar[1].getTrAVIS() + " --delsize " + bestsofar[2].getTrAVIS() + " --maxdellen " + del_total.length + " --maxinslen " + ins_total.length + " -n0 " + n0.toString() + " -m " + MODEL.getName() + " "+ rates_alpha + " --gap --extants " + aln.getHeight() + " --delprop " + delprop  + "--indelmodel " + rhoP + " " + rhoShape + " " + 1/rhoScale);
-                                System.out.println("Alternatively, consider specifying:");
-                                System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);// 如果有祖先序列且提供了输出路径
+                                //System.out.println("-d " + alpha + " " + 1.0/beta + " -indelSize " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indelmodel " + rhoP + " " + rhoShape + " " + rhoScale);
+                                //System.out.println("Or:");
+                                System.out.println("-d " + alpha + " " + beta + " --inssize " + bestsofar[1].getTrAVIS() + " --delsize " + bestsofar[2].getTrAVIS() + " --maxdellen " + del_total.length + " --maxinslen " + ins_total.length + " -n0 " + n0.toString() + " -m " +MODELS[MODEL_IDX] +" " + rates_alpha + " --gap --extants " + aln.getHeight() + " --delprop " + delprop  + " --indelmodel " + rhoP + " " + rhoShape + " " + rhoScale + " --seed " + SEED);
+                                //System.out.println("Alternatively, consider specifying:");
+                                //System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);// 如果有祖先序列且提供了输出路径
                                 String[] INDELMODELS = new String[]{"ZeroTruncatedPoisson", "Poisson", "Zipf", "Lavalette"};
                                 int spaceIndex = bestsofar[1].getTrAVIS().indexOf(" ");
                                 String firstPart = (spaceIndex != -1) ? bestsofar[1].getTrAVIS().substring(0, spaceIndex) : bestsofar[1].getTrAVIS();
@@ -789,23 +823,23 @@ public class GRASP {
                                 double LAMBDA_OF_INMODEL = Double.parseDouble(numberPart);
 
                                 int spaceIndex2 = bestsofar[2].getTrAVIS().indexOf(" ");
-                                String firstPart2 = (spaceIndex != -1) ? bestsofar[2].getTrAVIS().substring(0, spaceIndex) : bestsofar[2].getTrAVIS();
+                                String firstPart2 = (spaceIndex != -1) ? bestsofar[2].getTrAVIS().substring(0, spaceIndex2) : bestsofar[2].getTrAVIS();
                                 for (int l = 0; l < INDELMODELS.length; l++) {
                                     if (firstPart2.equalsIgnoreCase(INDELMODELS[l]))
                                     { DEL_MODEL_IDX = l; } }
                                 String numberPart2 =  bestsofar[2].getTrAVIS().substring(spaceIndex2 + 1).trim();
                                 double LAMBDA_OF_DELMODEL = Double.parseDouble(numberPart2);
                                 //System.out.println(DEL_MODEL_IDX);
-
-                                TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(tree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED,
+                                String filenamePrefix = (PREFIX == null || PREFIX.isEmpty()) ? "result" : PREFIX;
+                                String out = OUTPUT + "/" + filenamePrefix;
+                                TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED,
                                             rates_alpha,
                                             DEL_MODEL_IDX, IN_MODEL_IDX,
                                             LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
                                             ins_total.length, del_total.length,
-                                            delprop,  rhoP , rhoShape , 1/rhoScale);
+                                            delprop,  rhoP , rhoShape , rhoScale,true,out);
                                 EnumSeq[] seqs = tracker.getSequences();
                                 EnumSeq[] aseqs = tracker.getAlignment();
-                                POAGraph poaGraph = tracker.getPOAG();
 
                                 try {
                                     File file = new File(OUTPUT);
@@ -813,32 +847,12 @@ public class GRASP {
                                         file.mkdirs();
                                     }
 
-                                    FastaWriter fw = new FastaWriter(OUTPUT + "/travis.fa");
+                                    FastaWriter fw = new FastaWriter(out + ".fa");
                                     fw.save(GAPPY ? aseqs : seqs);
                                     fw.close();
 
-                                    AlnWriter aw = new AlnWriter(OUTPUT + "/travis.aln");
-                                    aw.save(aseqs);
-                                    aw.close();
+                                    newrtree.save(out + ".nwk", "nwk");
 
-                                    poaGraph.saveToDOT(OUTPUT + "/travis.dot");
-                                    poaGraph.saveToMatrix(OUTPUT + "/travis.m");
-
-                                    tree.save(OUTPUT + "/travis.nwk", "nwk");
-
-                                    if (rates_alpha != null) {
-                                        double[] rates = tracker.getRates();
-                                        Object[][] data = new Object[rates.length + 1][2];
-                                        for (int l = 0; l <= rates.length; l++) {
-                                            if (l == 0) {
-                                                data[0] = new Object[]{"Site", "Rate"};
-                                            } else {
-                                                data[l] = new Object[]{l, rates[l - 1]};
-                                            }
-                                        }
-                                        TSVFile ratesfile = new TSVFile(data, true);
-                                        ratesfile.save(OUTPUT + "/travis.tsv");
-                                    }
                                 } catch (IOException e) {
                                     usage(7, "Something went wrong saving files in directory");
                                 }
@@ -847,7 +861,6 @@ public class GRASP {
                                 usage(23, "TrAVIS reports must be based on joint reconstructions");
                         }
                         break;
-
                 }
                 ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
                 if (VERBOSE || TIME) {

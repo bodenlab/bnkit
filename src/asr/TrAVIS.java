@@ -106,7 +106,7 @@ public class TrAVIS {
 //                "\t\"--Rhomodel\" the model for indel rate with a zero inflated gamma input the probaility of zero, the shape and scale of the gamma\n"+
                 "\t\"--maxindel\" specifies the maximum length of an indel\n"+
  //               "\t\"-dist\" it can scale the distances of the tree only works when tree is not provide\n" +
-                "\t\"--verbose\" means that details of evolutionary events are printed out on standard-output)\n" +
+                "\t\"--verbose\" means that details of evolutionary events are printed out on standard-output and generate a txt file)\n" +
                 "\t\"--help\" prints out the parameters and instructions of how to use this tool\n");
         out.println("Notes: \n" +
                 "\tEvolutionary models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, \n\tLe-Gasquel and Whelan-Goldman; \n" +
@@ -199,7 +199,7 @@ public class TrAVIS {
                     }
                     if (!found_model)
                         usage(1, args[a + 1] + " is not a valid model name");
-                    if ( args.length > a +2 && !args[a + 2].startsWith("-")) {
+                    if ( args.length > a +2) {
                             RATESGAMMA = Double.parseDouble(args[a + 2]);
                     }
                 } else if ((arg.equalsIgnoreCase("rf") && args.length > a + 1)) {
@@ -349,9 +349,11 @@ public class TrAVIS {
                     usage(2, "Tree file could not be saved");
                 }
             }
+        } else {
+            tree = Tree.generateTreeFromMixture(tree,3,SEED,100);
         }
         if (ancseq != null && OUTPUT != null) { // we've got an ancestor to track down the tree
-            TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED, RATESGAMMA==null?-1:RATESGAMMA,DEL_MODEL_IDX,IN_MODEL_IDX,LAMBDA_OF_INMODEL,LAMBDA_OF_DELMODEL,MAX_IN_LENGTH ,MAX_DE_LENGTH,DELETIONPROP,RhoP,RhoShape,RhoScale);
+            TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED, RATESGAMMA==null?-1:RATESGAMMA,DEL_MODEL_IDX,IN_MODEL_IDX,LAMBDA_OF_INMODEL,LAMBDA_OF_DELMODEL,MAX_IN_LENGTH ,MAX_DE_LENGTH,DELETIONPROP,RhoP,RhoShape,RhoScale,VERBOSE,OUTPUT);
             EnumSeq[] seqs = tracker.getSequences();
             switch (FORMAT_IDX) {
                 case 0: // FASTA
@@ -644,10 +646,10 @@ public class TrAVIS {
         public boolean USERATES;
 
         public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED) {
-            this(tree, ancseq, MODEL, SEED, -1,0,0,1,1,10,10,0.5,1,1,0.5);
+            this(tree, ancseq, MODEL, SEED, -1,0,0,1,1,10,10,0.5,1,1,0.5,true,"123");
         }
 
-        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma,int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH,double DELETIONPROP,double RhoP,double RhoShape,double RhoScale) {
+        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma,int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH,double DELETIONPROP,double RhoP,double RhoShape,double RhoScale,boolean verbose,String output) {
             USERATES = (ratesgamma >= 0); // check if we will generate position specific rates; if not, use a constant rate 1
             rand = new Random(SEED);
             switch (IN_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"
@@ -824,22 +826,48 @@ public class TrAVIS {
             ti_insertions = new TreeInstance(tree, insertions);
             ti_seqs = new TreeInstance(tree, bpseqs);
 
-            if (TrAVIS.VERBOSE) {
-                System.out.println(tree);
-                for (int idx : tree) {
-                    BranchPoint bp = tree.getBranchPoint(idx);
-                    BranchPoint parent = bp.getParent(); // is null if no parent
-                    System.out.println(bp.getLabel() + "\t" + bpseqs[idx]);
-                    if (idx != 0 && parent != null) {
-                        for (int i = 0; i < deletions[idx].length; i++) {
-                            if (deletions[idx][i] > 0)
-                                System.out.println("\tDELETE " + parent.getLabel() + "->" + bp.getLabel() + "@" + i + ":" + deletions[idx][i]);
-                        }
-                        for (int i = 0; i < insertions[idx].length; i++) {
-                            if (insertions[idx][i] > 0)
-                                System.out.println("\tINSERT " + parent.getLabel() + "->" + bp.getLabel() + "@" + i + ":" + insertions[idx][i]);
+            if (verbose) {
+
+                String outputFile = output  +"_travis_report.txt";
+
+                try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
+
+                    System.out.println(tree);
+                    pw.println(tree);
+
+                    for (int idx : tree) {
+                        BranchPoint bp = tree.getBranchPoint(idx);
+                        BranchPoint parent = bp.getParent();
+
+                        System.out.println(bp.getLabel() + "\t" + bpseqs[idx]);
+                        pw.println(bp.getLabel() + "\t" + bpseqs[idx]);
+
+                        if (idx != 0 && parent != null) {
+                            for (int i = 0; i < deletions[idx].length; i++) {
+                                if (deletions[idx][i] > 0) {
+                                    String line = "\tDELETE " + parent.getLabel() + "->"
+                                            + bp.getLabel() + "@" + i + ":" + deletions[idx][i];
+
+                                    System.out.println(line);
+                                    pw.println(line);
+                                }
+                            }
+                            for (int i = 0; i < insertions[idx].length; i++) {
+                                if (insertions[idx][i] > 0) {
+                                    String line = "\tINSERT " + parent.getLabel() + "->"
+                                            + bp.getLabel() + "@" + i + ":" + insertions[idx][i];
+
+                                    System.out.println(line);
+                                    pw.println(line);
+                                }
+                            }
                         }
                     }
+
+                    pw.flush();
+
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
         }

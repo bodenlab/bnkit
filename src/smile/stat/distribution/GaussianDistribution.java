@@ -21,6 +21,7 @@ import smile.math.MathEx;
 import smile.math.special.Erf;
 
 import java.io.Serial;
+import java.util.Locale;
 
 /**
  * The normal distribution or Gaussian distribution is a continuous probability
@@ -151,7 +152,7 @@ public class GaussianDistribution implements ExponentialFamily {
 
     @Override
     public String toString() {
-        return String.format("Gaussian Distribution(%.4f, %.4f)", mu, sigma);
+        return String.format(Locale.US, "Gaussian Distribution(%.4f, %.4f)", mu, sigma);
     }
 
     /**
