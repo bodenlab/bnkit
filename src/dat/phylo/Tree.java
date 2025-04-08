@@ -843,7 +843,7 @@ public class Tree extends IdxTree {
                     if (i + 1 < args.length) {
                         TREERESOLUTION = Integer.parseInt(args[++i]);
                     } else {
-                        usage(9, "Missing RESOLUTION[int] after " + args[i]);
+                        usage(11, "Missing RESOLUTION[int] after " + args[i]);
                     }
                     break;
                 case "-v":
@@ -880,6 +880,9 @@ public class Tree extends IdxTree {
                     System.out.println("Distance-adjusted tree: size = " + tree1.getSize() + "\tLeaf-to-root distance distribution: " + gds1);
             }
         }
+
+        if (tree1 == null)
+            usage(12, "No tree to analyse");
 
         // Now we are estimating a mixture of Gamma distributions from the first/source tree (loaded or synthesised)
         // 1. ONE mixture of a specified number of Gamma distributions

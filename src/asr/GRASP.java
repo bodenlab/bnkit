@@ -13,11 +13,25 @@ import dat.pog.POAGraph;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import json.JSONObject;
+import json.JSONArray;
+import smile.stat.distribution.GammaDistribution;
+import smile.stat.distribution.GaussianDistribution;
+import smile.stat.distribution.Mixture;
 import stats.*;
+import java.io.IOException;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.DoubleStream;
+
+import static bn.prob.GammaDistrib.getAlpha;
+import static bn.prob.GammaDistrib.getBeta;
+import static stats.PowerLawCon.computeMinMax;
+import static stats.PowerLawCon.estimateAlpha;
+import smile.stat.distribution.ExponentialFamilyMixture;
 
 /**
  * Command line version of GRASP.
@@ -27,7 +41,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "23-Nov-2024";
+    public static String VERSION = "04-Feb-2025";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -88,7 +102,7 @@ public class GRASP {
                 "\t-pre (or --prefix) specifies a stub that is added to result filenames (default is the prefix of the alignment file)\n" +
                 "\t-indel (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
                 "\t-s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)\n" +
-                "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific rates\n\t\tWe recommend the use of this generally, but specifically for trees with great distances, and with biologically diverse entries\n\t\tAs an example, IQ-TREE produces rates on the accepted format\n" +
+                "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific substitution rates\n\t\tWe recommend the use of this generally, but specifically for trees with great distances, and with biologically diverse entries\n\t\tAs an example, IQ-TREE produces rates on the accepted format\n" +
                 "\t--include-extants means that extants are included in output files (when the format allows)\n" +
                 "\t--nogap means that the gap-character is excluded in the resulting output (when the format allows)\n" +
                 "\t--nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end\n" +
@@ -128,6 +142,7 @@ public class GRASP {
             out.println("\n" + msg + " (Error " + error + ")");
         System.exit(error);
     }
+
 
     public static void main(String[] args) {
 
@@ -301,6 +316,8 @@ public class GRASP {
                 }
             }
         }
+
+
 
         if (ALIGNMENT == null && INPUT == null)
             usage(3, "Must specify alignment (--aln <Clustal or FASTA file>) or previously saved folder (--input-folder <folder>");
@@ -615,7 +632,7 @@ public class GRASP {
                                 double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
                                 double gap_open_prop = (double) aln.getGapStartCount() / (double) (aln.getWidth() * aln.getHeight());
                                 double gap_length = aln.getMeanGapLength();
-                                double indel_factor = 10; // FIXME: this is the default value
+                                //double indel_factor = 10; // FIXME: this is the default value
                                 if (VERBOSE) {
                                     System.out.println("Gap proportion= " + gap_prop);
                                     System.out.println("Gap opening proportion= " + gap_open_prop);
@@ -628,10 +645,12 @@ public class GRASP {
                                 String[] names = aln.getNames();
                                 int[] ins_total = new int[0];
                                 int[] del_total = new int[0];
+                                List<Double> rList = new ArrayList<>();
                                 for (int idx : mytree) {
                                     int parent = mytree.getParent(idx);
                                     if (parent != -1) { // not root
-                                        dists.add(mytree.getDistance(idx));
+                                        double dist = mytree.getDistance(idx);
+                                        dists.add(dist);
                                         Object[] pseq = ancseqs_gappy[(Integer)mytree.getLabel(parent)];
                                         Object[] cseq = null;
                                         if (mytree.isLeaf(idx)) {
@@ -642,6 +661,9 @@ public class GRASP {
                                         }
                                         int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
                                         int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
+                                        int[] Events = TrAVIS.calculateIndelAndEvents(pseq, cseq);
+                                        double rate = TrAVIS.calculateRForNodes(Events,dist);
+                                        rList.add(rate);
                                         int[] ins_tmp = new int[Math.max(insertions.length, ins_total.length)];
                                         for (int j = 0; j < ins_tmp.length; j++) {
                                             ins_tmp[j] += j < insertions.length ? insertions[j] : 0;
@@ -668,6 +690,9 @@ public class GRASP {
                                     ninsertions += (j < ins_total.length ? ins_total[j] : 0);
                                     ndeletions += (j < del_total.length ? del_total[j] : 0);
                                 }
+
+
+
                                 if (VERBOSE) {
                                     System.out.println("Indels\tInsertions\tDeletions");
                                     System.out.println("Len\tCnt\tCnt\tCnt");
@@ -675,7 +700,15 @@ public class GRASP {
                                         System.out.println((j + 1) + "\t" + indel_total[j] + "\t" + (j < ins_total.length ? ins_total[j] : 0) + "\t" + (j < del_total.length ? del_total[j] : 0));
                                     }
                                 }
+
                                 double delprop = (double) ndeletions / (double) (ninsertions + ndeletions);
+
+                                double[] rarray = rList.stream().mapToDouble(Double::doubleValue).toArray();
+                                ZeroInflatedGamma zig = ZeroInflatedGamma.fit(rarray);
+                                double rhoP = zig.getP();
+                                double rhoShape = zig.getShape();
+                                double rhoScale = zig.getScale();
+
                                 if (VERBOSE)
                                     System.out.println("Deletion proportion= " + delprop);
                                 /* Trying the following distributions (with params)
@@ -734,18 +767,82 @@ public class GRASP {
                                     n0.append(ancseqs_nogap[0][j]);
                                 if (VERBOSE)
                                     System.out.println("N0= " + n0.toString());
-                                Double rates_alpha = null;
+                                Double rates_alpha = 0.01;
                                 if (RATES != null) { // position-specific rates available
-                                    rates_alpha = GammaDistrib.getAlpha(RATES);
+                                    rates_alpha = getAlpha(RATES);
                                     if (VERBOSE)
                                         System.out.println("Position-specific rates Gamma shape= " + rates_alpha + " scale= " + 1.0/rates_alpha);
                                 }
                                 System.out.println("To reproduce pseudo-biological properties of current reconstruction, use TrAVIS with the following parameters:");
-                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -indelmodel " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor);
-                                System.out.println("Or:");
-                                System.out.println("-shape " + alpha + " -scale " + 1.0/beta + " -inmodel " + bestsofar[1].getTrAVIS() + " -delmodel " + bestsofar[2].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indel " + indel_factor);
+                                System.out.println("-d " + alpha + " " + 1.0/beta + " --inssize " + bestsofar[1].getTrAVIS() + " --delsize " + bestsofar[2].getTrAVIS() + " --maxdellen " + del_total.length + " --maxinslen " + ins_total.length + " -n0 " + n0.toString() + " -m " + MODEL.getName() + " "+ rates_alpha + " --gap --extants " + aln.getHeight() + " --delprop " + delprop  + "--indelmodel " + rhoP + " " + rhoShape + " " + 1/rhoScale);
                                 System.out.println("Alternatively, consider specifying:");
-                                System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);
+                                System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);// 如果有祖先序列且提供了输出路径
+                                String[] INDELMODELS = new String[]{"ZeroTruncatedPoisson", "Poisson", "Zipf", "Lavalette"};
+                                int spaceIndex = bestsofar[1].getTrAVIS().indexOf(" ");
+                                String firstPart = (spaceIndex != -1) ? bestsofar[1].getTrAVIS().substring(0, spaceIndex) : bestsofar[1].getTrAVIS();
+                                int IN_MODEL_IDX = 0;
+                                int DEL_MODEL_IDX = 0;
+                                for (int l = 0; l < INDELMODELS.length; l++) {
+                                    if (firstPart.equalsIgnoreCase(INDELMODELS[l]))
+                                    { IN_MODEL_IDX = l; } }
+                                String numberPart = bestsofar[1].getTrAVIS().substring(spaceIndex + 1).trim();
+                                double LAMBDA_OF_INMODEL = Double.parseDouble(numberPart);
+
+                                int spaceIndex2 = bestsofar[2].getTrAVIS().indexOf(" ");
+                                String firstPart2 = (spaceIndex != -1) ? bestsofar[2].getTrAVIS().substring(0, spaceIndex) : bestsofar[2].getTrAVIS();
+                                for (int l = 0; l < INDELMODELS.length; l++) {
+                                    if (firstPart2.equalsIgnoreCase(INDELMODELS[l]))
+                                    { DEL_MODEL_IDX = l; } }
+                                String numberPart2 =  bestsofar[2].getTrAVIS().substring(spaceIndex2 + 1).trim();
+                                double LAMBDA_OF_DELMODEL = Double.parseDouble(numberPart2);
+                                //System.out.println(DEL_MODEL_IDX);
+
+                                TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(tree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED,
+                                            rates_alpha,
+                                            DEL_MODEL_IDX, IN_MODEL_IDX,
+                                            LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
+                                            ins_total.length, del_total.length,
+                                            delprop,  rhoP , rhoShape , 1/rhoScale);
+                                EnumSeq[] seqs = tracker.getSequences();
+                                EnumSeq[] aseqs = tracker.getAlignment();
+                                POAGraph poaGraph = tracker.getPOAG();
+
+                                try {
+                                    File file = new File(OUTPUT);
+                                    if (!file.exists()) {
+                                        file.mkdirs();
+                                    }
+
+                                    FastaWriter fw = new FastaWriter(OUTPUT + "/travis.fa");
+                                    fw.save(GAPPY ? aseqs : seqs);
+                                    fw.close();
+
+                                    AlnWriter aw = new AlnWriter(OUTPUT + "/travis.aln");
+                                    aw.save(aseqs);
+                                    aw.close();
+
+                                    poaGraph.saveToDOT(OUTPUT + "/travis.dot");
+                                    poaGraph.saveToMatrix(OUTPUT + "/travis.m");
+
+                                    tree.save(OUTPUT + "/travis.nwk", "nwk");
+
+                                    if (rates_alpha != null) {
+                                        double[] rates = tracker.getRates();
+                                        Object[][] data = new Object[rates.length + 1][2];
+                                        for (int l = 0; l <= rates.length; l++) {
+                                            if (l == 0) {
+                                                data[0] = new Object[]{"Site", "Rate"};
+                                            } else {
+                                                data[l] = new Object[]{l, rates[l - 1]};
+                                            }
+                                        }
+                                        TSVFile ratesfile = new TSVFile(data, true);
+                                        ratesfile.save(OUTPUT + "/travis.tsv");
+                                    }
+                                } catch (IOException e) {
+                                    usage(7, "Something went wrong saving files in directory");
+                                }
+
                             } else if (MODE == Inference.MARGINAL)
                                 usage(23, "TrAVIS reports must be based on joint reconstructions");
                         }
