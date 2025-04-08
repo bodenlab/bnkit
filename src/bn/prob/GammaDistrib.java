@@ -217,6 +217,9 @@ public class GammaDistrib implements Distrib, Serializable {
         double x_mean = 0;
         double log_x_mean = 0;
         for (double xi : X) {
+            if (xi <= 0) {
+                xi = Double.MIN_VALUE;
+            }
             x_mean += xi;
             log_x_mean += Math.log(xi);
         }
