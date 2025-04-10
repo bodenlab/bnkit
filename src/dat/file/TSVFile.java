@@ -731,6 +731,7 @@ public class TSVFile {
         bd.close();
     }
 
+    public static Integer INSTAN_SHAPE = 1; // Use when a node has an instantiated value
     public static Integer DEFAULT_SHAPE = 2; // #1: rectangle  #2: circle  #3: star  #4: right pointing triangle  #5: left pointing triangle  #6: checkmark
     public static Integer DEFAULT_SIZE = 3; // #size can be any number. Maximum size in the dataset will be displayed using MAXIMUM_SIZE, while others will be proportionally smaller
     public static Double DEFAULT_POS = 1.0; // #position is a number between 0 and 1 and defines the position of the symbol on the branch (0 is at the start of node branch, 0.5 is in the middle, and 1 is at the end)
@@ -796,6 +797,7 @@ public class TSVFile {
                 // System.out.println(i +"\t" + bhex[i] + "\t" + bins[i]);
             }
             int[] USE_SIZE = new int[values.length];
+            int[] USE_SHAPE = new int[values.length];
             Arrays.fill(USE_SIZE, DEFAULT_SIZE);
             if (confid != null) { // there are values for expressing confidence too;
                 if (isDouble(confid)) { // confid values are doubles; presently, standard deviation
@@ -810,11 +812,13 @@ public class TSVFile {
                         cbins[i] = cmin + cbinrange / 2 + cbinrange * i; // middle value
                     }
                     for (int i = 0; i < confid.length; i++) {
-                        if (confid[i] == null)
+                        if (confid[i] == null) {
                             USE_SIZE[i] = DEFAULT_SIZE;
-                        else {
+                            USE_SHAPE[i] = INSTAN_SHAPE;
+                        } else {
                             int cbin = Math.min(3 - 1, (int) (((Double) confid[i] + cbinrange / 2 - cmin) / cbinrange));
                             USE_SIZE[i] = cbint[cbin];
+                            USE_SHAPE[i] = DEFAULT_SHAPE;
                         }
                     }
                 }
@@ -862,7 +866,7 @@ public class TSVFile {
                     continue;
                 int bin = Math.min (nbins - 1, (int) (( (Double) values[i] + binrange / 2 - min) / binrange));
                 if (confid != null) {
-                    bd.write(items[i] + " " + DEFAULT_SHAPE + " " + USE_SIZE[i] + " " + bhex[bin] + " " + DEFAULT_FILL + " " + DEFAULT_POS + " " + (confid[i] != null ? String.format("%.3f±%.3f", values[i], confid[i]) : String.format("%.3f", values[i]))); bd.newLine();
+                    bd.write(items[i] + " " + USE_SHAPE[i] + " " + USE_SIZE[i] + " " + bhex[bin] + " " + DEFAULT_FILL + " " + DEFAULT_POS + " " + (confid[i] != null ? String.format("%.3f±%.3f", values[i], confid[i]) : String.format("%.3f", values[i]))); bd.newLine();
                 } else {
                     bd.write(items[i] + " " + DEFAULT_SHAPE + " " + DEFAULT_SIZE + " " + bhex[bin] + " " + DEFAULT_FILL + " " + DEFAULT_POS + " " + String.format("%.3f", values[i])); bd.newLine();
                 }

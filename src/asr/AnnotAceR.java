@@ -485,11 +485,11 @@ public class AnnotAceR {
                         // only override if inference is being performed
                         pbn.overrideMasterJSON(PARAMS);
                         if (VERBOSE)
-                            System.out.println("Using pre-set distribution: " + pbn.toString());
+                            System.out.println("Using pre-set distribution: " + pbn);
                     }
 
                     if (VERBOSE)
-                        System.out.println("Using initial distribution: " + pbn.toString());
+                        System.out.println("Using initial distribution: " + pbn);
                 }
 
                 if (LEARN) { // learn, do not infer
@@ -632,10 +632,8 @@ public class AnnotAceR {
                                 MixtureDistrib mixtureDistrib = (MixtureDistrib) instan_anydistrib;
 
                                 double[] samples = new double[NSAMPLES];
-                                double sum = 0;
                                 for (int i = 0; i < NSAMPLES; i++) {
                                     samples[i] = (Double) instan_anydistrib.sample();
-                                    sum += samples[i];
                                 }
 
                                 GaussianDistrib gd = GaussianDistrib.estimate(samples);
@@ -666,7 +664,7 @@ public class AnnotAceR {
                                 Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
 
                                 if (IWD) {
-                                    TSVFile.save2iTOL("IWD_" + OUTPUT, matrix[NODE], matrix[MEAN], matrix[IWD_VAL], tsv.getHeader(valcol), NBINS, TSVFile.getMin(ENTRY_VALUES), TSVFile.getMax(ENTRY_VALUES));
+                                    TSVFile.save2iTOL("IWD_" + OUTPUT, matrix[NODE], matrix[IWD_VAL],"IWD_" + tsv.getHeader(valcol), NBINS, TSVFile.getMin(matrix[IWD_VAL]), TSVFile.getMax(matrix[IWD_VAL]));
                                 }
 
                                 TSVFile.save2iTOL(OUTPUT, matrix[NODE], matrix[MEAN], matrix[SD], tsv.getHeader(valcol), NBINS, TSVFile.getMin(ENTRY_VALUES), TSVFile.getMax(ENTRY_VALUES)); break;
