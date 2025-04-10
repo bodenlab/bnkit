@@ -247,8 +247,8 @@ public class AnnotAceR {
             } catch (IOException e) {
                 usage(5, inputs == null ? "Failed to load the input-file " + INPUT : "Failed to load the tree-file " + NEWICK);
             }
-            TSVFile tsv = new TSVFile(inputs, LABEL != null ? true : false); // put data in TSV instance, allowing for header if a LABEL has been specified
 
+            TSVFile tsv = new TSVFile(inputs, true); // put data in TSV instance, allowing for header if a LABEL has been specified
             /********************************************************************************
              Two modes: direct and latent; set models accordingly (and do appropriate checks)
              ********************************************************************************/
