@@ -925,7 +925,10 @@ public class TrAVIS {
                 poag.addNode(entry.getValue(), entry.getKey());
             for (EnumEdge edge : edges) {
                 if (edge.getPair()[0] == start) {
-                    poag.addEdge(-1, nodes.get(edge.getPair()[1]));
+                    if (edge.getPair()[1] != end)
+                        poag.addEdge(-1, nodes.get(edge.getPair()[1]));
+                    else
+                        poag.addEdge(-1, poag.maxsize()); // empty sequence
                 } else if (edge.getPair()[1] == end) {
                     poag.addTerminalEdge(nodes.get(edge.getPair()[0]));
                 } else {

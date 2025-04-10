@@ -41,7 +41,7 @@ import smile.stat.distribution.ExponentialFamilyMixture;
  */
 public class GRASP {
 
-    public static String VERSION = "8-Apr-2025";
+    public static String VERSION = "9-Apr-2025";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -832,15 +832,24 @@ public class GRASP {
                                 //System.out.println(DEL_MODEL_IDX);
                                 String filenamePrefix = (PREFIX == null || PREFIX.isEmpty()) ? "result" : PREFIX;
                                 String out = OUTPUT + "/" + filenamePrefix;
-                                TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED,
+                                TrAVIS.TrackTree tracker = null;
+                                EnumSeq[] seqs = null;
+                                while (tracker == null) {
+                                    tracker = new TrAVIS.TrackTree(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED,
                                             rates_alpha,
                                             DEL_MODEL_IDX, IN_MODEL_IDX,
                                             LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
                                             ins_total.length, del_total.length,
                                             delprop,  rhoP , rhoShape , rhoScale,true,out);
-                                EnumSeq[] seqs = tracker.getSequences();
+                                    seqs = tracker.getSequences();
+                                    for (EnumSeq seq : seqs) {
+                                        if (seq.length() < 1) {
+                                            tracker = null;
+                                            break;
+                                        }
+                                    }
+                                }
                                 EnumSeq[] aseqs = tracker.getAlignment();
-
                                 try {
                                     File file = new File(OUTPUT);
                                     if (!file.exists()) {
