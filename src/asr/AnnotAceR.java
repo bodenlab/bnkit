@@ -269,15 +269,15 @@ public class AnnotAceR {
             String[] ENTRIES = new String[ENTRIES_OBJ.length];      // entry-names as an array of String
             Set<Object> ENTRIES_SET = new HashSet<>();
             for (int i = 0; i < ENTRIES.length; i ++) {
-//                int bpidx = tree.getIndex(ENTRIES_OBJ[i]); // this search for branchpoint, does not care if ancestor is specified as string with "N" prefix or as ancestor number (Integer)
-//                if (bpidx < 0) { // not found
-//                    System.err.println("No node in tree with label or ancestor ID \"" + ENTRIES_OBJ[i] + "\". Ignored.");
+                int bpidx = tree.getIndex(ENTRIES_OBJ[i]); // this search for branchpoint, does not care if ancestor is specified as string with "N" prefix or as ancestor number (Integer)
+                if (bpidx < 0) { // not found
+                    System.err.println("No node in tree with label or ancestor ID \"" + ENTRIES_OBJ[i] + "\". Ignored.");
                     ENTRIES[i] = ENTRIES_OBJ[i].toString();
                     ENTRIES_SET.add(ENTRIES_OBJ[i]);
-//                } else {
-//                    ENTRIES[i] = tree.getLabel(bpidx).toString(); //
-//                    ENTRIES_SET.add(tree.getLabel(bpidx));
-//                }
+                } else {
+                    ENTRIES[i] = tree.getLabel(bpidx).toString(); //
+                    ENTRIES_SET.add(tree.getLabel(bpidx));
+                }
             }
             Object[] ENTRY_VALUES = tsv.getCol(valcol, COLPARSER); // values associated with entries
             HashMap<String, Integer> ENTRY_TO_VAL = new HashMap<>();
@@ -667,7 +667,7 @@ public class AnnotAceR {
                                 Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
 
                                 if (IWD) {
-                                    TSVFile.save2iTOL("IWD_" + OUTPUT, matrix[NODE], matrix[IWD_VAL],"IWD_" + tsv.getHeader(valcol), NBINS, TSVFile.getMin(matrix[IWD_VAL]), TSVFile.getMax(matrix[IWD_VAL]));
+                                    TSVFile.save2iTOL( OUTPUT + ".IWD", matrix[NODE], matrix[IWD_VAL],"IWD_" + tsv.getHeader(valcol), NBINS, TSVFile.getMin(matrix[IWD_VAL]), TSVFile.getMax(matrix[IWD_VAL]));
                                 }
 
                                 TSVFile.save2iTOL(OUTPUT, matrix[NODE], matrix[MEAN], matrix[SD], tsv.getHeader(valcol), NBINS, TSVFile.getMin(ENTRY_VALUES), TSVFile.getMax(ENTRY_VALUES)); break;
