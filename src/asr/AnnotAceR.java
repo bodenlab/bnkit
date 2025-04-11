@@ -90,6 +90,7 @@ public class AnnotAceR {
     private static final int MEAN = 1;
     private static final int SD = 2;
     private static final int IWD_VAL = 3;
+    private static final int DEFAULT_COL_HEADER = 1;
 
 
     public static void main(String[] args) {
@@ -248,18 +249,21 @@ public class AnnotAceR {
                 usage(5, inputs == null ? "Failed to load the input-file " + INPUT : "Failed to load the tree-file " + NEWICK);
             }
 
-            TSVFile tsv = new TSVFile(inputs, true); // put data in TSV instance, allowing for header if a LABEL has been specified
+            // put data in TSV instance, header always has to be applied
+            TSVFile tsv = new TSVFile(inputs, true);
             /********************************************************************************
              Two modes: direct and latent; set models accordingly (and do appropriate checks)
              ********************************************************************************/
             Set observed; // this is for (the set of) observed values (as established through the complete list of values across all entries)
-            int valcol = 1; // column with values, 1 being the default if no label is specified
+            int valcol = DEFAULT_COL_HEADER; // column with values, 1 being the default if no label is specified
             String[] xalpha = null; // if applicable, nominated discrete values conditioned on latent states
 
             if (LABEL != null) {
                 valcol = tsv.getColumn(LABEL); // label is given so make sure to adjust column
                 if (valcol == -1)
                     usage(13, "Invalid name of column: " + LABEL);
+            } else {
+                LABEL = tsv.getHeader(DEFAULT_COL_HEADER);
             }
             Object[] ENTRIES_OBJ = tsv.getCol(0);       // entry-names as an array of Object (perhaps a mix of String and Integer, since GRASP uses numeric ancestor IDs)
             String[] ENTRIES = new String[ENTRIES_OBJ.length];      // entry-names as an array of String
@@ -484,12 +488,11 @@ public class AnnotAceR {
                     if (!LEARN) {
                         // only override if inference is being performed
                         pbn.overrideMasterJSON(PARAMS);
-                        if (VERBOSE)
-                            System.out.println("Using pre-set distribution: " + pbn);
                     }
 
-                    if (VERBOSE)
-                        System.out.println("Using initial distribution: " + pbn);
+                    if (VERBOSE) {
+                        System.out.println("Using " + (!LEARN ? "pre-set" : "initial") + " distribution: " + pbn);
+                    }
                 }
 
                 if (LEARN) { // learn, do not infer
