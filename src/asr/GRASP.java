@@ -834,14 +834,16 @@ public class GRASP {
                                 String out = OUTPUT + "/" + filenamePrefix;
                                 TrAVIS.TrackTree tracker = null;
                                 EnumSeq[] seqs = null;
+                                EnumSeq[] seqs_ex = null;
                                 while (tracker == null) {
                                     tracker = new TrAVIS.TrackTree(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED,
                                             rates_alpha,
                                             DEL_MODEL_IDX, IN_MODEL_IDX,
                                             LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
                                             ins_total.length, del_total.length,
-                                            delprop,  rhoP , rhoShape , rhoScale,true,out);
+                                            delprop,  rhoP , rhoShape , rhoScale,VERBOSE,out);
                                     seqs = tracker.getSequences();
+                                    seqs_ex = tracker.getLeafSequences();
                                     for (EnumSeq seq : seqs) {
                                         if (seq.length() < 1) {
                                             tracker = null;
@@ -850,15 +852,20 @@ public class GRASP {
                                     }
                                 }
                                 EnumSeq[] aseqs = tracker.getAlignment();
+                                EnumSeq[] aseqs_ex = tracker.getLeafAlignments();
                                 try {
                                     File file = new File(OUTPUT);
                                     if (!file.exists()) {
                                         file.mkdirs();
                                     }
 
-                                    FastaWriter fw = new FastaWriter(out + ".fa");
+                                    FastaWriter fw = new FastaWriter(out + "_full.fa");
                                     fw.save(GAPPY ? aseqs : seqs);
                                     fw.close();
+
+                                    FastaWriter fw1 = new FastaWriter(out + ".fa");
+                                    fw1.save(GAPPY ? aseqs_ex : seqs_ex);
+                                    fw1.close();
 
                                     newrtree.save(out + ".nwk", "nwk");
 

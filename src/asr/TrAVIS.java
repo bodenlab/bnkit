@@ -122,7 +122,6 @@ public class TrAVIS {
     }
 
     public static Boolean VERBOSE = false;
-    static Double SCALEINDEL = 1.0;
      // proportion of DELETIONS v INSERTIONS
 
     public static void main(String[] args) {
@@ -204,8 +203,6 @@ public class TrAVIS {
                     }
                 } else if ((arg.equalsIgnoreCase("rf") && args.length > a + 1)) {
                     SRATESFILE = args[++a];
-                } else if (arg.equalsIgnoreCase("-indel") && args.length > a + 1) {
-                    SCALEINDEL = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("-indelmodel") && args.length > a + 3) {
                     RhoP = Double.parseDouble(args[a+1]);
                     RhoShape = Double.parseDouble(args[a+2]);
@@ -715,7 +712,7 @@ public class TrAVIS {
                         // three possibilities: 1. match and potential substitution, 2. deletion/s, and 3. insertion/s
                         //double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
                         //change indel rate into a seperate rate
-                        double toss = rand.nextDouble() / TrAVIS.SCALEINDEL;
+                        double toss = rand.nextDouble();
                         double p = Math.exp(-(Rho*t));
 
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
@@ -894,6 +891,19 @@ public class TrAVIS {
             return eseqs;
         }
 
+        public EnumSeq[] getLeafSequences() {
+            EnumSeq[] all = getSequences();  // 获取所有原始序列
+            List<EnumSeq> leafList = new ArrayList<>();
+            for (int i = 0; i < tree.getSize(); i++) {
+                if (tree.isLeaf(i)) {
+                    leafList.add(all[i]);
+                }
+            }
+            return leafList.toArray(new EnumSeq[0]);
+        }
+
+
+
         public POAGraph getPOAG() {
             if (poag != null)  // already computed
                 return poag;
@@ -971,6 +981,19 @@ public class TrAVIS {
             }
             return alignedseqs;
         }
+
+
+        public EnumSeq[] getLeafAlignments() {
+            EnumSeq[] all = getAlignment();  // 获取所有对齐后的序列
+            List<EnumSeq> leafList = new ArrayList<>();
+            for (int i = 0; i < tree.getSize(); i++) {
+                if (tree.isLeaf(i)) {
+                    leafList.add(all[i]);
+                }
+            }
+            return leafList.toArray(new EnumSeq[0]);
+        }
+
 
         public double[] getRates() {
             if (!USERATES)
