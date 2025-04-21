@@ -398,8 +398,17 @@ public class Tree extends IdxTree {
             Mixture mixture = ExponentialFamilyMixture.fit(data, components, 0, 200, 1E-4);
             return mixture;
         } catch (StackOverflowError e) { // EM will occasionally throw a StackOverflowError exception
-            return null;
+            System.out.println("Stack Overflow during EM fitting. Falling back to single component.");
+            return getSingleGammaMixture(data);
         }
+    }
+
+    private Mixture getSingleGammaMixture(double[] data) {
+        GammaDistribution single = GammaDistribution.fit(data);
+        Mixture.Component[] singleComponent = {
+                new Mixture.Component(1.0, single)
+        };
+        return new Mixture(singleComponent);
     }
 
     public static GammaDistrib[] getGammaDistribs(Mixture mixture) {
@@ -770,18 +779,23 @@ public class Tree extends IdxTree {
         mixture = tree1.getGammaMixture(NCOMP); // find mixture and weights for each component
 
         int compwmax = 0;
-        double[] shapes = new double[NCOMP];
-        double[] scales = new double[NCOMP];
-        double[] priors = new double[NCOMP];
-        GammaDistrib[] gds = new GammaDistrib[NCOMP];
-        for (int i = 0; i < NCOMP; i++) {
-            double a = shapes[i] = ((GammaDistribution) (mixture.components[i].distribution)).k;
-            double b = scales[i] = ((GammaDistribution) (mixture.components[i].distribution)).theta;
-            gds[i] = new GammaDistrib(shapes[i], 1 / scales[i]);
+        int realCompCount = mixture.components.length;
+        double[] shapes = new double[realCompCount];
+        double[] scales = new double[realCompCount];
+        double[] priors = new double[realCompCount];
+        GammaDistrib[] gds = new GammaDistrib[realCompCount];
+        for (int i = 0; i < realCompCount; i++) {
+            GammaDistribution dist = (GammaDistribution) (mixture.components[i].distribution);
+            double a = shapes[i] = dist.k;
+            double b = scales[i] = dist.theta;
+            gds[i] = new GammaDistrib(a, 1.0 / b);
             double weight = priors[i] = mixture.components[i].priori;
-            if (weight > mixture.components[compwmax].priori)
+
+            if (weight > mixture.components[compwmax].priori) {
                 compwmax = i;
+            }
         }
+
 
         // 2. Generate a new tree based on the above mixture of Gamma distributions
         //   a) assume that branch lengths are uniformly distributed across topology
