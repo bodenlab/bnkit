@@ -845,7 +845,7 @@ public class GRASP {
                                             DEL_MODEL_IDX, IN_MODEL_IDX,
                                             LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
                                             ins_total.length, del_total.length,
-                                            delprop,  rhoP , rhoShape , rhoScale,false,out);
+                                            delprop,  rhoP , rhoShape , rhoScale,VERBOSE,out);
                                     seqs = tracker.getSequences();
                                     seqs_ex = tracker.getLeafSequences();
                                     for (EnumSeq seq : seqs) {
