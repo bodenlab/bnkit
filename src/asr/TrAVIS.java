@@ -586,7 +586,7 @@ public class TrAVIS {
      * @param branchLength Branch lengths from parent to child.
      * @return indel rates for a node.
      */
-    public static Double calculateRForNodes(int[]Events,double branchLength) {
+    public static Double calculateRForNodes(int[]Events,double seqlength, double branchLength) {
 
 
         double rs = 0;
@@ -598,7 +598,7 @@ public class TrAVIS {
         double B = matches + mismatches + indels;
         // Calculate r using the formula
         if (B > 0 && branchLength > 0) {
-            rs = -Math.log(1 - (double) indels / B) / branchLength;
+            rs = -Math.log(1 - (double) indels / seqlength) / branchLength;
         }
 
         //if (rs ==0) {
@@ -677,6 +677,8 @@ public class TrAVIS {
             int[][] insertions = new int[tree.getSize()][];
             rates = new double[tree.getSize()][];
             EnumSeq[] bpseqs = new EnumSeq[tree.getSize()];
+            int sum = 0;
+            int count = 0;
 
             for (int idx : tree) {
                 if (idx == 0) {
@@ -702,7 +704,7 @@ public class TrAVIS {
                     List<Double> tailrates = new ArrayList<>(); // collect character rates for the tail of the child; intended for tailing insertions
                     // note: we don't yet know how many indices are required for child so use list before moving to array
                     int i = 0;                                  // idx for parent position
-                    double Rho = rhomodel.sample();
+
                     //if (Rho != 0){
                     //System.out.println(Rho);
                     //}
@@ -713,9 +715,12 @@ public class TrAVIS {
                         //double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
                         //change indel rate into a seperate rate
                         double toss = rand.nextDouble();
+                        double Rho = rhomodel.sample();
                         double p = Math.exp(-(Rho*t));
+                        double pp = (1- p);
+                        //System.out.println(parseq.length);
 
-                        if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
+                        if (toss >= pp) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
                             EnumDistrib d = MODEL.getDistrib(parseq[i], (USERATES?rates[paridx][i]:1)*t); // bug fix 13/3/24, prev version did not multiply with site specific rate
                             Object nchar = null;
                             double tossagain = rand.nextDouble();
@@ -735,10 +740,12 @@ public class TrAVIS {
                                 throw new RuntimeException("Sampling invalid distribution");
                             i += 1;
                         } else {
+                            count +=1;
                             double toss2 = rand.nextDouble();
                             if (toss2 < DELETIONPROP) { // 2. deletion with prob q = (1 - p)/2, so consider length of deletion
                                 int k;
                                 k = Math.min(delmodel.sample(), parseq.length - i);// length, can only delete what is left of the sequence
+                                sum+=k;
                                 deletions[idx][i] = k;  // deletions skip characters in the parent
                                 i += k;
                             } else { // 3. insertion with prob q = (1 - p)/2, so consider length of insertion
@@ -748,7 +755,7 @@ public class TrAVIS {
 
                                 int k;
                                 k = inmodel.sample(); // length, can only delete what is left of the sequence
-
+                                sum+=k;
                                 insertions[idx][i == 0 ? (rand.nextBoolean() ? 0 : parseq.length) : i] += k; // insertions can be on top of another
                                 for (int j = 0; j < k; j ++) {
                                     Object nchar = null;
@@ -819,6 +826,7 @@ public class TrAVIS {
                     bpseqs[idx].setName(tree.getBranchPoint(idx).getLabel().toString());
                 }
             }
+            System.out.println("result: sum of indel "+ sum + " num of indel " + count);
             ti_deletions = new TreeInstance(tree, deletions);
             ti_insertions = new TreeInstance(tree, insertions);
             ti_seqs = new TreeInstance(tree, bpseqs);

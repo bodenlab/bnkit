@@ -643,11 +643,10 @@ public class GRASP {
                                     System.out.println("Gap opening proportion= " + gap_open_prop);
                                     System.out.println("Mean gap length= " + gap_length);
                                 }
-                                Tree newrtree = Tree.generateTreeFromMixture(tree,3,SEED,100);
-
+                                Tree newrtree = Tree.generateTreeFromMixture(tree, 3, SEED, 100);
                                 IdxTree mytree = indelpred.getTree();
                                 Set<Double> dists = new HashSet<>();
-                                Map <String, Integer> extmap = aln.getMap();
+                                Map<String, Integer> extmap = aln.getMap();
                                 String[] names = aln.getNames();
                                 int[] ins_total = new int[0];
                                 int[] del_total = new int[0];
@@ -657,18 +656,18 @@ public class GRASP {
                                     if (parent != -1) { // not root
                                         double dist = mytree.getDistance(idx);
                                         dists.add(dist);
-                                        Object[] pseq = ancseqs_gappy[(Integer)mytree.getLabel(parent)];
+                                        Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(parent)];
                                         Object[] cseq = null;
                                         if (mytree.isLeaf(idx)) {
                                             EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(idx)));
                                             cseq = seq.get();
                                         } else {
-                                            cseq = ancseqs_gappy[(Integer)mytree.getLabel(idx)];
+                                            cseq = ancseqs_gappy[(Integer) mytree.getLabel(idx)];
                                         }
                                         int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
                                         int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
                                         int[] Events = TrAVIS.calculateIndelAndEvents(pseq, cseq);
-                                        double rate = TrAVIS.calculateRForNodes(Events,dist);
+                                        double rate = TrAVIS.calculateRForNodes(Events, pseq.length, dist);
                                         rList.add(rate);
                                         int[] ins_tmp = new int[Math.max(insertions.length, ins_total.length)];
                                         for (int j = 0; j < ins_tmp.length; j++) {
@@ -698,15 +697,20 @@ public class GRASP {
                                 }
 
 
-
+                                int sum = 0;
+                                int count = 0;
                                 if (VERBOSE) {
                                     System.out.println("Indels\tInsertions\tDeletions");
                                     System.out.println("Len\tCnt\tCnt\tCnt");
-                                    for (int j = 0; j < indel_total.length; j++) {
+                                }
+                                for (int j = 0; j < indel_total.length; j++) {
+                                    if (VERBOSE) {
                                         System.out.println((j + 1) + "\t" + indel_total[j] + "\t" + (j < ins_total.length ? ins_total[j] : 0) + "\t" + (j < del_total.length ? del_total[j] : 0));
                                     }
+                                    sum += indel_total[j]*(j + 1);
+                                    count += indel_total[j];
                                 }
-
+                                System.out.println("sample: sum of indel "+ sum + " num of indel " + count);
                                 double delprop = (double) ndeletions / (double) (ninsertions + ndeletions);
 
                                 double[] rarray = rList.stream().mapToDouble(Double::doubleValue).toArray();

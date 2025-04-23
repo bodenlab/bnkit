@@ -166,9 +166,9 @@ public class ExponentialFamilyMixture extends Mixture {
             diff = loglikelihood - L;
             L = loglikelihood;
 
-            if (iter % 10 == 0) {
-                System.out.format("Iteration %d: log likelihood = %.6f\n", iter, L);
-            }
+            //if (iter % 10 == 0) {
+                //System.out.format("Iteration %d: log likelihood = %.6f\n", iter, L);
+            //}
         }
 
         return new ExponentialFamilyMixture(L, x.length, components);
