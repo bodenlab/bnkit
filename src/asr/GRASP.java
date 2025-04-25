@@ -41,7 +41,7 @@ import smile.stat.distribution.ExponentialFamilyMixture;
  */
 public class GRASP {
 
-    public static String VERSION = "22-Apr-2025";
+    public static String VERSION = "9-Apr-2025";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -669,6 +669,7 @@ public class GRASP {
                                         int[] Events = TrAVIS.calculateIndelAndEvents(pseq, cseq);
                                         double rate = TrAVIS.calculateRForNodes(Events, pseq.length, dist);
                                         rList.add(rate);
+
                                         int[] ins_tmp = new int[Math.max(insertions.length, ins_total.length)];
                                         for (int j = 0; j < ins_tmp.length; j++) {
                                             ins_tmp[j] += j < insertions.length ? insertions[j] : 0;
@@ -695,8 +696,19 @@ public class GRASP {
                                     ninsertions += (j < ins_total.length ? ins_total[j] : 0);
                                     ndeletions += (j < del_total.length ? del_total[j] : 0);
                                 }
-
-
+                                String filenamePrefix = (PREFIX == null || PREFIX.isEmpty()) ? "result" : PREFIX;
+                                String out = OUTPUT + "/" + filenamePrefix;
+                                if (VERBOSE) {
+                                    System.out.println(rList);
+                                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(out +"_sample_relist.txt"))) {
+                                        for (Double r : rList) {
+                                            writer.write(r.toString());
+                                            writer.newLine();
+                                        }
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
                                 int sum = 0;
                                 int count = 0;
                                 if (VERBOSE) {
@@ -834,8 +846,8 @@ public class GRASP {
                                 String numberPart2 =  bestsofar[2].getTrAVIS().substring(spaceIndex2 + 1).trim();
                                 double LAMBDA_OF_DELMODEL = Double.parseDouble(numberPart2);
                                 //System.out.println(DEL_MODEL_IDX);
-                                String filenamePrefix = (PREFIX == null || PREFIX.isEmpty()) ? "result" : PREFIX;
-                                String out = OUTPUT + "/" + filenamePrefix;
+
+
                                 TrAVIS.TrackTree tracker = null;
                                 EnumSeq[] seqs = null;
                                 EnumSeq[] seqs_ex = null;

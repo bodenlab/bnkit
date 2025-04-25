@@ -665,7 +665,7 @@ public class TrAVIS {
             }
 
             rhomodel = new ZeroInflatedGamma(RhoP,RhoShape,RhoScale,SEED);
-
+            List<Double> rList = new ArrayList<>();
             if (USERATES) {
                 gamma = new GammaDistrib(ratesgamma, ratesgamma); // mean is a/b so setting b=a
                 gamma.setSeed(SEED);
@@ -704,10 +704,9 @@ public class TrAVIS {
                     List<Double> tailrates = new ArrayList<>(); // collect character rates for the tail of the child; intended for tailing insertions
                     // note: we don't yet know how many indices are required for child so use list before moving to array
                     int i = 0;                                  // idx for parent position
+                    double Rho = rhomodel.sample();
+                    rList.add(Rho);
 
-                    //if (Rho != 0){
-                    //System.out.println(Rho);
-                    //}
                     while (i < parseq.length) {
                         // make sure the toss is different in each sites
                         // move through the child by incrementing the idx in the parent
@@ -715,12 +714,11 @@ public class TrAVIS {
                         //double p = Math.exp(-(USERATES?rates[paridx][i]:1)*t);
                         //change indel rate into a seperate rate
                         double toss = rand.nextDouble();
-                        double Rho = rhomodel.sample();
-                        double p = Math.exp(-(Rho*t));
-                        double pp = (1- p);
-                        //System.out.println(parseq.length);
 
-                        if (toss >= pp) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
+                        double p = Math.exp(-(Rho*t));
+
+                        //double pp = (1- p);
+                        if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution
                             EnumDistrib d = MODEL.getDistrib(parseq[i], (USERATES?rates[paridx][i]:1)*t); // bug fix 13/3/24, prev version did not multiply with site specific rate
                             Object nchar = null;
                             double tossagain = rand.nextDouble();
@@ -832,7 +830,15 @@ public class TrAVIS {
             ti_seqs = new TreeInstance(tree, bpseqs);
 
             if (verbose) {
-
+                System.out.println(rList);
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(output +"_result_relist.txt"))) {
+                    for (Double r : rList) {
+                        writer.write(r.toString());
+                        writer.newLine();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
                 String outputFile = output  +"_travis_report.txt";
 
                 try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
