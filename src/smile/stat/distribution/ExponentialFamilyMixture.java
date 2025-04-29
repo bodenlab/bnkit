@@ -18,7 +18,7 @@
 package smile.stat.distribution;
 
 import smile.math.MathEx;
-
+import java.util.Arrays;
 import java.io.Serial;
 
 /**
@@ -93,46 +93,48 @@ public class ExponentialFamilyMixture extends Mixture {
      */
     public static ExponentialFamilyMixture fit(double[] x, Component[] components, double gamma, int maxIter, double tol) {
         if (x.length < components.length / 2) {
-            throw new IllegalArgumentException("Too many components");
+            throw new IllegalArgumentException("Too many components compared to data size.");
         }
 
         if (gamma < 0.0 || gamma > 0.2) {
-            throw new IllegalArgumentException("Invalid regularization factor gamma.");
+            throw new IllegalArgumentException("Invalid regularization factor gamma: " + gamma);
         }
 
         int n = x.length;
         int k = components.length;
 
-        double[][] posteriori = new double[k][n];
+        double[][] posteriori = new double[k][n]; // posterior probabilities
+        double L = Double.NEGATIVE_INFINITY; // previous log-likelihood
 
-        // Log Likelihood
-        double L = 0.0;
-
-        // EM loop until convergence
         double diff = Double.MAX_VALUE;
         for (int iter = 1; iter <= maxIter && diff > tol; iter++) {
-            // Expectation step
+            // ----------- E-step: calculate posterior probabilities -----------
             for (int i = 0; i < k; i++) {
                 Component c = components[i];
-
                 for (int j = 0; j < n; j++) {
-                    posteriori[i][j] = c.priori * c.distribution.p(x[j]); // numerator_c = P(C=c) * P(X|C=c)
+                    posteriori[i][j] = c.priori * c.distribution.p(x[j]);
                 }
             }
 
-            // Normalize posteriori probability. // P(X=x) = numerator_c / Sum_{c \in C} numerator_c
+            // Normalize posterior probabilities for each sample
             for (int j = 0; j < n; j++) {
-                double p = 0.0;
-
+                double total = 0.0;
                 for (int i = 0; i < k; i++) {
-                    p += posteriori[i][j];
+                    total += posteriori[i][j];
                 }
 
-                for (int i = 0; i < k; i++) {
-                    posteriori[i][j] /= p;
+                if (total <= 1e-300) {
+                    // If total is too small (zero or near zero), assign uniform probability
+                    for (int i = 0; i < k; i++) {
+                        posteriori[i][j] = 1.0 / k;
+                    }
+                } else {
+                    for (int i = 0; i < k; i++) {
+                        posteriori[i][j] /= total;
+                    }
                 }
 
-                // Adjust posterior probabilites based on Regularized EM algorithm.
+                // Regularization adjustment if gamma > 0
                 if (gamma > 0) {
                     for (int i = 0; i < k; i++) {
                         posteriori[i][j] *= (1 + gamma * MathEx.log2(posteriori[i][j]));
@@ -143,32 +145,45 @@ public class ExponentialFamilyMixture extends Mixture {
                 }
             }
 
-            // Maximization step
-            double Z = 0.0;
+            // ----------- M-step: update components' parameters -----------
+            double[] newPrioris = new double[k];
+
             for (int i = 0; i < k; i++) {
                 components[i] = ((ExponentialFamily) components[i].distribution).M(x, posteriori[i]);
-                Z += components[i].priori;
+                newPrioris[i] = components[i].priori;
+            }
+
+            // Normalize new prior probabilities
+            double Z = Arrays.stream(newPrioris).sum();
+            if (Z <= 1e-300) {
+                throw new IllegalStateException("Total weight Z is zero or very small. EM collapsed.");
             }
 
             for (int i = 0; i < k; i++) {
-                components[i] = new Component(components[i].priori / Z, components[i].distribution);
+                components[i] = new Component(newPrioris[i] / Z, components[i].distribution);
             }
 
+            // ----------- Calculate new log-likelihood -----------
             double loglikelihood = 0.0;
             for (double xi : x) {
-                double p = 0.0;
+                double px = 0.0;
                 for (Component c : components) {
-                    p += c.priori * c.distribution.p(xi);
+                    px += c.priori * c.distribution.p(xi);
                 }
-                if (p > 0) loglikelihood += Math.log(p);
+                if (px > 1e-300) {
+                    loglikelihood += Math.log(px);
+                } else {
+                    loglikelihood += -1e6; // Penalty for extremely small probability
+                }
             }
 
             diff = loglikelihood - L;
             L = loglikelihood;
 
-            //if (iter % 10 == 0) {
-                //System.out.format("Iteration %d: log likelihood = %.6f\n", iter, L);
-            //}
+            // Optionally, print iteration progress
+            // if (iter % 10 == 0) {
+            //     System.out.format("Iteration %d: log-likelihood = %.6f%n", iter, loglikelihood);
+            // }
         }
 
         return new ExponentialFamilyMixture(L, x.length, components);
