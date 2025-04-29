@@ -14,6 +14,7 @@ import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
 import dat.pog.*;
 import smile.stat.distribution.Distribution;
+import smile.stat.distribution.ExponentialFamilyMixture;
 import smile.stat.distribution.GammaDistribution;
 import stats.*;
 import smile.stat.distribution.Mixture;
@@ -350,7 +351,17 @@ public class TrAVIS {
             tree = Tree.generateTreeFromMixture(tree,3,SEED,100);
         }
         if (ancseq != null && OUTPUT != null) { // we've got an ancestor to track down the tree
-            TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED, RATESGAMMA==null?-1:RATESGAMMA,DEL_MODEL_IDX,IN_MODEL_IDX,LAMBDA_OF_INMODEL,LAMBDA_OF_DELMODEL,MAX_IN_LENGTH ,MAX_DE_LENGTH,DELETIONPROP,RhoP,RhoShape,RhoScale,VERBOSE,OUTPUT);
+            TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED,
+                    RATESGAMMA == null ? -1 : RATESGAMMA,
+                    DEL_MODEL_IDX, IN_MODEL_IDX,
+                    LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
+                    MAX_IN_LENGTH, MAX_DE_LENGTH, DELETIONPROP,
+                    RhoP,
+                    new double[]{1.0},
+                    new double[]{RhoShape},
+                    new double[]{RhoScale},
+                    VERBOSE, OUTPUT
+            );
             EnumSeq[] seqs = tracker.getSequences();
             switch (FORMAT_IDX) {
                 case 0: // FASTA
@@ -626,7 +637,7 @@ public class TrAVIS {
 
         IndelModel inmodel = null;
         IndelModel delmodel = null;
-        ZeroInflatedGamma rhomodel = null;
+        ZeroInflatedGammaMix rhomodel = null;
 
         public final Tree tree;
         private final TreeInstance ti_seqs;
@@ -643,10 +654,26 @@ public class TrAVIS {
         public boolean USERATES;
 
         public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED) {
-            this(tree, ancseq, MODEL, SEED, -1,0,0,1,1,10,10,0.5,1,1,0.5,true,"123");
+            this(
+                    tree,
+                    ancseq,
+                    MODEL,
+                    SEED,
+                    -1,     // ratesgamma (disable USERATES)
+                    0, 0,   // DEL_MODEL_IDX, IN_MODEL_IDX
+                    1, 1,   // LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL
+                    10, 10, // MAX_IN_LENGTH, MAX_DE_LENGTH
+                    0.5,    // DELETIONPROP
+                    0.3,    // rhoP
+                    new double[]{1.0},   // weights
+                    new double[]{2.0},   // shapes
+                    new double[]{1.0},   // scales
+                    true,                // verbose
+                    "123"                // output
+            );
         }
 
-        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma,int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH,double DELETIONPROP,double RhoP,double RhoShape,double RhoScale,boolean verbose,String output) {
+        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma,int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH,double DELETIONPROP, double rhoP, double[] weights, double[] shapes, double[] scales,boolean verbose,String output) {
             USERATES = (ratesgamma >= 0); // check if we will generate position specific rates; if not, use a constant rate 1
             rand = new Random(SEED);
             switch (IN_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"
@@ -664,7 +691,12 @@ public class TrAVIS {
                 default -> throw new IllegalArgumentException("Invalid model index");
             }
 
-            rhomodel = new ZeroInflatedGamma(RhoP,RhoShape,RhoScale,SEED);
+            List<Mixture.Component> components = new ArrayList<>();
+            for (int i = 0; i < weights.length; i++) {
+                components.add(new Mixture.Component(weights[i], new GammaDistribution(shapes[i], scales[i])));
+            }
+            rhomodel = new ZeroInflatedGammaMix(rhoP, new ExponentialFamilyMixture(components.toArray(new Mixture.Component[0])), SEED);
+
             List<Double> rList = new ArrayList<>();
             if (USERATES) {
                 gamma = new GammaDistrib(ratesgamma, ratesgamma); // mean is a/b so setting b=a
@@ -831,7 +863,7 @@ public class TrAVIS {
 
             if (verbose) {
                 System.out.println(rList);
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(output +"_result_relist.txt"))) {
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(output +"_result_rlist.txt"))) {
                     for (Double r : rList) {
                         writer.write(r.toString());
                         writer.newLine();

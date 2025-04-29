@@ -700,7 +700,7 @@ public class GRASP {
                                 String out = OUTPUT + "/" + filenamePrefix;
                                 if (VERBOSE) {
                                     System.out.println(rList);
-                                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(out +"_sample_relist.txt"))) {
+                                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(out +"_sample_rlist.txt"))) {
                                         for (Double r : rList) {
                                             writer.write(r.toString());
                                             writer.newLine();
@@ -726,11 +726,24 @@ public class GRASP {
                                 double delprop = (double) ndeletions / (double) (ninsertions + ndeletions);
 
                                 double[] rarray = rList.stream().mapToDouble(Double::doubleValue).toArray();
-                                ZeroInflatedGamma zig = ZeroInflatedGamma.fit(rarray);
-                                double rhoP = zig.getP();
-                                double rhoShape = zig.getShape();
-                                double rhoScale = zig.getScale();
+                                ZeroInflatedGammaMix zig = ZeroInflatedGammaMix.fit(rarray, 2);
 
+                                double rhoP = zig.getP();
+                                List<Double> rhoShapes = new ArrayList<>();
+                                List<Double> rhoScales = new ArrayList<>();
+                                List<Double> rhoWeights = new ArrayList<>();
+
+                                for (Mixture.Component c : zig.getGammaMixture().components) {
+                                    GammaDistribution gamma = (GammaDistribution) c.distribution;
+                                    String[] parts = gamma.toString().split(",");
+                                    double scale = Double.parseDouble(parts[0].replace("Gamma Distribution(", "").trim());
+                                    double shape = Double.parseDouble(parts[1].replace(")", "").trim());
+                                    double weight = c.priori;
+
+                                    rhoShapes.add(shape);
+                                    rhoScales.add(scale);
+                                    rhoWeights.add(weight);
+                                }
                                 if (VERBOSE)
                                     System.out.println("Deletion proportion= " + delprop);
                                 /* Trying the following distributions (with params)
@@ -824,7 +837,29 @@ public class GRASP {
                                 System.out.println("To reproduce pseudo-biological properties of current reconstruction, use TrAVIS with the following parameters:");
                                 //System.out.println("-d " + alpha + " " + 1.0/beta + " -indelSize " + bestsofar[0].getTrAVIS() + " -maxindel " + indel_total.length + " -n0 " + n0.toString() + " -rates " + rates_alpha + " -gap -extants " + aln.getHeight() + " -delprop " + delprop + " -indelmodel " + rhoP + " " + rhoShape + " " + rhoScale);
                                 //System.out.println("Or:");
-                                System.out.println("-d " + alpha + " " + beta + " --inssize " + bestsofar[1].getTrAVIS() + " --delsize " + bestsofar[2].getTrAVIS() + " --maxdellen " + del_total.length + " --maxinslen " + ins_total.length + " -n0 " + n0.toString() + " -m " +MODELS[MODEL_IDX] +" " + rates_alpha + " --gap --extants " + aln.getHeight() + " --delprop " + delprop  + " --indelmodel " + rhoP + " " + rhoShape + " " + rhoScale + " --seed " + SEED);
+
+                                StringBuilder indelModelParams = new StringBuilder();
+                                indelModelParams.append(rhoP);
+                                for (int j = 0; j < rhoShapes.size(); j++) {
+                                    indelModelParams.append(" ").append(rhoWeights.get(j));
+                                    indelModelParams.append(" ").append(rhoShapes.get(j));
+                                    indelModelParams.append(" ").append(rhoScales.get(j));
+                                }
+
+                                System.out.println(
+                                        "-d " + alpha + " " + beta +
+                                                " --inssize " + bestsofar[1].getTrAVIS() +
+                                                " --delsize " + bestsofar[2].getTrAVIS() +
+                                                " --maxdellen " + del_total.length +
+                                                " --maxinslen " + ins_total.length +
+                                                " -n0 " + n0.toString() +
+                                                " -m " + MODELS[MODEL_IDX] +
+                                                " " + rates_alpha +
+                                                " --gap --extants " + aln.getHeight() +
+                                                " --delprop " + delprop +
+                                                " --indelmodel " + indelModelParams.toString() +
+                                                " --seed " + SEED
+                                );
                                 //System.out.println("Alternatively, consider specifying:");
                                 //System.out.println("Gap opening propertion= " + gap_open_prop + " Gap proportion= " + gap_prop + " Mean gap length= " + gap_length);// 如果有祖先序列且提供了输出路径
                                 String[] INDELMODELS = new String[]{"ZeroTruncatedPoisson", "Poisson", "Zipf", "Lavalette"};
@@ -851,15 +886,21 @@ public class GRASP {
                                 TrAVIS.TrackTree tracker = null;
                                 EnumSeq[] seqs = null;
                                 EnumSeq[] seqs_ex = null;
+                                EnumSeq[] aseqs = null;
+                                EnumSeq[] aseqs_ex = null;
+                                double[] rhoShapeArray = rhoShapes.stream().mapToDouble(Double::doubleValue).toArray();
+                                double[] rhoScaleArray = rhoScales.stream().mapToDouble(Double::doubleValue).toArray();
+                                double[] rhoWeightArray = rhoWeights.stream().mapToDouble(Double::doubleValue).toArray();
                                 while (tracker == null) {
                                     tracker = new TrAVIS.TrackTree(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED,
                                             rates_alpha,
                                             DEL_MODEL_IDX, IN_MODEL_IDX,
                                             LAMBDA_OF_INMODEL, LAMBDA_OF_DELMODEL,
                                             ins_total.length, del_total.length,
-                                            delprop,  rhoP , rhoShape , rhoScale,VERBOSE,out);
+                                            delprop,  rhoP , rhoWeightArray,rhoShapeArray , rhoScaleArray,VERBOSE,out);
                                     seqs = tracker.getSequences();
                                     seqs_ex = tracker.getLeafSequences();
+
                                     for (EnumSeq seq : seqs) {
                                         if (seq.length() < 1) {
                                             tracker = null;
@@ -867,8 +908,9 @@ public class GRASP {
                                         }
                                     }
                                 }
-                                EnumSeq[] aseqs = tracker.getAlignment();
-                                EnumSeq[] aseqs_ex = tracker.getLeafAlignments();
+
+                                aseqs = tracker.getAlignment();
+                                aseqs_ex = tracker.getLeafAlignments();
                                 try {
                                     File file = new File(OUTPUT);
                                     if (!file.exists()) {
