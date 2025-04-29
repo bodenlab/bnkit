@@ -904,6 +904,7 @@ public class GRASP {
                                     for (EnumSeq seq : seqs) {
                                         if (seq.length() < 1) {
                                             tracker = null;
+                                            SEED +=1;
                                             break;
                                         }
                                     }
