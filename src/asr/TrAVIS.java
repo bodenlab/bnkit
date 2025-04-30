@@ -673,7 +673,23 @@ public class TrAVIS {
             );
         }
 
-        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma,int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH,double DELETIONPROP, double rhoP, double[] weights, double[] shapes, double[] scales,boolean verbose,String output) {
+        //                     Example call (in unit test):
+        //                     TrAVIS.TrackTree t = new TrAVIS.TrackTree(tree, ancseq, model, SEED,
+        //                     0.7, // rates gamma
+        //                     0, // DEL_MODEL_IDX
+        //                     0, // IN_MODEL_IDX
+        //                     1, // LAMBDA_OF_INMODEL
+        //                     1, // LAMBDA_OF_DELMODEL
+        //                     10, // MAX_IN_LENGTH
+        //                     10, // MAX_DE_LENGTH
+        //                     0.5, // DELETIONPROP
+        //                     1, // rhoP
+        //                     new double[] {1.0},   // weights (for mixture)
+        //                     new double[] {1}, // shapes
+        //                     new double[] {0.5}, // scales
+        //                     false, // verbose
+        //                     OUTPUT); // gamma a=0.7 typical protein rate variation
+        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma, int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH, double DELETIONPROP, double rhoP, double[] weights, double[] shapes, double[] scales, boolean verbose, String output) {
             USERATES = (ratesgamma >= 0); // check if we will generate position specific rates; if not, use a constant rate 1
             rand = new Random(SEED);
             switch (IN_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"

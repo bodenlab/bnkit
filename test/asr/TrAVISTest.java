@@ -59,7 +59,7 @@ class TrAVISTest {
                     //             TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED, RATESGAMMA==null?-1:RATESGAMMA);
                     Tree tree = Tree.Random(N, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2);
                     tree.adjustDistances(D); // scale distances
-                    TrAVIS.TrackTree t = new TrAVIS.TrackTree(tree, ancseq, model, SEED, 0.7,0,0,1,1,10,10,0.5,1,1,0.5,false, OUTPUT); // gamma a=0.7 typical protein rate variation
+                    TrAVIS.TrackTree t = new TrAVIS.TrackTree(tree, ancseq, model, SEED, 0.7,0,0,1,1,10,10,0.5,1, new double[] {1}, new double[] {1}, new double[] {0.5},false, OUTPUT); // gamma a=0.7 typical protein rate variation
                     int key = getKey(i, j, SEED);
                     trackMap.put(key, t);
                 }

@@ -41,7 +41,7 @@ import smile.stat.distribution.ExponentialFamilyMixture;
  */
 public class GRASP {
 
-    public static String VERSION = "9-Apr-2025";
+    public static String VERSION = "30-Apr-2025";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
