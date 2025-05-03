@@ -103,12 +103,12 @@ public class ExponentialFamilyMixture extends Mixture {
         int n = x.length;
         int k = components.length;
 
-        double[][] posteriori = new double[k][n]; // posterior probabilities
-        double L = Double.NEGATIVE_INFINITY; // previous log-likelihood
-
+        double[][] posteriori = new double[k][n];
+        double L = Double.NEGATIVE_INFINITY;
         double diff = Double.MAX_VALUE;
+
         for (int iter = 1; iter <= maxIter && diff > tol; iter++) {
-            // ----------- E-step: calculate posterior probabilities -----------
+            // ----------- E-step -----------
             for (int i = 0; i < k; i++) {
                 Component c = components[i];
                 for (int j = 0; j < n; j++) {
@@ -116,7 +116,7 @@ public class ExponentialFamilyMixture extends Mixture {
                 }
             }
 
-            // Normalize posterior probabilities for each sample
+            // Normalize posterior probabilities
             for (int j = 0; j < n; j++) {
                 double total = 0.0;
                 for (int i = 0; i < k; i++) {
@@ -124,7 +124,6 @@ public class ExponentialFamilyMixture extends Mixture {
                 }
 
                 if (total <= 1e-300) {
-                    // If total is too small (zero or near zero), assign uniform probability
                     for (int i = 0; i < k; i++) {
                         posteriori[i][j] = 1.0 / k;
                     }
@@ -134,7 +133,6 @@ public class ExponentialFamilyMixture extends Mixture {
                     }
                 }
 
-                // Regularization adjustment if gamma > 0
                 if (gamma > 0) {
                     for (int i = 0; i < k; i++) {
                         posteriori[i][j] *= (1 + gamma * MathEx.log2(posteriori[i][j]));
@@ -145,15 +143,37 @@ public class ExponentialFamilyMixture extends Mixture {
                 }
             }
 
-            // ----------- M-step: update components' parameters -----------
+            // ----------- M-step -----------
             double[] newPrioris = new double[k];
-
             for (int i = 0; i < k; i++) {
-                components[i] = ((ExponentialFamily) components[i].distribution).M(x, posteriori[i]);
+                Component updated = ((ExponentialFamily) components[i].distribution).M(x, posteriori[i]);
+
+                // If it's a GammaDistribution, extract shape and scale from toString
+                if (updated.distribution instanceof GammaDistribution) {
+                    GammaDistribution g = (GammaDistribution) updated.distribution;
+
+                    // Parse shape and scale from toString()
+                    String[] parts = g.toString().replace("Gamma Distribution(", "").replace(")", "").split(",");
+                    double parsedScale = Double.parseDouble(parts[0].trim());
+                    double parsedShape = Double.parseDouble(parts[1].trim());
+
+                    // Apply lower bound to scale
+                    double minScale = 1e-6;
+                    if (parsedScale < minScale) {
+                        parsedScale = minScale;
+                    }
+
+                    // Recreate GammaDistribution with safe parameters
+                    g = new GammaDistribution(parsedShape, parsedScale);
+                    components[i] = new Component(updated.priori, g);
+                } else {
+                    components[i] = updated;
+                }
+
                 newPrioris[i] = components[i].priori;
             }
 
-            // Normalize new prior probabilities
+            // Normalize priors
             double Z = Arrays.stream(newPrioris).sum();
             if (Z <= 1e-300) {
                 throw new IllegalStateException("Total weight Z is zero or very small. EM collapsed.");
@@ -163,7 +183,7 @@ public class ExponentialFamilyMixture extends Mixture {
                 components[i] = new Component(newPrioris[i] / Z, components[i].distribution);
             }
 
-            // ----------- Calculate new log-likelihood -----------
+            // ----------- Log-likelihood -----------
             double loglikelihood = 0.0;
             for (double xi : x) {
                 double px = 0.0;
@@ -173,19 +193,15 @@ public class ExponentialFamilyMixture extends Mixture {
                 if (px > 1e-300) {
                     loglikelihood += Math.log(px);
                 } else {
-                    loglikelihood += -1e6; // Penalty for extremely small probability
+                    loglikelihood += -1e6;
                 }
             }
 
             diff = loglikelihood - L;
             L = loglikelihood;
-
-            // Optionally, print iteration progress
-            // if (iter % 10 == 0) {
-            //     System.out.format("Iteration %d: log-likelihood = %.6f%n", iter, loglikelihood);
-            // }
         }
 
         return new ExponentialFamilyMixture(L, x.length, components);
     }
+
 }
