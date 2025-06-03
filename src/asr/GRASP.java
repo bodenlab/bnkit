@@ -41,7 +41,7 @@ import smile.stat.distribution.ExponentialFamilyMixture;
  */
 public class GRASP {
 
-    public static String VERSION = "30-Apr-2025";
+    public static String VERSION = "9-Apr-2025";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -144,6 +144,16 @@ public class GRASP {
         System.exit(error);
     }
 
+
+    static double logLikelihood(double[] data, ZeroInflatedGammaMix model) {
+        double logL = 0.0;
+        for (double val : data) {
+            double p = model.p(val);
+            p = Math.max(p, 1e-12);
+            logL += Math.log(p);
+        }
+        return logL;
+    }
 
     public static void main(String[] args) {
 
@@ -666,7 +676,7 @@ public class GRASP {
                                         }
                                         int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
                                         int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
-                                        int[] Events = TrAVIS.calculateIndelAndEvents(pseq, cseq);
+                                        int[] Events = TrAVIS.calculateIndelOpening(pseq, cseq);
                                         double rate = TrAVIS.calculateRForNodes(Events, pseq.length, dist);
                                         rList.add(rate);
 
@@ -726,7 +736,7 @@ public class GRASP {
                                 double delprop = (double) ndeletions / (double) (ninsertions + ndeletions);
 
                                 double[] rarray = rList.stream().mapToDouble(Double::doubleValue).toArray();
-                                ZeroInflatedGammaMix zig = ZeroInflatedGammaMix.fit(rarray, 2);
+                                ZeroInflatedGammaMix zig = ZeroInflatedGammaMix.fit(rarray, 3);
 
                                 double rhoP = zig.getP();
                                 List<Double> rhoShapes = new ArrayList<>();
@@ -744,6 +754,25 @@ public class GRASP {
                                     rhoScales.add(scale);
                                     rhoWeights.add(weight);
                                 }
+
+                                double[] rInflated = Arrays.stream(rarray).map(x -> Math.min(x * 1.05, 100)).toArray();
+                                double[] rDeflated = Arrays.stream(rarray).map(x -> x * 0.95).toArray();
+
+
+                                double llOriginal = logLikelihood(rarray, zig);
+                                double llInflated = logLikelihood(rInflated, zig);
+                                double llDeflated = logLikelihood(rDeflated, zig);
+
+                                System.out.printf("Log-likelihood (original): %.4f%n", llOriginal);
+                                System.out.printf("Log-likelihood (inflated): %.4f%n", llInflated);
+                                System.out.printf("Log-likelihood (deflated): %.4f%n", llDeflated);
+
+                                if (llOriginal >= llInflated && llOriginal >= llDeflated) {
+                                    System.out.println("Sanity check passed.");
+                                } else {
+                                    System.out.println("Warning: model may not reflect original data distribution.");
+                                }
+
                                 if (VERBOSE)
                                     System.out.println("Deletion proportion= " + delprop);
                                 /* Trying the following distributions (with params)
