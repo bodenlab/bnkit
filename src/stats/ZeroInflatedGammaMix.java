@@ -143,17 +143,17 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
             throw new IllegalArgumentException("Number of components must be >= 1.");
         }
 
-        // 1. 计算零膨胀比例
+
         int zeroCount = (int) Arrays.stream(data).filter(x -> x == 0.0).count();
         double p = (double) zeroCount / data.length;
 
-        // 2. 提取非零数据
+
         double[] nonZeroData = Arrays.stream(data).filter(x -> x > 0).toArray();
         if (nonZeroData.length == 0) {
             return new ZeroInflatedGammaMix(1.0, null, 42);
         }
 
-        // 3. 稳定初始化参数
+
         Arrays.sort(nonZeroData);
         Mixture.Component[] components = new Mixture.Component[numComponents];
         for (int i = 0; i < numComponents; i++) {
@@ -166,7 +166,7 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
             components[i] = new Mixture.Component(1.0 / numComponents, new GammaDistribution(shape, scale));
         }
 
-        // 4. 拟合 Gamma 混合模型
+
         ExponentialFamilyMixture gammaMixture;
         try {
             gammaMixture = ExponentialFamilyMixture.fit(nonZeroData, components);
@@ -175,7 +175,7 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
             return new ZeroInflatedGammaMix(p, null, 42);
         }
 
-        // 5. 剔除或修正异常成分
+
         List<Mixture.Component> valid = new ArrayList<>();
         for (Mixture.Component c : gammaMixture.components) {
             GammaDistribution g = (GammaDistribution) c.distribution;
@@ -184,20 +184,20 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
             double weight = c.priori;
 
             if (Double.isNaN(shape) || Double.isNaN(scale) || shape > 100 || scale < 1e-5 || weight < 1e-3) {
-                continue; // 异常 component 被丢弃
+                continue;
             }
 
-            // 加入已验证 component（数值安全）
+
             shape = Math.min(Math.max(shape, 0.01), 100);
             scale = Math.min(Math.max(scale, 1e-4), 10);
             valid.add(new Mixture.Component(weight, new GammaDistribution(shape, scale)));
         }
 
-// 6. 构建最终 GammaMixture（需归一化权重）
+
         if (valid.isEmpty()) {
             return new ZeroInflatedGammaMix(p, null, 42);
         } else {
-            // 归一化权重
+
             double totalWeight = valid.stream().mapToDouble(c -> c.priori).sum();
             Mixture.Component[] normalized = new Mixture.Component[valid.size()];
             for (int i = 0; i < valid.size(); i++) {
