@@ -3,7 +3,9 @@ import smile.stat.distribution.ExponentialFamilyMixture;
 import smile.stat.distribution.GammaDistribution;
 import smile.stat.distribution.Mixture;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation probability
@@ -55,22 +57,22 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
                 return sampleGamma((GammaDistribution) c.distribution);
             }
         }
-        // 防止浮点数误差：用最后一个component
+
         return sampleGamma((GammaDistribution) gammaMixture.components[gammaMixture.length() - 1].distribution);
     }
     private double getShape(GammaDistribution gamma) {
         return Double.parseDouble(gamma.toString().split(",")[1].replace(")", "").trim());
     }
 
-    /** 小工具：提取 GammaDistribution 的 scale 参数 */
+
     private double getScale(GammaDistribution gamma) {
         return Double.parseDouble(gamma.toString().split(",")[0]
                 .replace("Gamma Distribution(", "")
                 .trim());
     }
-    /** 从一个 GammaDistribution 手动采样，支持非整数 shape */
+
     private double sampleGamma(GammaDistribution gamma) {
-        double shape = getShape(gamma);  // 用小工具读shape
+        double shape = getShape(gamma);
         double scale = getScale(gamma);
         if (shape <= 0.0 || scale <= 0.0) {
             throw new IllegalArgumentException("Shape and scale must be positive.");
@@ -141,27 +143,75 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
             throw new IllegalArgumentException("Number of components must be >= 1.");
         }
 
+        // 1. 计算零膨胀比例
         int zeroCount = (int) Arrays.stream(data).filter(x -> x == 0.0).count();
         double p = (double) zeroCount / data.length;
 
+        // 2. 提取非零数据
         double[] nonZeroData = Arrays.stream(data).filter(x -> x > 0).toArray();
         if (nonZeroData.length == 0) {
-
             return new ZeroInflatedGammaMix(1.0, null, 42);
         }
 
-        // 动态初始化components
+        // 3. 稳定初始化参数
+        Arrays.sort(nonZeroData);
         Mixture.Component[] components = new Mixture.Component[numComponents];
         for (int i = 0; i < numComponents; i++) {
-
-            // 简单初始化每个Gamma的 shape/scale（可以更高级，但这个简单版够用）
-            double initShape = 1.0 + i;   // shape 从1, 2, 3...递增
-            double initScale = 1.0;       // scale 全部设成1.0
-            components[i] = new Mixture.Component(1.0 / numComponents, new GammaDistribution(initShape, initScale));
+            int qIndex = (int) ((i + 1.0) / (numComponents + 1) * nonZeroData.length);
+            double mean = Math.max(nonZeroData[qIndex], 1e-3);  // 避免为0
+            double shape = 2.0;
+            double scale = mean / shape;
+            shape = Math.max(shape, 0.01);
+            scale = Math.max(scale, 1e-4);
+            components[i] = new Mixture.Component(1.0 / numComponents, new GammaDistribution(shape, scale));
         }
-        ExponentialFamilyMixture gammaMixture = ExponentialFamilyMixture.fit(nonZeroData, components);
-        return new ZeroInflatedGammaMix(p, gammaMixture, 42);
+
+        // 4. 拟合 Gamma 混合模型
+        ExponentialFamilyMixture gammaMixture;
+        try {
+            gammaMixture = ExponentialFamilyMixture.fit(nonZeroData, components);
+        } catch (Exception e) {
+            System.err.println("Gamma mixture fit failed: " + e.getMessage());
+            return new ZeroInflatedGammaMix(p, null, 42);
+        }
+
+        // 5. 剔除或修正异常成分
+        List<Mixture.Component> valid = new ArrayList<>();
+        for (Mixture.Component c : gammaMixture.components) {
+            GammaDistribution g = (GammaDistribution) c.distribution;
+            double shape = g.k;
+            double scale = g.theta;
+            double weight = c.priori;
+
+            if (Double.isNaN(shape) || Double.isNaN(scale) || shape > 100 || scale < 1e-5 || weight < 1e-3) {
+                continue; // 异常 component 被丢弃
+            }
+
+            // 加入已验证 component（数值安全）
+            shape = Math.min(Math.max(shape, 0.01), 100);
+            scale = Math.min(Math.max(scale, 1e-4), 10);
+            valid.add(new Mixture.Component(weight, new GammaDistribution(shape, scale)));
+        }
+
+// 6. 构建最终 GammaMixture（需归一化权重）
+        if (valid.isEmpty()) {
+            return new ZeroInflatedGammaMix(p, null, 42);
+        } else {
+            // 归一化权重
+            double totalWeight = valid.stream().mapToDouble(c -> c.priori).sum();
+            Mixture.Component[] normalized = new Mixture.Component[valid.size()];
+            for (int i = 0; i < valid.size(); i++) {
+                Mixture.Component c = valid.get(i);
+                double newWeight = c.priori / totalWeight;
+                GammaDistribution g = (GammaDistribution) c.distribution;
+                normalized[i] = new Mixture.Component(newWeight,
+                        new GammaDistribution(g.k, g.theta));
+            }
+
+            return new ZeroInflatedGammaMix(p, new ExponentialFamilyMixture(normalized), 42);
+        }
     }
+
     /** Summary output */
     public String getTrAVIS() {
         return String.format("ZeroInflatedGammaMix p=%.4f, mixture components=%d", p, gammaMixture.length());
