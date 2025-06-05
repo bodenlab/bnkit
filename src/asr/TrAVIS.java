@@ -563,32 +563,43 @@ public class TrAVIS {
     }
 
     /**
-     * Calculate indels, matches, and mismatches between a parent and a child sequence.
+     * Calculate indel openings, matches, and mismatches between a parent and a child sequence.
      *
      * @param seq1 The sequence of the parent node.
-     * @param seq2  The sequence of the child node.
-     * @return An array of three integers: indels, matches, and mismatches.
+     * @param seq2 The sequence of the child node.
+     * @return An array of three integers: indel openings, matches, and mismatches.
      */
-    public static int[] calculateIndelAndEvents(Object[] seq1, Object[] seq2) {
-        int indels = 0;
+    public static int[] calculateIndelOpening(Object[] seq1, Object[] seq2) {
+        int indelOpenings = 0;
         int matches = 0;
         int mismatches = 0;
 
         int length = Math.min(seq1.length, seq2.length);
+        boolean inIndel = false;
+
         for (int i = 0; i < length; i++) {
-            if (seq1[i] == null &&  seq2[i] != null) {
-                indels++;  // Insertion
-            } else if (seq2[i] == null && seq1[i] != null) {
-                indels++;  // Deletion
-            } else if (seq1[i] == seq2[i] && seq1[i] != null && seq2[i] != null) {
-                matches++;  // Match
-            } else if (seq1[i] != seq2[i] && seq1[i] != null && seq2[i] != null) {
-                mismatches++;  // Mismatch
+            boolean isGap = (seq1[i] == null && seq2[i] != null) || (seq2[i] == null && seq1[i] != null);
+
+            if (isGap) {
+                if (!inIndel) {
+                    indelOpenings++;  // New indel opening
+                    inIndel = true;
+                }
+            } else {
+                inIndel = false;
+                if (seq1[i] != null && seq2[i] != null) {
+                    if (seq1[i].equals(seq2[i])) {
+                        matches++;
+                    } else {
+                        mismatches++;
+                    }
+                }
             }
         }
 
-        return new int[]{indels, matches, mismatches};
+        return new int[]{indelOpenings, matches, mismatches};
     }
+
 
     /**
      * Calculate the relative indel rate (r) for each node in a tree.
@@ -673,23 +684,7 @@ public class TrAVIS {
             );
         }
 
-        //                     Example call (in unit test):
-        //                     TrAVIS.TrackTree t = new TrAVIS.TrackTree(tree, ancseq, model, SEED,
-        //                     0.7, // rates gamma
-        //                     0, // DEL_MODEL_IDX
-        //                     0, // IN_MODEL_IDX
-        //                     1, // LAMBDA_OF_INMODEL
-        //                     1, // LAMBDA_OF_DELMODEL
-        //                     10, // MAX_IN_LENGTH
-        //                     10, // MAX_DE_LENGTH
-        //                     0.5, // DELETIONPROP
-        //                     1, // rhoP
-        //                     new double[] {1.0},   // weights (for mixture)
-        //                     new double[] {1}, // shapes
-        //                     new double[] {0.5}, // scales
-        //                     false, // verbose
-        //                     OUTPUT); // gamma a=0.7 typical protein rate variation
-        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma, int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH, double DELETIONPROP, double rhoP, double[] weights, double[] shapes, double[] scales, boolean verbose, String output) {
+        public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma,int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH,double DELETIONPROP, double rhoP, double[] weights, double[] shapes, double[] scales,boolean verbose,String output) {
             USERATES = (ratesgamma >= 0); // check if we will generate position specific rates; if not, use a constant rate 1
             rand = new Random(SEED);
             switch (IN_MODEL_IDX) { //"Zipf","PowerLaw","Lavalette"
