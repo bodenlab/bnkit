@@ -33,6 +33,23 @@ import static stats.PowerLawCon.computeMinMax;
 import static stats.PowerLawCon.estimateAlpha;
 import smile.stat.distribution.ExponentialFamilyMixture;
 
+class BranchInfo {
+    String from;
+    String to;
+    double rate;
+    double dist;
+    double cumulativeLength;
+
+    int depth;
+    @Override
+    public String toString() {
+        return from + "→" + to + " : rate=" + rate + ", dist=" + dist;
+    }
+}
+
+
+
+
 /**
  * Command line version of GRASP.
  * @author mikael
@@ -56,6 +73,7 @@ public class GRASP {
         JOINT,
         MARGINAL
     }
+
 
     public static void usage() {
         usage(0, null);
@@ -144,6 +162,108 @@ public class GRASP {
         System.exit(error);
     }
 
+    // Compute ranks for a list of values, handling ties by assigning average ranks
+    public static List<Double> getRanks(List<Double> values) {
+        int n = values.size();
+        List<Integer> indices = new ArrayList<>();
+        for (int i = 0; i < n; i++) indices.add(i);
+
+        // Sort indices based on corresponding values
+        indices.sort((i, j) -> Double.compare(values.get(i), values.get(j)));
+
+        // Initialize all ranks with 0.0
+        List<Double> ranks = new ArrayList<>(Collections.nCopies(n, 0.0));
+
+        int i = 0;
+        while (i < n) {
+            int j = i;
+            // Find all values that are equal (tie group)
+            while (j + 1 < n && Double.compare(values.get(indices.get(i)), values.get(indices.get(j + 1))) == 0) {
+                j++;
+            }
+            // Compute average rank for the tie group
+            double rank = (i + j + 2) / 2.0; // +2 because rank starts from 1
+            for (int k = i; k <= j; k++) {
+                ranks.set(indices.get(k), rank);
+            }
+            i = j + 1;
+        }
+        return ranks;
+    }
+
+    // Compute Spearman rank correlation between two lists
+    public static double spearman(List<Double> x, List<Double> y) {
+        if (x.size() != y.size()) throw new IllegalArgumentException("Lists must be the same length");
+        int n = x.size();
+        List<Double> rankX = getRanks(x);
+        List<Double> rankY = getRanks(y);
+
+        double sum = 0;
+        for (int i = 0; i < n; i++) {
+            double d = rankX.get(i) - rankY.get(i);
+            sum += d * d;
+        }
+
+        // Spearman's rank correlation coefficient formula
+        return 1 - (6 * sum) / (n * (n * n - 1));
+    }
+
+    // Optimize the order of rates within each depth layer to improve Spearman correlation with ground truth
+    public static void localSwapOptimize(List<BranchInfo> branchInfos, Map<String, Double> groundTruthRates, int nIter, int seed) {
+        Random rand = new Random(seed);
+
+        // Group branches by depth
+        Map<Integer, List<BranchInfo>> byDepth = new HashMap<>();
+        for (BranchInfo bi : branchInfos) {
+            byDepth.computeIfAbsent(bi.depth, k -> new ArrayList<>()).add(bi);
+        }
+
+        // Perform nIter random swaps to try to increase Spearman correlation
+        for (int iter = 0; iter < nIter; iter++) {
+            for (Map.Entry<Integer, List<BranchInfo>> entry : byDepth.entrySet()) {
+                List<BranchInfo> layer = entry.getValue();
+                int n = layer.size();
+                if (n < 2) continue;
+
+                // Randomly select two different indices within the same depth
+                int i = rand.nextInt(n), j = rand.nextInt(n);
+                while (i == j) j = rand.nextInt(n);
+
+                BranchInfo bi1 = layer.get(i);
+                BranchInfo bi2 = layer.get(j);
+
+                // Compute current Spearman correlation
+                List<Double> simList = new ArrayList<>();
+                List<Double> groundList = new ArrayList<>();
+                for (BranchInfo b : branchInfos) {
+                    simList.add(b.rate);
+                    String key = b.from + "→" + b.to;
+                    groundList.add(groundTruthRates.getOrDefault(key, 0.0));
+                }
+                double currentRho = spearman(simList, groundList);
+
+                // Swap the rates
+                double tmp = bi1.rate;
+                bi1.rate = bi2.rate;
+                bi2.rate = tmp;
+
+                // Compute new Spearman correlation
+                simList.clear(); groundList.clear();
+                for (BranchInfo b : branchInfos) {
+                    simList.add(b.rate);
+                    String key = b.from + "→" + b.to;
+                    groundList.add(groundTruthRates.getOrDefault(key, 0.0));
+                }
+                double newRho = spearman(simList, groundList);
+
+                // If the swap made correlation worse, undo the swap
+                if (newRho < currentRho) {
+                    bi2.rate = bi1.rate;
+                    bi1.rate = tmp;
+                }
+            }
+        }
+    }
 
     static double logLikelihood(double[] data, ZeroInflatedGammaMix model) {
         double logL = 0.0;
@@ -661,31 +781,102 @@ public class GRASP {
                                 int[] ins_total = new int[0];
                                 int[] del_total = new int[0];
                                 List<Double> rList = new ArrayList<>();
+                                List<BranchInfo> branchInfos = new ArrayList<>();
+                                Map<String, Double> branchRateMap = new LinkedHashMap<>();
+
+                                String filenamePrefix = (PREFIX == null || PREFIX.isEmpty()) ? "result" : PREFIX;
+                                String out = OUTPUT + "/" + filenamePrefix;
+                                try (PrintWriter writer = new PrintWriter(new FileWriter(out + "_branch_length.txt"))) {
+                                    writer.println("Branch\tLength"); // 写入表头
+
+                                    int n = newrtree.getSize();  // 假设这个是总节点数（可改为 tree.labels.length 或 rates.length 等）
+                                    for (int idx = 0; idx < n; idx++) {
+                                        // 排除 root（parent == -1）
+                                        int parent = newrtree.getParent(idx);
+                                        if (parent == -1) continue;
+
+                                        String parentLabel = newrtree.getLabel(parent).toString();
+                                        String childLabel = newrtree.getLabel(idx).toString();
+                                        double dist = newrtree.getDistance(idx);
+
+                                        // 如果 label 为空就用索引
+                                        if (parentLabel == null || parentLabel.isEmpty()) parentLabel = String.valueOf(parent);
+                                        if (childLabel == null || childLabel.isEmpty()) childLabel = String.valueOf(idx);
+
+                                        writer.printf("%s→%s\t%.5f\n", parentLabel, childLabel, dist);
+                                    }
+
+                                    System.out.println("✅ Tree structure saved to " + out + "_branch_length.txt");
+
+                                } catch (IOException e) {
+                                    System.err.println("❌ Failed to write tree: " + e.getMessage());
+                                }
+
+
+                                // Step 1: 查找 root 节点（getParent(idx) == -1）
+                                int rootIdx = -1;
+                                for (int idx : mytree) {
+                                    if (mytree.getParent(idx) == -1) {
+                                        rootIdx = idx;
+                                        break;
+                                    }
+                                }
+                                if (rootIdx == -1) throw new RuntimeException("❌ Root node not found.");
+                                String rootLabel = mytree.getLabel(rootIdx).toString();
+                                Map<String, Double> cumulativeDistMap = new HashMap<>();
+                                cumulativeDistMap.put(rootLabel, 0.0);
                                 for (int idx : mytree) {
                                     int parent = mytree.getParent(idx);
-                                    if (parent != -1) { // not root
+                                    if (parent != -1) { // Non-root node
                                         double dist = mytree.getDistance(idx);
                                         dists.add(dist);
+
+                                        String from = mytree.getLabel(parent).toString();
+                                        String to = mytree.getLabel(idx).toString();
+
+                                        // Accumulate branch length from root to current node
+                                        double parentCumulative = cumulativeDistMap.getOrDefault(from, 0.0);
+                                        double currentCumulative = parentCumulative + dist;
+                                        cumulativeDistMap.put(to, currentCumulative);
+
+                                        // Retrieve parent/child sequences
                                         Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(parent)];
-                                        Object[] cseq = null;
+                                        Object[] cseq;
                                         if (mytree.isLeaf(idx)) {
                                             EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(idx)));
                                             cseq = seq.get();
                                         } else {
                                             cseq = ancseqs_gappy[(Integer) mytree.getLabel(idx)];
                                         }
+
+                                        // Calculate indel rate
                                         int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
                                         int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
                                         int[] Events = TrAVIS.calculateIndelOpening(pseq, cseq);
                                         double rate = TrAVIS.calculateRForNodes(Events, pseq.length, dist);
                                         rList.add(rate);
 
+                                        // Record branch → rate
+                                        String label = from + "→" + to;
+                                        branchRateMap.put(label, rate);
+
+                                        // Save to branchInfos
+                                        BranchInfo bi = new BranchInfo();
+                                        bi.from = from;
+                                        bi.to = to;
+                                        bi.rate = rate;
+                                        bi.dist = dist;
+                                        bi.cumulativeLength = currentCumulative;
+                                        branchInfos.add(bi);
+
+                                        // Accumulate insertions/deletions (unchanged)
                                         int[] ins_tmp = new int[Math.max(insertions.length, ins_total.length)];
                                         for (int j = 0; j < ins_tmp.length; j++) {
                                             ins_tmp[j] += j < insertions.length ? insertions[j] : 0;
                                             ins_tmp[j] += j < ins_total.length ? ins_total[j] : 0;
                                         }
                                         ins_total = ins_tmp;
+
                                         int[] del_tmp = new int[Math.max(deletions.length, del_total.length)];
                                         for (int j = 0; j < del_tmp.length; j++) {
                                             del_tmp[j] += j < deletions.length ? deletions[j] : 0;
@@ -694,6 +885,18 @@ public class GRASP {
                                         del_total = del_tmp;
                                     }
                                 }
+                                Map<String, Integer> nodeDepthMap = new HashMap<>();
+                                for (BranchInfo bi : branchInfos) {
+                                    int depth = nodeDepthMap.getOrDefault(bi.to, 0); // child 决定这条 branch 的深度
+                                    System.out.println(bi.from + " -> " + bi.to + " : depth = " + depth);
+                                }
+
+                                Map<String, Double> groundTruthRates = new HashMap<>();
+                                for (BranchInfo bi : branchInfos) {
+                                    String label = bi.from + "→" + bi.to;
+                                    groundTruthRates.put(label, bi.rate);
+                                }
+
                                 int[] indel_total = new int[Math.max(ins_total.length, del_total.length)];
                                 for (int j = 0; j < indel_total.length; j++) {
                                     indel_total[j] += j < ins_total.length ? ins_total[j] : 0;
@@ -706,19 +909,47 @@ public class GRASP {
                                     ninsertions += (j < ins_total.length ? ins_total[j] : 0);
                                     ndeletions += (j < del_total.length ? del_total[j] : 0);
                                 }
-                                String filenamePrefix = (PREFIX == null || PREFIX.isEmpty()) ? "result" : PREFIX;
-                                String out = OUTPUT + "/" + filenamePrefix;
-                                if (VERBOSE) {
-                                    System.out.println(rList);
-                                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(out +"_sample_rlist.txt"))) {
-                                        for (Double r : rList) {
-                                            writer.write(r.toString());
-                                            writer.newLine();
+
+                                try (BufferedWriter writer = new BufferedWriter(new FileWriter(out + "_branch_length_real.txt"))) {
+                                    writer.write("Branch\tLength\n");
+                                    for (BranchInfo bi : branchInfos) {
+                                        String branch = bi.from + "→" + bi.to;
+                                        writer.write(branch + "\t" + String.format("%.5f", bi.dist) + "\n");
+                                    }
+                                    System.out.println("Write completed: " + out + "_branch_length_real.txt");
+                                } catch (IOException e) {
+                                    System.err.println("Write failed: " + e.getMessage());
+                                }
+
+
+                            /**
+                            if (VERBOSE) {
+                                System.out.println(rList);
+                                try (BufferedWriter writer = new BufferedWriter(new FileWriter(out +"_sample_rlist.txt"))) {
+                                    for (Double r : rList) {
+                                        writer.write(r.toString());
+                                        writer.newLine();
+                                    }
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                             **/
+
+                                    System.out.println("=== Branch → Indel Rate Path (Root to Tips) ===");
+                                    for (Map.Entry<String, Double> entry : branchRateMap.entrySet()) {
+                                        System.out.printf("%s : %.5f\n", entry.getKey(), entry.getValue());
+                                    }
+
+                                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(out + "_branch_rates.txt"))) {
+                                        writer.write("Branch\tRate\n");
+                                        for (Map.Entry<String, Double> entry : branchRateMap.entrySet()) {
+                                            writer.write(entry.getKey() + "\t" + entry.getValue() + "\n");
                                         }
                                     } catch (IOException e) {
                                         e.printStackTrace();
                                     }
-                                }
+
                                 int sum = 0;
                                 int count = 0;
                                 if (VERBOSE) {
@@ -755,6 +986,46 @@ public class GRASP {
                                     rhoWeights.add(weight);
                                 }
 
+
+                                // Repeat simulation 5 times
+                                for (int k = 1; k <= 5; k++) {
+                                    // For each branch, sample a new indel rate from the ZIG distribution
+                                    for (BranchInfo bi : branchInfos) {
+                                        double sampled_r = zig.sample();
+                                        bi.rate = sampled_r;
+                                    }
+
+                                    // Optimize the branch order locally to match ground truth using Spearman correlation
+                                    localSwapOptimize(branchInfos, groundTruthRates, 1000, k);
+
+                                    // Print the simulated tree's indel rates to the console
+                                    System.out.println("=== Simulated Tree #" + k + " ===");
+                                    for (BranchInfo bi : branchInfos) {
+                                        System.out.printf("%s→%s : %.5f\n", bi.from, bi.to, bi.rate);
+                                    }
+
+                                    // Write the simulated indel rates to a file
+                                    String filepath = out + "_indel_rates_" + k + ".txt";
+                                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(filepath))) {
+                                        writer.write("Branch\tIndelRate\n");
+                                        for (BranchInfo bi : branchInfos) {
+                                            writer.write(bi.from + "→" + bi.to + "\t" + String.format("%.5f", bi.rate) + "\n");
+                                        }
+                                        System.out.println("Simulated indel rates #" + k + " written to: " + filepath);
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+
+                                try (BufferedWriter writer = new BufferedWriter(new FileWriter(out + "_branch_cumulative_lengths.txt"))) {
+                                    writer.write("Branch\tCumulativeLength\n");
+                                    for (BranchInfo bi : branchInfos) {
+                                        writer.write(bi.from + "→" + bi.to + "\t" + String.format("%.5f", bi.cumulativeLength) + "\n");
+                                    }
+                                    System.out.println("Cumulative branch lengths written to file.");
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
                                 double[] rInflated = Arrays.stream(rarray).map(x -> Math.min(x * 1.05, 100)).toArray();
                                 double[] rDeflated = Arrays.stream(rarray).map(x -> x * 0.95).toArray();
 
@@ -819,7 +1090,6 @@ public class GRASP {
                                         double y = Math.log(model.p(j + 1) + 0.0001);
                                         sumIns += y * ins_total[j];
                                     }
-                                    // 更新 bestscore[1] = 用于“ins”的最优分
                                     if (sumIns > bestscore[1]) {
                                         bestscore[1] = sumIns;
                                         bestsofar[1] = model;
@@ -832,7 +1102,6 @@ public class GRASP {
                                         double y = Math.log(model.p(j + 1) + 0.0001);
                                         sumDel += y * del_total[j];
                                     }
-                                    // 更新 bestscore[2] = 用于“del”的最优分
                                     if (sumDel > bestscore[2]) {
                                         bestscore[2] = sumDel;
                                         bestsofar[2] = model;
