@@ -265,6 +265,55 @@ public class GRASP {
         }
     }
 
+    public static void globalSwapOptimize(List<BranchInfo> branchInfos, Map<String, Double> groundTruthRates, int nIter, int seed) {
+        Random rand = new Random(seed);
+
+        int n = branchInfos.size();
+        if (n < 2) return;
+
+        for (int iter = 0; iter < nIter; iter++) {
+            // Randomly select two distinct branches from the entire list
+            int i = rand.nextInt(n), j = rand.nextInt(n);
+            while (i == j) j = rand.nextInt(n);
+
+            BranchInfo bi1 = branchInfos.get(i);
+            BranchInfo bi2 = branchInfos.get(j);
+
+            // Compute current Spearman correlation between simulated and ground truth rates
+            List<Double> simList = new ArrayList<>();
+            List<Double> groundList = new ArrayList<>();
+            for (BranchInfo b : branchInfos) {
+                simList.add(b.rate);
+                String key = b.from + "→" + b.to;
+                groundList.add(groundTruthRates.getOrDefault(key, 0.0));
+            }
+            double currentRho = spearman(simList, groundList);
+
+            // Swap the rates of the two selected branches
+            double tmp = bi1.rate;
+            bi1.rate = bi2.rate;
+            bi2.rate = tmp;
+
+            // Recompute the Spearman correlation after the swap
+            simList.clear();
+            groundList.clear();
+            for (BranchInfo b : branchInfos) {
+                simList.add(b.rate);
+                String key = b.from + "→" + b.to;
+                groundList.add(groundTruthRates.getOrDefault(key, 0.0));
+            }
+            double newRho = spearman(simList, groundList);
+
+            // Revert the swap if the new correlation is worse
+            if (newRho < currentRho) {
+                bi2.rate = bi1.rate;
+                bi1.rate = tmp;
+            }
+        }
+    }
+    
+
+
     static double logLikelihood(double[] data, ZeroInflatedGammaMix model) {
         double logL = 0.0;
         for (double val : data) {
@@ -787,11 +836,11 @@ public class GRASP {
                                 String filenamePrefix = (PREFIX == null || PREFIX.isEmpty()) ? "result" : PREFIX;
                                 String out = OUTPUT + "/" + filenamePrefix;
                                 try (PrintWriter writer = new PrintWriter(new FileWriter(out + "_branch_length.txt"))) {
-                                    writer.println("Branch\tLength"); // 写入表头
+                                    writer.println("Branch\tLength");
 
-                                    int n = newrtree.getSize();  // 假设这个是总节点数（可改为 tree.labels.length 或 rates.length 等）
+                                    int n = newrtree.getSize();
                                     for (int idx = 0; idx < n; idx++) {
-                                        // 排除 root（parent == -1）
+
                                         int parent = newrtree.getParent(idx);
                                         if (parent == -1) continue;
 
@@ -799,21 +848,21 @@ public class GRASP {
                                         String childLabel = newrtree.getLabel(idx).toString();
                                         double dist = newrtree.getDistance(idx);
 
-                                        // 如果 label 为空就用索引
+
                                         if (parentLabel == null || parentLabel.isEmpty()) parentLabel = String.valueOf(parent);
                                         if (childLabel == null || childLabel.isEmpty()) childLabel = String.valueOf(idx);
 
                                         writer.printf("%s→%s\t%.5f\n", parentLabel, childLabel, dist);
                                     }
 
-                                    System.out.println("✅ Tree structure saved to " + out + "_branch_length.txt");
+                                    System.out.println("Tree structure saved to " + out + "_branch_length.txt");
 
                                 } catch (IOException e) {
-                                    System.err.println("❌ Failed to write tree: " + e.getMessage());
+                                    System.err.println("Failed to write tree: " + e.getMessage());
                                 }
 
 
-                                // Step 1: 查找 root 节点（getParent(idx) == -1）
+                          
                                 int rootIdx = -1;
                                 for (int idx : mytree) {
                                     if (mytree.getParent(idx) == -1) {
@@ -821,7 +870,7 @@ public class GRASP {
                                         break;
                                     }
                                 }
-                                if (rootIdx == -1) throw new RuntimeException("❌ Root node not found.");
+                                if (rootIdx == -1) throw new RuntimeException("Root node not found.");
                                 String rootLabel = mytree.getLabel(rootIdx).toString();
                                 Map<String, Double> cumulativeDistMap = new HashMap<>();
                                 cumulativeDistMap.put(rootLabel, 0.0);
@@ -996,8 +1045,8 @@ public class GRASP {
                                     }
 
                                     // Optimize the branch order locally to match ground truth using Spearman correlation
-                                    localSwapOptimize(branchInfos, groundTruthRates, 1000, k);
-
+                                    //localSwapOptimize(branchInfos, groundTruthRates, 1000, k+10);
+                                    globalSwapOptimize(branchInfos, groundTruthRates, 1000, k+10);
                                     // Print the simulated tree's indel rates to the console
                                     System.out.println("=== Simulated Tree #" + k + " ===");
                                     for (BranchInfo bi : branchInfos) {
