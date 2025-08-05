@@ -265,6 +265,13 @@ public class GRASP {
         }
     }
 
+    /**
+     * Blindly improve the correlation between rates drawn from a distribution, and rates in the reconstruction (and user-provided tree)
+     * @param branchInfos
+     * @param groundTruthRates
+     * @param nIter
+     * @param seed
+     */
     public static void globalSwapOptimize(List<BranchInfo> branchInfos, Map<String, Double> groundTruthRates, int nIter, int seed) {
         Random rand = new Random(seed);
 
@@ -272,7 +279,7 @@ public class GRASP {
         if (n < 2) return;
 
         for (int iter = 0; iter < nIter; iter++) {
-            // Randomly select two distinct branches from the entire list
+            // Blindly select two distinct and random branches from the entire list
             int i = rand.nextInt(n), j = rand.nextInt(n);
             while (i == j) j = rand.nextInt(n);
 
@@ -350,11 +357,11 @@ public class GRASP {
         // output formats
         boolean SAVE_AS = false;
         boolean INCLUDE_EXTANTS = false;
-        String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "MATLAB", "LATEX", "POAG", "TrAVIS"};
+        String[]  FORMATS    = new String[]  {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "MATLAB", "LATEX", "POAG", "TrAVIS", "INDEL"};
         // select these, default for "joint reconstruction"
         boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
         // select to compute consensus path for these output formats
-        boolean[] CONSENSUS = new boolean[]  {true,    false,     true,      false,  false, false, false,   false,    false,   false,  true  };
+        boolean[] CONSENSUS = new boolean[]  {true,    false,     true,      false,  false, false, false,   false,    false,   false,  true,    true  };
         // default inference mode
         Inference MODE = Inference.JOINT;
         // ancestor to reconstruct if inference mode is "marginal"
@@ -675,7 +682,7 @@ public class GRASP {
             for (int i = 0; i < SAVE_AS_IDX.length; i++) {
                 if (!SAVE_AS_IDX[i])
                     continue;
-                switch (i) { // {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX", "POAG", "TRAVIS"};
+                switch (i) { // {"FASTA", "DISTRIB", "CLUSTAL", "TREE", "POGS", "DOT", "TREES", "MATLAB", "LATEX", "POAG", "TRAVIS", "INDEL"};
                     case 0: // FASTA
                         if (!BYPASS && MODE != null) {
                             FastaWriter fw = null;
@@ -808,7 +815,97 @@ public class GRASP {
                             poag.saveToDOT(OUTPUT + "/" + PREFIX + "_POAGunderN" + MARG_NODE + ".dot");
                         }
                         break;
-
+                    case 11: // INDEL
+                        if (!BYPASS) {
+                            Random random = new Random();
+                            // calculate some v basic stats from the alignment itself
+                            double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
+                            double gap_open_prop = (double) aln.getGapStartCount() / (double) (aln.getWidth() * aln.getHeight());
+                            double gap_length = aln.getMeanGapLength();
+                            if (VERBOSE) {
+                                System.out.println("Gap proportion= " + gap_prop);
+                                System.out.println("Gap opening proportion= " + gap_open_prop);
+                                System.out.println("Mean gap length= " + gap_length);
+                            }
+                            // the user-provided tree for which ancestor sequences have been determined
+                            IdxTree mytree = indelpred.getTree();
+                            // retrieve sequence names to alignment index map (extants only of course)
+                            Map<String, Integer> extmap = aln.getMap();
+                            // collect evolutionary distances for each branch so that a distribution can be estimated
+                            Map<Integer, Double> dists = new HashMap<>();
+                            // collect reconstructed/observed indel rates on each branch so that a distribution can be estimated
+                            Map<Integer, Double> indelrates = new HashMap<>();
+                            // now go through the tree...
+                            System.out.println("Parent\tChild\tDist \tInsert\tDelete\tIndel\tRate");
+                            for (int idx : mytree) { // go through the original, user-provided tree
+                                int parent = mytree.getParent(idx);
+                                if (parent != -1) {  // Non-root node, so there is a branch with distance to catch...
+                                    double dist = mytree.getDistance(idx);
+                                    dists.put(idx, dist); // collect evolutionary distance on the node (to its parent)
+                                    // Retrieve parent/child reconstructed sequences at a node in the user-provided tree
+                                    Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(parent)];
+                                    Object[] cseq;
+                                    if (mytree.isLeaf(idx)) {
+                                        EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(idx)));
+                                        cseq = seq.get();
+                                    } else {
+                                        cseq = ancseqs_gappy[(Integer) mytree.getLabel(idx)];
+                                    }
+                                    // Calculate indel rate for the reconstructed sequences in the user-provided tree
+                                    int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
+                                    int nInsertions = Arrays.stream(insertions).sum();
+                                    int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
+                                    int nDeletions = Arrays.stream(deletions).sum();
+                                    double event_prop = (double) (nInsertions + nDeletions) / ancseqs_nogap[(Integer) mytree.getLabel(parent)].length;
+                                    double indelrate = -Math.log(1.0 - event_prop) / dist;
+                                    indelrates.put(idx, indelrate);
+                                    System.out.printf("%5d\t%5d\t%5.3f\t%5d\t%5d\t%5d\t%+5.3f\n", parent, idx, dist, nInsertions, nDeletions, nInsertions + nDeletions, indelrate);
+                                }
+                            }
+                            double[] rarray = new double[indelrates.size()];
+                            int j = 0;
+                            for (double r : indelrates.values())
+                                rarray[j ++] = r;
+                            // fit a 3-component mixture distribution to all collected rates (from the reconstruction)
+                            ZeroInflatedGammaMix zig = ZeroInflatedGammaMix.fit(rarray, 3);
+                            System.out.println("Parent\tChild\tDist \t#Insert\t#Delete\t#Indel\tRate\tP(orig)\tRate1\tP(sim)\t#IND(S)\tRate2\tP(sim)\t#IND(S)\tRate3\tP(sim)\t#IND(S)\tRate4\tP(sim)\t#IND(S)\tRate5\tP(sim)\t#IND(S)");
+                            for (int idx : mytree) { // go through the original, user-provided tree
+                                int parent = mytree.getParent(idx);
+                                if (parent != -1) {  // Non-root node, so there is a branch with distance to catch...
+                                    double dist = mytree.getDistance(idx);
+                                    // Retrieve parent/child reconstructed sequences at a node in the user-provided tree
+                                    Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(parent)];
+                                    Object[] cseq;
+                                    if (mytree.isLeaf(idx)) {
+                                        EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(idx)));
+                                        cseq = seq.get();
+                                    } else {
+                                        cseq = ancseqs_gappy[(Integer) mytree.getLabel(idx)];
+                                    }
+                                    // Calculate indel rate for the reconstructed sequences in the user-provided tree
+                                    int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
+                                    int nInsertions = Arrays.stream(insertions).sum();
+                                    int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
+                                    int nDeletions = Arrays.stream(deletions).sum();
+                                    int seqlength = ancseqs_nogap[(Integer) mytree.getLabel(parent)].length;
+                                    double event_prop = (double) (nInsertions + nDeletions) / seqlength;
+                                    double indelrate = -Math.log(1.0 - event_prop) / dist;
+                                    double p_before = Math.exp(-indelrate * dist);
+                                    System.out.printf("%5d\t%5d\t%5.3f\t%5d\t%5d\t%5d\t%+5.3f\t%+5.3f\t", parent, idx, dist, nInsertions, nDeletions, nInsertions + nDeletions, indelrate, p_before);
+                                    for (int k = 0; k < 5; k ++) {
+                                        double sample = zig.sample();
+                                        double p = Math.exp(-(sample * dist));
+                                        int nIndel = 0;
+                                        for (int pos = 0; pos < seqlength; pos++) {
+                                            nIndel += random.nextDouble() >= p ? 1 : 0;
+                                        }
+                                        System.out.printf("%5.3f\t%5.3f\t%5d\t", sample, p, nIndel);
+                                    }
+                                }
+                                System.out.println();
+                            }
+                        }
+                        break;
                     case 10: // TrAVIS
                         if (!BYPASS) {
                             if (MODE == Inference.JOINT) {
@@ -830,8 +927,9 @@ public class GRASP {
                                 int[] ins_total = new int[0];
                                 int[] del_total = new int[0];
                                 List<Double> rList = new ArrayList<>();
-                                List<BranchInfo> branchInfos = new ArrayList<>();
-                                Map<String, Double> branchRateMap = new LinkedHashMap<>();
+
+                                List<BranchInfo> branchInfos = new ArrayList<>(); // Stores information about each branch in the simulated tree, including rates and labels
+                                Map<String, Double> branchRateMap = new LinkedHashMap<>(); // Maps branch labels (from→to) to their corresponding rates
 
                                 String filenamePrefix = (PREFIX == null || PREFIX.isEmpty()) ? "result" : PREFIX;
                                 String out = OUTPUT + "/" + filenamePrefix;
@@ -862,7 +960,7 @@ public class GRASP {
                                 }
 
 
-                          
+                                // MB: not sure if the following is needed. index 0 is always a root node (but the datastructure can have more than one root)
                                 int rootIdx = -1;
                                 for (int idx : mytree) {
                                     if (mytree.getParent(idx) == -1) {
@@ -874,21 +972,21 @@ public class GRASP {
                                 String rootLabel = mytree.getLabel(rootIdx).toString();
                                 Map<String, Double> cumulativeDistMap = new HashMap<>();
                                 cumulativeDistMap.put(rootLabel, 0.0);
-                                for (int idx : mytree) {
+                                for (int idx : mytree) { // go through the original, user-provided tree
                                     int parent = mytree.getParent(idx);
-                                    if (parent != -1) { // Non-root node
+                                    if (parent != -1) {  // Non-root node
                                         double dist = mytree.getDistance(idx);
-                                        dists.add(dist);
+                                        dists.add(dist); // collect evolutionary distance on the node (to its parent)
 
                                         String from = mytree.getLabel(parent).toString();
                                         String to = mytree.getLabel(idx).toString();
 
                                         // Accumulate branch length from root to current node
-                                        double parentCumulative = cumulativeDistMap.getOrDefault(from, 0.0);
+                                        double parentCumulative = cumulativeDistMap.getOrDefault(from, 0.0); // MB: inefficient retrieval...
                                         double currentCumulative = parentCumulative + dist;
                                         cumulativeDistMap.put(to, currentCumulative);
 
-                                        // Retrieve parent/child sequences
+                                        // Retrieve parent/child reconstructed sequences at a node in the user-provided tree
                                         Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(parent)];
                                         Object[] cseq;
                                         if (mytree.isLeaf(idx)) {
@@ -898,7 +996,7 @@ public class GRASP {
                                             cseq = ancseqs_gappy[(Integer) mytree.getLabel(idx)];
                                         }
 
-                                        // Calculate indel rate
+                                        // Calculate indel rate for the reconstructed sequences in the user-provided tree
                                         int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
                                         int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
                                         int[] Events = TrAVIS.calculateIndelOpening(pseq, cseq);
@@ -941,6 +1039,7 @@ public class GRASP {
                                 }
 
                                 Map<String, Double> groundTruthRates = new HashMap<>();
+                                // MB: copy the rates from the reconstruction
                                 for (BranchInfo bi : branchInfos) {
                                     String label = bi.from + "→" + bi.to;
                                     groundTruthRates.put(label, bi.rate);
@@ -1016,6 +1115,7 @@ public class GRASP {
                                 double delprop = (double) ndeletions / (double) (ninsertions + ndeletions);
 
                                 double[] rarray = rList.stream().mapToDouble(Double::doubleValue).toArray();
+                                // fit a 3-component mixture distribution to all collected rates (from the reconstruction)
                                 ZeroInflatedGammaMix zig = ZeroInflatedGammaMix.fit(rarray, 3);
 
                                 double rhoP = zig.getP();
@@ -1039,6 +1139,7 @@ public class GRASP {
                                 // Repeat simulation 5 times
                                 for (int k = 1; k <= 5; k++) {
                                     // For each branch, sample a new indel rate from the ZIG distribution
+                                    // MB: this overwrites the original rate for node
                                     for (BranchInfo bi : branchInfos) {
                                         double sampled_r = zig.sample();
                                         bi.rate = sampled_r;

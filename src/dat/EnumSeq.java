@@ -499,7 +499,10 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
             return names;
         }
 
-
+        /**
+         * Get the names for all the sequences in the alignment, mapped to their corresponding index in the alignment
+         * @return names and index map
+         */
         public Map<String, Integer> getMap() {
             Map<String, Integer> map = new HashMap<>();
             for (int i = 0; i < seqs.size(); i++) {

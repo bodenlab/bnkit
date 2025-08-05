@@ -461,7 +461,7 @@ public class TrAVIS {
     /**
      * Calculates the counts of insertions between two sequences.
      *
-     * This method compares two sequences and determines the number of insertions
+     * This method compares two sequences (padded to be aligned) and determines the number of insertions
      * at each position. It returns an array where the index represents the length
      * of the insertion and the value at that index represents the count of such
      * insertions.
@@ -513,7 +513,7 @@ public class TrAVIS {
     /**
      * Calculates the counts of deletions between two sequences.
      *
-     * This method compares two sequences and determines the number of deletions
+     * This method compares two sequences (padded to be aligned) and determines the number of deletions
      * at each position. It returns an array where the index represents the length
      * of the deletion and the value at that index represents the count of such
      * deletions.
@@ -608,13 +608,13 @@ public class TrAVIS {
      * @param branchLength Branch lengths from parent to child.
      * @return indel rates for a node.
      */
-    public static Double calculateRForNodes(int[]Events,double seqlength, double branchLength) {
+    public static Double calculateRForNodes(int[] Events, double seqlength, double branchLength) {
 
 
         double rs = 0;
         int indels = Events[0];
-        int matches = Events[1];
-        int mismatches = Events[2];
+        int matches = Events[1];    // MB: why do we need the number of matches?
+        int mismatches = Events[2]; // MB: why do we need the number of mismatches?
 
         // Total alignment events (B)
         double B = matches + mismatches + indels;
@@ -684,6 +684,27 @@ public class TrAVIS {
             );
         }
 
+        /**
+         * TODO:
+         * @param tree
+         * @param ancseq
+         * @param MODEL
+         * @param SEED
+         * @param ratesgamma
+         * @param DEL_MODEL_IDX
+         * @param IN_MODEL_IDX
+         * @param LAMBDA_OF_INMODEL
+         * @param LAMBDA_OF_DELMODEL
+         * @param MAX_IN_LENGTH
+         * @param MAX_DE_LENGTH
+         * @param DELETIONPROP
+         * @param rhoP
+         * @param weights
+         * @param shapes
+         * @param scales
+         * @param verbose
+         * @param output
+         */
         public TrackTree(Tree tree, EnumSeq ancseq, SubstModel MODEL, long SEED, double ratesgamma,int DEL_MODEL_IDX, int IN_MODEL_IDX, double LAMBDA_OF_INMODEL, double LAMBDA_OF_DELMODEL, int MAX_IN_LENGTH, int MAX_DE_LENGTH,double DELETIONPROP, double rhoP, double[] weights, double[] shapes, double[] scales,boolean verbose,String output) {
             USERATES = (ratesgamma >= 0); // check if we will generate position specific rates; if not, use a constant rate 1
             rand = new Random(SEED);
