@@ -1,5 +1,6 @@
 package stats;
 
+import java.util.Arrays;
 import java.util.Random;
 
 /**
@@ -10,16 +11,6 @@ public class Poisson implements IndelModel {
 
     private double lambda;
     private Random rand = null;
-    private long seed = System.currentTimeMillis();
-
-    /**
-     * Define a Poisson distribution
-     *
-     * @param lambda the average number of events per interval
-     */
-    public Poisson(double lambda) {
-        this.lambda = lambda;
-    }
 
 
     /**
@@ -30,16 +21,30 @@ public class Poisson implements IndelModel {
      */
     public Poisson(double lambda, long seed) {
         this.lambda = lambda;
-        this.seed = seed;
+        this.rand = new Random(seed);
+    }
+
+    /**
+     * Define a Poisson distribution
+     *
+     * @param lambda the average number of events per interval
+     */
+    public Poisson(double lambda) {
+        this(lambda, System.currentTimeMillis());
     }
 
     public String toString() {
-        return "Poisson(lambda=" + lambda + ", seed=" + seed + ")";
+        return "Poisson(lambda=" + lambda + ")";
     }
 
     @Override
     public String getTrAVIS() {
-        return "Poisson " + lambda;
+        return String.format("Poisson:%.3f", lambda);
+    }
+
+    @Override
+    public void setSeed(long seed) {
+        this.rand = new Random(seed);
     }
 
 
@@ -95,30 +100,117 @@ public class Poisson implements IndelModel {
         return sum;
     }
 
-    int MAX_K = 1000;
+    int DEFAULT_MAXK = 1000;
 
     /**
      *
      * @return
      */
     public int sample() {
-        if (rand == null)
-            rand = new Random(seed);
         double toss = rand.nextDouble();
         double sum = 0;
-        for (int i = 0; i <= MAX_K; i ++) {
+        for (int i = 0; i <= DEFAULT_MAXK; i ++) {
             sum += p(i);
             if (sum > toss)
                 return i;
         }
-        return MAX_K;
+        return DEFAULT_MAXK;
     }
 
+    /**
+     * Estimate lambda via MLE
+     * @param data dataset
+     * @return an instance of Poisson with parameter value from MLE
+     */
+    // Estimate Poisson parameter λ via MLE (sample mean)
+    public static Poisson fitMLE(int[] data) {
+        double lambda = Arrays.stream(data).average().orElse(0.0);
+        return new Poisson(lambda);
+    }
+
+    /** Container class for the posterior; when prior is Gamma, the posterior is Gamma
+     *
+     */
+    static class Posterior {
+        double alpha;   // shape
+        double beta;    // rate
+        double mean;
+        double variance;
+        double map;
+
+        Posterior(double alpha, double beta, int sum, int n) {
+            this.alpha = alpha + sum;    // posterior shape
+            this.beta = beta + n;        // posterior rate
+            this.mean = this.alpha / this.beta;
+            this.variance = this.alpha / (this.beta * this.beta);
+            if (this.alpha > 1) {
+                this.map = (this.alpha - 1) / this.beta;
+            } else {
+                this.map = 0.0; // mode at 0 if shape ≤ 1
+            }
+        }
+    }
+
+    // Compute posterior given prior and data
+    public static Posterior posterior(double alphaPrior, double betaPrior, int[] data) {
+        int sum = 0;
+        for (int x : data) sum += x;
+        int n = data.length;
+        return new Posterior(alphaPrior, betaPrior, sum, n);
+    }
+
+    /**
+     * Estimate the parameter value of Poisson by MAP and return Poisson instance.
+     * @param data dataset
+     * @return an instance of Poisson with parameter value
+     */
+    public static Poisson fitMAP(int[] data, double alpha, double beta) {
+        return new Poisson(posterior(alpha, beta, data).map);
+    }
+
+    /**
+     * Find the distribution with maximum data likelihood
+     * @param indel_data
+     * @return the best model
+     */
+    public static IndelModel bestfit(int[] indel_data) {
+        return fitMLE(indel_data);
+    }
+
+    // Example usage
     public static void main(String[] args) {
+        // Prior Gamma(alpha=2, beta=1)
+        double alphaPrior = 2.0;
+        double betaPrior = 2.0;
+
+        // Observed Poisson data
+        // Example dataset (Poisson-like counts)
+        int[] data = {2, 3, 4, 2, 1, 0, 3, 2, 5, 4, 3, 2};
+
+        Poisson poisson = fitMAP(data, alphaPrior, betaPrior);
+        System.out.println("MAP gives " + poisson);
+        for (int i = 0; i < data.length; i ++) {
+            System.out.printf("%d ", poisson.sample());
+        }
+
+    }
+
+    public static void main1(String[] args) {
+        // Example dataset (Poisson-like counts)
+        int[] data = {2, 3, 4, 2, 1, 0, 3, 2, 5, 4, 3, 2};
+
+        Poisson poisson = fitMLE(data);
+        System.out.println("MLE gives " + poisson);
+        for (int i = 0; i < data.length; i ++) {
+            System.out.printf("%d ", poisson.sample());
+        }
+    }
+
+    public static void main0(String[] args) {
         for (int lambda = 1; lambda < 10; lambda ++) {
             Poisson poisson = new Poisson(lambda, 0);
             System.out.println("Lambda = " + lambda);
-            int[] cnt = new int[poisson.MAX_K + 1];
+            int[] cnt = new int[poisson.DEFAULT_MAXK + 1];
             for (int i = 0; i < 100; i ++)
                 cnt[poisson.sample()] += 1;
             for (int j = 0; j < 20; j ++)
@@ -145,6 +237,28 @@ public class Poisson implements IndelModel {
         }
         return (-tmp + Math.log(2.5066282746310005 * ser / x));
     }
+
+    // Log-likelihood of Poisson for given lambda
+    public static double logLikelihood(int[] data, double lambda) {
+        double logL = 0.0;
+        for (int x : data) {
+            logL += x * Math.log(lambda) - lambda - logFactorial(x);
+        }
+        return logL;
+    }
+
+
+    // Compute log(x!) using logGamma(x+1)
+    // Lanczos approximation
+    public static double logFactorial(int x) {
+        return lgamma(x + 1.0);
+    }
+
+    public double getLogLikelihood(int[] data) {
+        return logLikelihood(data, this.lambda);
+    }
+
+
 
 
 }

@@ -35,6 +35,10 @@ public class GaussianDistrib implements Distrib, Serializable {
         return String.format("%4.2f;%4.2f", mu, sigmaSquared);
     }
 
+    public String getTrAVIS() {
+        return String.format("GDF:%.3f,%.3f", mu, sigmaSquared);
+    }
+
     public double getMean() {
         return mu;
     }

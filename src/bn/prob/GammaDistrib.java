@@ -3,20 +3,24 @@ package bn.prob;
 
 import bn.Distrib;
 import dat.Enumerable;
+import stats.RateModel;
 
 import java.io.Serializable;
 import java.util.*;
 
 /**
- * A Gamma distribution with shape parameter k and scale parameter 1/lambda.
- * Defined as f(x) = (lambda*e^(-lambda*x)*(lambda*x)^(k - 1)) / Gamma(k) where
- * Gamma(k) = integral from 0 to infinity of t^(k-1) * e^(-t) dt
- * Implementation is partly based on Bayesian Logic (BLOG) inference engine version 0.7 
+ * A Gamma distribution with shape parameter k and scale parameter, where "scale" is 1/lambda and
+ * lambda is "rate"... yes, confusing!
+ *
+ * Implementation is partly based on Bayesian Logic (BLOG) inference engine version 0.7
  * (see copyright message below). The digamma and trigamma implementations are 
  * under an Apache Commons License as displayed below.
+ *
+ *  The PDF is defined as f(x) = (lambda*e^(-lambda*x)*(lambda*x)^(k - 1)) / Gamma(k) where
+ *  Gamma(k) = integral from 0 to infinity of t^(k-1) * e^(-t) dt
  */
 
-public class GammaDistrib implements Distrib, Serializable {
+public class GammaDistrib implements Distrib, Serializable, RateModel {
 
     private static final long serialVersionUID = 1L;
 
@@ -26,8 +30,8 @@ public class GammaDistrib implements Distrib, Serializable {
     private static final double C_LIMIT = 49;
     private static final double S_LIMIT = 1e-5;
 
-    private double lambda; // same as 1 / beta; see http://en.wikipedia.org/wiki/Gamma_distribution
-    private double k; // alpha = k
+    private double lambda;  // also referred to as "rate", which is the inverse of "scale"; see http://en.wikipedia.org/wiki/Gamma_distribution
+    private double k;       // also referred to as alpha = k
     private Random rand = new Random();
 
     public void setSeed(long seed) {
@@ -37,16 +41,26 @@ public class GammaDistrib implements Distrib, Serializable {
     /**
      * Creates a new Gamma distribution with parameters k and lambda.
      * @param k shape (same as a)
-     * @param lambda rate or scale, which is 1/beta
+     * @param lambda rate, or if you prefer to use scale, pass 1/lambda
+     * @param seed random seed
      */
-    public GammaDistrib(double k, double lambda) {
+    public GammaDistrib(double k, double lambda, long seed) {
         this.k = k;
         this.lambda = lambda;
+        this.rand = new Random(seed);
+    }
+
+    /**
+     * Creates a new Gamma distribution with parameters k and lambda.
+     * @param k shape (same as a)
+     * @param lambda rate, or if you prefer to use scale, pass 1/lambda
+     */
+    public GammaDistrib(double k, double lambda) {
+        this(k, lambda, System.currentTimeMillis());
     }
 
     public String toString() {
-        return "Gamma(alpha=" + k + ", beta=" + 1/lambda + " or scale=" + lambda + ")";
-//        return "Gamma(k=" + k + ", lambda=" + lambda + ")";
+        return "Gamma(shape=" + k + ", scale=" + 1/lambda + " or rate=" + lambda + ")";
     }
 
     /**
@@ -103,6 +117,26 @@ public class GammaDistrib implements Distrib, Serializable {
         }
     }
 
+    /**
+     *
+     * @param x input to the PDF
+     * @return the probability density at x
+     */
+    @Override
+    public double p(double x) {
+        return get(x);
+    }
+
+    @Override
+    public double cdf(double x) {
+        throw new RuntimeException("GammaDistrib cdf() not implemented");
+    }
+
+    @Override
+    public String getTrAVIS() {
+        return String.format("Gamma:%.3f,%.3f", getShape(), getScale());
+    }
+
     /*
      * Returns an approximation of the Gamma function of x r(x) = integral from 0
      * to infinity of (t^(x-1) * e^(-t) dt) with |error| < 2e-10. Laczos
@@ -132,42 +166,71 @@ public class GammaDistrib implements Distrib, Serializable {
         }
         return (-tmp + Math.log(2.5066282746310005 * ser / x));
     }
-    
+
+    // compute log prior for s ~ Gamma(alpha, beta) (shape-rate form)
+    public static double logPrior(double s, double alpha, double beta) {
+        if (s <= 0) return Double.NEGATIVE_INFINITY;
+        return (alpha - 1) * Math.log(s) - beta * s;
+        // constant terms dropped (not needed for MAP)
+    }
+
+
     /*
      * used for parameter learning
      * */
     public double getK() {
     	return k;
     }
-    
+
     public void setK(double _k) {
     	k = _k;
     }
-    
-    public double getLambda() {
-    	return lambda;
+
+    public double getShape() {
+        return getK();
     }
-    
+    public void setShape(double shape) {
+        setK(shape);
+    }
+    public double getLambda() {
+        return lambda;
+    }
+
     public void setLambda(double _lambda) {
-    	lambda = _lambda;
+        lambda = _lambda;
+    }
+
+    public double getRate() {
+        return lambda;
+    }
+
+    public void setRate(double _lambda) {
+        lambda = _lambda;
+    }
+
+    public double getScale() {
+        return 1.0 / lambda;
+    }
+
+    public void setScale(double scale) {
+        lambda = 1.0/scale;
     }
 
     public double getAlpha() {
         return k;
     }
-    
+
     public double getBeta() {
-        return 1.0 / lambda;
+        return lambda;
     }
-    
+
     public void setBeta(double beta) {
-        lambda = 1.0 / beta;
+        lambda = beta;
     }
-    
+
     public void setAlpha(double alpha) {
         k = alpha;
     }
-
 
     /**
      * The log likelihood of the data X given the gamma distribution.
@@ -176,9 +239,9 @@ public class GammaDistrib implements Distrib, Serializable {
      * @param X data
      * @return the log likelihood of the data; log p(X|alpha, beta)
      */
-    public double logLikelihood(double[] X) {
-        double a = getAlpha();
-        double b = getBeta();
+    public double getLogLikelihood(double[] X) {
+        double a = getAlpha();  // aka shape
+        double b = getBeta();   // aka rate
         int n = X.length;
         double x_mean = 0;
         double log_x_mean = 0;
@@ -199,12 +262,12 @@ public class GammaDistrib implements Distrib, Serializable {
      * @return the likelihood of the data; log p(X|alpha, beta); beware that the likelihood can be very small, so prefer #logLikelihood
      */
     public double likelihood(double[] X) {
-        return Math.exp(logLikelihood(X));
+        return Math.exp(getLogLikelihood(X));
     }
 
     /**
      * Estimate the parameters of a gamma distribution from data.
-     * Specifically the implementation estimates alpha, and beta is given by
+     * Specifically the implementation estimates alpha (shape), and beta (rate) is given by
      * beta = mean(x) / alpha.
      * It uses a fast approximation based on Thomas Minka "Estimating a Gamma distribution" 2002.
      * http://research.microsoft.com/en-us/um/people/minka/papers/minka-gamma.pdf
@@ -267,10 +330,10 @@ public class GammaDistrib implements Distrib, Serializable {
      * @param X the data from which to estimate the Gamma distribution parameters
      * @return a GammaDistrib object with the estimated parameters
      */
-    public static GammaDistrib MLE(double[] X) {
+    public static GammaDistrib fitMLE(double[] X) {
         double alpha = getAlpha(X);
         double beta = getBeta(X, alpha);
-        return new GammaDistrib(alpha, 1.0/beta);
+        return new GammaDistrib(alpha, beta);
     }
 
     /**
@@ -282,13 +345,13 @@ public class GammaDistrib implements Distrib, Serializable {
      * @param X the collection of data from which to estimate the Gamma distribution parameters
      * @return a GammaDistrib object with the estimated parameters
      */
-    public static GammaDistrib MLE(Collection<Double> X) {
+    public static GammaDistrib fitMLE(Collection<Double> X) {
         double[] x = new double[X.size()];
         int i = 0;
         for (Double d : X) {
             x[i++] = d;
         }
-        return MLE(x);
+        return fitMLE(x);
     }
 
     /*
@@ -382,6 +445,109 @@ public class GammaDistrib implements Distrib, Serializable {
         return new GammaDistrib[ncomponents];
     }
 
+    public static class Mixture implements RateModel {
+        public GammaDistrib[] distribs;
+        public double[] priors;
+        public Mixture(GammaDistrib[] distribs, double[] priors) {
+            this.distribs = distribs;
+            this.priors = priors;
+        }
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("GammaMixture[");
+            for (int i = 0; i < distribs.length; i++)
+                sb.append(String.format("%s,%.3f;", distribs[i].getTrAVIS(), priors[i]));
+            sb.append("]");
+            return sb.toString();
+        }
+
+        /**
+         * Samples a rate value from the distribution
+         *
+         * @return the sampled value
+         */
+        @Override
+        public Double sample() {
+            double p = distribs[0].rand.nextDouble();
+            double cumulative = 0;
+            for (int i = 0; i < distribs.length; i++) {
+                cumulative += priors[i];
+                if (p <= cumulative)
+                    return distribs[i].sample();
+            }
+            return distribs[distribs.length - 1].sample();
+        }
+
+        /**
+         * Computes the probability mass function (PMF) for a given value
+         *
+         * @param rate the rate value
+         * @return the probability of k
+         */
+        @Override
+        public double p(double rate) {
+            double cumulative = 0;
+            for (int i = 0; i < distribs.length; i++)
+                cumulative += distribs[i].p(rate) * priors[i];
+            return cumulative;
+        }
+
+        /**
+         * Computes the cumulative distribution function (CDF) for a given value
+         *
+         * @param rate the rate value
+         * @return the cumulative probability up to rate
+         */
+        @Override
+        public double cdf(double rate) {
+            double cumulative = 0;
+            for (int i = 0; i < distribs.length; i++)
+                cumulative += distribs[i].cdf(rate) * priors[i];
+            return cumulative;
+        }
+
+        /**
+         * @param seed
+         */
+        @Override
+        public void setSeed(long seed) {
+            for (int i = 0; i < distribs.length; i++)
+                distribs[i].setSeed(seed + i);
+        }
+
+        /**
+         * Returns a string representation of the distribution as it should be specified on the TrAVIS command line
+         *
+         * @return the text string
+         */
+        @Override
+        public String getTrAVIS() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("MixtureGamma:");
+            for (int i = 0; i < distribs.length; i++) {
+                sb.append(String.format("%.3f,%.3f,%.3f", distribs[i].getShape(), distribs[i].getScale(), priors[i]));
+                if (i < distribs.length - 1)
+                    sb.append(",");
+            }
+            return sb.toString();
+        }
+
+        /**
+         * Calculate the log likelihood of the data given the model/distribution
+         *
+         * @param data dataset
+         * @return the log-likelihood of the data given the model
+         */
+        @Override
+        public double getLogLikelihood(double[] data) {
+            double logLikelihood = 0.0;
+            for (double x : data) {
+                logLikelihood += Math.log(p(x));
+            }
+            return logLikelihood;
+        }
+    }
+
     public static void main0(String[] args) {
         double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5};
         double alpha = GammaDistrib.getAlpha(X);
@@ -432,7 +598,7 @@ public class GammaDistrib implements Distrib, Serializable {
             for (int i = 0; i < x.length; i ++) {
                 x[i] = X[k * x.length + i];
             }
-            Q[k] = GammaDistrib.MLE(x);
+            Q[k] = GammaDistrib.fitMLE(x);
             System.out.println("P(Q|Z = " + k + ") = " + Q[k]);
         }
         double[] counts = new double[clusters];
@@ -465,7 +631,7 @@ public class GammaDistrib implements Distrib, Serializable {
                         members.add(X[i]);
                 }
                 if (members.size() > 3)
-                    Q[k] = GammaDistrib.MLE(members);
+                    Q[k] = GammaDistrib.fitMLE(members);
                 //System.out.println("\t\tNew P(Q|Z = " + k + ") = " + Q[k]);
             }
 

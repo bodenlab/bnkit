@@ -19,7 +19,7 @@ import bn.prob.GaussianDistrib;
  */
 public class GammaDistribPrior extends GammaDistrib implements Prior {
 
-	// currently, GammaDistrib is only used as conjudge prior for GaussianDistrib
+	// currently, GammaDistrib is only used as conjugate prior for GaussianDistrib
 	private GaussianDistrib likelihoodDistrib;
 	private double oldK;
 	private double oldLambda;
@@ -27,7 +27,7 @@ public class GammaDistribPrior extends GammaDistrib implements Prior {
 	/**
 	 * 
 	 * @param k, describes shape
-	 * @param lambda, describes scale
+	 * @param lambda, describes rate, the inverse of scale
 	 */
 	public GammaDistribPrior(double k, double lambda) {
 		super(k, lambda);

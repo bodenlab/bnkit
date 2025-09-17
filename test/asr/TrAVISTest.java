@@ -5,6 +5,8 @@ import bn.ctmc.matrix.JTT;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.FastaWriter;
+import dat.file.Newick;
+import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.pog.POAGraph;
 import dat.pog.POGTree;
@@ -34,7 +36,7 @@ class TrAVISTest {
     //Object[] seq = new Object[] {'A','A','A','A','A', 'Q','Q','Q','Q','Q', 'P','P','P','P','P', 'W','W','W','W','W'};
     Object[] seq = new Object[] {'M', 'A', 'Q', 'P', 'W'};
     EnumSeq ancseq = new EnumSeq(Enumerable.aacid);
-    SubstModel model = new JTT();
+    SubstModel model = SubstModel.createModel("JTT");
 
     int getKey(int i, int j, int seed) {
         return i + j * nextants.length + seed * (nextants.length * scaledist.length);
@@ -57,9 +59,10 @@ class TrAVISTest {
                 double D = scaledist[j];
                 for (int SEED = 0; SEED < nSEEDS; SEED ++) {
                     //             TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED, RATESGAMMA==null?-1:RATESGAMMA);
-                    Tree tree = Tree.Random(N, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2);
+                    IdxTree tree = Tree.Random(N, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2).getIdxTree();
                     tree.adjustDistances(D); // scale distances
-                    TrAVIS.TrackTree t = new TrAVIS.TrackTree(tree, ancseq, model, SEED, 0.7,0,0,1,1,10,10,0.5,1, new double[] {1}, new double[] {1}, new double[] {0.5},false, OUTPUT); // gamma a=0.7 typical protein rate variation
+                    TrAVIS.TrackTree.Params params = new TrAVIS.TrackTree.Params(tree, ancseq, model);
+                    TrAVIS.TrackTree t = new TrAVIS.TrackTree(params, SEED);
                     int key = getKey(i, j, SEED);
                     trackMap.put(key, t);
                 }
@@ -85,7 +88,7 @@ class TrAVISTest {
             EnumSeq[] a = t.getAlignment();
             List<EnumSeq> aext = new ArrayList<>();       // extants as generated
             Map<Integer, EnumSeq> aanc = new HashMap<>(); // ancestors as generated
-            Tree tree = t.tree;
+            IdxTree tree = t.params.tree;
             int n0flips_total = 0;  // number of missed indel flips at N0 in this reconstruction
             int n0insertions = 0;   // number of insertions that have been introduced under N0 (regardless of size)
             int n0deletions = 0;    // number of deletions that have been introduced under N0 (regardless of size)
@@ -265,7 +268,7 @@ class TrAVISTest {
             EnumSeq[] a = t.getAlignment();
             List<EnumSeq> aext = new ArrayList<>();       // extants as generated
             Map<Integer, EnumSeq> aanc = new HashMap<>(); // ancestors as generated
-            Tree tree = t.tree;
+            IdxTree tree = t.params.tree;
             for (int i = 0; i < a.length; i++) {
                 int idx = tree.getIndex(a[i].getName());
                 if (idx == -1 && a[i].getName().startsWith("N")) { // possibly an ancestor, so internal name does NOT begin with "N"
@@ -403,7 +406,7 @@ class TrAVISTest {
             EnumSeq[] a = t.getAlignment();
             List<EnumSeq> aext = new ArrayList<>();       // extants as generated
             Map<Integer, EnumSeq> aanc = new HashMap<>(); // ancestors as generated
-            Tree tree = t.tree;
+            IdxTree tree = t.params.tree;
             for (int i = 0; i < a.length; i++) {
                 int idx = tree.getIndex(a[i].getName());
                 if (idx == -1 && a[i].getName().startsWith("N")) { // possibly an ancestor, so internal name does NOT begin with "N"
@@ -521,7 +524,7 @@ class TrAVISTest {
                     fw = new FastaWriter(OUTPUT + key + "_sim.fa");
                     fw.save(t.getAlignment());
                     fw.close();
-                    t.tree.save(OUTPUT + key + ".nwk", "nwk");
+                    Newick.save(t.params.tree, OUTPUT + key + ".nwk");
                 } catch (IOException e) {
                     System.out.println("Extants=" + nextants[getI(key)] + "\tScale=" + scaledist[getJ(key)] + "\tKey=" + key + " (failed saving)");
                 }

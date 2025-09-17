@@ -17,6 +17,9 @@
  */
 package bn;
 
+import bn.prob.GaussianDistrib;
+import stats.IndelModel;
+
 /**
  * Probability distribution defined. 
  * A variable in a BNode will be assigned an instance of a distribution in every row.
@@ -41,5 +44,32 @@ public interface Distrib {
      */
     public Object sample();
 
+    public static double[] parseParams(String str) throws RuntimeException {
+        try {
+            String[] parts = str.split(",");
+            double[] result = new double[parts.length];
+            for (int i = 0; i < parts.length; i++) {
+                result[i] = Double.parseDouble(parts[i].trim());
+            }
+            return result;
+        } catch (NumberFormatException e) {
+            throw new RuntimeException("Failed to parse doubles: " + str, e);
+        }
+    }
 
+    public static Distrib create(String distrib_name, String params) {
+        double[] params_arr = parseParams(params);
+        switch (distrib_name) {
+            case "GaussianDistrib":
+            case "gaussiandistrib":
+            case "Gaussian":
+            case "gaussian":
+            case "GDT":
+            case "GDF":
+            case "Normal":
+            case "normal":
+                return new GaussianDistrib(params_arr[0], params_arr[1]);
+        }
+        return null;
+    }
 }

@@ -1,7 +1,7 @@
 package bn.prob;
 
 import java.util.*;
-import smile.math.*;
+
 import smile.stat.distribution.*;
 
 public class GammaMixtureEM {
@@ -19,7 +19,7 @@ public class GammaMixtureEM {
                 System.out.print(subset[j] + " ");
             }
             System.out.println(" rendered: " + gamma[i]);
-            GammaDistrib gd = GammaDistrib.MLE(subset);
+            GammaDistrib gd = GammaDistrib.fitMLE(subset);
             System.out.println("\tMLE: " + gd);
         }
         Mixture mixture = ExponentialFamilyMixture.fit(data,

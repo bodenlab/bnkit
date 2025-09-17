@@ -1,4 +1,5 @@
 package stats;
+import bn.Distrib;
 import smile.stat.distribution.ExponentialFamilyMixture;
 import smile.stat.distribution.GammaDistribution;
 import smile.stat.distribution.Mixture;
@@ -8,24 +9,28 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
-public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation probability
+public class ZeroInflatedGammaMix implements RateModel, Distrib {
+    private double pi;  // Zero-inflation probability
     private ExponentialFamilyMixture gammaMixture;
     private Random rand;
-    private long seed;
 
     /** Constructor */
-    public ZeroInflatedGammaMix(double p, ExponentialFamilyMixture gammaMixture, long seed) {
-        if (p < 0 || p > 1) {
-            throw new IllegalArgumentException("Invalid zero-inflation probability p: " + p);
+    public ZeroInflatedGammaMix(double pi, ExponentialFamilyMixture gammaMixture, long seed) {
+        if (pi < 0 || pi > 1) {
+            throw new IllegalArgumentException("Invalid zero-inflation probability p: " + pi);
         }
-        this.p = p;
+        this.pi = pi;
         this.gammaMixture = gammaMixture;
-        this.seed = seed;
         this.rand = new Random(seed);
     }
 
-    public double getP() {
-        return p;
+    /** Constructor */
+    public ZeroInflatedGammaMix(double pi, ExponentialFamilyMixture gammaMixture) {
+        this(pi, gammaMixture, System.currentTimeMillis());
+    }
+
+    public double getPI() {
+        return pi;
     }
 
     public ExponentialFamilyMixture getGammaMixture() {
@@ -37,15 +42,46 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
         if (x < 0) {
             return 0.0;
         } else if (x == 0) {
-            return p;
+            return pi;
         } else {
-            return (1 - p) * gammaMixture.p(x);
+            return (1 - pi) * gammaMixture.p(x);
         }
     }
 
+    /**
+     * Computes the cumulative distribution function (CDF) for a given value
+     *
+     * @param rate the rate value
+     * @return the cumulative probability up to rate
+     */
+    @Override
+    public double cdf(double rate) {
+        throw new RuntimeException("ZeroInflatedGammaMix cdf() not implemented");
+    }
+
+    /**
+     * @param seed
+     */
+    @Override
+    public void setSeed(long seed) {
+        this.rand = new Random(seed);
+    }
+
+    /**
+     * Retrieve the probability of the value
+     *
+     * @param value
+     * @return the probability
+     */
+    @Override
+    public double get(Object value) {
+        double x = (Double) value;
+        return p(x);
+    }
+
     /** Sample a value */
-    public double sample() {
-        if (rand.nextDouble() < p) {
+    public Double sample() {
+        if (rand.nextDouble() < pi) {
             return 0.0;
         }
 
@@ -135,7 +171,7 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
      * @param numComponents number of Gamma components in the mixture
      * @return fitted ZeroInflatedGammaMix
      */
-    public static ZeroInflatedGammaMix fit(double[] data, int numComponents) {
+    public static ZeroInflatedGammaMix fitMLE(double[] data, int numComponents) {
         if (data.length == 0) {
             throw new IllegalArgumentException("Data cannot be empty.");
         }
@@ -197,7 +233,6 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
         if (valid.isEmpty()) {
             return new ZeroInflatedGammaMix(p, null, 42);
         } else {
-
             double totalWeight = valid.stream().mapToDouble(c -> c.priori).sum();
             Mixture.Component[] normalized = new Mixture.Component[valid.size()];
             for (int i = 0; i < valid.size(); i++) {
@@ -214,15 +249,41 @@ public class ZeroInflatedGammaMix {    private double p;  // Zero-inflation prob
 
     /** Summary output */
     public String getTrAVIS() {
-        return String.format("ZeroInflatedGammaMix p=%.4f, mixture components=%d", p, gammaMixture.length());
+        return String.format("ZeroInflatedGammaMix p=%.4f, mixture components=%d", pi, gammaMixture.length());
     }
 
-    /** 测试用主程序 */
+    /**
+     * Calculate the log likelihood of the data given the model/distribution
+     *
+     * @param data dataset
+     * @return the log-likelihood of the data given the model
+     */
+    @Override
+    public double getLogLikelihood(double[] data) {
+        if (gammaMixture == null) {
+            // All data must be zero if mixture is null
+            return Arrays.stream(data).allMatch(x -> x == 0.0) ? data.length * Math.log(pi) : Double.NEGATIVE_INFINITY;
+        }
+        double logL = 0.0;
+        for (double x : data) {
+            if (x == 0.0) {
+                logL += Math.log(pi);
+            } else if (x > 0.0) {
+                double px = gammaMixture.p(x);
+                if (px <= 0.0) return Double.NEGATIVE_INFINITY;
+                logL += Math.log(1.0 - pi) + Math.log(px);
+            }
+        }
+        return logL;
+    }
+
+    /**
+     *  */
     public static void main(String[] args) {
         double[] data = {0.0, 1.2, 3.4, 0.0, 2.1, 0.5, 0.0, 4.2, 3.3, 0.0, 1.7};
 
         ZeroInflatedGammaMix zig = ZeroInflatedGammaMix.fit(data);
-        System.out.println("Fitted Model p: " + zig.getP());
+        System.out.println("Fitted Model p: " + zig.getPI());
         System.out.println("Fitted Model #Components: " + zig.getGammaMixture().length());
 
         System.out.println("Components Details:");

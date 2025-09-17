@@ -2,8 +2,12 @@ package stats;
 
 import java.util.Random;
 
-
-public class PowerLaw implements IndelModel {
+/**
+ * @deprecated essentially the same as Zipf, so use that instead
+ */
+public class PowerLaw
+        // implements IndelModel
+    {
 
     private double alpha; // Power law exponent
     private Random rand = null;
@@ -80,9 +84,13 @@ public class PowerLaw implements IndelModel {
         return sum;
     }
 
-    @Override
     public String getTrAVIS() {
         return "PowerLaw " + alpha;
+    }
+
+    public void setSeed(long seed) {
+        this.seed = seed;
+        this.rand = new Random(seed);
     }
 
 
