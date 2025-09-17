@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "20-Aug-2025";
+    public static String VERSION = "17-Sep-2025";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -62,7 +62,7 @@ public class GRASP {
                 "\t{-j | --joint (default)}\n" +
                 "\t{-m | --marginal <branchpoint-id>}\n" +
                 "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
-                "\t{--indel-prior <LOWGAP|MEDGAP|HIGHGAP>}\n" +
+                "\t{* --indel-prior <LOWGAP|MEDGAP|HIGHGAP>}\n" +
                 "\t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>}\n" +
                 "\t{--indel-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>}\n"+
                 "\t{--supported-path <methodname>} (select one from DIJKSTRA(default) ASTAR)\n" +
@@ -93,6 +93,9 @@ public class GRASP {
                 "\t-indel (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
                 "\t-s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)\n" +
                 "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific substitution rates\n\t\tWe recommend the use of this generally, but specifically for trees with great distances, and with biologically diverse entries\n\t\tAs an example, IQ-TREE produces rates on the accepted format with the --rate option (--mlrate is NOT supported yet).\n" +
+                "\t--indel-prior (not implemented but intended for TrAVIS) specifies Gamma priors pre-determined from Pfam alignments that have few, moderate, or large numbers of gaps.\n" +
+                "\t--indel-length-distrib specifies the indel length distribution function, which serves to model both deletions and insertions in TrAVIS\n" +
+                "\t--indel-rate-distrib the indel rate distribution, which serves to model both insertions and deletions in TrAVIS\n"+
                 "\t--include-extants means that extants are included in output files (when the format allows)\n" +
                 "\t--nogap means that the gap-character is excluded in the resulting output (when the format allows)\n" +
                 "\t--nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end\n" +
@@ -108,7 +111,8 @@ public class GRASP {
                 "\tASR: complete reconstruction as JSON, incl. POGs of ancestors and extants, and tree (ASR.json)\n" +
                 "\tDOT: partial-order graphs of ancestors in DOT format\n" +
                 "\tTREES: position-specific trees with ancestor states labelled\n" +
-                "\tTrAVIS: Produce commandline parameters for running TrAVIS; \"--indel-prior\" specifies Gamma priors pre-determined from Pfam alignments that have few, moderate, or large numbers of gaps.\n");
+                "\tTrAVIS: Produce commandline parameters for running TrAVIS" +
+                "\tSIMUL: Run TrAVIS based on parameters from joint reconstruction, and save tree and alignments");
         out.println("Indel-methods: \n" +
                 "\tBEP: bi-directional edge (maximum) parsimony\n" +
                 "\tBEML: bi-directional edge maximum likelihood (uses uniform evolutionary model akin to JC)\n" +
