@@ -31,19 +31,20 @@ import static bn.prob.GammaDistrib.getAlpha;
  * an alignment that includes all extants and ancestors can be created. Preceding the alignment, the program generates a
  * partial order graph that helps consolidate multiple insertions and deletions at and across ancestor branchpoints.
  *
- * First, a phylogenetic tree is generated from user-specified parameters, using the gamma distribution for setting
+ * First, a phylogenetic tree is generated from user-specified parameters, using a gamma-like distribution for setting
  * evolutionary distances on each branch, in a bi- or multi-furcating manner, until a user-specified number of extants
  * have been mapped as leaves.
  *
- * Mutation events are determined stochastically following stripped-down principles described in
+ * Mutation events are determined stochastically following and amending principles described in
  * Cartwright R. Problems and Solutions for Estimating Indel Rates and Length Distributions.
  * Mol. Biol. Evol. 26(2):473–480. 2009. https://doi.org/10.1093/molbev/msn275
  *
- * For a given ancestor sequence (of arbitrary length) each position is looked at deciding whether to "match" or introduce
- * "indel" in the descendant, by a probability exp^-rt, where "rt" is the rate times the evolutionary distance on the branch.
- * When "matched", a substitution is introduced with a probability determined by a (specified) evolutionary model;
- * when not matched, "indels" are determined from a Poisson with mean 1 (meaning that some will have length 0, just as many
- * length 1, and fewer with longer lengths).
+ * For a given ancestor sequence (of arbitrary length) each position is looked at deciding whether to introduce
+ * "indels" in the descendant, by a probability e^-(rho*t*r), where "rho*t" is the indel rate times the evolutionary distance on the branch;
+ * optionally the position-specific substitution rate is also used (1 by default). There's also a "deletion" proportion that dictates whether
+ * a deletion or insertion should be introduced. Then, there's the length of the indel, which is decided by another Poisson-like distribution
+ * (several are provided).
+ * At each position, when "matched" (not "indel"), a substitution is introduced with a probability determined by a (specified) evolutionary model.
  *
  * Ultimately, tree and alignment files are saved.
  *
@@ -63,12 +64,13 @@ public class TrAVIS {
             out.println(msg + " (Error " + error + ")");
         out.println("Usage: asr.TrAVIS \n" +
                 "\t[-n0 | --ancestor <ancestor-seq>]\n" +
-                "\t[-n | --nwk <filename>]\n" +
                 "\t[-o | --output-folder <foldername>]\n" +
+                "\t{-n | --nwk <filename>}\n" +
                 "\t{--extants <5(default)>}\n" +
                 "\t{-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
                 "\t{-rf | --rates-file <filename>}\n" +
                 "\t{--dist-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>:<model-params>}\n" +
+                "\t{--dgamma <shape> <scale>}\n" +
                 "\t{--leaf2root-distrib <Gaussian|GDF>:<model-params>}\n" +
                 "\t{--subst-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>:<model-params>}\n" +
                 "\t{* --indel-prior <LOWGAP,MEDGAP,HIGHGAP>}\n" +
@@ -80,16 +82,14 @@ public class TrAVIS {
                 "\t\t{--deletion-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>:<model-param>}\n"+
                 "\t{--ratesconflate}\n" +
                 "\t{--delprop <0.5(default)>}\n" +
-                "\t{--max-deletion <max-length>}\n"+
-                "\t{--max-insertion <max-length>}\n"+
                 "\t{--gap}\n" +
                 "\t{--format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
                 "\t{--seed <number>}\n" +
                 "\t{--verbose}\n" +
                 "\t{--help}\n");
         out.println("where \n" +
-                "\t\"-n\" or \"--nwk\" requires a phylogenetic tree specified with the Newick format\n" +
                 "\t\"-o\" or \"--output-folder\" requires the name of a directory, for storing results (if it does not exist, it will be created)\n" +
+                "\t\"-n\" or \"--nwk\" requires a phylogenetic tree specified with the Newick format\n" +
                 "\t\"--rates-file\" requires a tabulated file with relative, position-specific rates\n\t\tAs an example, IQ-TREE produces rates on the accepted format (use the --rate option, --mlrate is not yet supported)\n" +
                 "\t\"--ratesconflate\" uses the site-specific substitution rate r to modulate the branchpoint-specific indel rate rho, so that indels are introduced with probability exp(-r*rho*t)\n" +
                 "\t\"--gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n" +
@@ -102,9 +102,7 @@ public class TrAVIS {
                 "\t\"--indel-rate-distrib\" the indel rate distribution, which serves to model both insertions and deletions\n"+
                 "\t\"--insertion-rate-distrib\" the model for insertion rate, which overrides that specified with \"--indel-rate-distrib\"\n"+
                 "\t\"--deletion-rate-distrib\" the model for deletion rate, which overrides that specified with \"--indel-rate-distrib\"\n"+
-
-                "\t\"--max-deletion\" and \"--max-insertion\" specify the maximum length of deletions and insertions, resp.\n"+
- //               "\t\"-dist\" it can scale the distances of the tree only works when tree is not provide\n" +
+                "\t\"--delprop\" sets the proportion of deletions (as a fraction of indel events; between 0 and 1, 0.5 by default)\n"+
                 "\t\"--verbose\" means that details of evolutionary events are printed out on standard-output and generate a txt file)\n" +
                 "\t\"--help\" prints out the parameters and instructions of how to use this tool\n");
         out.println("Notes: \n" +
@@ -112,6 +110,9 @@ public class TrAVIS {
                 "\tEvolutionary, substitution models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, \n\tLe-Gasquel and Whelan-Goldman; \n" +
                 "\tModels for DNA include Jukes-Cantor and Yang (general reversible process model).\n" +
                 "\tTree is set to have specified extants and gets distances from a distribution, either by specified parameters or estimated from specified tree.\n" +
+                "\tIf a phylogenetic tree file is given, a random version is generated from a distribution estimated from the file.\n" +
+                "\tIf no tree file is given, a distance distribution can be specified with \"--distance-distrib\" and used to generate a tree\n" +
+                "\tIf no distance distribution is given, use \"--dgamma\" to specify a Gamma distribution\n" +
                 "\tSubstitution rates are set from the Gamma distribution, either by specified parameters or estimated from specified rates file.\n" +
                 "\tIndel rates are set from the ZeroInflatedGamma or Gamma distribution, either by specified parameters or by fitting ZIG from specified rates file.\n" +
                 "\tThe proportion of deletions relative to all indels is given by --delprop <proportion> (when less than 0.5, insertions are more frequent than deletions.\n" +
@@ -134,22 +135,17 @@ public class TrAVIS {
     public static void main(String[] args) {
         String ANCSEQ = null; // ancestor sequence as a text string, provided
         String OUTPUTTREE = null;
-        Double RATESGAMMA = null;
+        Double GAMMA_ALPHA = null;
         Double SCALEDIST = null;
         boolean LOADTREE = false;
         String SRATESFILE = null;
         double[] SRATES = null;
         long SEED = System.currentTimeMillis();
         int EXTANTS_N = 5;
-        double GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
-        double GAMMA_SCALE = 0.2;
+        double TREE_GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
+        double TREE_GAMMA_SCALE = 0.2;
         int DESCENDANTS_MAX = 2, DESCENDANTS_MIN = 2; // Max and min of tree branching
-        int DEL_MODEL_IDX = 0, IN_MODEL_IDX = 0;
         double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
-        double LAMBDA_OF_INMODEL = 1.0;
-        double LAMBDA_OF_DELMODEL = 1.0;
-        int MAX_IN_LENGTH = 10;
-        int MAX_DE_LENGTH = 10;
 
         String[] EVOL_MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
         int EVOL_MODEL_IDX = 0; // default model is that above indexed
@@ -186,11 +182,11 @@ public class TrAVIS {
                     SEED = Integer.parseInt(args[++a]);
                 } else if (arg.equalsIgnoreCase("-extants") && args.length > a + 1) {
                     EXTANTS_N = Integer.parseInt(args[++a]);
-                } else if (arg.equalsIgnoreCase("d") && args.length > a + 2) {
-                    GAMMA_SHAPE = Double.parseDouble(args[a+1]);
-                    GAMMA_SCALE = Double.parseDouble(args[a+2]);
+                } else if (arg.equalsIgnoreCase("-dgamma") && args.length > a + 2) {
+                    TREE_GAMMA_SHAPE = Double.parseDouble(args[a+1]);
+                    TREE_GAMMA_SCALE = Double.parseDouble(args[a+2]);
                     if (args.length > a + 3 && !args[a + 3].startsWith("-")) {
-                        SCALEDIST = Double.parseDouble(args[a+3]);// brdist_scale
+                        SCALEDIST = Double.parseDouble(args[a+3]); // brdist_scale
                     }
                 } else if (arg.equalsIgnoreCase("-gap")) {
                     GAPPY = true;
@@ -250,17 +246,6 @@ public class TrAVIS {
                     SUBST_RATE_INFLUENCE_INDELS = true;
                 } else if (arg.equalsIgnoreCase("-delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("-maxdellen") && args.length > a + 1) {
-                    MAX_IN_LENGTH = Integer.parseInt(args[++a]);
-                } else if (arg.equalsIgnoreCase("-maxinslen") && args.length > a + 1) {
-                    MAX_DE_LENGTH = Integer.parseInt(args[++a]);
-
-
-        /*
-        --tree-distrib MixtureGamma:5.173,0.010,0.236,13.036,0.011,0.349,1.120,0.195,0.416
-        --leaf2root-distrib GDF:2.171,1.700
-         */
-
                 } else if (arg.equalsIgnoreCase("-tree-distrib") && args.length > a + 1) {
                     String params = args[a+1];
                     int colonPos = params.indexOf(':');
@@ -314,7 +299,7 @@ public class TrAVIS {
         }
 
         if (SRATES != null) { // position-specific rates available
-            RATESGAMMA = getAlpha(SRATES);
+            GAMMA_ALPHA = getAlpha(SRATES);
         }
         Random rand = new Random(SEED);
 
@@ -376,7 +361,7 @@ public class TrAVIS {
             if (TREE_DISTANCE_MODEL != null)
                 tree = IdxTree.generateTreeFromDistrib(TREE_DISTANCE_MODEL, LEAF2ROOT_DISTANCE_MODEL, EXTANTS_N, SEED, 100);
             else {
-                tree = Tree.Random(EXTANTS_N, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, DESCENDANTS_MAX, DESCENDANTS_MIN);
+                tree = Tree.Random(EXTANTS_N, SEED, TREE_GAMMA_SHAPE, 1.0 / TREE_GAMMA_SCALE, DESCENDANTS_MAX, DESCENDANTS_MIN);
                 if (LEAF2ROOT_DISTANCE_MODEL != null)
                     tree = IdxTree.shuffleWithLeaf2RootDistrib(tree, LEAF2ROOT_DISTANCE_MODEL, SEED, 100);
             }
@@ -401,9 +386,19 @@ public class TrAVIS {
             if (DELETION_LENGTH_MODEL != null)
                 params.setDeletemodel(DELETION_LENGTH_MODEL);
             // still need to set rate models
-            params.setSubstRateModel(RATESGAMMA);
+            if (SUBST_RATE_MODEL == null && GAMMA_ALPHA != null)
+                params.setSubstRateModel(GAMMA_ALPHA);
+            else if (SUBST_RATE_MODEL != null)
+                params.setSubstRateModel(SUBST_RATE_MODEL);
+            else
+                usage(7, "Substitution rate model could not be created");
             if (INDEL_RATE_MODEL != null)
                 params.setIndelRateModel(INDEL_RATE_MODEL);
+
+            params.SUBST_RATE_INFLUENCES_INDELS = SUBST_RATE_INFLUENCE_INDELS;
+            params.PROPORTION_DELETION = DELETIONPROP;
+            //params.MAX_DE_LENGTH;
+            //params.MAX_IN_LENGTH;
 
             TrackTree tracker = new TrackTree(params);
 
@@ -464,7 +459,7 @@ public class TrAVIS {
                         poaGraph.saveToDOT(OUTPUT+"/travis.dot");
                         poaGraph.saveToMatrix(OUTPUT+"/travis.m");
                         Newick.save(tree, OUTPUT+"/travis.nwk", Newick.MODE_DEFAULT);
-                        if (RATESGAMMA != null) {
+                        if (GAMMA_ALPHA != null) {
                             double[] rates = tracker.getRates();
                             Object[][] data = new Object[rates.length + 1][2];
                             for (int i = 0; i <= rates.length; i++) {
@@ -481,7 +476,7 @@ public class TrAVIS {
                     }
                     break;
                 case 6: // RATES
-                    if (RATESGAMMA != null) {
+                    if (GAMMA_ALPHA != null) {
                         double[] rates = tracker.getRates();
                         Object[][] data = new Object[rates.length + 1][2];
                         for (int i = 0; i <= rates.length; i++) {
