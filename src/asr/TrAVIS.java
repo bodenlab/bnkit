@@ -62,70 +62,48 @@ public class TrAVIS {
             out = System.err;
         if (msg != null)
             out.println(msg + " (Error " + error + ")");
-        out.println("Usage: asr.TrAVIS \n" +
-                "\t[-n0 | --ancestor <ancestor-seq>]\n" +
-                "\t[-o | --output-folder <foldername>]\n" +
-                "\t{-n | --nwk <filename>}\n" +
-                "\t{--extants <5(default)>}\n" +
-                "\t{-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
-                "\t{-rf | --rates-file <filename>}\n" +
-                "\t{--dist-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>:<model-params>}\n" +
-                "\t{--dgamma <shape> <scale>}\n" +
-                "\t{--leaf2root-distrib <Gaussian|GDF>:<model-params>}\n" +
-                "\t{--subst-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>:<model-params>}\n" +
-                "\t{* --indel-prior <LOWGAP,MEDGAP,HIGHGAP>}\n" +
-                "\t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>:<model-params>}\n" +
-                "\t\t{* --insertion-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>:<model-params>}\n" +
-                "\t\t{* --deletion-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>:<model-params>}\n" +
-                "\t{--indel-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>:<model-param>}\n"+
-                "\t\t{--insertion-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>:<model-param>}\n"+
-                "\t\t{--deletion-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>:<model-param>}\n"+
-                "\t{--ratesconflate}\n" +
-                "\t{--delprop <0.5(default)>}\n" +
-                "\t{--gap}\n" +
-                "\t{--format <FASTA(default)|CLUSTAL|DOT|TREE|RATES|DIR>}\n" +
-                "\t{--seed <number>}\n" +
-                "\t{--verbose}\n" +
-                "\t{--help}\n");
-        out.println("where \n" +
-                "\t\"-o\" or \"--output-folder\" requires the name of a directory, for storing results (if it does not exist, it will be created)\n" +
-                "\t\"-n\" or \"--nwk\" requires a phylogenetic tree specified with the Newick format\n" +
-                "\t\"--rates-file\" requires a tabulated file with relative, position-specific rates\n\t\tAs an example, IQ-TREE produces rates on the accepted format (use the --rate option, --mlrate is not yet supported)\n" +
-                "\t\"--ratesconflate\" uses the site-specific substitution rate r to modulate the branchpoint-specific indel rate rho, so that indels are introduced with probability exp(-r*rho*t)\n" +
-                "\t\"--gap\" means that the gap-character is included in the resulting output (default for CLUSTAL format)\n" +
-                "\t\"--indel-prior\" specifies Gamma priors \"LOWGAP\", \"MEDGAP\", \"HIGHGAP\", pre-determined from Pfam alignments that have few, moderate, or large numbers of gaps.\n" +
-                "\t\"--indel-length-distrib\" specifies the indel length distribution function, which serves to model both deletions and insertions\n" +
-                "\t\"--deletion-length-distrib\" specifies the deletion length distribution, which overrides that specified with \"--indel-distrib\"\n" +
-                "\t\"--insertion-length-distrib\" specifies the insertion length distribution, which overrides that specified with \"--indel-distrib\"\n" +
-                "\t\"--distance-distrib\" specifies the distribution from which branch distances are drawn\n" +
-                "\t\"--leaf2root-distrib\" specifies the distribution that guides how distances are placed relative leaves and the root\n" +
-                "\t\"--indel-rate-distrib\" the indel rate distribution, which serves to model both insertions and deletions\n"+
-                "\t\"--insertion-rate-distrib\" the model for insertion rate, which overrides that specified with \"--indel-rate-distrib\"\n"+
-                "\t\"--deletion-rate-distrib\" the model for deletion rate, which overrides that specified with \"--indel-rate-distrib\"\n"+
-                "\t\"--delprop\" sets the proportion of deletions (as a fraction of indel events; between 0 and 1, 0.5 by default)\n"+
-                "\t\"--verbose\" means that details of evolutionary events are printed out on standard-output and generate a txt file)\n" +
-                "\t\"--help\" prints out the parameters and instructions of how to use this tool\n");
-        out.println("Notes: \n" +
-                "\t* (asterisk) next to option above means it has not yet been implemented fully.\n" +
-                "\tEvolutionary, substitution models for proteins include Jones-Taylor-Thornton (default), Dayhoff-Schwartz-Orcutt, \n\tLe-Gasquel and Whelan-Goldman; \n" +
-                "\tModels for DNA include Jukes-Cantor and Yang (general reversible process model).\n" +
-                "\tTree is set to have specified extants and gets distances from a distribution, either by specified parameters or estimated from specified tree.\n" +
-                "\tIf a phylogenetic tree file is given, a random version is generated from a distribution estimated from the file.\n" +
-                "\tIf no tree file is given, a distance distribution can be specified with \"--distance-distrib\" and used to generate a tree\n" +
-                "\tIf no distance distribution is given, use \"--dgamma\" to specify a Gamma distribution\n" +
-                "\tSubstitution rates are set from the Gamma distribution, either by specified parameters or estimated from specified rates file.\n" +
-                "\tIndel rates are set from the ZeroInflatedGamma or Gamma distribution, either by specified parameters or by fitting ZIG from specified rates file.\n" +
-                "\tThe proportion of deletions relative to all indels is given by --delprop <proportion> (when less than 0.5, insertions are more frequent than deletions.\n" +
-                "\tThe parameter for indel/deletion/insertion length distribution models for proteins are provided as an argument (see below).\n" +
-                "\tGamma distribution is specified <shape,scale>\n" +
-                "\t\tshape (aka K, and alpha in the \"rate\" formulation)\n\t\tscale (which is 1/lambda, or 1/beta in the \"rate\" formulation); " +
-                "\t\tAlso note substitution rates from a Gamma distribution with specified parameter \"shape\" and mean 1;\n\t if no rate distribution is specified, a uniform rate is used.\n" +
-                "\tZeroInflatedGamma (ZIG) distribution is specified <pi,shape,scale> (where pi is the point mass at zero)\n" +
-                "\tZeroTruncatedPoisson (ZTP) distribution is specified <lambda>\n" +
-                "\tPoisson distribution is specified <lambda>\n" +
-                "\tZipf distribution is specified <s>\n" +
-                "\tLavalette distribution is specified <a>\n" +
-                "\t~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
+        out.println("Usage: asr.TrAVIS [options]\n" +
+                "Options:\n" +
+                "  -n0, --ancestor <sequence>                   Specify ancestor sequence (text string)\n" +
+                "  -o, --output-folder <folder>                 Output directory for results (created if missing)\n" +
+                "  -n, --nwk <file>                             Phylogenetic tree in Newick format\n" +
+                "      --extants <number>                       Number of extant leaves (default: 5)\n" +
+                "  -s, --substitution-model <model>             Substitution model: JTT (default), Dayhoff, LG, WAG, JC, Yang\n" +
+                "  -rf, --rates-file <file>                     Tabulated file with site-specific rates (IQ-TREE format)\n" +
+                "      --dist-distrib <type:params>             Branch distance (t) distribution: Gamma, ZeroInflatedGamma, MixtureGamma\n" +
+                "      --dgamma <shape> <scale> [<depth>]       Legacy format of Gamma distribution for branch distances (by shape, scale, optional tree depth)\n" +
+                "      --leaf2root-distrib <type:params>        Distribution for leaf-to-root distances: Gaussian, GDF\n" +
+                "      --subst-rate-distrib <type:params>       Substitution rate (r) distribution: Gamma, ZeroInflatedGamma, MixtureGamma\n" +
+                "  *   --indel-prior <LOWGAP|MEDGAP|HIGHGAP>    Pre-set priors for indel rates (Pfam-based)\n" +
+                "      --indel-rate-distrib <type:params>       Indel rate (rho) distribution: Gamma, ZeroInflatedGamma, MixtureGamma\n" +
+                "      --insertion-rate-distrib <type:params>   Insertion rate distribution (overrides indel-rate)\n" +
+                "      --deletion-rate-distrib <type:params>    Deletion rate distribution (overrides indel-rate)\n" +
+                "      --indel-length-distrib <type:params>     Indel length distribution: ZeroTruncatedPoisson, Poisson, Zipf, Lavalette\n" +
+                "      --insertion-length-distrib <type:params> Insertion length distribution (overrides indel-length)\n" +
+                "      --deletion-length-distrib <type:params>  Deletion length distribution (overrides indel-length)\n" +
+                "      --ratesconflate                          Modulate indel rate (rho) by site-specific substitution rate (r): p=e^(rho*r*t)\n" +
+                "      --delprop <fraction>                     Proportion of deletions among indels (0-1, default: 0.5)\n" +
+                "      --gap                                    Include gap character in output (default for CLUSTAL)\n" +
+                "      --format <type>                          Output format: FASTA (default), CLUSTAL, DOT, TREE, RATES, DIR\n" +
+                "      --seed <number>                          Random seed\n" +
+                "      --verbose                                Print details of generated events\n" +
+                "  -h, --help                                   Show this help message\n");
+        out.println("Notes:\n" +
+                "  * Options marked with an asterisk are not fully implemented.\n" +
+                "  - Substitution models for proteins: JTT, Dayhoff, LG, WAG; for DNA: JC, Yang.\n" +
+                "  - Site specific rates are set from the Gamma distribution, either by specified parameters or as estimated from rates file.\n" +
+                "  - If a phylogenetic tree file is given, the simulated tree is generated from a distribution estimated from it.\n" +
+                "  - If no tree file is given, a random tree is generated using the specified distribution.\n" +
+                "  - Indel priors (LOWGAP, MEDGAP, HIGHGAP) are based on Pfam alignments.\n" +
+                "  - Distribution parameters:\n" +
+                "      Gamma: <shape,scale>\n" +
+                "      ZeroInflatedGamma: <pi,shape,scale>\n" +
+                "      ZeroTruncatedPoisson/Poisson: <lambda>\n" +
+                "      Zipf: <s[,max]>\n" +
+                "      Lavalette: <a[,max]>\n" +
+                "  - Output formats: FASTA, CLUSTAL, DOT, TREE, RATES, DIR\n" +
+                "  - For more details, see documentation or contact the authors.\n" +
+                "  ~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
         System.exit(error);
     }
 

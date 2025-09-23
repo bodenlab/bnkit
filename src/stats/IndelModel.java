@@ -71,11 +71,15 @@ public interface IndelModel {
             case "lavalette":
                 if (params_arr.length == 1)
                     return new Lavalette(params_arr[0]);
+                else if (params_arr.length == 2)
+                    return new Lavalette(params_arr[0], (int) params_arr[1]);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "Zipf":
             case "zipf":
                 if (params_arr.length == 1)
                     return new Zipf(params_arr[0]);
+                else if (params_arr.length == 2)
+                    return new Zipf(params_arr[0], (int) params_arr[1]);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             default:
                 throw new RuntimeException("Invalid distribution " + distrib_name);

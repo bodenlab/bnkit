@@ -52,7 +52,10 @@ public class Zipf implements IndelModel {
     @Override
 
     public String getTrAVIS() {
-        return String.format("Zipf:%.3f", s);
+        if (this.maxK == DEFAULT_MAXK)
+            return String.format("Zipf:%.3f", s);
+        else
+            return String.format("Zipf:%.3f,%d", s, maxK);
     }
 
     @Override

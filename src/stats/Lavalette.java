@@ -20,10 +20,10 @@ public class Lavalette implements IndelModel {
         this(a, System.currentTimeMillis(), maxK);
     }
 
-    public static int DEFAUL_MAXK = 1000; //
+    public static int DEFAULT_MAXK = 1000; //
 
     public Lavalette(double a) {
-        this(a, System.currentTimeMillis(), DEFAUL_MAXK);
+        this(a, System.currentTimeMillis(), DEFAULT_MAXK);
     }
 
     public String toString() {
@@ -71,7 +71,10 @@ public class Lavalette implements IndelModel {
 
     @Override
     public String getTrAVIS() {
-        return String.format("Lavalette:%.3f", a);
+        if (this.maxK == DEFAULT_MAXK)
+            return String.format("Lavalette:%.3f", a);
+        else
+            return String.format("Lavalette:%.3f,%d", a, maxK);
     }
 
     public double getLogLikelihood(int[] data) {
