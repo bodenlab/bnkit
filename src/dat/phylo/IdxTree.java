@@ -192,7 +192,22 @@ public class IdxTree implements Iterable<Integer> {
         return leafdist;
     }
 
+    /**
+     * Determine a Gaussian distribution that models the leaf-to-root distances of the tree
+     * @param dmat
+     * @return
+     */
     protected static GaussianDistrib getLeafDistanceDistribution(Double[][] dmat) {
+        double[] leafdist = getLeafDistances(dmat);
+        return GaussianDistrib.estimate(leafdist);   // estimate distribution
+    }
+
+    /**
+     * Determine a Gaussian distribution that models the leaf-to-root distances of the tree
+     * @return
+     */
+    public GaussianDistrib getLeaf2RootDistrib() {
+        Double[][] dmat = getDistance2RootMatrix();
         double[] leafdist = getLeafDistances(dmat);
         return GaussianDistrib.estimate(leafdist);   // estimate distribution
     }
@@ -1261,6 +1276,8 @@ public class IdxTree implements Iterable<Integer> {
      * @return a sample from the mixture
      */
     public static double sampleMixture(GammaDistrib[] mixture, double[] priors) {
+        GammaDistrib.Mixture mix = new GammaDistrib.Mixture(mixture, priors);
+        //mix.s
         double r = Math.random();
         double sum = 0.0;
         for (int i = 0; i < mixture.length; i++) {
@@ -1380,79 +1397,21 @@ public class IdxTree implements Iterable<Integer> {
      * @param ncomponents number of components in the mixture
      * @return a mixture of Gamma distributions fitted to the distances in the tree; null if EM fails
      */
-    public static Mixture getGammaMixture(IdxTree tree, int ncomponents) {
+    public static GammaDistrib.Mixture getGammaMixture(IdxTree tree, int ncomponents) {
+        return getGammaMixture(tree, ncomponents, System.currentTimeMillis());
+    }
+
+    /**
+     * Estimates the distribution of the components that generated the given rates.
+     * This method uses expectation maximization to estimate the distribution of the components that generated the rates.
+     *
+     * @param ncomponents number of components in the mixture
+     * @return a mixture of Gamma distributions fitted to the distances in the tree; null if EM fails
+     */
+    public static GammaDistrib.Mixture getGammaMixture(IdxTree tree, int ncomponents, long seed) {
         double[] data = tree.getValidDistances();
-        Arrays.sort(data);
-        double[] subset = new double[data.length/ncomponents];
-        GammaDistribution[] gamma = new GammaDistribution[ncomponents];
-        Mixture.Component[] components = new Mixture.Component[ncomponents];
-        for (int i = 0; i < ncomponents; i++) {
-            System.arraycopy(data, i*subset.length, subset, 0, subset.length);
-            gamma[i] = GammaDistribution.fit(subset);
-            for (int j = 0; j < subset.length; j++) {
-                // System.out.print(subset[j] + " ");
-            }
-            components[i] = new Mixture.Component(1.0/ncomponents, gamma[i]);
-        }
-        try {
-            Mixture mixture = ExponentialFamilyMixture.fit(data, components, 0, 200, 1E-4);
-            return mixture;
-        } catch (StackOverflowError e) { // EM will occasionally throw a StackOverflowError exception
-            System.out.println("Stack Overflow during EM fitting. Falling back to single component.");
-            return getSingleGammaMixture(data);
-        }
-    }
-
-    private static Mixture getSingleGammaMixture(double[] data) {
-        GammaDistribution single = GammaDistribution.fit(data);
-        Mixture.Component[] singleComponent = {
-                new Mixture.Component(1.0, single)
-        };
-        return new Mixture(singleComponent);
-    }
-
-    public static GammaDistrib[] getGammaDistribs(Mixture mixture) {
-        int ncomponents = mixture.components.length;
-        GammaDistrib[] gds = new GammaDistrib[ncomponents];
-        for (int i = 0; i < ncomponents; i++) {
-            double a = ((GammaDistribution)(mixture.components[i].distribution)).k;
-            double b = ((GammaDistribution)(mixture.components[i].distribution)).theta;
-            gds[i] = new GammaDistrib(a, 1/b);
-        }
-        return gds;
-    }
-
-    public static double[] getGammaPriors(Mixture mixture) {
-        int ncomponents = mixture.components.length;
-        double[] priors = new double[ncomponents];
-        for (int i = 0; i < ncomponents; i++) {
-            priors[i] = mixture.components[i].priori;
-        }
-        return priors;
-    }
-
-    public static GammaDistrib.Mixture getGammaMixture4Distances(IdxTree tree, int NCOMP) {
-
-        // Estimate a mixture of Gamma distributions from the tree
-        // 1. ONE mixture of a specified number of Gamma distributions
-        Mixture mixture = IdxTree.getGammaMixture(tree, NCOMP); // find mixture and weights for each component
-        int compwmax = 0;
-        int realCompCount = mixture.components.length;
-        double[] shapes = new double[realCompCount];
-        double[] scales = new double[realCompCount];
-        double[] priors = new double[realCompCount];
-        GammaDistrib[] gds = new GammaDistrib[realCompCount];
-        for (int i = 0; i < realCompCount; i++) {
-            GammaDistribution dist = (GammaDistribution) (mixture.components[i].distribution);
-            double a = shapes[i] = dist.k;
-            double b = scales[i] = dist.theta;
-            gds[i] = new GammaDistrib(a, 1.0 / b);
-            double weight = priors[i] = mixture.components[i].priori;
-            if (weight > mixture.components[compwmax].priori) {
-                compwmax = i;
-            }
-        }
-        return new GammaDistrib.Mixture(gds, priors);
+        GammaDistrib.Mixture gdm = GammaDistrib.Mixture.fitMLE(data, ncomponents, seed);
+        return gdm;
     }
 
     public static IdxTree generateTreeFromMixture(IdxTree tree1,  int NCOMP, long SEED, int NITER) {
@@ -1460,11 +1419,11 @@ public class IdxTree implements Iterable<Integer> {
         GaussianDistrib gds1 = IdxTree.getLeafDistanceDistribution(tree1.getDistance2RootMatrix());
 
         // Now we are estimating a mixture of Gamma distributions from the first/source tree (loaded or synthesised)
-        GammaDistrib.Mixture mixture = getGammaMixture4Distances(tree1, NCOMP);
+        GammaDistrib.Mixture mixture = getGammaMixture(tree1, NCOMP, SEED);
 
         // 2. Generate a new tree based on the above mixture of Gamma distributions
         //   a) assume that branch lengths are uniformly distributed across topology
-        Tree tree2 = Tree.RandomMixture(tree1.getNLeaves(), SEED, mixture.distribs, mixture.priors, 2, 2);
+        Tree tree2 = Tree.Random(tree1.getNLeaves(), mixture, 2, 2, SEED);
 
         //   b) adjust the placement of distances to better fit the original distribution
         tree2.fitDistances(NITER, gds1, SEED + 202);
@@ -1491,12 +1450,7 @@ public class IdxTree implements Iterable<Integer> {
         // 2. Generate a new tree based on the above mixture of Gamma distributions
         //   a) assume that branch lengths are uniformly distributed across topology
         Tree tree = null;
-        if (GammaDistrib.Mixture.class.isInstance(distmodel)) {
-            GammaDistrib.Mixture mixture = (GammaDistrib.Mixture) distmodel;
-            tree = Tree.RandomMixture(NLEAVES, SEED, mixture.distribs, mixture.priors, 2, 2);
-        } else {
-            tree = Tree.Random(NLEAVES, distmodel, 2,2, SEED);
-        }
+        tree = Tree.Random(NLEAVES, distmodel, 2,2, SEED);
         if (leaf2root == null)
             return tree;
         try {
@@ -1538,19 +1492,12 @@ public class IdxTree implements Iterable<Integer> {
             // Namely... process an already loaded tree or synthesise a new tree
             GaussianDistrib gds1 = IdxTree.getLeafDistanceDistribution(tree1.getDistance2RootMatrix());
             // Then estimate a mixture of Gamma distributions from the first/source tree (loaded or synthesised)
-            GammaDistrib.Mixture mixture = getGammaMixture4Distances(tree1, NCOMP);
+            RateModel distmodel = getGammaMixture(tree1, NCOMP, SEED);
             // Then generate a new tree based on the above mixture of Gamma distributions
-            Tree tree2 = Tree.RandomMixture(tree1.getNLeaves(), SEED, mixture.distribs, mixture.priors, 2, 2);
+            Tree tree2 = Tree.Random(tree1.getNLeaves(), distmodel, 2, 2, SEED);
             // Finally, adjust the placement of distances to better fit the original distribution
             tree2.fitDistances(NITER, gds1, SEED + 202);
-            System.out.println("--tree-distrib " + mixture.getTrAVIS() + "\n--leaf2root-distrib " + gds1.getTrAVIS());
-/*
-            String[] parts = mixture.getTrAVIS().split(":");
-            System.out.println(RateModel.create(parts[0], parts[1]).getTrAVIS());
-
-            String[] parts2 = gds1.getTrAVIS().split(":");
-            System.out.println(((GaussianDistrib)Distrib.create(parts2[0], parts2[1])).getTrAVIS());
-*/
+            System.out.println("--dist-distrib " + distmodel.getTrAVIS() + "\n--leaf2root-distrib " + gds1.getTrAVIS());
         }
     }
 }

@@ -161,6 +161,10 @@ public class MathEx {
      */
     private static int nextSeed = -1;
 
+    public static void setNextSeed(int seed) {
+        nextSeed = seed;
+    }
+
     /**
      * High quality random number generator.
      */

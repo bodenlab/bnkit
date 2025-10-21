@@ -36,7 +36,7 @@ public interface RateModel {
             case "Gamma":
             case "gamma":
                 if (params_arr.length == 2)
-                    return new GammaDistrib(params_arr[0], params_arr[1]);
+                    return new GammaDistrib(params_arr[0], 1 / params_arr[1]);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "MixtureGamma":
             case "mixturegamma":
@@ -60,12 +60,14 @@ public interface RateModel {
      * @param rate_data
      * @return the best model
      */
-    static RateModel bestfit(double[] rate_data) {
+    static RateModel bestfit(double[] rate_data, long seed) {
         RateModel[] models = new RateModel[] {
-                ZeroInflatedGamma.fitMLE(rate_data),
+                ZeroInflatedGamma.fitMLE(rate_data, seed),
+                ZeroInflatedGamma.Mixture.fitMLE(rate_data, 2, seed),
+                ZeroInflatedGamma.Mixture.fitMLE(rate_data, 3, seed),
         };
         double best_ll = Double.MIN_VALUE;
-        IndelModel best_model = null;
+        RateModel best_model = null;
         int best_idx = 0;
         for (int i = 0; i < models.length; i++) {
             RateModel model = models[i];
@@ -78,29 +80,42 @@ public interface RateModel {
         return models[best_idx];
     }
 
-    static RateModel bestfit(String distrib_name, double[] rate_data) {
+    static RateModel bestfit(String distrib_name, double[] rate_data, long seed) {
         switch (distrib_name) {
             case "ZIG":
             case "ZeroInflatedGamma":
             case "zeroinflatedgamma":
             case "zig":
-                return ZeroInflatedGamma.fitMLE(rate_data);
-                /*
+                return ZeroInflatedGamma.fitMLE(rate_data, seed);
+            case "ZIG2":
+            case "zig2":
             case "MixtureZIG":
             case "MixtureZeroInflatedGamma":
             case "mixturezeroinflatedgamma":
             case "mixturezig":
-                return ZeroInflatedGammaMix.fitMLE(rate_data, 2);
-                 */
+            case "MixtureZIG2":
+            case "MixtureZeroInflatedGamma2":
+            case "mixturezeroinflatedgamma2":
+            case "mixturezig2":
+                return ZeroInflatedGamma.Mixture.fitMLE(rate_data, 2, seed);
+            case "ZIG3":
+            case "zig3":
+            case "MixtureZIG3":
+            case "MixtureZeroInflatedGamma3":
+            case "mixturezeroinflatedgamma3":
+            case "mixturezig3":
+                return ZeroInflatedGamma.Mixture.fitMLE(rate_data, 3, seed);
             case "Gamma":
             case "gamma":
-                return GammaDistrib.fitMLE(rate_data);
-            /*
+                return GammaDistrib.fitMLE(rate_data, seed);
             case "MixtureGamma":
             case "mixturegamma":
-                return null;
-                //return GammaDistrib.Mixture(gammas, priors);
-             */
+            case "MixtureGamma2":
+            case "mixturegamma2":
+                return GammaDistrib.Mixture.fitMLE(rate_data, 2, seed);
+            case "MixtureGamma3":
+            case "mixturegamma3":
+                return GammaDistrib.Mixture.fitMLE(rate_data, 3, seed);
             default:
                 throw new RuntimeException("Invalid distribution " + distrib_name);
         }

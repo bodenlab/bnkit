@@ -123,9 +123,9 @@ public class Poisson implements IndelModel {
      * @return an instance of Poisson with parameter value from MLE
      */
     // Estimate Poisson parameter λ via MLE (sample mean)
-    public static Poisson fitMLE(int[] data) {
+    public static Poisson fitMLE(int[] data, long seed) {
         double lambda = Arrays.stream(data).average().orElse(0.0);
-        return new Poisson(lambda);
+        return new Poisson(lambda, seed);
     }
 
     /** Container class for the posterior; when prior is Gamma, the posterior is Gamma
@@ -173,8 +173,17 @@ public class Poisson implements IndelModel {
      * @param indel_data
      * @return the best model
      */
+    public static IndelModel bestfit(int[] indel_data, long seed) {
+        return fitMLE(indel_data, seed);
+    }
+
+    /**
+     * Find the distribution with maximum data likelihood
+     * @param indel_data
+     * @return the best model
+     */
     public static IndelModel bestfit(int[] indel_data) {
-        return fitMLE(indel_data);
+        return bestfit(indel_data, System.currentTimeMillis());
     }
 
     // Example usage
@@ -199,7 +208,7 @@ public class Poisson implements IndelModel {
         // Example dataset (Poisson-like counts)
         int[] data = {2, 3, 4, 2, 1, 0, 3, 2, 5, 4, 3, 2};
 
-        Poisson poisson = fitMLE(data);
+        Poisson poisson = fitMLE(data, System.currentTimeMillis());
         System.out.println("MLE gives " + poisson);
         for (int i = 0; i < data.length; i ++) {
             System.out.printf("%d ", poisson.sample());

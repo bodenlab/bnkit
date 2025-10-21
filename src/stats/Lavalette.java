@@ -147,7 +147,30 @@ public class Lavalette implements IndelModel {
      * @return an instance of Lavalette with parameter value
      */
     // Estimate parameter a
-    public static Lavalette fitMLE(int[] data, int N){
+    public static Lavalette fitMLE(int[] data, int N) {
+        return fitMLE(data, N, System.currentTimeMillis());
+    }
+
+    /**
+     * Estimate the parameter value of Lavalette by MLE.
+     * Does this via Newton-Raphson.
+     * @param data dataset
+     * @param seed random seed
+     * @return an instance of Lavalette with parameter value
+     */
+    // Estimate parameter a
+    public static Lavalette fitMLE(int[] data, long seed) {
+        return fitMLE(data, Arrays.stream(data).max().getAsInt(), seed);
+    }
+
+    /**
+     * Estimate the parameter value of Lavalette by MLE.
+     * Does this via Newton-Raphson.
+     * @param data dataset
+     * @param N max rank
+     * @return an instance of Lavalette with parameter value
+     */
+    public static Lavalette fitMLE(int[] data, int N, long seed){
         int n = data.length;
         // Precompute average log term
         double avgLogTerm = Arrays.stream(data)
@@ -169,7 +192,7 @@ public class Lavalette implements IndelModel {
 
             if (Math.abs(step) < 1e-8) break; // convergence
         }
-        return new Lavalette(a, N);
+        return new Lavalette(a, seed, N);
     }
 
     // Log posterior (up to constant)
@@ -235,8 +258,8 @@ public class Lavalette implements IndelModel {
      * @param indel_data
      * @return the best model
      */
-    public static IndelModel bestfit(int[] indel_data) {
-        return fitMLE(indel_data);
+    public static IndelModel bestfit(int[] indel_data, long seed) {
+        return fitMLE(indel_data, Arrays.stream(indel_data).max().getAsInt(), seed);
     }
 
     public static void main(String[] args) {

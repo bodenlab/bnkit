@@ -91,12 +91,12 @@ public interface IndelModel {
      * @param indel_data
      * @return the best model
      */
-    static IndelModel bestfit(int[] indel_data) {
+    static IndelModel bestfit(int[] indel_data, long seed) {
         IndelModel[] models = new IndelModel[] {
-                Lavalette.fitMLE(indel_data),
-                Zipf.fitMLE(indel_data),
-                ZeroTruncatedPoisson.fitMLE(indel_data),
-                Poisson.fitMLE(indel_data),
+                Lavalette.fitMLE(indel_data, seed),
+                Zipf.fitMLE(indel_data, seed),
+                ZeroTruncatedPoisson.fitMLE(indel_data, seed),
+                Poisson.fitMLE(indel_data, seed),
         };
         double best_ll = Double.MIN_VALUE;
         IndelModel best_model = null;
@@ -112,22 +112,22 @@ public interface IndelModel {
         return models[best_idx];
     }
 
-    static IndelModel bestfit(String distrib_name, int[] indel_data) {
+    static IndelModel bestfit(String distrib_name, int[] indel_data, long seed) {
         switch (distrib_name) {
             case "ZTP":
             case "ZeroTruncatedPoisson":
             case "zerotruncatedpoisson":
             case "ztp":
-                return ZeroTruncatedPoisson.bestfit(indel_data);
+                return ZeroTruncatedPoisson.bestfit(indel_data, seed);
             case "Poisson":
             case "poisson":
-                return Poisson.bestfit(indel_data);
+                return Poisson.bestfit(indel_data, seed);
             case "Lavalette":
             case "lavalette":
-                return Lavalette.bestfit(indel_data);
+                return Lavalette.bestfit(indel_data, seed);
             case "Zipf":
             case "zipf":
-                return Zipf.bestfit(indel_data);
+                return Zipf.bestfit(indel_data, seed);
             default:
                 throw new RuntimeException("Invalid distribution " + distrib_name);
         }
