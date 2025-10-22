@@ -159,8 +159,10 @@ public class IndelDist {
 
         // This will be updated to a gap model later
         SubstModel MODEL = SubstModel.createModel(MODELS[MODEL_IDX]);
+        double geometric_seq_len_param = 0.05;
         Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln,
-                MEAN_RATES.get(RATE_CATEGORY.HIGH));
+                MEAN_RATES.get(RATE_CATEGORY.HIGH), geometric_seq_len_param);
+
 
         double[] test = {1.0, 0.5, 0.0003};
         double result = MathEx.logsumexp(test);
@@ -180,7 +182,7 @@ public class IndelDist {
      * @return matrix of shape (M, K): Each column, M, and likelihood with rate K
      */
     public static Double[][] computeColumnPriors(SubstModel model, Tree tree, EnumSeq.Alignment<Enumerable> aln,
-                                                 Double[] mean_rates) {
+                                                 Double[] mean_rates, double geometric_seq_len_param) {
 
 
         // TODO: make this multithreaded
@@ -189,19 +191,21 @@ public class IndelDist {
         for (int col_idx = 0; col_idx < aln.getWidth(); ++col_idx) {
             for (int rate_idx = 0; rate_idx < mean_rates.length; ++rate_idx) {
                 double rate = mean_rates[rate_idx];
-                column_priors[col_idx][rate_idx] = log_prob_col_given_rate(tree, aln, rate, model, col_idx);
+                column_priors[col_idx][rate_idx] = log_prob_col_given_rate(tree, aln, rate, model, col_idx, geometric_seq_len_param);
             }
         }
 
         return column_priors;
     }
 
-    public static double log_prob_col_given_rate(Tree tree, EnumSeq.Alignment<Enumerable> aln, Double rate, SubstModel model,
-                                                 int col_idx) {
+    public static double log_prob_col_given_rate(Tree tree, EnumSeq.Alignment<Enumerable> aln, Double rate,
+                                                 SubstModel model, int col_idx, double geometric_seq_len_param) {
 
 
         int total_nodes = tree.getNLeaves() + tree.getNParents();
-        Double[][] Pu_Lk_residue = new Double[total_nodes][model.getDomain().size()]; // nodes x num_letters
+        int alphabet_size = model.getDomain().size();
+        Object[] alphabet = model.getDomain().getValues();
+        Double[][] Pu_Lk_residue = new Double[total_nodes][alphabet_size]; // nodes x num_letters
         Double[]Pu_Lk_gap = new Double[total_nodes];
 
         // instantiate with negative infinity for subsequent log sum calculations
@@ -212,7 +216,19 @@ public class IndelDist {
         // update the Pu_Lk_residue and Pu_Lk_gap arrays in place
         tree.felsensteins_extended_peeling(aln, col_idx, Pu_Lk_residue, Pu_Lk_gap, rate, model);
 
-        return 0.0;
+        int ROOT_INDEX = 0;
+        double Pu_Lk_gap_root = Pu_Lk_gap[ROOT_INDEX]; //Assuming that root index is always 0
+        double[] residue_terms = new double[alphabet_size]; // number of alphabet letters
+        for (int res_idx = 0; res_idx < alphabet_size; res_idx++) {
+            double prior_prob = Math.log(model.getProb(alphabet[res_idx]));
+            double Pu_L_i = Pu_Lk_residue[ROOT_INDEX][res_idx];
+            residue_terms[res_idx] = prior_prob + Pu_L_i;
+        }
+
+        double weighted_log_sum_residue_prob = MathEx.logsumexp(residue_terms) + Math.log(geometric_seq_len_param);
+        double[] final_col_terms = {Pu_Lk_gap_root, weighted_log_sum_residue_prob};
+
+        return MathEx.logsumexp(final_col_terms);
     }
 
 }
