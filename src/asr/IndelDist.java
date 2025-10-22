@@ -148,22 +148,27 @@ public class IndelDist {
         try {
             tree = Utils.loadTree(NEWICK);
             aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
+            Utils.checkData(aln, tree);
         } catch (ASRException e) {
             usage(6, "Invalid input for ASR: " + e.getMessage());
         } catch (IOException e) {
             usage(2, "Failed to read or write files: " + e.getMessage());
         }
-
+        assert tree != null;
+        assert aln != null;
 
         // This will be updated to a gap model later
         SubstModel MODEL = SubstModel.createModel(MODELS[MODEL_IDX]);
-        Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln, MEAN_RATES.get(RATE_CATEGORY.HIGH));
+        Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln,
+                MEAN_RATES.get(RATE_CATEGORY.HIGH));
 
         double[] test = {1.0, 0.5, 0.0003};
         double result = MathEx.logsumexp(test);
         System.out.println(result);
 
     }
+
+
 
     /**
      * Calculates the likelihood of observing each column (independently)
@@ -177,20 +182,23 @@ public class IndelDist {
     public static Double[][] computeColumnPriors(SubstModel model, Tree tree, EnumSeq.Alignment<Enumerable> aln,
                                                  Double[] mean_rates) {
 
+
         // TODO: make this multithreaded
         Double[][] column_priors = new Double[aln.getWidth()][mean_rates.length];
         System.out.println("Computing column priors");
         for (int col_idx = 0; col_idx < aln.getWidth(); ++col_idx) {
             for (int rate_idx = 0; rate_idx < mean_rates.length; ++rate_idx) {
                 double rate = mean_rates[rate_idx];
-                column_priors[col_idx][rate_idx] = log_prob_col_given_rate(tree, rate, model);
+                column_priors[col_idx][rate_idx] = log_prob_col_given_rate(tree, aln, rate, model, col_idx);
             }
         }
 
         return column_priors;
     }
 
-    public static double log_prob_col_given_rate(Tree tree, Double rate, SubstModel model) {
+    public static double log_prob_col_given_rate(Tree tree, EnumSeq.Alignment<Enumerable> aln, Double rate, SubstModel model,
+                                                 int col_idx) {
+
 
         int total_nodes = tree.getNLeaves() + tree.getNParents();
         Double[][] Pu_Lk_residue = new Double[total_nodes][model.getDomain().size()]; // nodes x num_letters
@@ -201,8 +209,8 @@ public class IndelDist {
             Arrays.fill(Pu_Lk_residue[i], Double.NEGATIVE_INFINITY);
             Pu_Lk_gap[i] = Double.NEGATIVE_INFINITY;
         }
-
-        tree.felsensteins_extended_peeling(Pu_Lk_residue, Pu_Lk_gap, rate, model);
+        // update the Pu_Lk_residue and Pu_Lk_gap arrays in place
+        tree.felsensteins_extended_peeling(aln, col_idx, Pu_Lk_residue, Pu_Lk_gap, rate, model);
 
         return 0.0;
     }
