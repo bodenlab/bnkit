@@ -3,6 +3,9 @@ package bn.prob;
 
 import bn.Distrib;
 import dat.Enumerable;
+import smile.stat.distribution.ExponentialFamilyMixture;
+import smile.stat.distribution.GammaDistribution;
+import smile.stat.distribution.Mixture.Component;
 import stats.RateModel;
 
 import java.io.Serializable;
@@ -331,9 +334,21 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * @return a GammaDistrib object with the estimated parameters
      */
     public static GammaDistrib fitMLE(double[] X) {
+        return fitMLE(X, System.currentTimeMillis());
+    }
+    /**
+     * Estimates the parameters of a Gamma distribution using Maximum Likelihood Estimation (MLE).
+     *
+     * This method calculates the alpha and beta parameters of the Gamma distribution
+     * that best fit the given data using MLE.
+     *
+     * @param X the data from which to estimate the Gamma distribution parameters
+     * @return a GammaDistrib object with the estimated parameters
+     */
+    public static GammaDistrib fitMLE(double[] X, long seed) {
         double alpha = getAlpha(X);
         double beta = getBeta(X, alpha);
-        return new GammaDistrib(alpha, beta);
+        return new GammaDistrib(alpha, beta, seed);
     }
 
     /**
@@ -346,12 +361,25 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * @return a GammaDistrib object with the estimated parameters
      */
     public static GammaDistrib fitMLE(Collection<Double> X) {
+        return fitMLE(X, System.currentTimeMillis());
+    }
+
+    /**
+     * Estimates the parameters of a Gamma distribution using Maximum Likelihood Estimation (MLE).
+     *
+     * This method calculates the alpha and beta parameters of the Gamma distribution
+     * that best fit the given data using MLE.
+     *
+     * @param X the collection of data from which to estimate the Gamma distribution parameters
+     * @return a GammaDistrib object with the estimated parameters
+     */
+    public static GammaDistrib fitMLE(Collection<Double> X, long seed) {
         double[] x = new double[X.size()];
         int i = 0;
         for (Double d : X) {
             x[i++] = d;
         }
-        return fitMLE(x);
+        return fitMLE(x, seed);
     }
 
     /*
@@ -435,16 +463,8 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
     }
 
     /**
-     * Generates a mixture of Gamma distributions.
-     *
-     * @param ncomponents the number of components in the mixture
-     * @return an array of GammaDistrib objects representing the mixture
+     * Mixture of Gammas
      */
-    public static GammaDistrib[] getMixture(int ncomponents) {
-        // Implementation needed here
-        return new GammaDistrib[ncomponents];
-    }
-
     public static class Mixture implements RateModel {
         public GammaDistrib[] distribs;
         public double[] priors;
@@ -516,6 +536,99 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         }
 
         /**
+         * Fits a mixture of Gamma distributions to the specified data using Maximum Likelihood Estimation (MLE) via the EM algorithm.
+         *
+         * @param data the data array to fit
+         * @param components the number of mixture components (Gamma distributions)
+         * @param seed the random seed for initialization
+         * @return a Mixture model with estimated parameters
+         */
+        public static GammaDistrib.Mixture fitMLE(double[] data, int components, long seed) {
+            Arrays.sort(data);
+            double[] subset = new double[data.length/components];
+            GammaDistribution[] gamma = new GammaDistribution[components];
+            Component[] comps = new Component[components];
+            for (int i = 0; i < components; i++) {
+                System.arraycopy(data, i*subset.length, subset, 0, subset.length);
+                gamma[i] = GammaDistribution.fit(subset);
+                for (int j = 0; j < subset.length; j++) {
+                    // System.out.print(subset[j] + " ");
+                }
+                comps[i] = new Component(1.0/components, gamma[i]);
+            }
+            try {
+                Component[] trained = ExponentialFamilyMixture.fit(data, comps, 0, 200, 1E-4).components;
+                GammaDistrib[] gds = new GammaDistrib[trained.length];
+                double[] priors = new double[trained.length];
+                for (int i = 0; i < trained.length; i++) {
+                    gds[i] = new GammaDistrib(((GammaDistribution) trained[i].distribution).k, 1.0/((GammaDistribution) trained[i].distribution).theta, seed + i);
+                    priors[i] = trained[i].priori;
+                }
+                GammaDistrib.Mixture gdm = new GammaDistrib.Mixture(gds, priors);
+                return gdm;
+            } catch (StackOverflowError e) { // EM will occasionally throw a StackOverflowError exception
+                System.out.println("Stack Overflow during EM fitting. Falling back to single component.");
+                return new GammaDistrib.Mixture(new GammaDistrib[] {GammaDistrib.fitMLE(data, seed)}, new double[] {1.0});
+            }
+
+            /*
+
+            //Arrays.sort(X);
+            double[] X = Arrays.copyOf(data, data.length);
+            Arrays.sort(X);
+            int n = X.length;
+            double[][] resp = new double[n][components];
+            double[] priors = new double[components];
+            GammaDistrib[] distribs = new GammaDistrib[components];
+            // Initialize priors and components
+            Arrays.fill(priors, 1.0 / components);
+            for (int k = 0; k < components; k++) {
+                // Randomly assign data to clusters for initial fit
+                int start = k * n / components;
+                int end = (k + 1) * n / components;
+                double[] subset = Arrays.copyOfRange(X, start, end);
+                distribs[k] = GammaDistrib.fitMLE(subset, seed + k);
+            }
+            // EM algorithm
+            int maxIter = 100;
+            for (int iter = 0; iter < maxIter; iter++) {
+                // E-step: compute responsibilities
+                for (int i = 0; i < n; i++) {
+                    double sum = 0;
+                    for (int k = 0; k < components; k++) {
+                        resp[i][k] = priors[k] * distribs[k].p(X[i]);
+                        sum += resp[i][k];
+                    }
+                    for (int k = 0; k < components; k++) {
+                        resp[i][k] /= sum;
+                    }
+                }
+
+                // M-step: update priors and fit each component
+                for (int k = 0; k < components; k++) {
+                    // Weighted data for component k
+                    List<Double> weightedData = new ArrayList<>();
+                    for (int i = 0; i < n; i++) {
+                        for (int r = 0; r < (int) (resp[i][k] * 100); r++) {
+                            weightedData.add(X[i]);
+                        }
+                    }
+                    if (weightedData.size() > 0) {
+                        distribs[k] = GammaDistrib.fitMLE(weightedData, seed + k);
+                    }
+                    // Update priors
+                    double sumResp = 0;
+                    for (int i = 0; i < n; i++) {
+                        sumResp += resp[i][k];
+                    }
+                    priors[k] = sumResp / n;
+                }
+            }
+            return new Mixture(distribs, priors);
+             */
+        }
+
+        /**
          * Returns a string representation of the distribution as it should be specified on the TrAVIS command line
          *
          * @return the text string
@@ -549,7 +662,7 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
     }
 
     public static void main0(String[] args) {
-        double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5};
+        double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5, 0.001, 1.2, 2.3, 3.1, 5.9, 1.5, 1.4, 2.3, 1.9, 3.5, 2.3, 2.1, 2.9, 0.5, 0.4, 0.3, 0.9, 0.15, 0.01, 0.22, 0.23, 0.123};
         double alpha = GammaDistrib.getAlpha(X);
         double beta = GammaDistrib.getBeta(X, alpha);
         //double beta = 1 / alpha; // force mean to be 1
@@ -564,23 +677,13 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
             //System.out.println(i + "\t" + y);
         }
         System.out.println("Mean\t" + mean / N);
-        
-        
-        
-//        double[] x = {0, Double.MIN_VALUE, 1e-200, 1e-100, 1e-10, 0.00001, 0.1, 1.0, 100, 10000, 1e8, 1e10, 1e100, 1e200, Double.MAX_VALUE, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
-//        for (double xx : x) {
-//            System.out.println("Gamma(" + xx + ") = " + gamma(xx));
-//            System.out.println("\tLog Gamma(" + xx + ") = " + lgamma(xx));
-//            System.out.println("\tDi Gamma(" + xx + ") = " + digamma(xx));
-//            System.out.println("\tTri Gamma(" + xx + ") = " + trigamma(xx));
-//        }
     }
 
     /**
      * Example that finds a mixture of Gammas using Gibbs sampling.
      * @param args
      */
-    public static void main(String[] args) {
+    public static void main1(String[] args) {
         int clusters = 3;
         Enumerable label = new Enumerable(clusters);
         EnumDistrib C = EnumDistrib.random(label); // mixture distrib
@@ -670,6 +773,19 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         for (int k = 0; k < clusters; k ++) {
             System.out.println("P(Z = " + k + ") = " + C.get(k));
         }
+    }
+
+    /**
+     * Example that finds a mixture of Gammas using EM
+     * @param args
+     */
+    public static void main(String[] args) {
+        double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5, 0.001, 1.2, 2.3, 3.1, 5.9, 1.5, 1.4, 2.3, 1.9, 3.5, 2.3, 2.1, 2.9, 0.5, 0.4, 0.3, 0.9, 0.15, 0.01, 0.22, 0.23, 0.123};
+        GammaDistrib.Mixture mixture = GammaDistrib.Mixture.fitMLE(X, 2, 321);
+        GammaDistrib gamma = GammaDistrib.fitMLE(X, 321);
+        System.out.println(gamma.getTrAVIS() + "\t" + mixture.getTrAVIS());
+        for (int i=0; i < 10; i ++)
+            System.out.println(String.format("%5.3f\t%5.3f", gamma.sample(), mixture.sample()));
     }
 
 }

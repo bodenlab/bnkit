@@ -3,6 +3,7 @@ package asr;
 import bn.ctmc.SubstModel;
 import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
+import bn.prob.GaussianDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.*;
@@ -27,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GRASP {
 
-    public static String VERSION = "22-Sep-2025";
+    public static String VERSION = "21-Oct-2025";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -64,6 +65,8 @@ public class GRASP {
                 "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
                 "\t{* --indel-prior <LOWGAP|MEDGAP|HIGHGAP>}\n" +
                 "\t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>}\n" +
+                "\t{--copy-rates Copy substitution rates from reconstructed ancestor\n" +
+                "\t{--conflate-rates Modulate indel rate (rho) by site-specific substitution rate (r): p=e^(rho*r*t)\n" +
                 "\t{--indel-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>}\n"+
                 "\t{--supported-path <methodname>} (select one from DIJKSTRA(default) ASTAR)\n" +
                 "\t{--nogap}\n" +
@@ -149,6 +152,8 @@ public class GRASP {
         String PREFIX = null;
         String RATESFILE = null;
         double[] RATES = null;
+        boolean CONFLATE_RATES = false;
+        boolean COPY_SUBST_RATES = false;
 
         String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
         int MODEL_IDX = 0; // default model is that above indexed 0
@@ -301,6 +306,10 @@ public class GRASP {
                 } else if (arg.equalsIgnoreCase("-indel-length-distrib") && args.length > a + 1) {
                     //  --indel-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>
                     INDEL_LENGTH_DISTRIB = args[++a];
+                } else if (arg.equalsIgnoreCase("-copy-rates")) {
+                    COPY_SUBST_RATES = true;
+                } else if (arg.equalsIgnoreCase("-conflate-rates")) {
+                    CONFLATE_RATES = true;
                 } else if ((arg.equalsIgnoreCase("-threads") || arg.equalsIgnoreCase("t")) && args.length > a + 1) {
                     try {
                         NTHREADS = Integer.parseInt(args[++a]);
@@ -633,7 +642,17 @@ public class GRASP {
                         break;
                     case 10: // TrAVIS: figure out params to run TrAVIS, produce report
                         if (!BYPASS) {
-                            Random random = new Random();
+                            Random random = new Random(SEED);
+
+                            // the user-provided tree for which ancestor sequences have been determined
+                            IdxTree mytree = indelpred.getTree();
+                            RateModel ddistrib = IdxTree.getGammaMixture(mytree, 3, SEED);
+                            System.out.println("--dist-distrib " + ddistrib.getTrAVIS() + " \\");
+                            GaussianDistrib l2rdistrib = mytree.getLeaf2RootDistrib();
+                            IdxTree newrtree = Tree.Random(mytree.getNLeaves(), ddistrib, 2, 2, SEED);
+                            newrtree.fitDistances(100, l2rdistrib, SEED + 202);
+                            System.out.println("--leaf2root-distrib " + l2rdistrib.getTrAVIS() + " \\");
+
                             // calculate some v basic stats from the alignment itself
                             double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
                             double gap_open_prop = (double) aln.getGapStartCount() / (double) (aln.getWidth() * aln.getHeight());
@@ -648,8 +667,6 @@ public class GRASP {
                                 n0.append(ancseqs_nogap[0][j]);
                             System.out.println("--ancestor " + n0.toString() + " \\");
 
-                            // the user-provided tree for which ancestor sequences have been determined
-                            IdxTree mytree = indelpred.getTree();
                             System.out.println("--substitution-model " + MODEL.getName() + " \\");
                             RateModel subst_rate_distrib = null;
                             if (RATES != null) { // position-specific rates available
@@ -710,18 +727,18 @@ public class GRASP {
                             for (int jj = 0; jj < rarray.length; jj++)
                                 rarray[jj] = collect.get(jj);
                             // fit a zero-inflated or standard gamma distribution to all collected rates (from the reconstruction); seems to work OK but sometime less well than the mixture below
-                            RateModel indelrateDist = RateModel.bestfit(rarray);
+                            RateModel indelrateDist = RateModel.bestfit(rarray, SEED);
                             // Two options:
                             if (INDEL_RATE_DISTRIB != null) {
                                 // (1) an indel rate distribution has been nominated so we will use it
                                 try {
-                                    indelrateDist = RateModel.bestfit(INDEL_RATE_DISTRIB, rarray);
+                                    indelrateDist = RateModel.bestfit(INDEL_RATE_DISTRIB, rarray, SEED);
                                 } catch (RuntimeException e) {
                                     throw new RuntimeException("Invalid indel length distribution " + indelrateDist.getTrAVIS());
                                 }
                             } else
                                 // (2) we need to try all and pick the one with greatest log-likelihood
-                                indelrateDist = RateModel.bestfit(rarray);
+                                indelrateDist = RateModel.bestfit(rarray, SEED);
                             // fit a 3-component mixture distribution to all collected rates (from the reconstruction)
                             // ZeroInflatedGammaMix indelrateDist = ZeroInflatedGammaMix.fit(rarray, 2);
                             if (indelrateDist != null)
@@ -740,27 +757,23 @@ public class GRASP {
                             if (INDEL_LENGTH_DISTRIB != null) {
                                 // (1) an indel distribution has been nominated so we will use it
                                 try {
-                                    indel_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, indel_data);
-                                    insertion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, ins_data);
-                                    deletion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, del_data);
+                                    indel_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, indel_data, SEED);
+                                    insertion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, ins_data, SEED);
+                                    deletion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, del_data, SEED);
                                 } catch (RuntimeException e) {
                                     throw new RuntimeException("Invalid indel length distribution " + indel_length_distrib.getTrAVIS());
                                 }
                             } else {
                                 // (2) we need to try all and pick the one with greatest log-likelihood
-                                indel_length_distrib = IndelModel.bestfit(indel_data);
-                                insertion_length_distrib = IndelModel.bestfit(ins_data);
-                                deletion_length_distrib = IndelModel.bestfit(del_data);
+                                indel_length_distrib = IndelModel.bestfit(indel_data, SEED);
+                                insertion_length_distrib = IndelModel.bestfit(ins_data, SEED);
+                                deletion_length_distrib = IndelModel.bestfit(del_data, SEED);
                             }
                             System.out.println("--indel-length-distrib " + indel_length_distrib.getTrAVIS() + " \\");
                             System.out.println("--insertion-length-distrib " + insertion_length_distrib.getTrAVIS() + " \\");
                             System.out.println("--deletion-length-distrib " + deletion_length_distrib.getTrAVIS() + " \\");
                             int ninsertions = Arrays.stream(ins_total).sum();
-                            int max_insertion = ins_total.length;
-                            System.out.println("--max-insertion " + max_insertion + " \\");
                             int ndeletions = Arrays.stream(del_total).sum();
-                            int max_deletion = del_total.length;
-                            System.out.println("--max-deletion " + max_deletion + " \\");
                             int nindel = ninsertions + ndeletions;
                             double delprop = (double) ndeletions / (double) nindel;
                             System.out.printf("--delprop %.2f \\\n", delprop);
@@ -848,8 +861,11 @@ public class GRASP {
                     case 11: // SIMUL: simulate a complete reconstruction with the same pseudo-biological proerties as the present reconstruction
                         if (!BYPASS) {
                             if (MODE == Inference.JOINT) {
-
-                                IdxTree newrtree = IdxTree.generateTreeFromMixture(tree, 3, SEED, 100);
+                                RateModel ddistrib = IdxTree.getGammaMixture(tree, 3, SEED);
+                                GaussianDistrib l2rdistrib = tree.getLeaf2RootDistrib();
+                                IdxTree newrtree = Tree.Random(tree.getNLeaves(), ddistrib, 2, 2, SEED);
+                                newrtree.fitDistances(100, l2rdistrib, SEED + 202);
+//                                IdxTree newrtree = IdxTree.generateTreeFromMixture(tree, 3, SEED, 100);
                                 IdxTree mytree = indelpred.getTree();
                                 StringBuilder n0 = new StringBuilder();
                                 for (int j = 0; j < ancseqs_nogap[0].length; j++)
@@ -915,18 +931,18 @@ public class GRASP {
                                     rarray[jj] = collect.get(jj);
                                 // fit a gamma distribution to all collected rates (from the reconstruction); seems to work OK but less well than the mixture below
                                 // fit a zero-inflated or standard gamma distribution to all collected rates (from the reconstruction); seems to work OK but sometime less well than the mixture below
-                                RateModel indelrateDist = RateModel.bestfit(rarray);
+                                RateModel indelrateDist = RateModel.bestfit(rarray, SEED);
                                 // Two options:
                                 if (INDEL_RATE_DISTRIB != null) {
                                     // (1) an indel rate distribution has been nominated so we will use it
                                     try {
-                                        indelrateDist = RateModel.bestfit(INDEL_RATE_DISTRIB, rarray);
+                                        indelrateDist = RateModel.bestfit(INDEL_RATE_DISTRIB, rarray, SEED);
                                     } catch (RuntimeException e) {
                                         throw new RuntimeException("Invalid indel length distribution " + indelrateDist.getTrAVIS());
                                     }
                                 } else
                                     // (2) we need to try all and pick the one with greatest log-likelihood
-                                    indelrateDist = RateModel.bestfit(rarray);
+                                    indelrateDist = RateModel.bestfit(rarray, SEED);
                                 // now, turn to indel lengths...
                                 int[] indel_total = TrAVIS.mergeCounts(ins_total, del_total);
                                 int[] ins_data = TrAVIS.unfoldCounts(ins_total);
@@ -942,17 +958,17 @@ public class GRASP {
                                 if (INDEL_LENGTH_DISTRIB != null) {
                                     // (1) an indel distribution has been nominated so we will use it
                                     try {
-                                        indel_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, indel_data);
-                                        insertion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, ins_data);
-                                        deletion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, del_data);
+                                        indel_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, indel_data, SEED);
+                                        insertion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, ins_data, SEED);
+                                        deletion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, del_data, SEED);
                                     } catch (RuntimeException e) {
                                         throw new RuntimeException("Invalid indel length distribution " + indel_length_distrib.getTrAVIS());
                                     }
                                 } else {
                                     // (2) we need to try all and pick the one with greatest log-likelihood
-                                    indel_length_distrib = IndelModel.bestfit(indel_data);
-                                    insertion_length_distrib = IndelModel.bestfit(ins_data);
-                                    deletion_length_distrib = IndelModel.bestfit(del_data);
+                                    indel_length_distrib = IndelModel.bestfit(indel_data, SEED);
+                                    insertion_length_distrib = IndelModel.bestfit(ins_data, SEED);
+                                    deletion_length_distrib = IndelModel.bestfit(del_data, SEED);
                                 }
 
                                 int ninsertions = Arrays.stream(ins_total).sum();
@@ -965,21 +981,21 @@ public class GRASP {
                                 EnumSeq[] seqs_ex = null;
                                 while (tracker == null) {
                                     TrAVIS.TrackTree.Params params = new TrAVIS.TrackTree.Params(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL);
-                                    if (RATES != null) {
+                                    if (RATES != null && COPY_SUBST_RATES) {
                                         // recover rates for N0, appropriately indexed
                                         int[] n0idxs = indelpred.getConsensus(0);
                                         double[] rates = new double[n0idxs.length];
                                         for (int k = 0; k < n0idxs.length; k ++)
                                             rates[k] = RATES[n0idxs[k]];
                                         params.setSubstRates(rates);
-
+                                    } else if (RATES != null && !COPY_SUBST_RATES) {
+                                        params.setSubstRateModel(rates_alpha);
                                     }
-                                    params.setSubstRateModel(rates_alpha);
                                     params.setIndelRateModel(indelrateDist);
                                     params.setInsertmodel(insertion_length_distrib);
                                     params.setDeletemodel(deletion_length_distrib);
                                     params.PROPORTION_DELETION = delprop;
-                                    params.SUBST_RATE_INFLUENCES_INDELS = true;
+                                    params.SUBST_RATE_INFLUENCES_INDELS = CONFLATE_RATES;
                                     params.setSeed(SEED);
 
                                     tracker = new TrAVIS.TrackTree(params, SEED);

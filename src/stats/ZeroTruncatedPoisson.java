@@ -118,7 +118,7 @@ public class ZeroTruncatedPoisson implements IndelModel {
      * @param data dataset
      * @return instance of ZeroTruncatedPoisson with parameter value set by MLE
      */
-    public static ZeroTruncatedPoisson fitMLE(int[] data) {
+    public static ZeroTruncatedPoisson fitMLE(int[] data, long seed) {
         double mean = Arrays.stream(data).average().orElse(0.0);
 
         // Initial guess: start with mean (approx for small lambda)
@@ -138,7 +138,7 @@ public class ZeroTruncatedPoisson implements IndelModel {
             if (lambda <= 0) lambda = 1e-6; // keep positive
             if (Math.abs(step) < 1e-10) break;
         }
-        return new ZeroTruncatedPoisson(lambda);
+        return new ZeroTruncatedPoisson(lambda, seed);
     }
 
     // Log-likelihood for ZTP
@@ -218,8 +218,16 @@ public class ZeroTruncatedPoisson implements IndelModel {
      * @param indel_data
      * @return the best model
      */
+    public static IndelModel bestfit(int[] indel_data, long seed) {
+        return fitMLE(indel_data, seed);
+    }
+    /**
+     * Find the distribution with maximum data likelihood
+     * @param indel_data
+     * @return the best model
+     */
     public static IndelModel bestfit(int[] indel_data) {
-        return fitMLE(indel_data);
+        return fitMLE(indel_data, System.currentTimeMillis());
     }
 
     public static void main(String[] args) {
@@ -247,7 +255,7 @@ public class ZeroTruncatedPoisson implements IndelModel {
         int[] data = {1,2,1,3,2,4,1,2,3,1,5};
 
         // Run golden-section search
-        ZeroTruncatedPoisson ztp = fitMLE(data);
+        ZeroTruncatedPoisson ztp = fitMLE(data, System.currentTimeMillis());
         System.out.printf("MLE gives " + ztp);
         for (int i = 0; i < data.length; i ++) {
             System.out.printf("%d ", ztp.sample());

@@ -211,7 +211,8 @@ public class GaussianDistrib implements Distrib, Serializable {
         }
         if (diff == 0)
             return null;
-        return new GaussianDistrib(mean, diff / samples.length);
+        GaussianDistrib gd = new GaussianDistrib(mean, diff / samples.length);
+        return gd;
     }
     
     /**

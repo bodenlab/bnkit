@@ -178,7 +178,17 @@ public class Zipf implements IndelModel {
      * @return an instance of Zipf with parameter value
      */
     public static Zipf fitMLE(int[] data) {
-        return fitMLE(data, Arrays.stream(data).max().getAsInt());
+        return fitMLE(data, Arrays.stream(data).max().getAsInt(), System.currentTimeMillis());
+    }
+
+    /**
+     * Estimate the parameter value s of the Zipf distribution by MLE
+     * The implementation uses Newton–Raphson
+     * @param data data set
+     * @param seed random seed
+     */
+    public static Zipf fitMLE(int[] data, long seed) {
+        return fitMLE(data, Arrays.stream(data).max().getAsInt(), System.currentTimeMillis());
     }
 
     /**
@@ -186,8 +196,8 @@ public class Zipf implements IndelModel {
      * The implementation uses Newton–Raphson
      * @param data data set
      * @param N max value of observations
-      */
-    public static Zipf fitMLE(int[] data, int N) {
+     */
+    public static Zipf fitMLE(int[] data, int N, long seed) {
         double s = 2.0; // initial guess
         for (int iter = 0; iter < 100; iter++) {
             double H = harmonic(N, s);
@@ -204,7 +214,7 @@ public class Zipf implements IndelModel {
 
             if (Math.abs(step) < 1e-8) break; // convergence
         }
-        return new Zipf(s, N);
+        return new Zipf(s, seed, N);
     }
 
 
@@ -274,8 +284,8 @@ public class Zipf implements IndelModel {
      * @param indel_data
      * @return the best model
      */
-    public static IndelModel bestfit(int[] indel_data) {
-        return fitMLE(indel_data);
+    public static IndelModel bestfit(int[] indel_data, long seed) {
+        return fitMLE(indel_data, seed);
     }
 
     public static void main(String[] args) {

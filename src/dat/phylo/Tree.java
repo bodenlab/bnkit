@@ -278,177 +278,9 @@ public class Tree extends IdxTree {
         throw new TreeRuntimeException("Could not create tree: invalid input");
     }
 
-
-    public int[] getMixtureLabels(Mixture mixture) {
-        int[] labels = new int[getSize()];
-        for (int i = 0; i < getSize(); i++)
-            labels[i] = this.sampleComponent(getGammaDistribs(mixture), getGammaPriors(mixture), distance[i]);
-        return labels;
-    }
-
-    private static int getBin(double[] thresholds, double value) {
-        for (int i = 0; i < thresholds.length - 1; i++) {
-            if (value <= thresholds[i])
-                return i;
-        }
-        return thresholds.length - 1;
-    }
-
-    /**
-     * Create a random tree
-     * @param nLeaves number of leaves
-     * @param gds Gamma distributions making up a mixture specifying distance between branchpoints
-     * @param priors prior probabilities for the components of the mixture
-     * @param max_desc maximum number of descendants of an ancestor
-     * @param min_desc minimum number of descendants
-     * @return a tree where distances are drawn from a specified Gamma density and with branching factors drawn from a specified uniform distribution
-     * @throws TreeRuntimeException if something is wrong with the input labels
-     */
-    public static Tree RandomMixture(int nLeaves, long seed, GammaDistrib[] gds, double[] priors, int max_desc, int min_desc) {
-        String[] leaves = new String[nLeaves];
-        for (int i = 0; i < leaves.length; i ++)
-            leaves[i] = "A" + (i + 1);
-        return RandomMixture(leaves, seed, gds, priors, max_desc, min_desc);
-    }
-
-    /**
-     * Create a random tree
-     * @param nLeaves number of leaves
-     * @param gds Gamma distributions making up a mixture specifying distance between branchpoints
-     * @param priors prior probabilities for the components of the mixture indexed by log2 widths at branchpoint
-     * @param max_desc maximum number of descendants of an ancestor
-     * @param min_desc minimum number of descendants
-     * @return a tree where distances are drawn from a specified Gamma density and with branching factors drawn from a specified uniform distribution
-     * @throws TreeRuntimeException if something is wrong with the input labels
-     */
-    public static Tree RandomMixture(int nLeaves, long seed, GammaDistrib[] gds, double[][] priors, double[] thresholds, int max_desc, int min_desc) {
-        String[] leaves = new String[nLeaves];
-        for (int i = 0; i < leaves.length; i ++)
-            leaves[i] = "A" + (i + 1);
-        return RandomMixture(leaves, seed, gds, priors, thresholds, max_desc, min_desc);
-    }
-
-    /**
-     * Create a random tree
-     * @param leafLabels labels to be assigned to leaves
-     * @param seed random seed
-     * @param gds Gamma distributions making up a mixture specifying distance between branchpoints
-     * @param priors prior probabilities for the components of the mixture
-     * @param max_desc maximum number of descendants of an ancestor
-     * @param min_desc minimum number of descendants
-     * @return a tree where distances are drawn from a specified Gamma density and with branching factors drawn from a specified uniform distribution
-     * @throws TreeRuntimeException if something is wrong with the input labels
-     */
-    public static Tree RandomMixture(String[] leafLabels, long seed, GammaDistrib[] gds, double[] priors, int max_desc, int min_desc) {
-        Random rand = new Random(seed);
-        for (GammaDistrib gd : gds)
-            gd.setSeed(seed);
-        List<BranchPoint> nodes = new ArrayList<>(leafLabels.length);
-        Map<BranchPoint, Integer> widths = new HashMap<>();
-        // the initial, complete set of nodes that need ancestors
-        for (String label : leafLabels) {
-            BranchPoint bp = new BranchPoint(label);
-            bp.setDistance(Math.max(sampleMixture(gds, priors), 0.0000001));
-            nodes.add(bp);
-            widths.put(bp, 1); // width at leaf is 1
-        }
-        // create ancestor nodes by picking N children, connecting them via a new ancestor,
-        // then updating the list of nodes yet to be allocated an ancestor
-        int M = nodes.size();
-        BranchPoint bp = M > 0 ? nodes.get(0) : null;
-        while (M > 1) {
-            bp = new BranchPoint("");
-            // how many nodes to pick?
-            int N = Math.min(rand.nextInt(max_desc - min_desc + 1) + min_desc, nodes.size());
-            int mywidth = 0;
-            for (int j = 0; j < N; j ++) {
-                int pick = rand.nextInt(nodes.size());
-                BranchPoint node = nodes.get(pick);
-                Integer width = widths.get(node);
-                if (width != null) {
-                    mywidth += width;
-                    widths.remove(node);
-                }
-                bp.addChild(node);
-                node.setParent(bp);
-                nodes.remove(pick);
-                M -= 1;
-            }
-            widths.put(bp, mywidth);
-            bp.setDistance(Math.max(sampleMixture(gds, priors), 0.0000001));
-            nodes.add(bp);
-            M += 1;
-        }
-        if (bp != null) {
-            Tree t = new Tree(bp);
-            t.setInternalLabels();
-            return t;
-        }
-        throw new TreeRuntimeException("Could not create tree: invalid input");
-    }
-
     public IdxTree getIdxTree() {
         BranchPoint[] bps = Tree.straightenTree(root);
         return new IdxTree(bps);
-    }
-    /**
-     * Create a random tree
-     * @param leafLabels labels to be assigned to leaves
-     * @param seed random seed
-     * @param gds Gamma distributions making up a mixture specifying distance between branchpoints
-     * @param priors prior probabilities for the components of the mixture indexed by log2 widths at branchpoint
-     * @param max_desc maximum number of descendants of an ancestor
-     * @param min_desc minimum number of descendants
-     * @return a tree where distances are drawn from a specified Gamma density and with branching factors drawn from a specified uniform distribution
-     * @throws TreeRuntimeException if something is wrong with the input labels
-     */
-    public static Tree RandomMixture(String[] leafLabels, long seed, GammaDistrib[] gds, double[][] priors, double[] thresholds, int max_desc, int min_desc) {
-        Random rand = new Random(seed);
-        for (GammaDistrib gd : gds)
-            gd.setSeed(seed);
-        List<BranchPoint> nodes = new ArrayList<>(leafLabels.length);
-        Map<BranchPoint, Integer> widths = new HashMap<>();
-        // the initial, complete set of nodes that need ancestors
-        for (String label : leafLabels) {
-            BranchPoint bp = new BranchPoint(label);
-            bp.setDistance(Math.max(sampleMixture(gds, priors[0]), 0.0000001));
-            nodes.add(bp);
-            widths.put(bp, 1); // width at leaf is 1
-        }
-        // create ancestor nodes by picking N children, connecting them via a new ancestor,
-        // then updating the list of nodes yet to be allocated an ancestor
-        int M = nodes.size();
-        BranchPoint bp = M > 0 ? nodes.get(0) : null;
-        while (M > 1) {
-            bp = new BranchPoint("");
-            // how many nodes to pick?
-            int N = Math.min(rand.nextInt(max_desc - min_desc + 1) + min_desc, nodes.size());
-            int mywidth = 0;
-            for (int j = 0; j < N; j ++) {
-                int pick = rand.nextInt(nodes.size());
-                BranchPoint node = nodes.get(pick);
-                Integer width = widths.get(node);
-                if (width != null) {
-                    mywidth += width;
-                    widths.remove(node);
-                }
-                bp.addChild(node);
-                node.setParent(bp);
-                nodes.remove(pick);
-                M -= 1;
-            }
-            widths.put(bp, mywidth);
-            double log2width = Math.log(mywidth)/Math.log(2);
-            bp.setDistance(Math.max(sampleMixture(gds, priors[getBin(thresholds, log2width)]), 0.0000001));
-            nodes.add(bp);
-            M += 1;
-        }
-        if (bp != null) {
-            Tree t = new Tree(bp);
-            t.setInternalLabels();
-            return t;
-        }
-        throw new TreeRuntimeException("Could not create tree: invalid input");
     }
 
     public static void main0(String[] args) {
@@ -636,9 +468,8 @@ public class Tree extends IdxTree {
 
         // Now we are estimating a mixture of Gamma distributions from the first/source tree (loaded or synthesised)
         // 1. ONE mixture of a specified number of Gamma distributions
-        Mixture mixture = null;
-        mixture = IdxTree.getGammaMixture(tree1, NCOMP); // find mixture and weights for each component
-        if (mixture == null) {
+        GammaDistrib.Mixture gdm = IdxTree.getGammaMixture(tree1, NCOMP, SEED); // find mixture and weights for each component
+        if (gdm == null) {
             System.out.println("Could not find a mixture of " + NCOMP + " components");
             System.exit(1);
         }
@@ -650,11 +481,11 @@ public class Tree extends IdxTree {
         double[] priors = new double[NCOMP];
         GammaDistrib[] gds = new GammaDistrib[NCOMP];
         for (int i = 0; i < NCOMP; i++) {
-            double a = shapes[i] = ((GammaDistribution) (mixture.components[i].distribution)).k;
-            double b = scales[i] = ((GammaDistribution) (mixture.components[i].distribution)).theta;
+            double a = shapes[i] = gdm.distribs[i].getShape();
+            double b = scales[i] = gdm.distribs[i].getScale();
             gds[i] = new GammaDistrib(shapes[i], 1 / scales[i]);
-            double weight = priors[i] = mixture.components[i].priori;
-            if (weight > mixture.components[compwmax].priori)
+            double weight = priors[i] = gdm.priors[i];
+            if (weight > gdm.priors[compwmax])
                 compwmax = i;
             if (VERBOSE)
                 System.out.println("Gamma " + i +"\tShape (k, a in Matlab)= " + a + "\tScale (theta, b in Matlab)= " + b + " * " + weight);
@@ -663,7 +494,7 @@ public class Tree extends IdxTree {
         }
         // 2. Generate a new tree based on the above mixture of Gamma distributions
         //   a) assume that branch lengths are uniformly distributed across topology
-        tree2 = Tree.RandomMixture(tree1.getNLeaves(), SEED, gds, priors, 2, 2);
+        tree2 = Tree.Random(tree1.getNLeaves(), gdm, 2, 2, SEED);
         if (VERBOSE) {
             System.out.print("Generated intermediate tree (seed " + SEED + "): size = " + tree2.getSize() + "\t");
             Double[][] dmat2 = tree2.getDistance2RootMatrix();
