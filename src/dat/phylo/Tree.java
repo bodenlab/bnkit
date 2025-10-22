@@ -18,15 +18,14 @@
 package dat.phylo;
 
 import asr.Parsimony;
-import bn.Distrib;
-import bn.prob.EnumDistrib;
+import bn.ctmc.SubstModel;
 import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
 import dat.EnumSeq;
 import dat.EnumSeq.Alignment;
 import dat.Enumerable;
 import dat.file.Newick;
-import smile.stat.distribution.ExponentialFamilyMixture;
+import smile.math.MathEx;
 import smile.stat.distribution.GammaDistribution;
 import smile.stat.distribution.Mixture;
 import stats.RateModel;
@@ -281,6 +280,140 @@ public class Tree extends IdxTree {
     public IdxTree getIdxTree() {
         BranchPoint[] bps = Tree.straightenTree(root);
         return new IdxTree(bps);
+    }
+
+
+    public void felsensteins_extended_peeling( EnumSeq.Alignment<Enumerable> aln, int col_idx, Double[][] Pu_Lk_residue,
+                                               Double[] Pu_Lk_gap, Double rate, SubstModel model) {
+
+        Map<String, Integer> alnMap = aln.getMap();
+        // Indicator array - 1 means all children of the node have gaps and 0 otherwise
+        Double[] contains_gaps = contains_gaps(aln, col_idx);
+        int nNodes = getNLeaves() + getNParents();
+        // If we want to do a postorder traversal, can just iterate
+        // through branch point indices backwards as these are labelled depth-first.
+        for (int bpidx = nNodes - 1; bpidx >= 0; bpidx--) {
+            BranchPoint node = getBranchPoint(bpidx);
+
+            if (node.isLeaf()) {
+                String node_label = (String) node.getLabel();
+                EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(node_label));
+                Character residue = (Character) gseq.get(col_idx);
+                // null residue implies a gap
+                if (residue == null) { // equation 18/19
+                    Pu_Lk_gap[bpidx] = Double.NEGATIVE_INFINITY;
+                } else {
+                    int res_idx = model.getDomain().getIndex(residue);
+                    Pu_Lk_residue[bpidx][res_idx] = 0.0;
+                }
+
+            } else { // Ancestor
+                int[] children_bpindices = getChildren(bpidx);
+                // equation 21 - gaps
+                double[] all_children_log_terms_gap = new double[children.length];
+                Object[] alphabet = model.getDomain().getValues();
+                int current_child = 0;
+                for (int child_bpidx : children_bpindices) {
+                    // collect all possible terms we will marginalise over
+                    if (contains_gaps[bpidx] == 1.0) {
+                        // need to enumerate over every residue sum(Pu(L_child,q).P(q|-,t) and
+                        // then add Pu(L_child, -) so alphabet_size + 1
+                        double[] child_log_prob_terms = new double[model.getDomain().size() + 1];
+                        //1.0 sum(Pu(L_child,q).P(q|-,t)
+                        for (int res_idx = 0; res_idx < alphabet.length; res_idx++) {
+                            double pu_ld_q = Pu_Lk_residue[child_bpidx][res_idx];
+                            // TODO: implement this
+                            double p_q_given_gap_t = 0.0;
+                            //p_q_given_gap_t = Math.log((model.p_j_given_gap_t(residue, self.distances[child] * indel_rate)));
+                            child_log_prob_terms[res_idx] = pu_ld_q + p_q_given_gap_t;
+                        }
+
+                        child_log_prob_terms[alphabet.length] = Pu_Lk_gap[child_bpidx];
+                        all_children_log_terms_gap[current_child] = MathEx.logsumexp(child_log_prob_terms);
+
+                    } else {
+                        all_children_log_terms_gap[current_child] = Double.NEGATIVE_INFINITY;
+                    }
+                    current_child++;
+                }
+
+                // save the gap calculation
+                Pu_Lk_gap[bpidx] = MathEx.logsumexp(all_children_log_terms_gap);
+
+                // Equation 20 - now we assume the ancestor is a residue.
+                for (int res_i = 0; res_i < alphabet.length; res_i++) {
+
+                    double[] children_log_prob_terms = new double[children_bpindices.length];
+                    int current_child_res = 0;
+                    for (int child_bpidx : children_bpindices) {
+
+                        double[] child_log_prob_terms = (contains_gaps[child_bpidx] == 1.0) ? new double[alphabet.length + 1] : new double[alphabet.length];
+                        for (int res_q = 0; res_q < alphabet.length; res_q++) {
+                            double pu_l_q = Pu_Lk_residue[child_bpidx][res_q];
+                            double p_j_given_i_t = Math.log(model.getProb(alphabet[res_q], alphabet[res_i], getDistance(child_bpidx)));
+                            child_log_prob_terms[res_q] = pu_l_q + p_j_given_i_t;
+                        }
+
+                        if (contains_gaps[child_bpidx] == 1.0) {
+                            double p_gap_given_i_t = 0.0;
+                            // TODO: Implement this
+                            //double p_gap_given_i_t = Math.log(self.model.p_gap_given_i_t(t=self.distances[child] * indel_rate);
+                            child_log_prob_terms[alphabet.length] = p_gap_given_i_t;
+                        }
+
+                        double child_log_prob = MathEx.logsumexp(child_log_prob_terms);
+                        children_log_prob_terms[current_child_res] = child_log_prob;
+
+                        current_child_res++;
+                    }
+
+                    // save the residue calculation
+                    Pu_Lk_residue[bpidx][res_i] = MathEx.sum(children_log_prob_terms);
+                }
+            }
+
+        }
+
+    }
+    
+    public Double[] contains_gaps(EnumSeq.Alignment<Enumerable> aln, int col_idx) {
+
+        Map<String, Integer> alnMap = aln.getMap();
+        int nNodes = getNLeaves() + getNParents();
+        Double[] contains_gap = new Double[nNodes];
+        // If we want to do a postorder traversal, can just iterate
+        // through branch point indices backwards as these are labelled depth-first.
+        for (int bpidx = nNodes - 1; bpidx >= 0; bpidx--) {
+            BranchPoint node = getBranchPoint(bpidx);
+
+            if (node.isLeaf()) {
+                String node_label = (String) node.getLabel();
+                EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(node_label));
+                Character residue = (Character) gseq.get(col_idx);
+                // null residue implies a gap
+                if (residue == null) {
+                    contains_gap[bpidx] = 1.0;
+                } else {
+                    contains_gap[bpidx] = 0.0;
+                }
+
+            } else {
+                // Ancestor
+                int[] children = getChildren(bpidx);
+                double all_gaps = 1.0;
+                // if any of the children don't contain a gap, break and record
+                for (int child : children) {
+                    if (contains_gap[child] == 0.0) {
+                        all_gaps = 0.0;
+                        break;
+                    }
+                }
+                contains_gap[bpidx] = all_gaps;
+            }
+
+        }
+
+        return contains_gap;
     }
 
     public static void main0(String[] args) {

@@ -4544,4 +4544,19 @@ public class MathEx {
 
         return u;
     }
+
+    /**
+     * Apply the logsumexp operation to avoid overflow or underflow issues
+     * @param array the array
+     * @return
+     */
+    public static double logsumexp(double[] array) {
+        double xmax = max(array);
+        double sum = 0.0;
+        for (double x : array) {
+            sum += Math.exp(x - xmax);
+        }
+        return xmax + Math.log(sum);
+    }
+
 }
