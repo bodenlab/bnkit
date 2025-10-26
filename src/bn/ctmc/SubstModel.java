@@ -43,10 +43,10 @@ import java.util.PriorityQueue;
  */
 public abstract class SubstModel {
 
-    final double[][] R; // This is the IRM, sometimes referred to as Q
-    final double[] F;   // This is the frequencies of the character states
-    final Exp Rexp;     // exp(IRM)
-    final Enumerable alpha;
+    double[][] R; // This is the IRM, sometimes referred to as Q
+    double[] F;   // This is the frequencies of the character states
+    Exp Rexp;     // exp(IRM)
+    Enumerable alpha;
     private EnumTable<EnumDistrib> table = null;
 
     /**
