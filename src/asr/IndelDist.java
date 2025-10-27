@@ -159,6 +159,7 @@ public class IndelDist {
         assert tree != null;
         assert aln != null;
 
+        double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
 
         double mu = 0.05;
         double lambda = 0.05;
@@ -170,7 +171,7 @@ public class IndelDist {
             throw new IllegalArgumentException(MODELS[MODEL_IDX] + "not implemented yet");
         }
 
-        double geometric_seq_len_param = 0.05;
+
         Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln,
                 MEAN_RATES.get(RATE_CATEGORY.HIGH), geometric_seq_len_param);
 

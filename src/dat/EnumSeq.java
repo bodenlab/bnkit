@@ -591,6 +591,22 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
         }
 
         /**
+         * Calculates average sequence length in the alignment
+         * not including gaps.
+         *
+         * @return The average sequence length in all sequences.
+         */
+        public int getAvgSeqLength() {
+            double gap_prop = (double) getGapCount() / (double) (getWidth() * getHeight());
+            double non_gap_prop = 1 - gap_prop;
+
+            return (int) (non_gap_prop * (double) (getWidth()));
+        }
+
+
+
+
+        /**
          * Calculates the mean length of gaps (null values) in all sequences.
          *
          * This method iterates through all sequences and calculates the mean length
