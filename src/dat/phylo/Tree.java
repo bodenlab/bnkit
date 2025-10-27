@@ -18,7 +18,7 @@
 package dat.phylo;
 
 import asr.Parsimony;
-import bn.ctmc.SubstModel;
+import bn.ctmc.GapSubstModel;
 import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
 import dat.EnumSeq;
@@ -283,13 +283,34 @@ public class Tree extends IdxTree {
     }
 
 
+    /**
+     *
+     * @param aln the alignment
+     * @param col_idx
+     * @param Pu_Lk_residue Probability of a node with a particular residue (node x residues)
+     * @param Pu_Lk_gap
+     * @param rate the indel rate
+     * @param model Gap-augmented substitution matrix
+     */
     public void felsensteins_extended_peeling( EnumSeq.Alignment<Enumerable> aln, int col_idx, Double[][] Pu_Lk_residue,
-                                               Double[] Pu_Lk_gap, Double rate, SubstModel model) {
+                                               Double[] Pu_Lk_gap, Double rate, GapSubstModel model) {
 
         Map<String, Integer> alnMap = aln.getMap();
+        // construct map of bpidx to id
+        int nNodes = getNLeaves() + getNParents();
+        Map<Integer, String> bpidx2id = new HashMap<>();
+        for (int bpidx= 0; bpidx < nNodes; bpidx ++) {
+            BranchPoint node = getBranchPoint(bpidx);
+            if (node.isLeaf()) {
+                String node_label = (String) node.getLabel();
+                bpidx2id.put(bpidx, node_label);
+            }
+        }
         // Indicator array - 1 means all children of the node have gaps and 0 otherwise
         Double[] contains_gaps = contains_gaps(aln, col_idx);
-        int nNodes = getNLeaves() + getNParents();
+
+        Object[] alphabet = model.getDomain().getValues();
+        int num_residues = alphabet.length - 1; // just want actual residues, not gaps
         // If we want to do a postorder traversal, can just iterate
         // through branch point indices backwards as these are labelled depth-first.
         for (int bpidx = nNodes - 1; bpidx >= 0; bpidx--) {
@@ -311,24 +332,27 @@ public class Tree extends IdxTree {
                 int[] children_bpindices = getChildren(bpidx);
                 // equation 21 - gaps
                 double[] all_children_log_terms_gap = new double[children.length];
-                Object[] alphabet = model.getDomain().getValues();
+
                 int current_child = 0;
                 for (int child_bpidx : children_bpindices) {
                     // collect all possible terms we will marginalise over
                     if (contains_gaps[bpidx] == 1.0) {
                         // need to enumerate over every residue sum(Pu(L_child,q).P(q|-,t) and
-                        // then add Pu(L_child, -) so alphabet_size + 1
-                        double[] child_log_prob_terms = new double[model.getDomain().size() + 1];
+                        // then add Pu(L_child, -) so full alphabet_size
+                        double[] child_log_prob_terms = new double[alphabet.length];
                         //1.0 sum(Pu(L_child,q).P(q|-,t)
-                        for (int res_idx = 0; res_idx < alphabet.length; res_idx++) {
+                        for (int res_idx = 0; res_idx < num_residues; res_idx++) {
                             double pu_ld_q = Pu_Lk_residue[child_bpidx][res_idx];
-                            // TODO: implement this
-                            double p_q_given_gap_t = 0.0;
-                            //p_q_given_gap_t = Math.log((model.p_j_given_gap_t(residue, self.distances[child] * indel_rate)));
+
+                            EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(bpidx2id.get(child_bpidx)));
+                            Object residue = gseq.get(col_idx);
+
+                            double p_q_given_gap_t = Math.log(model.prob_j_given_gap_t(distance[child_bpidx] * rate, residue));
+
                             child_log_prob_terms[res_idx] = pu_ld_q + p_q_given_gap_t;
                         }
 
-                        child_log_prob_terms[alphabet.length] = Pu_Lk_gap[child_bpidx];
+                        child_log_prob_terms[num_residues] = Pu_Lk_gap[child_bpidx];
                         all_children_log_terms_gap[current_child] = MathEx.logsumexp(child_log_prob_terms);
 
                     } else {
@@ -341,24 +365,22 @@ public class Tree extends IdxTree {
                 Pu_Lk_gap[bpidx] = MathEx.logsumexp(all_children_log_terms_gap);
 
                 // Equation 20 - now we assume the ancestor is a residue.
-                for (int res_i = 0; res_i < alphabet.length; res_i++) {
+                for (int res_i = 0; res_i < num_residues; res_i++) {
 
                     double[] children_log_prob_terms = new double[children_bpindices.length];
                     int current_child_res = 0;
                     for (int child_bpidx : children_bpindices) {
 
-                        double[] child_log_prob_terms = (contains_gaps[child_bpidx] == 1.0) ? new double[alphabet.length + 1] : new double[alphabet.length];
-                        for (int res_q = 0; res_q < alphabet.length; res_q++) {
+                        double[] child_log_prob_terms = (contains_gaps[child_bpidx] == 1.0) ? new double[alphabet.length] : new double[num_residues];
+                        for (int res_q = 0; res_q < num_residues; res_q++) {
                             double pu_l_q = Pu_Lk_residue[child_bpidx][res_q];
                             double p_j_given_i_t = Math.log(model.getProb(alphabet[res_q], alphabet[res_i], getDistance(child_bpidx)));
                             child_log_prob_terms[res_q] = pu_l_q + p_j_given_i_t;
                         }
 
                         if (contains_gaps[child_bpidx] == 1.0) {
-                            double p_gap_given_i_t = 0.0;
-                            // TODO: Implement this
-                            //double p_gap_given_i_t = Math.log(self.model.p_gap_given_i_t(t=self.distances[child] * indel_rate);
-                            child_log_prob_terms[alphabet.length] = p_gap_given_i_t;
+                            double p_gap_given_i_t = Math.log(model.prob_gap_given_i_t(distance[child_bpidx] * rate));
+                            child_log_prob_terms[num_residues] = p_gap_given_i_t;
                         }
 
                         double child_log_prob = MathEx.logsumexp(child_log_prob_terms);

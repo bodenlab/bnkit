@@ -5,6 +5,9 @@ import bn.ctmc.matrix.JTTGap;
 import dat.Enumerable;
 import bn.math.Matrix.Exp;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * This is a gap augmented conditional probability table for CTMC
  * based on discrete alphabets. This is based directly on the
@@ -90,6 +93,24 @@ public class GapSubstModel extends SubstModel {
         return "GapSubstModel";
     }
 
+    @Override
+    /**
+     * Get probability P(X=x)
+     * @param X
+     * @return
+     */
+    public double getProb(Object X) {
+
+        // gaps are encoded by nulls in EnumSeq.Gappy<Enumerable>
+        if (X == null) {
+            X = '-';
+        }
+
+        int index_X = alpha.getIndex(X);
+        return F[index_X];
+    }
+
+
     /**
      * Function for the rate of deletion. For the case of
      * no insertions or deletions (mu=lambda=0) the function
@@ -169,7 +190,8 @@ public class GapSubstModel extends SubstModel {
      * @param state residue character
      * @return  P(j| -, t)
      */
-    public double prob_j_given_gap_t(double t, Character state) {
+    public double prob_j_given_gap_t(double t, Object state) {
+
         double insertion_prob = ksi_t(t);
         double stationary_freq_residue = getProb(state);
 
