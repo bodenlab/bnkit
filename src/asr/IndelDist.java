@@ -174,10 +174,7 @@ public class IndelDist {
         Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln,
                 MEAN_RATES.get(RATE_CATEGORY.HIGH), geometric_seq_len_param);
 
-
-        double[] test = {1.0, 0.5, 0.0003};
-        double result = MathEx.logsumexp(test);
-        System.out.println(result);
+        double[][] partial_sums = compute_prefix_sums(columnPriors);
 
     }
 
@@ -262,6 +259,30 @@ public class IndelDist {
         double[] final_col_terms = {Pu_Lk_gap_root, weighted_log_sum_residue_prob};
 
         return MathEx.logsumexp(final_col_terms);
+    }
+
+    /**
+     *
+     * @param column_likelihoods array of num_cols x rate
+     * @return an array of (num_cols + 1) x k with the likelihood
+     * of observing up to that row with rate k
+     */
+    public static double[][] compute_prefix_sums(Double[][] column_likelihoods) {
+
+        int numberOfCols = column_likelihoods.length + 1;
+        int numRates = column_likelihoods[0].length;
+
+        double[][] partial_sums = new double[numberOfCols][numRates];
+        for (int k = 0; k < numRates; k++) {
+            double total = 0.0;
+            for (int i = 1; i < numberOfCols; i++)  {
+                total += column_likelihoods[i - 1][k];
+                partial_sums[i][k] = total;
+            }
+        }
+
+        return partial_sums;
+
     }
 
 }
