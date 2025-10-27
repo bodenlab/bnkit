@@ -1,20 +1,15 @@
 package asr;
 
 import bn.ctmc.GapSubstModel;
-import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JTTGap;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
 import dat.phylo.Tree;
 import smile.math.MathEx;
-
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.Arrays;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.Random;
+import java.util.*;
 
 
 public class IndelDist {
@@ -160,7 +155,7 @@ public class IndelDist {
         assert aln != null;
 
         double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
-
+        double[] rate_priors = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
         double mu = 0.05;
         double lambda = 0.05;
         // This will be updated to a gap model later
@@ -175,8 +170,10 @@ public class IndelDist {
         Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln,
                 MEAN_RATES.get(RATE_CATEGORY.HIGH), geometric_seq_len_param);
 
-        double[][] partial_sums = compute_prefix_sums(columnPriors);
+        double[][] prefix_sums = compute_prefix_sums(columnPriors);
 
+        int[][] segments = assign_segments(columnPriors.length, rate_priors, prefix_sums);
+        System.out.println(Arrays.deepToString(segments));
     }
 
 
@@ -214,7 +211,7 @@ public class IndelDist {
      *  adapted pruning algorithm before extracting the probability of the root
      *  node. All possible residue assignments are summed over and also weighted
      *  by the geometric sequence length parameter (assumed to be the average sequence
-     *  length of the alignment). Refer to Rivas & Eddy (2008, https://doi.org/10.1371/journal.pcbi.1000172)
+     *  length of the alignment). Refer to Rivas & Eddy (2008, <a href="https://doi.org/10.1371/journal.pcbi.1000172">...</a>)
      *  for a description of Felsenstein's peeling algorithm extended to gaps.
      *
      * @param tree a given tree
@@ -284,6 +281,80 @@ public class IndelDist {
 
         return partial_sums;
 
+    }
+
+    /**
+     * Uses dynamic programming to assign segments to the MSA columns. This adapts
+     * the algorithm from Zhai & Alexandre (2017) <a href="https://doi.org/10.1093/sysbio/syx033">...</a>
+     * but column likelihoods are calculated using a gap augmented substitution
+     * model.
+     *
+     * @param num_cols number of alignment columns
+     * @param rate_priors the prior probabilities of each rate
+     * @param prefix_sums an array of (num_cols + 1) x k with the likelihood of observing up to that row with rate k
+     *
+     * @return A list of tuples (start, end, rate_category) representing the optimal segmentation of the MSA columns.
+     */
+    public static int[][] assign_segments(int num_cols, double[] rate_priors,
+                                  double[][] prefix_sums) {
+
+
+        int START = 0;
+        int RATE_ASSIGNED = 1;
+        Double[] dp_path = new Double[num_cols + 1];
+        Arrays.fill(dp_path, Double.NEGATIVE_INFINITY);
+        dp_path[0] = 0.0;
+        // each col will record the most optimal start and end position
+        int[][] back_path = new int[num_cols + 1][2];
+        int K = rate_priors.length;
+
+        int max_seg_len = 50;
+        for (int j = 1; j < num_cols + 1; j++) {
+            int i_min = Math.max(1, j - max_seg_len + 1);
+            double best_score = Double.NEGATIVE_INFINITY;
+            int[] best_entry = new int[2];
+            for (int i = i_min; i < (j + 1); i++) {
+                int L = j - i + 1; // segment length
+                for (int k = 0; k < K; k++) {
+                    double LL = prefix_sums[j][k] - prefix_sums[i - 1][k];
+                    //double len_weight = lengthPrior(L);
+                    double prior = rate_priors[k];
+                    double score = dp_path[i - 1] + LL + prior;
+                    if (score > best_score) {
+                        best_score = score;
+                        best_entry[START] = i;
+                        best_entry[RATE_ASSIGNED] = k;
+                    }
+                }
+            }
+
+            dp_path[j] = best_score;
+            back_path[j][START] = best_entry[START];
+            back_path[j][RATE_ASSIGNED] = best_entry[RATE_ASSIGNED];
+        }
+        ArrayList<int[]> segments = new ArrayList<>();
+        int j = num_cols;
+        while (j > 0) {
+            int i = back_path[j][START];
+            int k = back_path[j][RATE_ASSIGNED];
+            segments.add(new int[] {i, j, k});
+            j = i - 1;
+        }
+
+        int[][] optimal_segs = new int[segments.size()][3];
+        int SEG_START = 0;
+        int SEG_END = 1;
+        int SEG_RATE = 2;
+        int pos = 0;
+        for (int i = segments.size() - 1; i >= 0; i--) {
+            int[] segment = segments.get(i);
+            optimal_segs[pos][SEG_START] = segment[SEG_START];
+            optimal_segs[pos][SEG_END] = segment[SEG_END];
+            optimal_segs[pos][SEG_RATE] = segment[SEG_RATE];
+            pos++;
+        }
+
+        return optimal_segs;
     }
 
 }
