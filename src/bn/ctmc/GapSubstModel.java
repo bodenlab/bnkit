@@ -24,13 +24,26 @@ public class GapSubstModel extends SubstModel {
 
     final double mu; // deletion rate
     final double lambda; // insertion rate
+    final double[][] IRM;
+    final Enumerable OrigAlpha;
+    final double[] OrigF;
 
-    public GapSubstModel(double[] F, double[][] S, Enumerable alphabet, double mu, double lambda)
+    public GapSubstModel deepCopy() {
+        return new GapSubstModel(this.OrigF, this.IRM, this.OrigAlpha, this.mu, this.lambda);
+    }
+
+    public GapSubstModel(double[] F, double[][] IRM, Enumerable alphabet, double mu, double lambda)
             throws IllegalArgumentException{
+
         // perform normal setup
-        super(F, S, alphabet);
+        super(F, IRM, alphabet, true, true);
         this.mu = mu;
         this.lambda = lambda;
+        // save these for later in case we need to make a copy
+        this.IRM = IRM;
+        this.OrigAlpha = alphabet;
+        this.OrigF = F;
+
 
         double[][] R_EPS = new double[F.length + 1][F.length + 1];
         int K = alphabet.size();
