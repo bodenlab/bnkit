@@ -58,6 +58,10 @@ public class Tree extends IdxTree {
         this.root = root;        // assume all branch points are OK and store them
     }
 
+    public Tree copy() {
+        return new Tree(root);
+    }
+
     /**
      * Create the array of branch points from a single branch point, which in turn is linked to its children
      * @param root the ultimate branch point
@@ -315,7 +319,7 @@ public class Tree extends IdxTree {
             Pu_Lk_gap[i] = Double.NEGATIVE_INFINITY;
         }
         // update the Pu_Lk_residue and Pu_Lk_gap arrays in place
-        felsensteins_extended_peeling(aln, col_idx, Pu_Lk_residue, Pu_Lk_gap, rate, model);
+        this.felsensteins_extended_peeling(aln, col_idx, Pu_Lk_residue, Pu_Lk_gap, rate, model);
 
         int ROOT_INDEX = 0;
         // get the probability of the ancestor being a gap
@@ -398,9 +402,7 @@ public class Tree extends IdxTree {
                         for (int res_idx = 0; res_idx < num_residues; res_idx++) {
                             double pu_ld_q = Pu_Lk_residue[child_bpidx][res_idx];
 
-                            EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(bpidx2id.get(child_bpidx)));
-                            Object residue = gseq.get(col_idx);
-
+                            Object residue = model.getDomain().get(res_idx);
                             double p_q_given_gap_t = Math.log(model.prob_j_given_gap_t(distance[child_bpidx] * rate, residue));
 
                             child_log_prob_terms[res_idx] = pu_ld_q + p_q_given_gap_t;

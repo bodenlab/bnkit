@@ -10,7 +10,9 @@ import smile.math.MathEx;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
+import asr.ThreadedPeeler.Peeler;
 
 public class IndelDist {
 
@@ -167,15 +169,21 @@ public class IndelDist {
         }
 
 
+        long startTime = System.currentTimeMillis();
         Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln,
                 MEAN_RATES.get(RATE_CATEGORY.HIGH), geometric_seq_len_param);
 
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - startTime;
+        System.out.println("Execution time: " + duration / 1000 + " s");
+
         double[][] prefix_sums = compute_prefix_sums(columnPriors);
 
-        int[][] segments = assign_segments(columnPriors.length, rate_priors, prefix_sums);
+        double expected_segment_length = 20.0;
+        double rho = 1 / expected_segment_length;
+        int[][] segments = assign_segments(columnPriors.length, rate_priors, prefix_sums, rho);
         System.out.println(Arrays.deepToString(segments));
     }
-
 
 
     /**
@@ -191,15 +199,34 @@ public class IndelDist {
                                                  Double[] mean_rates, double geometric_seq_len_param) {
 
 
-        // TODO: make this multithreaded
-        Double[][] column_priors = new Double[aln.getWidth()][mean_rates.length];
-        System.out.println("Computing column priors");
-        for (int col_idx = 0; col_idx < aln.getWidth(); ++col_idx) {
-            for (int rate_idx = 0; rate_idx < mean_rates.length; ++rate_idx) {
-                double rate = mean_rates[rate_idx];
+        int numCols = aln.getWidth();
+        int numRates = mean_rates.length;
+        int nThreads = 4;
+        Peeler[] peelers = new Peeler[numCols * numRates];
 
-                column_priors[col_idx][rate_idx] = tree.log_prob_col_given_rate(aln, rate, model, col_idx, geometric_seq_len_param);
+        System.out.println("Computing column priors");
+        for (int col_idx = 0; col_idx < numCols; ++col_idx) {
+            for (int rate_idx = 0; rate_idx < numRates; ++rate_idx) {
+                double indel_rate = mean_rates[rate_idx];
+                int idx = col_idx * numRates + rate_idx;
+                GapSubstModel model_copy = model.deepCopy();
+                peelers[idx] = new Peeler(tree, aln, indel_rate, model_copy, col_idx, geometric_seq_len_param);
             }
+        }
+
+        Double[][] column_priors = new Double[numCols][numRates];
+        ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, nThreads);
+        try {
+            Map<Integer, Peeler> ret = thread_pool.runBatch();
+            for (int col_idx = 0; col_idx < numCols; ++col_idx) {
+                for (int rate_idx = 0; rate_idx < numRates; ++rate_idx) {
+                    int idx = col_idx * numRates + rate_idx;
+                    Peeler peeler = ret.get(idx);
+                    column_priors[col_idx][rate_idx] = peeler.getDecoration();
+                }
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
         }
 
         return column_priors;
@@ -242,7 +269,7 @@ public class IndelDist {
      * @return A list of tuples (start, end, rate_category) representing the optimal segmentation of the MSA columns.
      */
     public static int[][] assign_segments(int num_cols, double[] rate_priors,
-                                  double[][] prefix_sums) {
+                                  double[][] prefix_sums, double rho) {
 
 
         int START = 0;
@@ -256,16 +283,17 @@ public class IndelDist {
 
         int max_seg_len = 50;
         for (int j = 1; j < num_cols + 1; j++) {
+            // only look back as far as the maximum segment length
             int i_min = Math.max(1, j - max_seg_len + 1);
             double best_score = Double.NEGATIVE_INFINITY;
             int[] best_entry = new int[2];
             for (int i = i_min; i < (j + 1); i++) {
                 int L = j - i + 1; // segment length
                 for (int k = 0; k < K; k++) {
-                    double LL = prefix_sums[j][k] - prefix_sums[i - 1][k];
-                    //double len_weight = lengthPrior(L);
-                    double prior = rate_priors[k];
-                    double score = dp_path[i - 1] + LL + prior;
+                    double LL = prefix_sums[j][k] - prefix_sums[i - 1][k]; // prob of this segment at this indel rate
+                    double len_weight = length_prior(L, rho); // longer segments penalised more heavily
+                    double prior = rate_priors[k]; // prior prob of that particular weight category
+                    double score = dp_path[i - 1] + LL + prior + len_weight; // include score from last most likely pos
                     if (score > best_score) {
                         best_score = score;
                         best_entry[START] = i;
@@ -278,6 +306,8 @@ public class IndelDist {
             back_path[j][START] = best_entry[START];
             back_path[j][RATE_ASSIGNED] = best_entry[RATE_ASSIGNED];
         }
+
+        // perform the backtrace through segments
         ArrayList<int[]> segments = new ArrayList<>();
         int j = num_cols;
         while (j > 0) {
@@ -287,20 +317,35 @@ public class IndelDist {
             j = i - 1;
         }
 
-        int[][] optimal_segs = new int[segments.size()][3];
+        // need to reverse the order
+        int[][] optimal_segments = new int[segments.size()][3];
         int SEG_START = 0;
         int SEG_END = 1;
         int SEG_RATE = 2;
         int pos = 0;
         for (int i = segments.size() - 1; i >= 0; i--) {
             int[] segment = segments.get(i);
-            optimal_segs[pos][SEG_START] = segment[SEG_START];
-            optimal_segs[pos][SEG_END] = segment[SEG_END];
-            optimal_segs[pos][SEG_RATE] = segment[SEG_RATE];
+            // note the start and ends are inclusive and zero-indexed
+            optimal_segments[pos][SEG_START] = segment[SEG_START] -1;
+            optimal_segments[pos][SEG_END] = segment[SEG_END] - 1;
+            optimal_segments[pos][SEG_RATE] = segment[SEG_RATE];
             pos++;
         }
 
-        return optimal_segs;
+        return optimal_segments;
+    }
+
+    /**
+     * Want to penalise the model for having segements that are too long.
+     * Can use a Geometric distribution. Expected value is 1/rho. i.e.
+     * seg_len = 1/rho therefore for a segment length of 20 rho = 0.05.
+     *
+     * @param segment_length the length of the indel rate segment
+     * @param rho the geometric sequence length param for a segment.
+     * @return
+     */
+    public static double length_prior(int segment_length, double rho) {
+        return (segment_length - 1) * Math.log(1 - rho) + Math.log(rho);
     }
 
 }

@@ -4556,7 +4556,7 @@ public class MathEx {
         for (double x : array) {
             sum += Math.exp(x - xmax);
         }
-        return xmax + Math.log(sum);
+        return xmax + log(sum);
     }
 
 }
