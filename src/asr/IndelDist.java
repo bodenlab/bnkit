@@ -198,65 +198,11 @@ public class IndelDist {
             for (int rate_idx = 0; rate_idx < mean_rates.length; ++rate_idx) {
                 double rate = mean_rates[rate_idx];
 
-                column_priors[col_idx][rate_idx] = log_prob_col_given_rate(tree, aln, rate, model, col_idx, geometric_seq_len_param);
+                column_priors[col_idx][rate_idx] = tree.log_prob_col_given_rate(aln, rate, model, col_idx, geometric_seq_len_param);
             }
         }
 
         return column_priors;
-    }
-
-    /**
-     *  Calculate the total probability of a given aligned
-     *  column u i.e. P(u|Tree, Model, SeqLenParam). Uses Felsenstein's
-     *  adapted pruning algorithm before extracting the probability of the root
-     *  node. All possible residue assignments are summed over and also weighted
-     *  by the geometric sequence length parameter (assumed to be the average sequence
-     *  length of the alignment). Refer to Rivas & Eddy (2008, <a href="https://doi.org/10.1371/journal.pcbi.1000172">...</a>)
-     *  for a description of Felsenstein's peeling algorithm extended to gaps.
-     *
-     * @param tree a given tree
-     * @param aln the alignment
-     * @param rate the indel rate
-     * @param model Gap-augmented substitution matrix
-     * @param col_idx zero-indexed column position
-     * @param geometric_seq_len_param the geometric sequence length parameter
-     * @return log (P(alignment col |Tree, Model, SeqLenParam))
-     */
-    public static double log_prob_col_given_rate(Tree tree, EnumSeq.Alignment<Enumerable> aln, Double rate,
-                                                 GapSubstModel model, int col_idx, double geometric_seq_len_param) {
-
-
-        int total_nodes = tree.getNLeaves() + tree.getNParents();
-        int alphabet_size = model.getDomain().size() - 1; // ignore gaps
-        Object[] alphabet = model.getDomain().getValues();
-        Double[][] Pu_Lk_residue = new Double[total_nodes][alphabet_size]; // nodes x num_letters
-        Double[]Pu_Lk_gap = new Double[total_nodes];
-
-        // instantiate with negative infinity for subsequent log sum calculations
-        for (int i = 0; i < total_nodes; i++) {
-            Arrays.fill(Pu_Lk_residue[i], Double.NEGATIVE_INFINITY);
-            Pu_Lk_gap[i] = Double.NEGATIVE_INFINITY;
-        }
-        // update the Pu_Lk_residue and Pu_Lk_gap arrays in place
-        tree.felsensteins_extended_peeling(aln, col_idx, Pu_Lk_residue, Pu_Lk_gap, rate, model);
-
-        int ROOT_INDEX = 0;
-        // get the probability of the ancestor being a gap
-        double Pu_Lk_gap_root = Pu_Lk_gap[ROOT_INDEX]; //Assuming that root index is always 0
-
-        // sum over possible residue assignments
-        double[] residue_terms = new double[alphabet_size]; // number of alphabet letters
-        for (int res_idx = 0; res_idx < alphabet_size; res_idx++) {
-            double prior_prob = Math.log(model.getProb(alphabet[res_idx]));
-            double Pu_L_i = Pu_Lk_residue[ROOT_INDEX][res_idx];
-            residue_terms[res_idx] = prior_prob + Pu_L_i; // weight by prior prob of residue
-        }
-
-        // combine all the terms together
-        double weighted_log_sum_residue_prob = MathEx.logsumexp(residue_terms) + Math.log(geometric_seq_len_param);
-        double[] final_col_terms = {Pu_Lk_gap_root, weighted_log_sum_residue_prob};
-
-        return MathEx.logsumexp(final_col_terms);
     }
 
     /**
