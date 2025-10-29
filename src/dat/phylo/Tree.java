@@ -18,6 +18,7 @@
 package dat.phylo;
 
 import asr.Parsimony;
+import asr.ThreadedPeeler;
 import bn.ctmc.GapSubstModel;
 import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
@@ -26,12 +27,12 @@ import dat.EnumSeq.Alignment;
 import dat.Enumerable;
 import dat.file.Newick;
 import smile.math.MathEx;
-import smile.stat.distribution.GammaDistribution;
-import smile.stat.distribution.Mixture;
 import stats.RateModel;
+import asr.ThreadedPeeler.Peeler;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Class to represent a single phylogenetic tree, refactored from old PhyloTree (now deprecated).
@@ -303,8 +304,8 @@ public class Tree extends IdxTree {
      * @param geometric_seq_len_param the geometric sequence length parameter
      * @return log (P(alignment col |Tree, Model, SeqLenParam))
      */
-    public double log_prob_col_given_rate(EnumSeq.Alignment<Enumerable> aln, Double rate, GapSubstModel model,
-                                          int col_idx, double geometric_seq_len_param) {
+    public double logProbColGivenRate(EnumSeq.Alignment<Enumerable> aln, Double rate, GapSubstModel model,
+                                      int col_idx, double geometric_seq_len_param) {
 
 
         int total_nodes = getNLeaves() + getNParents();
@@ -319,7 +320,7 @@ public class Tree extends IdxTree {
             Pu_Lk_gap[i] = Double.NEGATIVE_INFINITY;
         }
         // update the Pu_Lk_residue and Pu_Lk_gap arrays in place
-        this.felsensteins_extended_peeling(aln, col_idx, Pu_Lk_residue, Pu_Lk_gap, rate, model);
+        this.felsensteinsExtendedPeeling(aln, col_idx, Pu_Lk_residue, Pu_Lk_gap, rate, model);
 
         int ROOT_INDEX = 0;
         // get the probability of the ancestor being a gap
@@ -344,14 +345,16 @@ public class Tree extends IdxTree {
     /**
      *
      * @param aln the alignment
-     * @param col_idx
+     * @param col_idx the column index
      * @param Pu_Lk_residue Probability of a node with a particular residue (node x residues)
-     * @param Pu_Lk_gap
+     * @param Pu_Lk_gap Probability of a node containing a gap
      * @param rate the indel rate
      * @param model Gap-augmented substitution matrix
+     *
+     *  source:  Rivas & Eddy (2008, <a href="https://doi.org/10.1371/journal.pcbi.1000172">...</a>)
      */
-    public void felsensteins_extended_peeling( EnumSeq.Alignment<Enumerable> aln, int col_idx, Double[][] Pu_Lk_residue,
-                                               Double[] Pu_Lk_gap, Double rate, GapSubstModel model) {
+    public void felsensteinsExtendedPeeling(EnumSeq.Alignment<Enumerable> aln, int col_idx, Double[][] Pu_Lk_residue,
+                                            Double[] Pu_Lk_gap, Double rate, GapSubstModel model) {
 
         Map<String, Integer> alnMap = aln.getMap();
         // construct map of bpidx to id
@@ -365,7 +368,7 @@ public class Tree extends IdxTree {
             }
         }
         // Indicator array - 1 means all children of the node have gaps and 0 otherwise
-        Double[] contains_gaps = contains_gaps(aln, col_idx);
+        Double[] contains_gaps = containsGaps(aln, col_idx);
 
         Object[] alphabet = model.getDomain().getValues();
         int num_residues = alphabet.length - 1; // just want actual residues, not gaps
@@ -453,8 +456,16 @@ public class Tree extends IdxTree {
         }
 
     }
-    
-    public Double[] contains_gaps(EnumSeq.Alignment<Enumerable> aln, int col_idx) {
+
+    /**
+     *
+     * @param aln
+     * @param col_idx
+     * @return
+     *
+     * source: Rivas & Eddy (2008, <a href="https://doi.org/10.1371/journal.pcbi.1000172">...</a>)
+     */
+    public Double[] containsGaps(EnumSeq.Alignment<Enumerable> aln, int col_idx) {
 
         Map<String, Integer> alnMap = aln.getMap();
         int nNodes = getNLeaves() + getNParents();
@@ -492,6 +503,111 @@ public class Tree extends IdxTree {
         }
 
         return contains_gap;
+    }
+
+
+    /**
+     *
+     * @param model the substitution model
+     * @param aln the alignment
+     * @param geometricSeqLenParam
+     * @param alpha the alphabet
+     * @return
+     *
+     * source: Rivas & Eddy (2008, <a href="https://doi.org/10.1371/journal.pcbi.1000172">...</a>)
+     */
+    public double calcAlnLikelihood(GapSubstModel model, EnumSeq.Alignment<Enumerable> aln,
+                                    double geometricSeqLenParam, Enumerable alpha) {
+
+
+
+        int numCols = aln.getWidth();
+        int nThreads = 4;
+        Peeler[] peelers = new ThreadedPeeler.Peeler[numCols];
+        // first compute each column likelihood
+        for (int i = 0; i < numCols; i++) {
+            GapSubstModel model_copy = model.deepCopy(); // copy to avoid race conditions
+            peelers[i] = new Peeler(this, aln, 1.0, model_copy, i, geometricSeqLenParam);
+        }
+
+        double LL = 0.0;
+        ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, nThreads);
+        try {
+            Map<Integer, Peeler> ret = thread_pool.runBatch();
+            for (int i = 0; i < numCols; i++) {
+                Peeler peeler = ret.get(i);
+                LL += peeler.getDecoration(); // add each column likelihood
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
+
+        double p_star_given_t_r_p = probExtraCol(model, geometricSeqLenParam); // add the normalisation term
+
+        // need to create a dummy aln containing only gaps
+        List<EnumSeq.Gappy<Enumerable>> seqarr = new ArrayList<>();
+        for (int i = 0; i < aln.getHeight(); i++) {
+            EnumSeq<Enumerable> seq = aln.getEnumSeq(i);
+            EnumSeq.Gappy<Enumerable> gap_copy = new EnumSeq.Gappy<>(alpha);
+            gap_copy.set(new Character[1]); // add an empty column
+            gap_copy.setName(seq.getName());
+            seqarr.add(gap_copy);
+        }
+
+        EnumSeq.Alignment<Enumerable> gap_aln = new EnumSeq.Alignment<>(seqarr);
+        //  Normalisation: log P★ - log(1 - P(col_gap))
+        double gap_prob = logProbColGivenRate(gap_aln, 1.0, model, 0, geometricSeqLenParam);
+        double unobserved_term = MathEx.logm1exp(gap_prob);
+
+        double norm_term = p_star_given_t_r_p - unobserved_term;
+
+        return norm_term + LL;
+    }
+
+    /**
+     * This is used for normalisation of the overall column likelihood.
+     * "the factorization in columns of the unconditional length
+     * alignment distribution leaves some normalization terms that we
+     * gather together into what we think of as an “extra column” (★)
+     * contribution. Thus, when calculating the total probability of a
+     * multiple alignment as the product of l individual columns,
+     * there is an additional term in the equation."
+     *
+     * @return normalisation term for the alignment
+     *
+     * source: Rivas & Eddy (2008, <a href="https://doi.org/10.1371/journal.pcbi.1000172">...</a>)
+     */
+    public double probExtraCol(GapSubstModel model, double geometricSeqLenParam) {
+
+
+        int nNodes = getNLeaves() + getNParents();
+
+        // First calculate the likelihood of an all gap column
+        double[] p_star = new double[nNodes];
+        Arrays.fill(p_star,  Double.NEGATIVE_INFINITY);
+        for (int bpidx = nNodes - 1; bpidx >= 0; bpidx--) {
+            BranchPoint node = getBranchPoint(bpidx);
+
+            if (node.isLeaf()) {
+                p_star[bpidx] = 0.0; // log(1)
+            } else {
+                // ancestor
+                int[] children_bpindices = getChildren(bpidx);
+                double childrenLL = 0.0;
+                for (int childBpidx: children_bpindices) {
+                    childrenLL += p_star[childBpidx];
+                    // add probability of gap remaining
+                    childrenLL += Math.log(1 - model.ksi_t(getDistance(childBpidx)));
+                }
+                p_star[bpidx] = childrenLL;
+            }
+        }
+
+        double col_likelihood = 0.0;
+        col_likelihood += Math.log(1 - geometricSeqLenParam); // penalise for length of sequence
+        col_likelihood += p_star[0]; // add the probability of root node
+
+        return col_likelihood;
     }
 
     public static void main0(String[] args) {

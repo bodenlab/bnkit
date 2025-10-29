@@ -6,7 +6,7 @@ import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
 import dat.phylo.Tree;
-import smile.math.MathEx;
+
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
@@ -134,14 +134,6 @@ public class IndelDist {
         String OUTPUT = getArg(argParser, "OUTPUT", String.class);
         String INPUT = getArg(argParser, "INPUT", String.class);
 
-        System.out.println(ALPHAS);
-        System.out.println(ALIGNMENT);
-        System.out.println(NEWICK);
-        System.out.println(SEED);
-        System.out.println(MODEL_IDX);
-        System.out.println(OUTPUT);
-        System.out.println(INPUT);
-
         Tree tree = null;
         EnumSeq.Alignment<Enumerable> aln = null;
         try {
@@ -156,6 +148,7 @@ public class IndelDist {
         assert tree != null;
         assert aln != null;
 
+
         double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
         double[] rate_priors = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
         double mu = 0.05;
@@ -167,6 +160,7 @@ public class IndelDist {
         } else {
             throw new IllegalArgumentException(MODELS[MODEL_IDX] + "not implemented yet");
         }
+
 
 
         long startTime = System.currentTimeMillis();
@@ -183,6 +177,8 @@ public class IndelDist {
         double rho = 1 / expected_segment_length;
         int[][] segments = assign_segments(columnPriors.length, rate_priors, prefix_sums, rho);
         System.out.println(Arrays.deepToString(segments));
+
+
     }
 
 

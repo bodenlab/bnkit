@@ -65,19 +65,19 @@ public class ThreadedPeeler {
         private final double geometric_seq_len_param;
         private double col_prob = Double.NaN;
 
-        public Peeler(Tree tree, EnumSeq.Alignment<Enumerable> aln, Double rate,
+        public Peeler(Tree tree, EnumSeq.Alignment<Enumerable> aln, Double col_indel_rate,
                        GapSubstModel model, int col_idx, double geometricSeqLenParam) {
 
             this.tree = tree;
             this.aln = aln;
-            this.rate = rate;
+            this.rate = col_indel_rate;
             this.model = model;
             this.col_idx = col_idx;
             this.geometric_seq_len_param = geometricSeqLenParam;
         }
 
         public void decorate() {
-            this.col_prob = this.tree.log_prob_col_given_rate(aln, rate, model,
+            this.col_prob = this.tree.logProbColGivenRate(aln, rate, model,
                     col_idx, geometric_seq_len_param);
         }
 

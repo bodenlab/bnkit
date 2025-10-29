@@ -385,6 +385,7 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
          * @param aseqs 
          */
         public Alignment(List<EnumSeq.Gappy<E>> aseqs) {
+
             this.seqs = aseqs;
             int w = -1;
             for (EnumSeq.Gappy<E> seq : aseqs) {

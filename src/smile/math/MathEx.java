@@ -4559,4 +4559,21 @@ public class MathEx {
         return xmax + log(sum);
     }
 
+    /**
+     * Compute log(1 - exp(a)) safely for x <= 0.
+     * @param x value to compute for
+     * @return log(1 - exp(a))
+     * @throws IllegalArgumentException if x <= 0
+     */
+    public static double logm1exp(double x) throws IllegalArgumentException{
+        double LOG_HALF = Math.log(0.5);
+        if (x > 0) {
+            throw new IllegalArgumentException("x must be <= 0");
+        } else if (x <= LOG_HALF) {
+            return Math.log1p(-Math.exp(x));
+        } else {
+            return Math.log(-Math.expm1(x));
+        }
+    }
+
 }
