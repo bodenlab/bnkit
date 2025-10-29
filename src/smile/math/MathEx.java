@@ -4552,11 +4552,16 @@ public class MathEx {
      */
     public static double logsumexp(double[] array) {
         double xmax = max(array);
+
+        if (xmax == Double.NEGATIVE_INFINITY) {
+            return Double.NEGATIVE_INFINITY;
+        }
+
         double sum = 0.0;
         for (double x : array) {
             sum += Math.exp(x - xmax);
         }
-        return xmax + log(sum);
+        return xmax + Math.log(sum);
     }
 
     /**
@@ -4566,6 +4571,7 @@ public class MathEx {
      * @throws IllegalArgumentException if x <= 0
      */
     public static double logm1exp(double x) throws IllegalArgumentException{
+
         double LOG_HALF = Math.log(0.5);
         if (x > 0) {
             throw new IllegalArgumentException("x must be <= 0");

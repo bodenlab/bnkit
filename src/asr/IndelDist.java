@@ -13,6 +13,8 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 import asr.ThreadedPeeler.Peeler;
+import smile.math.phylo.AlnLikelihood;
+import smile.math.special.Minimise;
 
 public class IndelDist {
 
@@ -134,6 +136,7 @@ public class IndelDist {
         String OUTPUT = getArg(argParser, "OUTPUT", String.class);
         String INPUT = getArg(argParser, "INPUT", String.class);
 
+        long totalTime = System.currentTimeMillis();
         Tree tree = null;
         EnumSeq.Alignment<Enumerable> aln = null;
         try {
@@ -148,24 +151,30 @@ public class IndelDist {
         assert tree != null;
         assert aln != null;
 
-
         double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
         double[] rate_priors = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
-        double mu = 0.05;
-        double lambda = 0.05;
         // This will be updated to a gap model later
         GapSubstModel MODEL;
         if (MODELS[MODEL_IDX].equals("JTT")) {
-            MODEL = new JTTGap(mu, lambda);
+            MODEL = new JTTGap(0.05, 0.05);
         } else {
             throw new IllegalArgumentException(MODELS[MODEL_IDX] + "not implemented yet");
         }
 
+        long modstartTime = System.currentTimeMillis();
+        double optimal_mu = optimiseMuLambda(0, 0.5, MODEL, tree,
+                geometric_seq_len_param, aln, ALPHAS[MODEL_IDX]);
 
+        long modendTime = System.currentTimeMillis();
+        long modduration = modendTime - modstartTime;
+        System.out.println("Optimal model selection execution time: " + modduration / 1000 + " s");
+
+        if (MODELS[MODEL_IDX].equals("JTT")) {
+            MODEL = new JTTGap(optimal_mu, optimal_mu);
+        }
 
         long startTime = System.currentTimeMillis();
-        Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln,
-                MEAN_RATES.get(RATE_CATEGORY.HIGH), geometric_seq_len_param);
+        Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln, MEAN_RATES.get(RATE_CATEGORY.HIGH), geometric_seq_len_param);
 
         long endTime = System.currentTimeMillis();
         long duration = endTime - startTime;
@@ -176,6 +185,12 @@ public class IndelDist {
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
         int[][] segments = assign_segments(columnPriors.length, rate_priors, prefix_sums, rho);
+
+
+        long totalTimeend = System.currentTimeMillis();
+        long finaltoal = totalTime - totalTimeend;
+        System.out.println("Total program run time: " + finaltoal / 1000 + " s");
+
         System.out.println(Arrays.deepToString(segments));
 
 
@@ -344,4 +359,12 @@ public class IndelDist {
         return (segment_length - 1) * Math.log(1 - rho) + Math.log(rho);
     }
 
+    public static double optimiseMuLambda(double min_val, double max_val, GapSubstModel model, Tree tree,
+                                          double geometric_seq_len_param, EnumSeq.Alignment<Enumerable> aln,
+                                          Enumerable alpha) {
+
+        AlnLikelihood alnLikelihood = new AlnLikelihood(tree, aln, geometric_seq_len_param, alpha, model);
+
+        return Minimise.brent(alnLikelihood, min_val, max_val);
+    }
 }

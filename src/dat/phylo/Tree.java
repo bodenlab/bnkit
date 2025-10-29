@@ -392,12 +392,12 @@ public class Tree extends IdxTree {
             } else { // Ancestor
                 int[] children_bpindices = getChildren(bpidx);
                 // equation 21 - gaps
-                double[] all_children_log_terms_gap = new double[children.length];
+                double[] all_children_log_terms_gap = new double[children_bpindices.length];
 
                 int current_child = 0;
                 for (int child_bpidx : children_bpindices) {
                     // collect all possible terms we will marginalise over
-                    if (contains_gaps[bpidx] == 1.0) {
+                    if (contains_gaps[child_bpidx] == 1.0) {
                         // need to enumerate over every residue sum(Pu(L_child,q).P(q|-,t) and
                         // then add Pu(L_child, -) so full alphabet_size
                         double[] child_log_prob_terms = new double[alphabet.length];
@@ -424,6 +424,7 @@ public class Tree extends IdxTree {
                 Pu_Lk_gap[bpidx] = MathEx.logsumexp(all_children_log_terms_gap);
 
                 // Equation 20 - now we assume the ancestor is a residue.
+                // 1.0 sum(Pu(L_child,q).P(q|-,t)
                 for (int res_i = 0; res_i < num_residues; res_i++) {
 
                     double[] children_log_prob_terms = new double[children_bpindices.length];
@@ -433,7 +434,7 @@ public class Tree extends IdxTree {
                         double[] child_log_prob_terms = (contains_gaps[child_bpidx] == 1.0) ? new double[alphabet.length] : new double[num_residues];
                         for (int res_q = 0; res_q < num_residues; res_q++) {
                             double pu_l_q = Pu_Lk_residue[child_bpidx][res_q];
-                            double p_j_given_i_t = Math.log(model.getProb(alphabet[res_q], alphabet[res_i], getDistance(child_bpidx)));
+                            double p_j_given_i_t = Math.log(model.prob_j_given_i_t((Character) alphabet[res_q], (Character) alphabet[res_i], getDistance(child_bpidx) * rate));
                             child_log_prob_terms[res_q] = pu_l_q + p_j_given_i_t;
                         }
 
@@ -454,7 +455,6 @@ public class Tree extends IdxTree {
             }
 
         }
-
     }
 
     /**

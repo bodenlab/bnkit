@@ -25,11 +25,23 @@ public class GapSubstModel extends SubstModel {
     final double mu; // deletion rate
     final double lambda; // insertion rate
     final double[][] IRM;
-    final Enumerable OrigAlpha;
-    final double[] OrigF;
+    final Enumerable origAlpha;
+    final double[] origF;
 
     public GapSubstModel deepCopy() {
-        return new GapSubstModel(this.OrigF, this.IRM, this.OrigAlpha, this.mu, this.lambda);
+        return new GapSubstModel(this.origF, this.IRM, this.origAlpha, this.mu, this.lambda);
+    }
+
+    public double[][] getIRM() {
+        return this.IRM;
+    }
+
+    public double[] getOrigF() {
+        return this.origF;
+    }
+
+    public Enumerable getOrigAlpha() {
+        return this.origAlpha;
     }
 
     public GapSubstModel(double[] F, double[][] IRM, Enumerable alphabet, double mu, double lambda)
@@ -41,8 +53,8 @@ public class GapSubstModel extends SubstModel {
         this.lambda = lambda;
         // save these for later in case we need to make a copy
         this.IRM = IRM;
-        this.OrigAlpha = alphabet;
-        this.OrigF = F;
+        this.origAlpha = alphabet;
+        this.origF = F;
 
 
         double[][] R_EPS = new double[F.length + 1][F.length + 1];
