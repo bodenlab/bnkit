@@ -82,6 +82,7 @@ public abstract class SubstModel {
      *                  (i.e. the sum of each row is zero and the matrix is scaled to one expected substitution per unit time)
      */
     public SubstModel(double[] F, double[][] IRM, Enumerable alphabet, boolean symmetric, boolean normalise) {
+
         if (IRM.length != F.length)
             throw new IllegalArgumentException("Invalid size of either IRM or F");
         if (alphabet.size() != F.length)

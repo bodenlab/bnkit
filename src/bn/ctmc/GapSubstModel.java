@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * This is a gap augmented conditional probability table for CTMC
  * based on discrete alphabets. This is based directly on the
- * paper by Eddy and Rivas (https://doi.org/10.1371/journal.pcbi.1000172)
+ * paper by (<a href="https://doi.org/10.1371/journal.pcbi.1000172">Eddy and Rivas, 2008</a>)
  * which describes a non-reversible generative (birth-dirth) evolutionary
  * model for insertions and deletions. Makes the key assumption that
  * indel events occur one residue at a time. When the insertion (lambda) and
@@ -24,38 +24,35 @@ public class GapSubstModel extends SubstModel {
 
     final double mu; // deletion rate
     final double lambda; // insertion rate
-    final double[][] IRM;
-    final Enumerable origAlpha;
-    final double[] origF;
 
-    public GapSubstModel deepCopy() {
-        return new GapSubstModel(this.origF, this.IRM, this.origAlpha, this.mu, this.lambda);
+
+    /**
+     * Makes a copy of a previously generated gap model. Ideally this is used
+     * when FGap and RGap were previously created to account for mu and lambda
+     * and therefore symmetric and normalise should both be false.
+     * @param FGap
+     * @param RGap
+     * @param alphabet
+     * @param mu
+     * @param lambda
+     * @param symmetric
+     * @param normalise
+     */
+    public GapSubstModel(double[] FGap, double[][] RGap, Enumerable alphabet, double mu, double lambda,
+                         boolean symmetric, boolean normalise) {
+        super(FGap, RGap, alphabet, symmetric, normalise);
+        this.mu = mu;
+        this.lambda = lambda;
     }
 
-    public double[][] getIRM() {
-        return this.IRM;
-    }
 
-    public double[] getOrigF() {
-        return this.origF;
-    }
+    public GapSubstModel(double[] F, double[][] IRM, Enumerable alphabet, double mu, double lambda) throws IllegalArgumentException{
 
-    public Enumerable getOrigAlpha() {
-        return this.origAlpha;
-    }
-
-    public GapSubstModel(double[] F, double[][] IRM, Enumerable alphabet, double mu, double lambda)
-            throws IllegalArgumentException{
 
         // perform normal setup
         super(F, IRM, alphabet, true, true);
         this.mu = mu;
         this.lambda = lambda;
-        // save these for later in case we need to make a copy
-        this.IRM = IRM;
-        this.origAlpha = alphabet;
-        this.origF = F;
-
 
         double[][] R_EPS = new double[F.length + 1][F.length + 1];
         int K = alphabet.size();
@@ -88,6 +85,8 @@ public class GapSubstModel extends SubstModel {
         }
         gap_alphabet[alphabet.size()] = '-';
         this.alpha = new Enumerable(gap_alphabet);
+
+        // update F to include gaps
         double[] F_gap = new double[alpha.size()];
         if (mu + lambda < 0) {
             throw new IllegalArgumentException("mu + lambda must be >= 0");
@@ -100,6 +99,7 @@ public class GapSubstModel extends SubstModel {
             }
             // stationary prob for an indel
             F_gap[alpha.size() - 1] = gap_freq;
+
         } else if (mu + lambda == 0) {
             // no indels - zero prob of gaps
             for (int i = 0; i < alpha.size() - 1; i++) {
@@ -110,7 +110,14 @@ public class GapSubstModel extends SubstModel {
             throw new IllegalArgumentException("mu and lambda combination not supported");
         }
         this.F = F_gap;
+    }
 
+    public double getMu() {
+        return this.mu;
+    }
+
+    public double getLambda() {
+        return this.lambda;
     }
 
     @Override

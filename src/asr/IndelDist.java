@@ -1,17 +1,16 @@
 package asr;
 
 import bn.ctmc.GapSubstModel;
+import bn.ctmc.matrix.JTT;
 import bn.ctmc.matrix.JTTGap;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
 import dat.phylo.Tree;
-
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
-
 import asr.ThreadedPeeler.Peeler;
 import smile.math.phylo.AlnLikelihood;
 import smile.math.special.Minimise;
@@ -24,7 +23,6 @@ public class IndelDist {
         HIGH
     }
     public static EnumMap<RATE_CATEGORY, Double[]> MEAN_RATES = new EnumMap<>(RATE_CATEGORY.class);
-    public static Double RATE_PRIOR = Math.log(0.25);
     public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
 
     public static void usage(int error_code, String msg) {
@@ -124,11 +122,12 @@ public class IndelDist {
         MEAN_RATES.put(RATE_CATEGORY.LOW, new Double[]{0.05109101808171236, 0.13936648207205818, 0.2548798168737909, 0.5313293496383602});
         MEAN_RATES.put(RATE_CATEGORY.MEDIUM, new Double[]{0.10822622872656855, 0.3236414936793391, 0.6232831770054337, 1.368582433909853});
         MEAN_RATES.put(RATE_CATEGORY.HIGH, new Double[]{0.11819301147978692, 0.3823224943520077, 0.7695135589733401, 1.7645916247946944} );
-
+        double[] RATE_PRIORS = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
 
         HashMap<String, Object> argParser = parseArgs(args);
 
-        Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
+        Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
+                                                Enumerable.nacid, Enumerable.nacid};
         String ALIGNMENT = getArg(argParser, "ALIGNMENT", String.class);
         String NEWICK = getArg(argParser, "NEWICK", String.class);
         Integer SEED = getArg(argParser, "SEED", Integer.class);
@@ -136,7 +135,8 @@ public class IndelDist {
         String OUTPUT = getArg(argParser, "OUTPUT", String.class);
         String INPUT = getArg(argParser, "INPUT", String.class);
 
-        long totalTime = System.currentTimeMillis();
+
+        long progStart = System.currentTimeMillis();
         Tree tree = null;
         EnumSeq.Alignment<Enumerable> aln = null;
         try {
@@ -152,47 +152,48 @@ public class IndelDist {
         assert aln != null;
 
         double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
-        double[] rate_priors = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
+
         // This will be updated to a gap model later
+        if (!MODELS[MODEL_IDX].equals("JTT")) {
+            throw new IllegalArgumentException(MODELS[MODEL_IDX] + "not implemented yet");
+        }
+
+        Double optimal_mu = null;
+        try {
+            long startOptCalc = System.currentTimeMillis();
+            optimal_mu = optimiseMuLambda(0, 0.5, MODEL_IDX, tree, geometric_seq_len_param, aln);
+            long endOptCalc = System.currentTimeMillis();
+            long OptDuration = endOptCalc - startOptCalc;
+            System.out.println("Model optimisation time: " + OptDuration / 1000 + " s");
+
+        } catch (IllegalArgumentException e) {
+            usage(7, MODELS[MODEL_IDX] + " not supported for gap augmentation");
+        }
+
         GapSubstModel MODEL;
         if (MODELS[MODEL_IDX].equals("JTT")) {
-            MODEL = new JTTGap(0.05, 0.05);
+            MODEL = new JTTGap(optimal_mu, optimal_mu);
         } else {
             throw new IllegalArgumentException(MODELS[MODEL_IDX] + "not implemented yet");
         }
 
-        long modstartTime = System.currentTimeMillis();
-        double optimal_mu = optimiseMuLambda(0, 0.5, MODEL, tree,
-                geometric_seq_len_param, aln, ALPHAS[MODEL_IDX]);
-
-        long modendTime = System.currentTimeMillis();
-        long modduration = modendTime - modstartTime;
-        System.out.println("Optimal model selection execution time: " + modduration / 1000 + " s");
-
-        if (MODELS[MODEL_IDX].equals("JTT")) {
-            MODEL = new JTTGap(optimal_mu, optimal_mu);
-        }
-
-        long startTime = System.currentTimeMillis();
+        long startColCalc = System.currentTimeMillis();
         Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln, MEAN_RATES.get(RATE_CATEGORY.HIGH), geometric_seq_len_param);
-
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-        System.out.println("Execution time: " + duration / 1000 + " s");
+        long endColCalc = System.currentTimeMillis();
+        long colCalcDuration = endColCalc - startColCalc;
+        System.out.println("Column prior calculation time: " + colCalcDuration / 1000 + " s");
 
         double[][] prefix_sums = compute_prefix_sums(columnPriors);
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
-        int[][] segments = assign_segments(columnPriors.length, rate_priors, prefix_sums, rho);
+        int[][] segments = assign_segments(columnPriors.length, RATE_PRIORS, prefix_sums, rho);
 
-
-        long totalTimeend = System.currentTimeMillis();
-        long finaltoal = totalTime - totalTimeend;
-        System.out.println("Total program run time: " + finaltoal / 1000 + " s");
+        long probEnd = System.currentTimeMillis();
+        long totalRunTime = progStart - probEnd;
 
         System.out.println(Arrays.deepToString(segments));
-
+        System.out.println("Total program run time: " + totalRunTime / 1000 + " s");
 
     }
 
@@ -220,7 +221,9 @@ public class IndelDist {
             for (int rate_idx = 0; rate_idx < numRates; ++rate_idx) {
                 double indel_rate = mean_rates[rate_idx];
                 int idx = col_idx * numRates + rate_idx;
-                GapSubstModel model_copy = model.deepCopy();
+                GapSubstModel model_copy = new GapSubstModel(model.getF(), model.getR(), model.getDomain(),
+                                                             model.getMu(), model.getLambda(),
+                                                        false, false);
                 peelers[idx] = new Peeler(tree, aln, indel_rate, model_copy, col_idx, geometric_seq_len_param);
             }
         }
@@ -359,11 +362,22 @@ public class IndelDist {
         return (segment_length - 1) * Math.log(1 - rho) + Math.log(rho);
     }
 
-    public static double optimiseMuLambda(double min_val, double max_val, GapSubstModel model, Tree tree,
-                                          double geometric_seq_len_param, EnumSeq.Alignment<Enumerable> aln,
-                                          Enumerable alpha) {
+    public static double optimiseMuLambda(double min_val, double max_val, int model_idx, Tree tree,
+                                          double geometric_seq_len_param,
+                                          EnumSeq.Alignment<Enumerable> aln) throws IllegalArgumentException {
 
-        AlnLikelihood alnLikelihood = new AlnLikelihood(tree, aln, geometric_seq_len_param, alpha, model);
+        double[] F;
+        double[][] IRM;
+        Enumerable alpha;
+        if (MODELS[model_idx].equals("JTT")) {
+            F = JTT.F;
+            IRM = JTT.Q;
+            alpha = new Enumerable(JTT.S);
+        } else {
+            throw new IllegalArgumentException(MODELS[model_idx] + "not implemented yet");
+        }
+
+        AlnLikelihood alnLikelihood = new AlnLikelihood(tree, aln, geometric_seq_len_param, alpha, F, IRM);
 
         return Minimise.brent(alnLikelihood, min_val, max_val);
     }

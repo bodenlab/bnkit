@@ -526,7 +526,9 @@ public class Tree extends IdxTree {
         Peeler[] peelers = new ThreadedPeeler.Peeler[numCols];
         // first compute each column likelihood
         for (int i = 0; i < numCols; i++) {
-            GapSubstModel model_copy = model.deepCopy(); // copy to avoid race conditions
+            GapSubstModel model_copy = new GapSubstModel(model.getF(), model.getR(), model.getDomain(),
+                    model.getMu(), model.getLambda(),
+                    false, false);// copy to avoid race conditions
             peelers[i] = new Peeler(this, aln, 1.0, model_copy, i, geometricSeqLenParam);
         }
 

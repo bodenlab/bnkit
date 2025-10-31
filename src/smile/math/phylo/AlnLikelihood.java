@@ -12,15 +12,17 @@ public class AlnLikelihood implements Function {
     EnumSeq.Alignment<Enumerable> aln;
     double geometricSeqLenParam;
     Enumerable alpha;
-    GapSubstModel model;
+    double[] F;
+    double[][] IRM;
 
     public AlnLikelihood(Tree tree, EnumSeq.Alignment<Enumerable> aln, double geometricSeqLenParam,
-                         Enumerable alpha, GapSubstModel model) {
+                         Enumerable alpha, double[] F, double[][] IRM) {
         this.tree = tree;
         this.aln = aln;
         this.geometricSeqLenParam = geometricSeqLenParam;
         this.alpha = alpha;
-        this.model = model;
+        this.F = F;
+        this.IRM = IRM;
     }
 
     /**
@@ -32,8 +34,7 @@ public class AlnLikelihood implements Function {
     @Override
     public double f(double mu_lambda) {
 
-        GapSubstModel model = new GapSubstModel(this.model.getOrigF(), this.model.getIRM(),
-                this.model.getOrigAlpha(), mu_lambda, mu_lambda);
+        GapSubstModel model = new GapSubstModel(this.F, this.IRM, this.alpha, mu_lambda, mu_lambda);
 
         // trying to maximise the log likelihood
         return -1 * tree.calcAlnLikelihood(model, aln, geometricSeqLenParam, alpha);
