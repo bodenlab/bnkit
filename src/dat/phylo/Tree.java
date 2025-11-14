@@ -17,6 +17,7 @@
  */
 package dat.phylo;
 
+import asr.IndelDist;
 import asr.Parsimony;
 import asr.ThreadedPeeler;
 import bn.ctmc.GapSubstModel;
@@ -351,7 +352,7 @@ public class Tree extends IdxTree {
      * @param rate the indel rate
      * @param model Gap-augmented substitution matrix
      *
-     *  source:  Rivas & Eddy (2008, <a href="https://doi.org/10.1371/journal.pcbi.1000172">...</a>)
+     * source: <a href="https://doi.org/10.1371/journal.pcbi.1000172"> Rivas & Eddy, 2008</a>
      */
     public void felsensteinsExtendedPeeling(EnumSeq.Alignment<Enumerable> aln, int col_idx, Double[][] Pu_Lk_residue,
                                             Double[] Pu_Lk_gap, Double rate, GapSubstModel model) {
@@ -463,7 +464,7 @@ public class Tree extends IdxTree {
      * @param col_idx
      * @return
      *
-     * source: Rivas & Eddy (2008, <a href="https://doi.org/10.1371/journal.pcbi.1000172">...</a>)
+     * source: <a href="https://doi.org/10.1371/journal.pcbi.1000172">Rivas & Eddy, 2008</a>
      */
     public Double[] containsGaps(EnumSeq.Alignment<Enumerable> aln, int col_idx) {
 
@@ -533,7 +534,7 @@ public class Tree extends IdxTree {
         }
 
         double LL = 0.0;
-        ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, nThreads);
+        ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, IndelDist.NTHREADS);
         try {
             Map<Integer, Peeler> ret = thread_pool.runBatch();
             for (int i = 0; i < numCols; i++) {

@@ -22,8 +22,44 @@ public class IndelDist {
         MEDIUM,
         HIGH
     }
+
+    public enum ERROR {
+        SUCCESS(0, null),
+        SUB_MODEL(1, "Could not find model with ID "),
+        INPUT(2, "Input must be a string"),
+        ALN(3, "Must specify alignment (--aln <Clustal or FASTA file>)"),
+        NWK( 4, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>)"),
+        UNKNOWN(5, "Unknown option or missing required argument: "),
+        MAX_MIN_MU(6, "min-rate and max-rate must be >= 0 and min-rate must be < max-rate"),
+        ASR(7, "Invalid input for ASR: "),
+        IO(8, "Failed to read or write files: "),
+        MODEL_AVAIL(9, " not supported for gap augmentation");
+
+
+
+        private final int code;
+        private final String description;
+
+        ERROR(int code, String description) {
+            this.code = code;
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public int getCode() {
+            return code;
+        }
+
+    }
+
     public static EnumMap<RATE_CATEGORY, Double[]> MEAN_RATES = new EnumMap<>(RATE_CATEGORY.class);
     public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
+    public static int NTHREADS = 4;
+    public static double MIN_MU_LAMBDA_VALUE = 0;
+    public static double MAX_MU_LAMBDA_VALUE = 0;
 
     public static void usage(int error_code, String msg) {
         PrintStream out = System.out;
@@ -38,6 +74,10 @@ public class IndelDist {
                 \t{--seed}
                 \t{-i | --input-folder <folder>}
                 \t{-o | --output-folder <folder>} (default is current working folder, or input folder if available)
+                \t{-t | --threads <number>}
+                \t{-mnr | --min-rate <double>} (The lower search bound when determining optimal insertions/deletion rate in the substitution model)
+                \t{-mxr | --max-rate <double>} (The upper search bound when determining optimal insertions/deletion rate in the substitution model)
+                \t-h (or --help) will print out this screen
                 """
         );
 
@@ -45,6 +85,10 @@ public class IndelDist {
             out.println("\n" + msg + "(Error code " + error_code + ")");
         }
         System.exit(error_code);
+    }
+
+    public static void usage() {
+        usage(ERROR.SUCCESS.getCode(), ERROR.SUCCESS.getDescription());
     }
 
     private static <T> T getArg(HashMap<String, Object> args, String key, Class<T> type) {
@@ -86,7 +130,7 @@ public class IndelDist {
                     }
 
                     if (!model_found) {
-                        usage(1, "Could not find model with ID " + args[a + 1]);
+                        usage(ERROR.SUB_MODEL.getCode(), ERROR.SUB_MODEL.getDescription() + args[a + 1]);
                     }
                 } else if ((arg.equalsIgnoreCase("-seed") && args.length > a+1)) {
                     argMap.put("SEED", Integer.parseInt(args[++a]));
@@ -94,24 +138,49 @@ public class IndelDist {
                     argMap.put("OUTPUT", args[++a]);
                 } else if ((arg.equalsIgnoreCase("-input-folder") || arg.equalsIgnoreCase("i")) && args.length > a + 1) {
                     argMap.put("INPUT", args[++a]);
-                }
+                } else if ((arg.equalsIgnoreCase("-threads") || arg.equalsIgnoreCase("t")) && args.length > a + 1) {
+                    try {
+                        NTHREADS = Integer.parseInt(args[++a]);
+                    } catch (NumberFormatException e) {
+                        System.err.println("Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
+                    }
+                } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
+                    usage();
+                } else if ((arg.equalsIgnoreCase("-min-rate") || arg.equalsIgnoreCase("mnr") && args.length > a + 1)) {
+                    try {
+                        MIN_MU_LAMBDA_VALUE = Double.parseDouble(args[++a]);
+                    } catch (NumberFormatException e) {
+                        System.err.println("Failed to set minimum Mu/Lambda value for option --min-rate: " + args[a] + " is not a valid double");
+                    }
+                } else if ((arg.equalsIgnoreCase("-max-rate") || arg.equalsIgnoreCase("mxr") && args.length > a + 1)) {
+                    try {
+                        MAX_MU_LAMBDA_VALUE = Double.parseDouble(args[++a]);
+                    } catch (NumberFormatException e) {
+                        System.err.println("Failed to set maximum Mu/Lambda value for option --min-rate: " + args[a] + " is not a valid double");
+                    }
+                } else {
+                    usage(ERROR.UNKNOWN.getCode(), ERROR.UNKNOWN.getDescription() + "\" + args[a] + \"");
+            }
+
             }
         }
 
         // now perform checks
         if (argMap.get("ALIGNMENT") == null) {
-            usage(3, "Must specify alignment (--aln <Clustal or FASTA file>)");
+            usage(ERROR.ALN.getCode(), ERROR.ALN.getDescription());
         } else if (argMap.get("NEWICK") == null) {
-            usage(4, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>)");
+            usage(ERROR.NWK.getCode(), ERROR.NWK.getDescription());
         } else if (argMap.get("OUTPUT") == null) {
             String INPUT = null;
             try {
                 INPUT = (String) argMap.get("INPUT");
             } catch (ClassCastException e) {
-                usage(5, "Input must be a string");
+                usage(ERROR.INPUT.getCode(), ERROR.INPUT.getDescription());
             }
 
             argMap.put("OUTPUT", INPUT == null ? "." : INPUT);
+        } else if (MAX_MU_LAMBDA_VALUE <= MIN_MU_LAMBDA_VALUE || MIN_MU_LAMBDA_VALUE < 0.0) {
+            usage(ERROR.MAX_MIN_MU.getCode(), ERROR.MAX_MIN_MU.getDescription());
         }
 
         return argMap;
@@ -144,9 +213,9 @@ public class IndelDist {
             aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
             Utils.checkData(aln, tree);
         } catch (ASRException e) {
-            usage(6, "Invalid input for ASR: " + e.getMessage());
+            usage(ERROR.ASR.getCode(), ERROR.ASR.getDescription() + e.getMessage());
         } catch (IOException e) {
-            usage(2, "Failed to read or write files: " + e.getMessage());
+            usage(ERROR.IO.getCode(), ERROR.IO.getDescription() + e.getMessage());
         }
         assert tree != null;
         assert aln != null;
@@ -155,19 +224,19 @@ public class IndelDist {
 
         // This will be updated to a gap model later
         if (!MODELS[MODEL_IDX].equals("JTT")) {
-            throw new IllegalArgumentException(MODELS[MODEL_IDX] + "not implemented yet");
+            throw new IllegalArgumentException(MODELS[MODEL_IDX] + " not implemented yet");
         }
 
         Double optimal_mu = null;
         try {
             long startOptCalc = System.currentTimeMillis();
-            optimal_mu = optimiseMuLambda(0, 0.5, MODEL_IDX, tree, geometric_seq_len_param, aln);
+            optimal_mu = optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, MODEL_IDX, tree, geometric_seq_len_param, aln);
             long endOptCalc = System.currentTimeMillis();
             long OptDuration = endOptCalc - startOptCalc;
             System.out.println("Model optimisation time: " + OptDuration / 1000 + " s");
 
         } catch (IllegalArgumentException e) {
-            usage(7, MODELS[MODEL_IDX] + " not supported for gap augmentation");
+            usage(ERROR.MODEL_AVAIL.getCode(), MODELS[MODEL_IDX] + ERROR.MODEL_AVAIL.getDescription());
         }
 
         GapSubstModel MODEL;
@@ -213,7 +282,7 @@ public class IndelDist {
 
         int numCols = aln.getWidth();
         int numRates = mean_rates.length;
-        int nThreads = 4;
+        int nThreads = IndelDist.NTHREADS;
         Peeler[] peelers = new Peeler[numCols * numRates];
 
         System.out.println("Computing column priors");
@@ -229,7 +298,7 @@ public class IndelDist {
         }
 
         Double[][] column_priors = new Double[numCols][numRates];
-        ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, nThreads);
+        ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, IndelDist.NTHREADS);
         try {
             Map<Integer, Peeler> ret = thread_pool.runBatch();
             for (int col_idx = 0; col_idx < numCols; ++col_idx) {

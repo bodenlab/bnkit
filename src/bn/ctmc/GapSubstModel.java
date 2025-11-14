@@ -48,45 +48,60 @@ public class GapSubstModel extends SubstModel {
 
     public GapSubstModel(double[] F, double[][] IRM, Enumerable alphabet, double mu, double lambda) throws IllegalArgumentException{
 
-
         // perform normal setup
         super(F, IRM, alphabet, true, true);
         this.mu = mu;
         this.lambda = lambda;
 
+        double[][] R_EPS = constructIndelR();
+        this.R = R_EPS;
+        this.Rexp = new Exp(R_EPS);
+
+        Character[] gap_alphabet = addGapToAlphabet();
+        this.alpha = new Enumerable(gap_alphabet);
+
+        // update F to include gaps
+        this.F = addGapToStationaryFreqs();
+    }
+
+    private double[][] constructIndelR() {
+
         double[][] R_EPS = new double[F.length + 1][F.length + 1];
-        int K = alphabet.size();
+        int K = this.alpha.size();
         // Top-left block: R - μI (substitutions with deletions)
         for (int i = 0; i < K; i++) {
             // Top-right column: μ (deletions to gap)
-            R_EPS[i][K] = mu;
+            R_EPS[i][K] = this.mu;
 
             for (int j = 0; j < K; j++) {
                 R_EPS[i][j] = this.R[i][j];
                 if (i == j) {
-                    R_EPS[i][j] -= mu;
+                    R_EPS[i][j] -= this.mu;
                 }
             }
         }
 
         //  Bottom-left row: λ * π_j (insertions from gap)
         for (int j = 0; j < K; ++j) {
-            R_EPS[K][j] = F[j] * lambda;
+            R_EPS[K][j] = this.F[j] * this.lambda;
         }
-        R_EPS[K][K] = -lambda;
+        R_EPS[K][K] = -this.lambda;
 
-        this.R = R_EPS;
-        this.Rexp = new Exp(R_EPS);
+        return R_EPS;
+    }
 
-        // update the alphabet to have an extra character
-        Character[] gap_alphabet = new Character[alphabet.size() + 1];
-        for (int i = 0; i < alphabet.size(); i++) {
-            gap_alphabet[i] = (Character) alphabet.get(i);
+    private Character[] addGapToAlphabet() {
+        Character[] gap_alphabet = new Character[alpha.size() + 1];
+        for (int i = 0; i < alpha.size(); i++) {
+            gap_alphabet[i] = (Character) alpha.get(i);
         }
-        gap_alphabet[alphabet.size()] = '-';
-        this.alpha = new Enumerable(gap_alphabet);
+        gap_alphabet[alpha.size()] = '-';
 
-        // update F to include gaps
+        return gap_alphabet;
+    }
+
+    private double[] addGapToStationaryFreqs() {
+
         double[] F_gap = new double[alpha.size()];
         if (mu + lambda < 0) {
             throw new IllegalArgumentException("mu + lambda must be >= 0");
@@ -109,8 +124,10 @@ public class GapSubstModel extends SubstModel {
         } else {
             throw new IllegalArgumentException("mu and lambda combination not supported");
         }
-        this.F = F_gap;
+
+        return F_gap;
     }
+
 
     public double getMu() {
         return this.mu;
