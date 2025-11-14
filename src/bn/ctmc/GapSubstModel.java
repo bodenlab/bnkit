@@ -12,7 +12,7 @@ import java.util.Map;
  * This is a gap augmented conditional probability table for CTMC
  * based on discrete alphabets. This is based directly on the
  * paper by (<a href="https://doi.org/10.1371/journal.pcbi.1000172">Eddy and Rivas, 2008</a>)
- * which describes a non-reversible generative (birth-dirth) evolutionary
+ * which describes a non-reversible generative (birth-death) evolutionary
  * model for insertions and deletions. Makes the key assumption that
  * indel events occur one residue at a time. When the insertion (lambda) and
  * deletion (mu) rates are zero, the model will return the same values as the
@@ -25,44 +25,37 @@ public class GapSubstModel extends SubstModel {
     final double mu; // deletion rate
     final double lambda; // insertion rate
 
+    public GapSubstModel(double[] F, double[][] IRM, Enumerable alphabet, double mu, double lambda,
+                         boolean symmetric, boolean normalise, boolean copy) {
 
-    /**
-     * Makes a copy of a previously generated gap model. Ideally this is used
-     * when FGap and RGap were previously created to account for mu and lambda
-     * and therefore symmetric and normalise should both be false.
-     * @param FGap
-     * @param RGap
-     * @param alphabet
-     * @param mu
-     * @param lambda
-     * @param symmetric
-     * @param normalise
-     */
-    public GapSubstModel(double[] FGap, double[][] RGap, Enumerable alphabet, double mu, double lambda,
-                         boolean symmetric, boolean normalise) {
-        super(FGap, RGap, alphabet, symmetric, normalise);
+        super(F, IRM, alphabet, symmetric, normalise);
         this.mu = mu;
         this.lambda = lambda;
+
+        if (!copy) {
+            double[][] R_EPS = constructIndelR();
+            this.R = R_EPS;
+            this.Rexp = new Exp(R_EPS);
+
+            Character[] gap_alphabet = addGapToAlphabet();
+            this.alpha = new Enumerable(gap_alphabet);
+
+            this.F = addGapToStationaryFreqs();
+        }
+
     }
 
 
     public GapSubstModel(double[] F, double[][] IRM, Enumerable alphabet, double mu, double lambda) throws IllegalArgumentException{
-
-        // perform normal setup
-        super(F, IRM, alphabet, true, true);
-        this.mu = mu;
-        this.lambda = lambda;
-
-        double[][] R_EPS = constructIndelR();
-        this.R = R_EPS;
-        this.Rexp = new Exp(R_EPS);
-
-        Character[] gap_alphabet = addGapToAlphabet();
-        this.alpha = new Enumerable(gap_alphabet);
-
-        // update F to include gaps
-        this.F = addGapToStationaryFreqs();
+        this(F, IRM, alphabet, mu, lambda, true, true, false);
     }
+
+
+    public GapSubstModel deepCopy() {
+        return new GapSubstModel(getF().clone(), getR().clone(), getDomain(), mu, lambda, false,
+                false, true);
+    }
+
 
     private double[][] constructIndelR() {
 
@@ -103,6 +96,7 @@ public class GapSubstModel extends SubstModel {
     private double[] addGapToStationaryFreqs() {
 
         double[] F_gap = new double[alpha.size()];
+
         if (mu + lambda < 0) {
             throw new IllegalArgumentException("mu + lambda must be >= 0");
         } else if (mu + lambda > 0) {
@@ -143,11 +137,6 @@ public class GapSubstModel extends SubstModel {
     }
 
     @Override
-    /**
-     * Get probability P(X=x)
-     * @param X
-     * @return
-     */
     public double getProb(Object X) {
 
         // gaps are encoded by nulls in EnumSeq.Gappy<Enumerable>
@@ -255,16 +244,16 @@ public class GapSubstModel extends SubstModel {
         // Stationary probabilities
         System.out.println(JTT.getProb('A'));
         System.out.println(JTT_no_indel.getProb('A'));
-        System.out.println(JTT_Gap.getProb('A') + '\n');
+        System.out.println(JTT_Gap.getProb('A'));
 
         // Conditional probabilities
         System.out.println(JTT.getProb('A', 'Y', 0.5));
         System.out.println(JTT_no_indel.getProb('A', 'Y', 0.5));
-        System.out.println(JTT_Gap.getProb('A', 'Y', 0.5) + '\n');
+        System.out.println(JTT_Gap.getProb('A', 'Y', 0.5));
 
         // Gap probabilities
         System.out.println(JTT_Gap.getProb('-'));
-        System.out.println(JTT_no_indel.getProb('-') + '\n');
+        System.out.println(JTT_no_indel.getProb('-'));
 
         // Gap specific functions
         System.out.println(JTT_Gap.ksi_t(0.05));

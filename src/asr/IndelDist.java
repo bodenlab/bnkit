@@ -290,9 +290,7 @@ public class IndelDist {
             for (int rate_idx = 0; rate_idx < numRates; ++rate_idx) {
                 double indel_rate = mean_rates[rate_idx];
                 int idx = col_idx * numRates + rate_idx;
-                GapSubstModel model_copy = new GapSubstModel(model.getF(), model.getR(), model.getDomain(),
-                                                             model.getMu(), model.getLambda(),
-                                                        false, false);
+                GapSubstModel model_copy = model.deepCopy();
                 peelers[idx] = new Peeler(tree, aln, indel_rate, model_copy, col_idx, geometric_seq_len_param);
             }
         }
