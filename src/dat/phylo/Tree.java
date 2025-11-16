@@ -551,7 +551,6 @@ public class Tree extends IdxTree {
 
 
         int numCols = aln.getWidth();
-        int nThreads = 4;
         Peeler[] peelers = new ThreadedPeeler.Peeler[numCols];
         // first compute each column likelihood
         for (int i = 0; i < numCols; i++) {

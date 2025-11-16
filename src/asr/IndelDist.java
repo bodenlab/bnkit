@@ -17,6 +17,13 @@ import smile.math.special.Minimise;
 
 public class IndelDist {
 
+
+    private static final int SEG_START = 0;
+    private static final int SEG_END = 1;
+    private static final int SEG_RATE = 2;
+    private static final int START = 0;
+    private static final int RATE_ASSIGNED = 1;
+
     public enum RATE_CATEGORY {
         LOW,
         MEDIUM,
@@ -339,7 +346,7 @@ public class IndelDist {
 
     /**
      * Uses dynamic programming to assign segments to the MSA columns. This adapts
-     * the algorithm from Zhai & Alexandre (2017) <a href="https://doi.org/10.1093/sysbio/syx033">...</a>
+     * the algorithm from <a href="https://doi.org/10.1093/sysbio/syx033">Zhai & Alexandre (2017)</a>
      * but column likelihoods are calculated using a gap augmented substitution
      * model.
      *
@@ -352,9 +359,6 @@ public class IndelDist {
     public static int[][] assign_segments(int num_cols, double[] rate_priors,
                                   double[][] prefix_sums, double rho) {
 
-
-        int START = 0;
-        int RATE_ASSIGNED = 1;
         Double[] dp_path = new Double[num_cols + 1];
         Arrays.fill(dp_path, Double.NEGATIVE_INFINITY);
         dp_path[0] = 0.0;
@@ -372,9 +376,11 @@ public class IndelDist {
                 int L = j - i + 1; // segment length
                 for (int k = 0; k < K; k++) {
                     double LL = prefix_sums[j][k] - prefix_sums[i - 1][k]; // prob of this segment at this indel rate
-                    double len_weight = length_prior(L, rho); // longer segments penalised more heavily
-                    double prior = rate_priors[k]; // prior prob of that particular weight category
-                    double score = dp_path[i - 1] + LL + prior + len_weight; // include score from last most likely pos
+                    // longer segments penalised more heavily
+                    double segment_length_penalty = calcSegmentLengthPenalty(L, rho);
+                    double prior_prob_rate = rate_priors[k];
+                    // include score from last most likely pos
+                    double score = dp_path[i - 1] + LL + prior_prob_rate + segment_length_penalty;
                     if (score > best_score) {
                         best_score = score;
                         best_entry[START] = i;
@@ -389,6 +395,13 @@ public class IndelDist {
         }
 
         // perform the backtrace through segments
+        ArrayList<int[]> segments = performBacktrace(num_cols, back_path);
+
+        return reverseSegmentOrder(segments);
+    }
+
+    private static ArrayList<int[]> performBacktrace(int num_cols, int[][] back_path) {
+
         ArrayList<int[]> segments = new ArrayList<>();
         int j = num_cols;
         while (j > 0) {
@@ -398,11 +411,13 @@ public class IndelDist {
             j = i - 1;
         }
 
-        // need to reverse the order
+        return segments;
+    }
+
+    private static int[][] reverseSegmentOrder(ArrayList<int[]> segments) {
+
         int[][] optimal_segments = new int[segments.size()][3];
-        int SEG_START = 0;
-        int SEG_END = 1;
-        int SEG_RATE = 2;
+
         int pos = 0;
         for (int i = segments.size() - 1; i >= 0; i--) {
             int[] segment = segments.get(i);
@@ -414,10 +429,12 @@ public class IndelDist {
         }
 
         return optimal_segments;
+
     }
 
+
     /**
-     * Want to penalise the model for having segements that are too long.
+     * Want to penalise the model for having segments that are too long.
      * Can use a Geometric distribution. Expected value is 1/rho. i.e.
      * seg_len = 1/rho therefore for a segment length of 20 rho = 0.05.
      *
@@ -425,7 +442,7 @@ public class IndelDist {
      * @param rho the geometric sequence length param for a segment.
      * @return
      */
-    public static double length_prior(int segment_length, double rho) {
+    public static double calcSegmentLengthPenalty(int segment_length, double rho) {
         return (segment_length - 1) * Math.log(1 - rho) + Math.log(rho);
     }
 
