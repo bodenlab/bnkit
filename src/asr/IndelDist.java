@@ -23,6 +23,7 @@ public class IndelDist {
     private static final int SEG_RATE = 2;
     private static final int START = 0;
     private static final int RATE_ASSIGNED = 1;
+    private static final int DEFAULT_MODEL = 0;
 
     public enum RATE_CATEGORY {
         LOW,
@@ -217,6 +218,10 @@ public class IndelDist {
         EnumSeq.Alignment<Enumerable> aln = null;
         try {
             tree = Utils.loadTree(NEWICK);
+            if (MODEL_IDX == null) {
+                MODEL_IDX = DEFAULT_MODEL;
+            }
+
             aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
             Utils.checkData(aln, tree);
         } catch (ASRException e) {
@@ -228,7 +233,6 @@ public class IndelDist {
         assert aln != null;
 
         double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
-
         // This will be updated to a gap model later
         if (!MODELS[MODEL_IDX].equals("JTT")) {
             throw new IllegalArgumentException(MODELS[MODEL_IDX] + " not implemented yet");
@@ -259,18 +263,17 @@ public class IndelDist {
         long colCalcDuration = endColCalc - startColCalc;
         System.out.println("Column prior calculation time: " + colCalcDuration / 1000 + " s");
 
-        double[][] prefix_sums = compute_prefix_sums(columnPriors);
+        double[][] prefix_sums = computePrefixSums(columnPriors);
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
-        int[][] segments = assign_segments(columnPriors.length, RATE_PRIORS, prefix_sums, rho);
+        int[][] segments = assignSegments(columnPriors.length, RATE_PRIORS, prefix_sums, rho);
 
         long probEnd = System.currentTimeMillis();
         long totalRunTime = progStart - probEnd;
 
         System.out.println(Arrays.deepToString(segments));
         System.out.println("Total program run time: " + totalRunTime / 1000 + " s");
-
     }
 
 
@@ -289,7 +292,6 @@ public class IndelDist {
 
         int numCols = aln.getWidth();
         int numRates = mean_rates.length;
-        int nThreads = IndelDist.NTHREADS;
         Peeler[] peelers = new Peeler[numCols * numRates];
 
         System.out.println("Computing column priors");
@@ -326,7 +328,7 @@ public class IndelDist {
      * @return an array of (num_cols + 1) x k with the likelihood
      * of observing up to that row with rate k
      */
-    public static double[][] compute_prefix_sums(Double[][] column_likelihoods) {
+    public static double[][] computePrefixSums(Double[][] column_likelihoods) {
 
         int numberOfCols = column_likelihoods.length + 1;
         int numRates = column_likelihoods[0].length;
@@ -356,8 +358,8 @@ public class IndelDist {
      *
      * @return A list of tuples (start, end, rate_category) representing the optimal segmentation of the MSA columns.
      */
-    public static int[][] assign_segments(int num_cols, double[] rate_priors,
-                                  double[][] prefix_sums, double rho) {
+    public static int[][] assignSegments(int num_cols, double[] rate_priors,
+                                         double[][] prefix_sums, double rho) {
 
         Double[] dp_path = new Double[num_cols + 1];
         Arrays.fill(dp_path, Double.NEGATIVE_INFINITY);

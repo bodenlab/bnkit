@@ -406,6 +406,7 @@ public class Tree extends IdxTree {
         Pu_Lk_gap[bpidx] = MathEx.logsumexp(calcLogProbChildrenGivenAncestralGap(bpidx, Pu_Lk_residue,
                 Pu_Lk_gap, rate, model, contains_gaps, alphabet, num_residues));
 
+
         // Equation 20 - now we assume the ancestor is a residue.
         // 1.0 sum(Pu(L_child,q).P(q|-,t)
         for (int parent_res_idx = 0; parent_res_idx < num_residues; parent_res_idx++) {
@@ -468,6 +469,7 @@ public class Tree extends IdxTree {
                 double pu_l_q = Pu_Lk_residue[child_bpidx][child_res_idx];
                 double p_j_given_i_t = Math.log(model.prob_j_given_i_t((Character) alphabet[child_res_idx],
                         (Character) alphabet[res_i], getDistance(child_bpidx) * rate));
+
                 child_log_prob_terms[child_res_idx] = pu_l_q + p_j_given_i_t;
             }
 
@@ -477,6 +479,7 @@ public class Tree extends IdxTree {
             }
 
             double child_log_prob = MathEx.logsumexp(child_log_prob_terms);
+
             children_log_prob_terms[current_child_res] = child_log_prob;
 
             current_child_res++;
@@ -543,7 +546,7 @@ public class Tree extends IdxTree {
      * @param alpha the alphabet
      * @return
      *
-     * source: Rivas & Eddy (2008, <a href="https://doi.org/10.1371/journal.pcbi.1000172">...</a>)
+     * source: <a href="https://doi.org/10.1371/journal.pcbi.1000172">Rivas & Eddy, 2008</a>)
      */
     public double calcAlnLikelihood(GapSubstModel model, EnumSeq.Alignment<Enumerable> aln,
                                     double geometricSeqLenParam, Enumerable alpha) {
