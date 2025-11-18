@@ -17,13 +17,20 @@ import smile.math.special.Minimise;
 
 public class IndelDist {
 
-
     private static final int SEG_START = 0;
     private static final int SEG_END = 1;
     private static final int SEG_RATE = 2;
     private static final int START = 0;
     private static final int RATE_ASSIGNED = 1;
     private static final int DEFAULT_MODEL = 0;
+    public static int NTHREADS = 4;
+    public static double MIN_MU_LAMBDA_VALUE = 0;
+    public static double MAX_MU_LAMBDA_VALUE = 0.5;
+    public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
+    private static final Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
+                                                                 Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
+    private static final double[] RATE_PRIORS = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
+
 
     public enum RATE_CATEGORY {
         LOW,
@@ -31,6 +38,17 @@ public class IndelDist {
         HIGH
     }
 
+    private static final Map<RATE_CATEGORY, Double[]> MEAN_RATES =
+            Map.of(
+                    RATE_CATEGORY.LOW, new Double[]{0.05109101808171236, 0.13936648207205818, 0.2548798168737909, 0.5313293496383602},
+                    RATE_CATEGORY.MEDIUM, new Double[]{0.10822622872656855, 0.3236414936793391, 0.6232831770054337, 1.368582433909853},
+                    RATE_CATEGORY.HIGH, new Double[]{0.11819301147978692, 0.3823224943520077, 0.7695135589733401, 1.7645916247946944}
+            );
+
+
+    /**
+     * Error codes for the program
+     */
     public enum ERROR {
         SUCCESS(0, null),
         SUB_MODEL(1, "Could not find model with ID "),
@@ -42,8 +60,6 @@ public class IndelDist {
         ASR(7, "Invalid input for ASR: "),
         IO(8, "Failed to read or write files: "),
         MODEL_AVAIL(9, " not supported for gap augmentation");
-
-
 
         private final int code;
         private final String description;
@@ -63,11 +79,6 @@ public class IndelDist {
 
     }
 
-    public static EnumMap<RATE_CATEGORY, Double[]> MEAN_RATES = new EnumMap<>(RATE_CATEGORY.class);
-    public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
-    public static int NTHREADS = 4;
-    public static double MIN_MU_LAMBDA_VALUE = 0;
-    public static double MAX_MU_LAMBDA_VALUE = 0;
 
     public static void usage(int error_code, String msg) {
         PrintStream out = System.out;
@@ -114,21 +125,29 @@ public class IndelDist {
 
     }
 
-    public static HashMap<String, Object> parseArgs(String[] args) {
+    public static HashMap<String, Object> createArgMap(String[] args) {
 
         HashMap<String, Object> argMap = new HashMap<>();
 
         argMap.put("SEED", new Random().nextInt());
 
+        parseArgs(args, argMap);
+
+        checkArgsValid(argMap);
+
+        return argMap;
+    }
+
+    private static void parseArgs(String[] args, HashMap<String, Object> argMap) {
         // Read in all the arguments
         for (int a = 0; a < args.length; a++) {
             if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
-                if (((arg.equalsIgnoreCase("-aln")) || (arg.equalsIgnoreCase("a"))) && args.length > a+1) {
+                if (((arg.equalsIgnoreCase("-aln")) || (arg.equalsIgnoreCase("a"))) && args.length > a + 1) {
                     argMap.put("ALIGNMENT", args[++a]);
-                } else if (((arg.equalsIgnoreCase("-nwk")) || (arg.equalsIgnoreCase("n"))) && args.length > a+1) {
+                } else if (((arg.equalsIgnoreCase("-nwk")) || (arg.equalsIgnoreCase("n"))) && args.length > a + 1) {
                     argMap.put("NEWICK", args[++a]);
-                } else if ((arg.equalsIgnoreCase("-substitution-model") || arg.equalsIgnoreCase("s")) && args.length > a+1) {
+                } else if ((arg.equalsIgnoreCase("-substitution-model") || arg.equalsIgnoreCase("s")) && args.length > a + 1) {
                     boolean model_found = false;
                     for (int i = 0; i < MODELS.length; i++) {
                         if (args[a + 1].equalsIgnoreCase(MODELS[i])) {
@@ -140,7 +159,7 @@ public class IndelDist {
                     if (!model_found) {
                         usage(ERROR.SUB_MODEL.getCode(), ERROR.SUB_MODEL.getDescription() + args[a + 1]);
                     }
-                } else if ((arg.equalsIgnoreCase("-seed") && args.length > a+1)) {
+                } else if ((arg.equalsIgnoreCase("-seed") && args.length > a + 1)) {
                     argMap.put("SEED", Integer.parseInt(args[++a]));
                 } else if ((arg.equalsIgnoreCase("-output-folder") || arg.equalsIgnoreCase("o")) && args.length > a + 1) {
                     argMap.put("OUTPUT", args[++a]);
@@ -168,12 +187,13 @@ public class IndelDist {
                     }
                 } else {
                     usage(ERROR.UNKNOWN.getCode(), ERROR.UNKNOWN.getDescription() + "\" + args[a] + \"");
-            }
-
+                }
             }
         }
+    }
 
-        // now perform checks
+    private static void checkArgsValid(HashMap<String, Object> argMap) {
+
         if (argMap.get("ALIGNMENT") == null) {
             usage(ERROR.ALN.getCode(), ERROR.ALN.getDescription());
         } else if (argMap.get("NEWICK") == null) {
@@ -190,21 +210,14 @@ public class IndelDist {
         } else if (MAX_MU_LAMBDA_VALUE <= MIN_MU_LAMBDA_VALUE || MIN_MU_LAMBDA_VALUE < 0.0) {
             usage(ERROR.MAX_MIN_MU.getCode(), ERROR.MAX_MIN_MU.getDescription());
         }
-
-        return argMap;
     }
 
 
-    public static void main(String[] args) {
-        MEAN_RATES.put(RATE_CATEGORY.LOW, new Double[]{0.05109101808171236, 0.13936648207205818, 0.2548798168737909, 0.5313293496383602});
-        MEAN_RATES.put(RATE_CATEGORY.MEDIUM, new Double[]{0.10822622872656855, 0.3236414936793391, 0.6232831770054337, 1.368582433909853});
-        MEAN_RATES.put(RATE_CATEGORY.HIGH, new Double[]{0.11819301147978692, 0.3823224943520077, 0.7695135589733401, 1.7645916247946944} );
-        double[] RATE_PRIORS = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
 
-        HashMap<String, Object> argParser = parseArgs(args);
+        HashMap<String, Object> argParser = createArgMap(args);
 
-        Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
-                                                Enumerable.nacid, Enumerable.nacid};
+
         String ALIGNMENT = getArg(argParser, "ALIGNMENT", String.class);
         String NEWICK = getArg(argParser, "NEWICK", String.class);
         Integer SEED = getArg(argParser, "SEED", Integer.class);
@@ -232,19 +245,19 @@ public class IndelDist {
         assert tree != null;
         assert aln != null;
 
-        double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
-        // This will be updated to a gap model later
-        if (!MODELS[MODEL_IDX].equals("JTT")) {
+
+        if (!MODELS[MODEL_IDX].equals("JTT") || !MODELS[MODEL_IDX].equals("JC")) {
             throw new IllegalArgumentException(MODELS[MODEL_IDX] + " not implemented yet");
         }
 
-        Double optimal_mu = null;
+        double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
+        double optimal_mu = 0.0;
         try {
             long startOptCalc = System.currentTimeMillis();
             optimal_mu = optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, MODEL_IDX, tree, geometric_seq_len_param, aln);
             long endOptCalc = System.currentTimeMillis();
             long OptDuration = endOptCalc - startOptCalc;
-            System.out.println("Model optimisation time: " + OptDuration / 1000 + " s");
+            System.out.println("Gap augmented substitution model optimisation time: " + OptDuration / 1000 + " s");
 
         } catch (IllegalArgumentException e) {
             usage(ERROR.MODEL_AVAIL.getCode(), MODELS[MODEL_IDX] + ERROR.MODEL_AVAIL.getDescription());
@@ -257,21 +270,33 @@ public class IndelDist {
             throw new IllegalArgumentException(MODELS[MODEL_IDX] + "not implemented yet");
         }
 
+        System.out.println("Computing column priors under different rate categories...");
         long startColCalc = System.currentTimeMillis();
         Double[][] columnPriors = computeColumnPriors(MODEL, tree, aln, MEAN_RATES.get(RATE_CATEGORY.HIGH), geometric_seq_len_param);
-        long endColCalc = System.currentTimeMillis();
-        long colCalcDuration = endColCalc - startColCalc;
+        long colCalcDuration = System.currentTimeMillis() - startColCalc;
+
         System.out.println("Column prior calculation time: " + colCalcDuration / 1000 + " s");
 
+
+        System.out.println("Computing prefix sums for segment assignment...");
+        long startPrefixTime = System.currentTimeMillis();
         double[][] prefix_sums = computePrefixSums(columnPriors);
+        long prefixDuration = System.currentTimeMillis() - startPrefixTime;
+        System.out.println("Prefix sum calculation time: " + prefixDuration / 1000 + " s");
+
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
+        System.out.println("Assigning optimal rate segments...");
+        long startSegAssign = System.currentTimeMillis();
         int[][] segments = assignSegments(columnPriors.length, RATE_PRIORS, prefix_sums, rho);
+        long segAssignDuration = System.currentTimeMillis() - startSegAssign;
+        System.out.println("Segment assignment time: " + segAssignDuration / 1000 + " s");
 
         long probEnd = System.currentTimeMillis();
         long totalRunTime = progStart - probEnd;
 
+        System.out.println("Optimal indel rate segments (start, end, rate_category):");
         System.out.println(Arrays.deepToString(segments));
         System.out.println("Total program run time: " + totalRunTime / 1000 + " s");
     }
@@ -292,9 +317,19 @@ public class IndelDist {
 
         int numCols = aln.getWidth();
         int numRates = mean_rates.length;
+        Peeler[] peelers = createPeelingJobs(aln, numCols, numRates, mean_rates, model, tree, geometric_seq_len_param);
+
+        Double[][] column_priors = runPeelingJobs(peelers, numCols, numRates);
+
+        return column_priors;
+    }
+
+    private static Peeler[] createPeelingJobs(EnumSeq.Alignment<Enumerable> aln, int numCols, int numRates,
+                                                Double[] mean_rates, GapSubstModel model, Tree tree,
+                                                double geometric_seq_len_param) {
+
         Peeler[] peelers = new Peeler[numCols * numRates];
 
-        System.out.println("Computing column priors");
         for (int col_idx = 0; col_idx < numCols; ++col_idx) {
             for (int rate_idx = 0; rate_idx < numRates; ++rate_idx) {
                 double indel_rate = mean_rates[rate_idx];
@@ -303,6 +338,20 @@ public class IndelDist {
                 peelers[idx] = new Peeler(tree, aln, indel_rate, model_copy, col_idx, geometric_seq_len_param);
             }
         }
+
+        return peelers;
+    }
+
+
+    /**
+     * Runs the peeling jobs in parallel using a thread pool.
+     *
+     * @param peelers array of peeling jobs to run
+     * @param numCols number of columns
+     * @param numRates number of rates
+     * @return matrix of shape (numCols, numRates) with the likelihoods of each column under each rate
+     */
+    private static Double[][] runPeelingJobs(Peeler[] peelers, int numCols, int numRates) {
 
         Double[][] column_priors = new Double[numCols][numRates];
         ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, IndelDist.NTHREADS);
@@ -317,6 +366,7 @@ public class IndelDist {
             }
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
+            throw new RuntimeException("Failed to run peeling jobs");
         }
 
         return column_priors;
@@ -379,7 +429,7 @@ public class IndelDist {
                 for (int k = 0; k < K; k++) {
                     double LL = prefix_sums[j][k] - prefix_sums[i - 1][k]; // prob of this segment at this indel rate
                     // longer segments penalised more heavily
-                    double segment_length_penalty = calcSegmentLengthPenalty(L, rho);
+                    double segment_length_penalty = calcLogSegmentLengthPenalty(L, rho);
                     double prior_prob_rate = rate_priors[k];
                     // include score from last most likely pos
                     double score = dp_path[i - 1] + LL + prior_prob_rate + segment_length_penalty;
@@ -402,6 +452,12 @@ public class IndelDist {
         return reverseSegmentOrder(segments);
     }
 
+    /**
+     * Perform backtrace through the dynamic programming table to get the segments.
+     * @param num_cols number of columns
+     * @param back_path the back path table
+     * @return list of segments from backtrace with data organised as (start, end, rate_assigned) zero-indexed
+     */
     private static ArrayList<int[]> performBacktrace(int num_cols, int[][] back_path) {
 
         ArrayList<int[]> segments = new ArrayList<>();
@@ -416,6 +472,12 @@ public class IndelDist {
         return segments;
     }
 
+    /**
+     * Because the backtrace goes from the end to the start, need to
+     * reverse the order of the segments.
+     * @param segments list of segments from backtrace
+     * @return 2D array of segments in correct order
+     */
     private static int[][] reverseSegmentOrder(ArrayList<int[]> segments) {
 
         int[][] optimal_segments = new int[segments.size()][3];
@@ -442,12 +504,25 @@ public class IndelDist {
      *
      * @param segment_length the length of the indel rate segment
      * @param rho the geometric sequence length param for a segment.
-     * @return
+     * @return the log penalty for a segment of this length
      */
-    public static double calcSegmentLengthPenalty(int segment_length, double rho) {
+    public static double calcLogSegmentLengthPenalty(int segment_length, double rho) {
         return (segment_length - 1) * Math.log(1 - rho) + Math.log(rho);
     }
 
+    /**
+     * Optimises mu and lambda (insertion and deletion rates) assuming they are equal. Uses Brent's method to find
+     * the optimal value that maximises the likelihood of the alignment given the tree. The likelihood is calculated
+     * according to equation 29 in <a href="https://doi.org/10.1371/journal.pcbi.1000172"> Rivas & Eddy, 2008</a>
+     * @param min_val smallest value to search
+     * @param max_val largest value to search
+     * @param model_idx index of the substitution model to use
+     * @param tree phylogenetic tree
+     * @param geometric_seq_len_param geometric sequence length param for the alignment
+     * @param aln the alignment
+     * @return the optimal mu and lambda value
+     * @throws IllegalArgumentException if the model is not supported
+     */
     public static double optimiseMuLambda(double min_val, double max_val, int model_idx, Tree tree,
                                           double geometric_seq_len_param,
                                           EnumSeq.Alignment<Enumerable> aln) throws IllegalArgumentException {

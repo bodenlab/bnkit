@@ -5,17 +5,14 @@ import bn.ctmc.matrix.JTTGap;
 import dat.Enumerable;
 import bn.math.Matrix.Exp;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * This is a gap augmented conditional probability table for CTMC
  * based on discrete alphabets. This is based directly on the
- * paper by (<a href="https://doi.org/10.1371/journal.pcbi.1000172">Eddy and Rivas, 2008</a>)
+ * paper by <a href="https://doi.org/10.1371/journal.pcbi.1000172">Eddy and Rivas, 2008</a>,
  * which describes a non-reversible generative (birth-death) evolutionary
  * model for insertions and deletions. Makes the key assumption that
- * indel events occur one residue at a time. When the insertion (lambda) and
- * deletion (mu) rates are zero, the model will return the same values as the
+ * indel events occur one residue at a time. When the insertion (λ) and
+ * deletion (μ) rates are zero, the model will return the same values as the
  * standard CTMC table.
  *
  * @author Sebastian
@@ -42,7 +39,6 @@ public class GapSubstModel extends SubstModel {
 
             this.F = addGapToStationaryFreqs();
         }
-
     }
 
 
@@ -57,16 +53,21 @@ public class GapSubstModel extends SubstModel {
     }
 
 
+    /**
+     * Constructs the indel augmented rate matrix R_EPS
+     * as per Eddy & Rivas (2008).
+     * @return a double array of shape (numChars + 1) x (numChars + 1) to account for gaps
+     */
     private double[][] constructIndelR() {
 
         double[][] R_EPS = new double[F.length + 1][F.length + 1];
-        int K = this.alpha.size();
-        // Top-left block: R - μI (substitutions with deletions)
-        for (int i = 0; i < K; i++) {
-            // Top-right column: μ (deletions to gap)
-            R_EPS[i][K] = this.mu;
+        int numChars = this.alpha.size();
+        // Applies R - μI (substitutions with deletions)
+        for (int i = 0; i < numChars; i++) {
+            // last column all μ (deletions to gap)
+            R_EPS[i][numChars] = this.mu;
 
-            for (int j = 0; j < K; j++) {
+            for (int j = 0; j < numChars; j++) {
                 R_EPS[i][j] = this.R[i][j];
                 if (i == j) {
                     R_EPS[i][j] -= this.mu;
@@ -74,52 +75,62 @@ public class GapSubstModel extends SubstModel {
             }
         }
 
-        //  Bottom-left row: λ * π_j (insertions from gap)
-        for (int j = 0; j < K; ++j) {
-            R_EPS[K][j] = this.F[j] * this.lambda;
+        //  Bottom row: λ * π_j (insertions from gap)
+        for (int j = 0; j < numChars; ++j) {
+            R_EPS[numChars][j] = this.F[j] * this.lambda;
         }
-        R_EPS[K][K] = -this.lambda;
+        // sums row to zero
+        R_EPS[numChars][numChars] = -this.lambda;
 
         return R_EPS;
     }
 
+    /**
+     * Adds gap character to the alphabet
+     * @return Character array with gap added
+     */
     private Character[] addGapToAlphabet() {
-        Character[] gap_alphabet = new Character[alpha.size() + 1];
+        Character[] gapAlphabet = new Character[alpha.size() + 1];
         for (int i = 0; i < alpha.size(); i++) {
-            gap_alphabet[i] = (Character) alpha.get(i);
+            gapAlphabet[i] = (Character) alpha.get(i);
         }
-        gap_alphabet[alpha.size()] = '-';
+        gapAlphabet[alpha.size()] = '-';
 
-        return gap_alphabet;
+        return gapAlphabet;
     }
 
+    /**
+     * Adjusts stationary frequencies to account for gaps
+     *
+     *  @return array of modified stationary frequencies with gap stationary frequency added
+     */
     private double[] addGapToStationaryFreqs() {
 
-        double[] F_gap = new double[alpha.size()];
+        double[] fGap = new double[alpha.size()];
 
         if (mu + lambda < 0) {
             throw new IllegalArgumentException("mu + lambda must be >= 0");
         } else if (mu + lambda > 0) {
             // need to adjust stationary freqs by deletion ratio
             // first just adjust real letters
-            double gap_freq = mu / (mu + lambda);
+            double gapFreq = mu / (mu + lambda);
             for (int i = 0; i < alpha.size() - 1; i++) {
-                F_gap[i] = (1 - gap_freq) * F[i];
+                fGap[i] = (1 - gapFreq) * F[i];
             }
             // stationary prob for an indel
-            F_gap[alpha.size() - 1] = gap_freq;
+            fGap[alpha.size() - 1] = gapFreq;
 
         } else if (mu + lambda == 0) {
             // no indels - zero prob of gaps
             for (int i = 0; i < alpha.size() - 1; i++) {
-                F_gap[i] = F[i];
+                fGap[i] = F[i];
             }
-            F_gap[alpha.size() - 1] = 0.0;
+            fGap[alpha.size() - 1] = 0.0;
         } else {
             throw new IllegalArgumentException("mu and lambda combination not supported");
         }
 
-        return F_gap;
+        return fGap;
     }
 
 
@@ -157,15 +168,15 @@ public class GapSubstModel extends SubstModel {
      * @param t branch length
      * @return probability of deletion
      */
-    public double gamma_t(double t) {
+    public double gammaT(double time) {
         if (this.mu == 0 && this.lambda == 0) {
             return 0.0;
         }
 
-        double deletion_prop = this.mu / (this.mu + this.lambda);
-        double indel_prop = 1 - Math.exp(-((this.mu + this.lambda) * t));
+        double deletionProp = this.mu / (this.mu + this.lambda);
+        double indelProp = 1 - Math.exp(-((this.mu + this.lambda) * time));
 
-        return deletion_prop * indel_prop;
+        return deletionProp * indelProp;
     }
 
     /**
@@ -173,17 +184,17 @@ public class GapSubstModel extends SubstModel {
      * no insertions or deletions (mu=lambda=0) the function
      * is defined as zero.
      * (Eddy & Rivas, 2008) - Equation 6
-     * @param t branch length
+     * @param time branch length
      * @return probability of insertion
      */
-    public double ksi_t(double t) {
+    public double ksiT(double time) {
         if (this.mu == 0 && this.lambda == 0) {
             return 0.0;
         }
-        double insertion_rate = this.lambda / (this.mu + this.lambda);
-        double indel_prop = 1 - Math.exp(-((this.mu + this.lambda) * t));
+        double insertionRate = this.lambda / (this.mu + this.lambda);
+        double indelProp = 1 - Math.exp(-((this.mu + this.lambda) * time));
 
-        return insertion_rate * indel_prop;
+        return insertionRate * indelProp;
     }
 
     /**
@@ -191,16 +202,16 @@ public class GapSubstModel extends SubstModel {
      * for a particular branch length, t. Re-weights the probability based on
      * observing this residue given it is not an insertion.
      * (Eddy & Rivas, 2008) - Equation 22: P(x|y,t) = (1 - ksi) * P(x|y)
-     * @param child_x child state
-     * @param parent_y parent state
-     * @param t branch length
+     * @param child child state
+     * @param parent parent state
+     * @param time branch length
      * @return P(x|y,t)
      */
-    public double prob_j_given_i_t(Character child_x, Character parent_y, double t) {
-        double prob_no_insertion = 1 - ksi_t(t);
-        double prob_j_given_i = getProb(child_x, parent_y, t);
+    public double getProbGapAugmented(Character child, Character parent, double time) {
+        double probNoInsertion = 1 - ksiT(time);
+        double conditionalProb = getProb(child, parent, time);
 
-        return prob_j_given_i * prob_no_insertion;
+        return conditionalProb * probNoInsertion;
     }
 
     /**
@@ -211,11 +222,11 @@ public class GapSubstModel extends SubstModel {
      * @param t branch length
      * @return P(-| i, t)
      */
-    public double prob_gap_given_i_t(double t) {
-        double prob_no_insertion = 1 - ksi_t(t);
-        double prob_deletion = gamma_t(t);
+    public double getProbOfGap(double t) {
+        double probNoInsertion = 1 - ksiT(t);
+        double probDeletion = gammaT(t);
 
-        return prob_no_insertion * prob_deletion;
+        return probNoInsertion * probDeletion;
     }
 
     /**
@@ -228,12 +239,12 @@ public class GapSubstModel extends SubstModel {
      * @param state residue character
      * @return  P(j| -, t)
      */
-    public double prob_j_given_gap_t(double t, Object state) {
+    public double getProbOfInsertion(double time, Object state) {
 
-        double insertion_prob = ksi_t(t);
-        double stationary_freq_residue = getProb(state);
+        double insertionProb = ksiT(time);
+        double stationaryFreqResidue = getProb(state);
 
-        return insertion_prob * stationary_freq_residue;
+        return insertionProb * stationaryFreqResidue;
     }
 
     public static void main(String[] argv) {
@@ -256,11 +267,11 @@ public class GapSubstModel extends SubstModel {
         System.out.println(JTT_no_indel.getProb('-'));
 
         // Gap specific functions
-        System.out.println(JTT_Gap.ksi_t(0.05));
-        System.out.println(JTT_Gap.gamma_t(0.05));
-        System.out.println(JTT_Gap.prob_gap_given_i_t(0.05));
-        System.out.println(JTT_Gap.prob_j_given_gap_t(0.05, 'A'));
-        System.out.println(JTT_Gap.prob_gap_given_i_t(0.05));
+        System.out.println(JTT_Gap.ksiT(0.05));
+        System.out.println(JTT_Gap.gammaT(0.05));
+        System.out.println(JTT_Gap.getProbOfGap(0.05));
+        System.out.println(JTT_Gap.getProbOfInsertion(0.05, 'A'));
+        System.out.println(JTT_Gap.getProbOfGap(0.05));
     }
 }
 
