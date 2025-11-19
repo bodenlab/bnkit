@@ -1,6 +1,7 @@
 package asr;
 
 import bn.ctmc.GapSubstModel;
+import bn.ctmc.matrix.JC;
 import bn.ctmc.matrix.JTT;
 import bn.ctmc.matrix.JTTGap;
 import dat.EnumSeq;
@@ -12,7 +13,7 @@ import java.io.PrintStream;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import asr.ThreadedPeeler.Peeler;
-import smile.math.phylo.AlnLikelihood;
+import smile.math.Function;
 import smile.math.special.Minimise;
 
 public class IndelDist {
@@ -496,7 +497,6 @@ public class IndelDist {
 
     }
 
-
     /**
      * Want to penalise the model for having segments that are too long.
      * Can use a Geometric distribution. Expected value is 1/rho. i.e.
@@ -518,13 +518,13 @@ public class IndelDist {
      * @param max_val largest value to search
      * @param model_idx index of the substitution model to use
      * @param tree phylogenetic tree
-     * @param geometric_seq_len_param geometric sequence length param for the alignment
+     * @param geometricSeqLenParam geometric sequence length param for the alignment
      * @param aln the alignment
      * @return the optimal mu and lambda value
      * @throws IllegalArgumentException if the model is not supported
      */
     public static double optimiseMuLambda(double min_val, double max_val, int model_idx, Tree tree,
-                                          double geometric_seq_len_param,
+                                          double geometricSeqLenParam,
                                           EnumSeq.Alignment<Enumerable> aln) throws IllegalArgumentException {
 
         double[] F;
@@ -534,12 +534,55 @@ public class IndelDist {
             F = JTT.F;
             IRM = JTT.Q;
             alpha = new Enumerable(JTT.S);
+        } else if (MODELS[model_idx].equals("JC")) {
+            F = JC.F(JC.S.length);
+            IRM = JC.Q(1, JC.S.length);
+            alpha = new Enumerable(JC.S);
         } else {
             throw new IllegalArgumentException(MODELS[model_idx] + "not implemented yet");
         }
 
-        AlnLikelihood alnLikelihood = new AlnLikelihood(tree, aln, geometric_seq_len_param, alpha, F, IRM);
+        AlnLikelihood alnLikelihood = new AlnLikelihood(tree, aln, F, IRM, alpha, geometricSeqLenParam);
 
         return Minimise.brent(alnLikelihood, min_val, max_val);
+    }
+
+    /**
+     * Function to calculate the likelihood of an alignment given a tree and gap augmented substitution model.
+     */
+    public static class AlnLikelihood implements Function {
+
+        double[] F;
+        double[][] IRM;
+        Enumerable alpha;
+        Tree tree;
+        EnumSeq.Alignment<Enumerable> aln;
+        double geometricSeqLenParam;
+
+        public AlnLikelihood(Tree tree, EnumSeq.Alignment<Enumerable> aln, double[] F, double[][] IRM,
+                             Enumerable alpha, double geometricSeqLenParam) {
+            this.tree = tree;
+            this.aln = aln;
+            this.geometricSeqLenParam = geometricSeqLenParam;
+            this.F = F;
+            this.IRM = IRM;
+            this.alpha = alpha;
+        }
+
+        /**
+         * Get the log likelihood of a particular alignment given the tree and gap augmented substitution model.
+         * This is used by a minimisation routine to find optimal params for the substitution model.
+         * @param muLambda Assumes mu (deletion rate) and lambda (insertion rate) are equal
+         * @return likelihood of the alignment given the tree + mu + lambda.
+         */
+        @Override
+        public double f(double muLambda) {
+
+            GapSubstModel newModel = new GapSubstModel(this.F, this.IRM, this.alpha, muLambda, muLambda);
+
+            // trying to maximise the log likelihood
+            return -1 * ThreadedPeeler.calcProbAlnGivenTree(tree, newModel, aln, geometricSeqLenParam,
+                                                            alpha, NTHREADS);
+        }
     }
 }

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static asr.ThreadedPeeler.logProbColGivenRate;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -138,7 +139,7 @@ public class IndelDistTest {
 
         GapSubstModel MODEL = new JCGap(0.05, 0.05);
         double geometric_seq_len_param = (double) 1/ 400; // average seq length 400
-        double prob = tree.logProbColGivenRate(aln, 1.0, MODEL, 0, geometric_seq_len_param);
+        double prob = logProbColGivenRate(tree, aln, 1.0, MODEL, 0, geometric_seq_len_param);
         // expected value calculated by hand
         assertEquals(-13.465945445655642, prob, 1e-5);
 
@@ -158,7 +159,7 @@ public class IndelDistTest {
         GapSubstModel MODEL = new JCGap(0.05, 0.05);
 
         double geometric_seq_len_param = (double) 1/ 400; // average seq length 400
-        double prob = tree.logProbColGivenRate(aln, 1.0, MODEL, 0, geometric_seq_len_param);
+        double prob = logProbColGivenRate(tree, aln, 1.0, MODEL, 0, geometric_seq_len_param);
         // expected value calculated by hand
         assertEquals(-12.5800651892681382, prob, 1e-5);
 

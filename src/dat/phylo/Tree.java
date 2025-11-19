@@ -17,9 +17,7 @@
  */
 package dat.phylo;
 
-import asr.IndelDist;
 import asr.Parsimony;
-import asr.ThreadedPeeler;
 import bn.ctmc.GapSubstModel;
 import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
@@ -29,11 +27,8 @@ import dat.Enumerable;
 import dat.file.Newick;
 import smile.math.MathEx;
 import stats.RateModel;
-import asr.ThreadedPeeler.Peeler;
-
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Class to represent a single phylogenetic tree, refactored from old PhyloTree (now deprecated).
@@ -289,60 +284,6 @@ public class Tree extends IdxTree {
     }
 
     /**
-     *  Calculate the total probability of a given aligned
-     *  column u i.e. P(u|Tree, Model, SeqLenParam). Uses Felsenstein's
-     *  adapted pruning algorithm before extracting the probability of the root
-     *  node. All possible residue assignments are summed over and also weighted
-     *  by the geometric sequence length parameter (assumed to be the average sequence
-     *  length of the alignment). Refer to <a href="https://doi.org/10.1371/journal.pcbi.1000172">Rivas & Eddy (2008)</a>)
-     *  for a description of Felsenstein's peeling algorithm extended to gaps.
-     *
-     * @param aln the alignment
-     * @param rate the indel rate
-     * @param model Gap-augmented substitution matrix
-     * @param colIdx zero-indexed column position
-     * @param geometricSeqLenParam the geometric sequence length parameter
-     * @return log (P(alignment col |Tree, Model, SeqLenParam))
-     */
-    public double logProbColGivenRate(EnumSeq.Alignment<Enumerable> aln, Double rate, GapSubstModel model,
-                                      int colIdx, double geometricSeqLenParam) {
-
-
-        int totalNodes = getNLeaves() + getNParents();
-        int alphabetSize = model.getDomain().size() - 1; // ignore gaps
-        Object[] alphabet = model.getDomain().getValues();
-        Double[][] nodeResidueProbs = new Double[totalNodes][alphabetSize]; // nodes x num_letters
-        Double[]nodeGapProbs = new Double[totalNodes];
-
-        // instantiate with negative infinity for subsequent log sum calculations
-        for (int i = 0; i < totalNodes; i++) {
-            Arrays.fill(nodeResidueProbs[i], Double.NEGATIVE_INFINITY);
-            nodeGapProbs[i] = Double.NEGATIVE_INFINITY;
-        }
-        // update the nodeResidueProbs and nodeGapProbs arrays in place
-        this.felsensteinsExtendedPeeling(aln, colIdx, nodeResidueProbs, nodeGapProbs, rate, model);
-
-
-        int ROOT_INDEX = 0;
-        double rootGapProb = nodeGapProbs[ROOT_INDEX];
-
-        // sum over possible residue assignments
-        double[] residueTerms = new double[alphabetSize]; // number of alphabet letters
-        for (int resIdx = 0; resIdx < alphabetSize; resIdx++) {
-            double priorProb = Math.log(model.getProb(alphabet[resIdx]));
-            double rootResidueProb = nodeResidueProbs[ROOT_INDEX][resIdx];
-            residueTerms[resIdx] = priorProb + rootResidueProb; // weight by prior prob of residue
-        }
-
-        // combine all the terms together
-        double weightedLogSumResidueProb = MathEx.logsumexp(residueTerms) + Math.log(geometricSeqLenParam);
-        double[] finalColTerms = {rootGapProb, weightedLogSumResidueProb};
-
-        return MathEx.logsumexp(finalColTerms);
-    }
-
-
-    /**
      * Felsenstein's peeling algorithm extended to handle gaps. Described in
      * <a href="https://doi.org/10.1371/journal.pcbi.1000172"> Rivas & Eddy, 2008</a>.
      *
@@ -583,111 +524,6 @@ public class Tree extends IdxTree {
         }
 
         return containsGap;
-    }
-
-
-    /**
-     * Get the log likelihood of a particular alignment given the tree and gap augmented substitution model.
-     * source: <a href="https://doi.org/10.1371/journal.pcbi.1000172">Rivas & Eddy, 2008</a>
-     *
-     * @param model the substitution model
-     * @param aln the alignment
-     * @param geometricSeqLenParam the geometric sequence length parameter
-     * @param alpha the alphabet
-     *
-     * @return the log likelihood of the alignment given the tree and model
-     */
-    public double calcAlnLikelihood(GapSubstModel model, EnumSeq.Alignment<Enumerable> aln,
-                                    double geometricSeqLenParam, Enumerable alpha) {
-
-
-
-        int numCols = aln.getWidth();
-        Peeler[] peelers = new ThreadedPeeler.Peeler[numCols];
-        // first compute each column likelihood
-        for (int i = 0; i < numCols; i++) {
-            GapSubstModel model_copy = model.deepCopy(); // copy to avoid race conditions
-            peelers[i] = new Peeler(this, aln, 1.0, model_copy, i, geometricSeqLenParam);
-        }
-
-        double LL = 0.0;
-        ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, IndelDist.NTHREADS);
-        try {
-            Map<Integer, Peeler> ret = thread_pool.runBatch();
-            for (int i = 0; i < numCols; i++) {
-                Peeler peeler = ret.get(i);
-                LL += peeler.getDecoration(); // add each column likelihood
-            }
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }
-
-        double p_star_given_t_r_p = probExtraCol(model, geometricSeqLenParam); // add the normalisation term
-
-        // need to create a dummy aln containing only gaps
-        List<EnumSeq.Gappy<Enumerable>> seqarr = new ArrayList<>();
-        for (int i = 0; i < aln.getHeight(); i++) {
-            EnumSeq<Enumerable> seq = aln.getEnumSeq(i);
-            EnumSeq.Gappy<Enumerable> gap_copy = new EnumSeq.Gappy<>(alpha);
-            gap_copy.set(new Character[1]); // add an empty column
-            gap_copy.setName(seq.getName());
-            seqarr.add(gap_copy);
-        }
-
-        EnumSeq.Alignment<Enumerable> gap_aln = new EnumSeq.Alignment<>(seqarr);
-        //  Normalisation: log P★ - log(1 - P(col_gap))
-        double gap_prob = logProbColGivenRate(gap_aln, 1.0, model, 0, geometricSeqLenParam);
-        double unobserved_term = MathEx.logm1exp(gap_prob);
-
-        double norm_term = p_star_given_t_r_p - unobserved_term;
-
-        return norm_term + LL;
-    }
-
-    /**
-     * This is used for normalisation of the overall column likelihood.
-     * "the factorization in columns of the unconditional length
-     * alignment distribution leaves some normalization terms that we
-     * gather together into what we think of as an “extra column” (★)
-     * contribution. Thus, when calculating the total probability of a
-     * multiple alignment as the product of l individual columns,
-     * there is an additional term in the equation."
-     *
-     * source: <a href="https://doi.org/10.1371/journal.pcbi.1000172">Rivas & Eddy, 2008</a>
-     *
-     * @return normalisation term for the alignment
-     */
-    public double probExtraCol(GapSubstModel model, double geometricSeqLenParam) {
-
-
-        int nNodes = getNLeaves() + getNParents();
-
-        // First calculate the likelihood of an all gap column
-        double[] p_star = new double[nNodes];
-        Arrays.fill(p_star,  Double.NEGATIVE_INFINITY);
-        for (int bpidx = nNodes - 1; bpidx >= 0; bpidx--) {
-            BranchPoint node = getBranchPoint(bpidx);
-
-            if (node.isLeaf()) {
-                p_star[bpidx] = 0.0; // log(1)
-            } else {
-                // ancestor
-                int[] children_bpindices = getChildren(bpidx);
-                double childrenLL = 0.0;
-                for (int childBpidx: children_bpindices) {
-                    childrenLL += p_star[childBpidx];
-                    // add probability of gap remaining
-                    childrenLL += Math.log(1 - model.ksiT(getDistance(childBpidx)));
-                }
-                p_star[bpidx] = childrenLL;
-            }
-        }
-
-        double col_likelihood = 0.0;
-        col_likelihood += Math.log(1 - geometricSeqLenParam); // penalise for length of sequence
-        col_likelihood += p_star[0]; // add the probability of root node
-
-        return col_likelihood;
     }
 
     public static void main0(String[] args) {

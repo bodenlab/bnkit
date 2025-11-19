@@ -30,13 +30,13 @@ import java.util.Arrays;
 public class JC extends SubstModel {
     // The original theoretical model of DNA evolution (single nucleotide substitution) but here provided in a more flexible, any-alphabet form.
 
-    static double[] F(int n) {
+    public static double[] F(int n) {
         double[] freqs = new double[n];
         Arrays.fill(freqs, 1.0/n);
         return freqs;
     }
 
-    static double[][] Q(double gamma, int n) {
+    public static double[][] Q(double gamma, int n) {
         double[][] q = new double[n][n];
         for (int row = 0; row < n; row ++) {
             for (int col = 0; col < n; col ++) {
