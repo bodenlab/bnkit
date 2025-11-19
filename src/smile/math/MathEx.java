@@ -4544,4 +4544,42 @@ public class MathEx {
 
         return u;
     }
+
+    /**
+     * Apply the logsumexp operation to avoid overflow or underflow issues
+     * @param array the array
+     * @return
+     */
+    public static double logsumexp(double[] array) {
+        double xmax = max(array);
+
+        if (xmax == Double.NEGATIVE_INFINITY) {
+            return Double.NEGATIVE_INFINITY;
+        }
+
+        double sum = 0.0;
+        for (double x : array) {
+            sum += Math.exp(x - xmax);
+        }
+        return xmax + Math.log(sum);
+    }
+
+    /**
+     * Compute log(1 - exp(a)) safely for x <= 0.
+     * @param x value to compute for
+     * @return log(1 - exp(a))
+     * @throws IllegalArgumentException if x <= 0
+     */
+    public static double logm1exp(double x) throws IllegalArgumentException{
+
+        double LOG_HALF = Math.log(0.5);
+        if (x > 0) {
+            throw new IllegalArgumentException("x must be <= 0");
+        } else if (x <= LOG_HALF) {
+            return Math.log1p(-Math.exp(x));
+        } else {
+            return Math.log(-Math.expm1(x));
+        }
+    }
+
 }

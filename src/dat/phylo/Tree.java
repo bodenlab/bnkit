@@ -18,19 +18,15 @@
 package dat.phylo;
 
 import asr.Parsimony;
-import bn.Distrib;
-import bn.prob.EnumDistrib;
+import bn.ctmc.GapSubstModel;
 import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
 import dat.EnumSeq;
 import dat.EnumSeq.Alignment;
 import dat.Enumerable;
 import dat.file.Newick;
-import smile.stat.distribution.ExponentialFamilyMixture;
-import smile.stat.distribution.GammaDistribution;
-import smile.stat.distribution.Mixture;
+import smile.math.MathEx;
 import stats.RateModel;
-
 import java.io.IOException;
 import java.util.*;
 
@@ -57,6 +53,10 @@ public class Tree extends IdxTree {
     public Tree(BranchPoint root) {
         super(straightenTree(root));
         this.root = root;        // assume all branch points are OK and store them
+    }
+
+    public Tree copy() {
+        return new Tree(root);
     }
 
     /**
@@ -281,6 +281,249 @@ public class Tree extends IdxTree {
     public IdxTree getIdxTree() {
         BranchPoint[] bps = Tree.straightenTree(root);
         return new IdxTree(bps);
+    }
+
+    /**
+     * Felsenstein's peeling algorithm extended to handle gaps. Described in
+     * <a href="https://doi.org/10.1371/journal.pcbi.1000172"> Rivas & Eddy, 2008</a>.
+     *
+     * @param aln the alignment
+     * @param colIdx the column index
+     * @param nodeResidueProbs Probability of a node with a particular residue (node x residues)
+     * @param nodeGapProbs Probability of a node containing a gap
+     * @param rate the indel rate
+     * @param model Gap-augmented substitution matrix
+     *
+     */
+    public void felsensteinsExtendedPeeling(EnumSeq.Alignment<Enumerable> aln, int colIdx, Double[][] nodeResidueProbs,
+                                            Double[] nodeGapProbs, Double rate, GapSubstModel model) {
+
+        Map<String, Integer> alnMap = aln.getMap();
+        // construct map of bpidx to id
+        int nNodes = getNLeaves() + getNParents();
+
+        // Indicator array - 1 means all children of the node have gaps and 0 otherwise
+        Double[] containsGaps = containsGaps(aln, colIdx);
+
+        Object[] alphabet = model.getDomain().getValues();
+        int numResidues = alphabet.length - 1; // just want actual residues, not gaps
+
+        // iterate through branch point indices backwards for postorder traversal
+        for (int bpidx = nNodes - 1; bpidx >= 0; bpidx--) {
+            BranchPoint node = getBranchPoint(bpidx);
+
+            if (node.isLeaf()) {
+                calcLeafPeelingProbabilities(node, aln, alnMap, colIdx,
+                        nodeResidueProbs, nodeGapProbs, model, bpidx);
+
+            } else {
+                calcAncestralPeelingProbabilities(numResidues, bpidx, nodeResidueProbs, nodeGapProbs,
+                        rate, model, containsGaps, alphabet);
+            }
+        }
+    }
+
+    /**
+     * Calculate the peeling probabilities for a leaf node. Note that these are log probabilities.
+     *
+     * @param node the leaf node
+     * @param aln the alignment
+     * @param alnMap map of sequence names to alignment indices
+     * @param colIdx the column index
+     * @param nodeResidueProbs array of node residue probabilities
+     * @param nodeGapProbs array of node gap probabilities
+     * @param model the gap-augmented substitution model
+     * @param bpidx the branch point index
+     */
+    private void calcLeafPeelingProbabilities(BranchPoint node, EnumSeq.Alignment<Enumerable> aln,
+                                              Map<String, Integer> alnMap, int colIdx, Double[][] nodeResidueProbs,
+                                              Double[] nodeGapProbs, GapSubstModel model, int bpidx) {
+
+        String nodeLabel = (String) node.getLabel();
+        EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(nodeLabel));
+        Character residue = (Character) gseq.get(colIdx);
+        // null residue implies a gap
+        if (residue == null) { // equation 18/19 Rivas & Eddy 2008
+            nodeGapProbs[bpidx] = Double.NEGATIVE_INFINITY;
+        } else {
+            int res_idx = model.getDomain().getIndex(residue);
+            nodeResidueProbs[bpidx][res_idx] = 0.0;
+        }
+    }
+
+    /**
+     * Calculate the peeling probabilities for an ancestral node. First calculates the probability
+     * if the ancestor is a gap, then if it is a residue. Note that these are log probabilities.
+     *
+     * @param numResidues number of residues in the alphabet
+     * @param bpidx the branch point index
+     * @param nodeResidueProbs Probability of a node with a particular residue (node x residues)
+     * @param nodeGapProbs Probability of a node containing a gap
+     * @param rate the indel rate
+     * @param model Gap-augmented substitution matrix
+     * @param containsGaps indicator array for whether all descendants of a node contain gaps
+     * @param alphabet the alphabet
+     */
+    private void calcAncestralPeelingProbabilities(int numResidues, int bpidx, Double[][] nodeResidueProbs,
+                                                   Double[] nodeGapProbs, Double rate, GapSubstModel model,
+                                                   Double[] containsGaps, Object[] alphabet) {
+
+        nodeGapProbs[bpidx] = MathEx.logsumexp(calcLogProbChildrenGivenAncestralGap(bpidx, nodeResidueProbs,
+                nodeGapProbs, rate, model, containsGaps, alphabet, numResidues));
+
+
+        for (int parentResIdx = 0; parentResIdx < numResidues; parentResIdx++) {
+            nodeResidueProbs[bpidx][parentResIdx] = calcLogProbChildrenGivenAncestralResidue(bpidx, parentResIdx,
+                                                    nodeResidueProbs, rate, model, containsGaps, alphabet, numResidues);
+        }
+    }
+
+    /**
+     * Calculate the log probability of all children given that the ancestor is a gap.
+     *
+     * @param bpidx the branch point index
+     * @param nodeResidueProbs Probability of a node with a particular residue (node x residues)
+     * @param nodeGapProbs Probability of a node containing a gap
+     * @param rate the indel rate
+     * @param model Gap-augmented substitution matrix
+     * @param containsGaps indicator array for whether all descendants of a node contain gaps
+     * @param alphabet the alphabet
+     * @param numResidues number of residues in the alphabet
+     * @return An array with the log probabilities for each child given the ancestral gap
+     */
+    private double[] calcLogProbChildrenGivenAncestralGap(int bpidx,  Double[][] nodeResidueProbs,
+                                               Double[] nodeGapProbs, Double rate, GapSubstModel model,
+                                               Double[] containsGaps, Object[] alphabet, int numResidues) {
+
+        int[] childrenBpIndices = getChildren(bpidx);
+        double[] allChildrenLogGapTerms = new double[childrenBpIndices.length];
+
+        int current_child = 0;
+        for (int childBpidx : childrenBpIndices) {
+            // collect all possible terms we will marginalise over
+            if (containsGaps[childBpidx] == 1.0) {
+                // need to enumerate over every residue sum(Pu(L_child,q).P(q|-,t) and
+                // then add Pu(L_child, -) so full alphabet_size
+                double[] childLogProbTerms = new double[alphabet.length];
+                //1.0 sum(Pu(L_child,q).P(q|-,t)
+                for (int resIdx = 0; resIdx < numResidues; resIdx++) {
+                    double nodeResidueProb = nodeResidueProbs[childBpidx][resIdx];
+
+                    Object residue = model.getDomain().get(resIdx);
+                    double insertionProb = Math.log(model.getProbOfInsertion(distance[childBpidx] * rate, residue));
+
+                    childLogProbTerms[resIdx] = nodeResidueProb + insertionProb;
+                }
+
+                childLogProbTerms[numResidues] = nodeGapProbs[childBpidx];
+                allChildrenLogGapTerms[current_child] = MathEx.logsumexp(childLogProbTerms);
+
+            } else {
+                allChildrenLogGapTerms[current_child] = Double.NEGATIVE_INFINITY;
+            }
+            current_child++;
+        }
+
+        return allChildrenLogGapTerms;
+    }
+
+    /**
+     * Calculate the log probability of all children given that the ancestor is a residue.
+     *
+     * @param bpidx the branch point index
+     * @param parentResIdx the residue index of the ancestor
+     * @param nodeResidueProbs Probability of a node with a particular residue (node x residues)
+     * @param rate the indel rate
+     * @param model Gap-augmented substitution matrix
+     * @param containsGaps indicator array for whether all descendants of a node contain gaps
+     * @param alphabet the alphabet
+     * @param numResidues number of residues in the alphabet
+     * @return the culmulative log probability of all children given that the ancestor is a residue
+     */
+    private double calcLogProbChildrenGivenAncestralResidue(int bpidx, int parentResIdx, Double[][] nodeResidueProbs,
+                                                            Double rate, GapSubstModel model, Double[] containsGaps,
+                                                            Object[] alphabet, int numResidues) {
+
+        int[] childrenBpindices = getChildren(bpidx);
+
+        double[] childrenLogProbTerms = new double[childrenBpindices.length];
+        int currentChildResIdx = 0;
+        for (int childBpidx : childrenBpindices) {
+
+            // only include full alphabet with gap if all children have gaps
+            double[] childLogProbTerms = (containsGaps[childBpidx] == 1.0) ? new double[alphabet.length] : new double[numResidues];
+
+            for (int childResIdx = 0; childResIdx < numResidues; childResIdx++) {
+                double childNodeResidueProb = nodeResidueProbs[childBpidx][childResIdx];
+                double gapAugmentedResidueProb = Math.log(model.getProbGapAugmented((Character) alphabet[childResIdx],
+                        (Character) alphabet[parentResIdx], getDistance(childBpidx) * rate));
+
+                childLogProbTerms[childResIdx] = childNodeResidueProb + gapAugmentedResidueProb;
+            }
+
+            if (containsGaps[childBpidx] == 1.0) {
+                double deletionProb = Math.log(model.getProbOfGap(distance[childBpidx] * rate));
+                childLogProbTerms[numResidues] = deletionProb;
+            }
+
+            double childLogProb = MathEx.logsumexp(childLogProbTerms);
+
+            childrenLogProbTerms[currentChildResIdx] = childLogProb;
+
+            currentChildResIdx++;
+        }
+
+        return MathEx.sum(childrenLogProbTerms);
+    }
+
+
+    /**
+     * Determine for each node whether all its descendants contain gaps
+     *
+     * @param aln the alignment
+     * @param colIdx the column index
+     * @return array of indicators for each node whether all its descendants contain gaps where 1.0 = all gaps,
+     * 0.0 = at least one non-gap
+     *
+     * source: <a href="https://doi.org/10.1371/journal.pcbi.1000172">Rivas & Eddy, 2008</a>
+     */
+    public Double[] containsGaps(EnumSeq.Alignment<Enumerable> aln, int colIdx) {
+
+        Map<String, Integer> alnMap = aln.getMap();
+        int nNodes = getNLeaves() + getNParents();
+        Double[] containsGap = new Double[nNodes];
+        // If we want to do a postorder traversal, can just iterate
+        // through branch point indices backwards as these are labelled depth-first.
+        for (int bpidx = nNodes - 1; bpidx >= 0; bpidx--) {
+            BranchPoint node = getBranchPoint(bpidx);
+
+            if (node.isLeaf()) {
+                String node_label = (String) node.getLabel();
+                EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(node_label));
+                Character residue = (Character) gseq.get(colIdx);
+                // null residue implies a gap
+                if (residue == null) {
+                    containsGap[bpidx] = 1.0;
+                } else {
+                    containsGap[bpidx] = 0.0;
+                }
+
+            } else {
+                // Ancestor
+                int[] children = getChildren(bpidx);
+                double all_gaps = 1.0;
+                // if any of the children don't contain a gap, break and record
+                for (int child : children) {
+                    if (containsGap[child] == 0.0) {
+                        all_gaps = 0.0;
+                        break;
+                    }
+                }
+                containsGap[bpidx] = all_gaps;
+            }
+        }
+
+        return containsGap;
     }
 
     public static void main0(String[] args) {

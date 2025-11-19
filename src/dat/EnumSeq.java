@@ -385,6 +385,7 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
          * @param aseqs 
          */
         public Alignment(List<EnumSeq.Gappy<E>> aseqs) {
+
             this.seqs = aseqs;
             int w = -1;
             for (EnumSeq.Gappy<E> seq : aseqs) {
@@ -589,6 +590,22 @@ public class EnumSeq<E extends dat.Enumerable> extends dat.SeqDomain<E> {
                 count += seq.getNNulls();
             return count;
         }
+
+        /**
+         * Calculates average sequence length in the alignment
+         * not including gaps.
+         *
+         * @return The average sequence length in all sequences.
+         */
+        public int getAvgSeqLength() {
+            double gap_prop = (double) getGapCount() / (double) (getWidth() * getHeight());
+            double non_gap_prop = 1 - gap_prop;
+
+            return (int) (non_gap_prop * (double) (getWidth()));
+        }
+
+
+
 
         /**
          * Calculates the mean length of gaps (null values) in all sequences.
