@@ -1,0 +1,221 @@
+package asr;
+
+import dat.EnumSeq;
+import dat.Enumerable;
+import dat.file.Utils;
+import dat.phylo.Tree;
+import dat.pog.POAGraph;
+
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.HashMap;
+
+public class Mip {
+
+    private static final int DEFAULT_MODEL = 0;
+    private static final int VIRTUAL_NODES = 2;
+    private static final int GAP = 0;
+    private static final int NON_GAP = 1;
+    private static final int DEFAULT_GAP_PENALTY = 2;
+
+    public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
+    private static final Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
+                                                                 Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
+
+    public static void main(String[] args) {
+        HashMap<String, Object> argParser = createArgMap(args);
+        String ALIGNMENT = (String) argParser.get("ALIGNMENT");
+        String NEWICK = (String) argParser.get("NEWICK");
+        Integer MODEL_IDX = (Integer) argParser.get("MODEL_IDX");
+
+        Tree tree = null;
+        EnumSeq.Alignment<Enumerable> aln = null;
+        try {
+            tree = Utils.loadTree(NEWICK);
+            if (MODEL_IDX == null) {
+                MODEL_IDX = DEFAULT_MODEL;
+            }
+
+            aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
+            Utils.checkData(aln, tree);
+        } catch (ASRException e) {
+            usage(IndelDist.ERROR.ASR.getCode(), IndelDist.ERROR.ASR.getDescription() + e.getMessage());
+        } catch (IOException e) {
+            usage(IndelDist.ERROR.IO.getCode(), IndelDist.ERROR.IO.getDescription() + e.getMessage());
+        }
+        assert tree != null;
+        assert aln != null;
+
+        // have tree, pog with edges, and binary sequences for extant taxa
+        POAGraph alnPog = new POAGraph(aln);
+        HashMap<String, Enumerable> extantBinarySeqs = createBinarySeqMap(aln);
+
+        // Next we create the ancestor penalty array to mirror the tree children array
+        double[][] tree_neighbour_alpha_pen = createTreeNeighbourAlphaPen(tree);
+
+
+    }
+
+    public static HashMap<String, Enumerable> createBinarySeqMap(EnumSeq.Alignment<Enumerable> aln) {
+
+        int VIRTUAL_START = 0;
+        int VIRTUAL_END = aln.getWidth() + 1;
+        HashMap<String, Enumerable> binarySeqMap = new HashMap<>();
+
+        for (int i = 0; i < aln.getHeight(); i++) {
+
+            EnumSeq<Enumerable> seq = aln.getEnumSeq(i);
+            Integer[] binSeqValues = new Integer[aln.getWidth() + VIRTUAL_NODES];
+            binSeqValues[VIRTUAL_START] = NON_GAP;
+            binSeqValues[VIRTUAL_END] = NON_GAP;
+
+            for (int j = 0; j < aln.getWidth(); j++) {
+                if (seq.get(j) == null) {
+                    binSeqValues[j + 1] = GAP;
+                } else {
+                    binSeqValues[j + 1] = NON_GAP;
+                }
+            }
+
+            binarySeqMap.put(seq.getName(), new Enumerable(binSeqValues));
+         }
+
+        return binarySeqMap;
+    }
+
+    private static double[][] createTreeNeighbourAlphaPen(Tree tree) {
+
+        double[][] tree_neighbour_alpha_pen = new double[tree.getNParents() + tree.getNLeaves()][];
+        for (int i = 0; i < tree_neighbour_alpha_pen.length; i++) {
+            int[] children = tree.getChildren(i);
+            tree_neighbour_alpha_pen[i] = new double[children.length];
+            for (int j = 0; j < children.length; j++) {
+                tree_neighbour_alpha_pen[i][j] = DEFAULT_GAP_PENALTY;
+            }
+        }
+
+        return tree_neighbour_alpha_pen;
+    }
+
+    private static void addPosConstraintsAncestors() {
+
+    }
+
+    private static void addEdgeConstraintsAncestors() {
+
+    }
+
+    private static void addPenaltyConstraints() {
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+    /**
+     * Error codes for the program
+     */
+    public enum ERROR {
+        SUCCESS(0, null),
+        ALN(1, "Must specify alignment (--aln <Clustal or FASTA file>)"),
+        NWK( 2, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>)"),
+        UNKNOWN(3, "Unknown option or missing required argument: "),
+        IO(4, "Failed to read or write files: "),
+        SUB_MODEL(5, "Could not find model with ID "),;
+
+        private final int code;
+        private final String description;
+
+        ERROR(int code, String description) {
+            this.code = code;
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public int getCode() {
+            return code;
+        }
+    }
+
+    public static void usage(int error_code, String msg) {
+        PrintStream out = System.out;
+        if (error_code != 0)
+            out = System.err;
+
+        out.println("""
+                Usage: asr.IndelDist\s
+                \t[-a | --aln <filename>]
+                \t[-n | --nwk <filename>]
+                \t{-s | --substitution-model <JTT(default)}
+                \t-h (or --help) will print out this screen
+                """
+        );
+
+        if (msg != null) {
+            out.println("\n" + msg + "(Error code " + error_code + ")");
+        }
+        System.exit(error_code);
+    }
+
+    public static void usage() {
+        usage(ERROR.SUCCESS.getCode(), ERROR.SUCCESS.getDescription());
+    }
+
+    public static HashMap<String, Object> createArgMap(String[] args) {
+
+        HashMap<String, Object> argMap = new HashMap<>();
+
+        parseArgs(args, argMap);
+
+        checkArgsValid(argMap);
+
+        return argMap;
+    }
+
+    private static void parseArgs(String[] args, HashMap<String, Object> argMap) {
+        // Read in all the arguments
+        for (int a = 0; a < args.length; a++) {
+            if (args[a].startsWith("-")) {
+                String arg = args[a].substring(1);
+                if (((arg.equalsIgnoreCase("-aln")) || (arg.equalsIgnoreCase("a"))) && args.length > a + 1) {
+                    argMap.put("ALIGNMENT", args[++a]);
+                } else if (((arg.equalsIgnoreCase("-nwk")) || (arg.equalsIgnoreCase("n"))) && args.length > a + 1) {
+                    argMap.put("NEWICK", args[++a]);
+                } else if ((arg.equalsIgnoreCase("-substitution-model") || arg.equalsIgnoreCase("s")) && args.length > a + 1) {
+                    boolean model_found = false;
+                    for (int i = 0; i < MODELS.length; i++) {
+                        if (args[a + 1].equalsIgnoreCase(MODELS[i])) {
+                            model_found = true;
+                            argMap.put("MODEL_IDX", i);
+                        }
+                    }
+
+                    if (!model_found) {
+                        usage(ERROR.SUB_MODEL.getCode(), ERROR.SUB_MODEL.getDescription() + args[a + 1]);
+                    }
+                } else {
+                        usage(ERROR.UNKNOWN.getCode(), ERROR.UNKNOWN.getDescription() + "\" + args[a] + \"");
+                    }
+            }
+        }
+    }
+
+    private static void checkArgsValid(HashMap<String, Object> argMap) {
+
+        if (!argMap.containsKey("ALIGNMENT")) {
+            usage(IndelDist.ERROR.ALN.getCode(), IndelDist.ERROR.ALN.getDescription());
+        } else if (!argMap.containsKey("NEWICK")) {
+            usage(IndelDist.ERROR.NWK.getCode(), IndelDist.ERROR.NWK.getDescription());
+        }
+    }
+}

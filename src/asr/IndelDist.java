@@ -77,7 +77,6 @@ public class IndelDist {
         public int getCode() {
             return code;
         }
-
     }
 
 
@@ -111,22 +110,9 @@ public class IndelDist {
         usage(ERROR.SUCCESS.getCode(), ERROR.SUCCESS.getDescription());
     }
 
-    private static <T> T getArg(HashMap<String, Object> args, String key, Class<T> type) {
-        Object value = args.get(key);
-        if (value == null) {
-            return null;
-        }
-
-        if (!type.isInstance(value)) {
-            throw new ClassCastException("Value for " +
-                    key + " is not of type " + type.getName());
-        }
-
-        return type.cast(value);
-
-    }
 
     public static HashMap<String, Object> createArgMap(String[] args) {
+
 
         HashMap<String, Object> argMap = new HashMap<>();
 
@@ -195,11 +181,11 @@ public class IndelDist {
 
     private static void checkArgsValid(HashMap<String, Object> argMap) {
 
-        if (argMap.get("ALIGNMENT") == null) {
+        if (!argMap.containsKey("ALIGNMENT")) {
             usage(ERROR.ALN.getCode(), ERROR.ALN.getDescription());
-        } else if (argMap.get("NEWICK") == null) {
+        } else if (!argMap.containsKey("NEWICK")) {
             usage(ERROR.NWK.getCode(), ERROR.NWK.getDescription());
-        } else if (argMap.get("OUTPUT") == null) {
+        } else if (!argMap.containsKey("OUTPUT")) {
             String INPUT = null;
             try {
                 INPUT = (String) argMap.get("INPUT");
@@ -218,14 +204,12 @@ public class IndelDist {
 
         HashMap<String, Object> argParser = createArgMap(args);
 
-
-        String ALIGNMENT = getArg(argParser, "ALIGNMENT", String.class);
-        String NEWICK = getArg(argParser, "NEWICK", String.class);
-        Integer SEED = getArg(argParser, "SEED", Integer.class);
-        Integer MODEL_IDX = getArg(argParser, "MODEL_IDX", Integer.class);
-        String OUTPUT = getArg(argParser, "OUTPUT", String.class);
-        String INPUT = getArg(argParser, "INPUT", String.class);
-
+        String ALIGNMENT = (String) argParser.get("ALIGNMENT");
+        String NEWICK = (String) argParser.get("NEWICK");
+        Integer SEED = (Integer) argParser.get("SEED");
+        Integer MODEL_IDX = (Integer) argParser.get("MODEL_IDX");
+        String OUTPUT = (String) argParser.get("OUTPUT");
+        String INPUT = (String) argParser.get("INPUT");
 
         long progStart = System.currentTimeMillis();
         Tree tree = null;
