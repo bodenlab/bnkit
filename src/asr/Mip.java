@@ -5,10 +5,14 @@ import dat.Enumerable;
 import dat.file.Utils;
 import dat.phylo.Tree;
 import dat.pog.POAGraph;
-
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.HashMap;
+import com.google.ortools.Loader;
+import com.google.ortools.linearsolver.MPConstraint;
+import com.google.ortools.linearsolver.MPObjective;
+import com.google.ortools.linearsolver.MPSolver;
+import com.google.ortools.linearsolver.MPVariable;
 
 public class Mip {
 
@@ -46,12 +50,25 @@ public class Mip {
         assert tree != null;
         assert aln != null;
 
+        // Create the linear solver with the SCIP backend.
+        MPSolver solver = MPSolver.createSolver("SCIP");
+        if (solver == null) {
+            usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription());
+        }
+
         // have tree, pog with edges, and binary sequences for extant taxa
         POAGraph alnPog = new POAGraph(aln);
         HashMap<String, Enumerable> extantBinarySeqs = createBinarySeqMap(aln);
 
         // Next we create the ancestor penalty array to mirror the tree children array
         double[][] tree_neighbour_alpha_pen = createTreeNeighbourAlphaPen(tree);
+
+
+        HashMap<Integer, MPVariable[]> ancestorPositionVars = addPosConstraintsAncestors(tree, solver, aln.getWidth());
+
+        addEdgeConstraintsAncestors();
+
+        addPenaltyConstraints();
 
 
     }
@@ -97,7 +114,28 @@ public class Mip {
         return tree_neighbour_alpha_pen;
     }
 
-    private static void addPosConstraintsAncestors() {
+    /**
+     * create position varaibles for ancestor sequences
+     * @param tree the phylogenetic tree
+     * @param solver the MIP solver
+     * @param seqLength the length of the sequences in the alignment
+     * @return
+     */
+    private static HashMap<Integer, MPVariable[]> addPosConstraintsAncestors(Tree tree, MPSolver solver, int seqLength) {
+
+        int[] ancestors = tree.getAncestors();
+        HashMap<Integer, MPVariable[]> ancestorSeqVars = new HashMap<>();
+        for (int i = 0; i < ancestors.length; i++) {
+            int ancestorIdx = ancestors[i];
+            MPVariable[] seqVars = new MPVariable[seqLength];
+            for (int j = 0; j < seqLength; j++) {
+                // NOTE: May want to check that create labels won't create large memory usage.
+                seqVars[j] = solver.makeIntVar(0, 1, "A" + ancestorIdx + "_Pos" + j);
+            }
+            ancestorSeqVars.put(ancestorIdx, seqVars);
+        }
+
+        return ancestorSeqVars;
 
     }
 
@@ -128,7 +166,8 @@ public class Mip {
         NWK( 2, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>)"),
         UNKNOWN(3, "Unknown option or missing required argument: "),
         IO(4, "Failed to read or write files: "),
-        SUB_MODEL(5, "Could not find model with ID "),;
+        SUB_MODEL(5, "Could not find model with ID "),
+        MIP_ENGINE(6, "Could not create MIP solver with SCIP"),;
 
         private final int code;
         private final String description;
