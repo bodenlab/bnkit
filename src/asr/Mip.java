@@ -2,8 +2,6 @@ package asr;
 
 import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
-import com.google.ortools.modelbuilder.LinearArgument;
-import com.google.ortools.modelbuilder.LinearExpr;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
@@ -23,6 +21,7 @@ public class Mip {
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int DEFAULT_GAP_PENALTY = 2;
+    private static final int NUM_THREADS = 4;
 
     public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
     private static final Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
@@ -58,23 +57,35 @@ public class Mip {
         if (solver == null) {
             usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription());
         }
+        assert solver != null;
 
+        solver.setNumThreads(NUM_THREADS);
         // have tree, pog with edges, and binary sequences for extant taxa
         POAGraph alnPog = new POAGraph(aln);
 
         HashMap<Integer, Integer[]> extantBinarySeqs = createBinarySeqMap(aln, tree);
 
-        // Next we create the ancestor penalty array to mirror the tree children array
+        // Next we create the ancestor penalty array to mirror the tree's children array
         double[][] treeNeighbourAlphaPen = createTreeNeighbourAlphaPen(tree);
 
         HashMap<Integer, MPVariable[]> ancestorPositionVars = createAncestralPositionVariables(tree, solver, aln.getWidth());
 
         HashMap<EdgeKey, MPVariable> allEdges = addEdgeConstraintsAncestors(tree, alnPog, solver, ancestorPositionVars);
 
+        MPObjective objective = solver.objective();
         addPenaltyConstraints(tree, allEdges, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
-                aln.getWidth(), solver);
+                aln.getWidth(), solver, objective);
 
+        objective.setMinimization();
 
+        MPSolver.ResultStatus resultStatus = solver.solve();
+
+        if (resultStatus == MPSolver.ResultStatus.OPTIMAL
+                || resultStatus == MPSolver.ResultStatus.FEASIBLE) {
+            System.out.println("Total cost: " + objective.value() + "\n");
+        } else {
+            System.err.println("No solution found.");
+        }
     }
 
     public static HashMap<Integer, Integer[]> createBinarySeqMap(EnumSeq.Alignment<Enumerable> aln, Tree tree) {
@@ -268,16 +279,15 @@ public class Mip {
                                               double[][] treeNeighbourAlphaPen,
                                               HashMap<Integer, MPVariable[]> ancestorPositionVars,
                                               int seqLength,
-                                              MPSolver solver) {
+                                              MPSolver solver,
+                                              MPObjective objective) {
 
 
-        MPObjective objective = solver.objective();
-        HashMap<Pair, MPVariable[]> penalty = new HashMap<>();
         HashMap<Object, Object> diff = new HashMap<>();
 
         for (int ancestralIdx : tree.getAncestors()) {
 
-            MPVariable[] ancestorPosVars = ancestorPositionVars.get(ancestralIdx);
+            MPVariable[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
 
 
             for (int childIdx : tree.getChildren(ancestralIdx)) {
@@ -289,10 +299,9 @@ public class Mip {
                     pen[i] = solver.makeIntVar(0, 1, "");
                 }
 
-                penalty.put(nodePair, pen);
                 Integer[] nodeNeighbourPosVar = null;
                 MPVariable[] nodeNeighborPosVarAncestor = null;
-                MPVariable[] diffPos;
+                MPVariable[] diffPos = null;
 
                 if (tree.isLeaf(childIdx)) {
                     nodeNeighbourPosVar = extantBinarySeqs.get(childIdx);
@@ -314,13 +323,14 @@ public class Mip {
 
                         // constraint - difference variables
                         if (nodeNeighbourPosVar[pos] == 1) {
-                            // diff = 1 - nodePosVar[pos]
+                            // constraint: diff = 1 - nodePosVar[pos]
+                            // rearrange: diff + nodePosVar[pos] == 1
                             diffVar = solver.makeIntVar(0, 1, "");
                             MPConstraint c = solver.makeConstraint(1, 1, "");
                             c.setCoefficient(diffVar, 1.0);
-                            c.setCoefficient(ancestorPosVars[pos], 1.0);
+                            c.setCoefficient(nodePosVar[pos], 1.0);
                         } else {
-                            diffVar = ancestorPosVars[pos];
+                            diffVar = nodePosVar[pos];
                         }
 
                         diff.put(diffKey, new MPVariable[]{diffVar});
@@ -331,7 +341,8 @@ public class Mip {
                             // Rewrite as: pen[1] - diff[1] == 0
                             MPConstraint c = solver.makeConstraint(0, 0, "");
                             c.setCoefficient(pen[pos], 1.0);
-                            c.setCoefficient(diffVar, -1.0);
+                            MPVariable curDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
+                            c.setCoefficient(curDiffVar, -1.0);
                         } else {
 
                             // constraint: pen[pos]>= diff[(node, node_neighbor_item, pos)] - diff[(node, node_neighbor_item, pos - 1)])
@@ -339,7 +350,10 @@ public class Mip {
                             // rearrange: pen[pos] -  diff[(node, node_neighbor_item, pos)] + diff[(node, node_neighbor_item, pos - 1)]) >= 0
                             MPConstraint c1 = solver.makeConstraint(0, Double.POSITIVE_INFINITY, "");
                             c1.setCoefficient(pen[pos], 1.0);
-                            c1.setCoefficient(diffVar, -1.0);
+
+                            MPVariable curDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
+                            c1.setCoefficient(curDiffVar, -1.0);
+
                             MPVariable diffVarPrev = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos - 1)))[0];
                             c1.setCoefficient(diffVarPrev, 1.0);
 
@@ -350,8 +364,8 @@ public class Mip {
                             double rhs = nodeNeighbourPosVar[pos - 1] - nodeNeighbourPosVar[pos] - 1;
                             MPConstraint c2 = solver.makeConstraint(rhs, Double.POSITIVE_INFINITY, "");
                             c2.setCoefficient(pen[pos], 1.0);
-                            c2.setCoefficient(ancestorPosVars[pos -1], 1.0);
-                            c2.setCoefficient(ancestorPosVars[pos], -1.0);
+                            c2.setCoefficient(nodePosVar[pos -1], 1.0);
+                            c2.setCoefficient(nodePosVar[pos], -1.0);
 
                             // Constraint: pen[pos] >= node_neighbor_pos_var[pos] + (1 - node_pos_var[pos]) + (1 - node_neighbor_pos_var[pos - 1]) + node_pos_var[pos - 1] - 3
                             // Rearrange: pen[pos] + node_pos_var[pos] - node_pos_var[pos - 1]  >= node_neighbor_pos_var[pos] + 1 + (1 - node_neighbor_pos_var[pos - 1]) - 3
@@ -359,22 +373,70 @@ public class Mip {
                             double rhs3 = nodeNeighbourPosVar[pos] - nodeNeighbourPosVar[pos - 1] - 1;
                             MPConstraint c3 = solver.makeConstraint(rhs3, Double.POSITIVE_INFINITY, "");
                             c3.setCoefficient(pen[pos], 1.0);
-                            c3.setCoefficient(ancestorPosVars[pos], 1.0);
-                            c3.setCoefficient(ancestorPosVars[pos - 1], -1.0);
+                            c3.setCoefficient(nodePosVar[pos], 1.0);
+                            c3.setCoefficient(nodePosVar[pos - 1], -1.0);
                         }
 
-                        objective.setCoefficient(diffVar, 1.0);
+
+                        MPVariable objDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
+                        objective.setCoefficient(objDiffVar, 1.0);
                         objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
 
                     } else {
-                        System.out.println("Ancestor");
+                        //diff_pos[pos] <= node_pos_var[pos] + node_neighbor_pos_var[pos]
+                        MPConstraint c1 = solver.makeConstraint(Double.NEGATIVE_INFINITY, 0, "");
+                        c1.setCoefficient(diffPos[pos], 1.0);
+                        c1.setCoefficient(nodePosVar[pos], -1.0);
+                        c1.setCoefficient(nodeNeighborPosVarAncestor[pos], -1.0);
+
+                        // diff_pos[pos] >= node_pos_var[pos] - node_neighbor_pos_var[pos]
+                        MPConstraint c2 = solver.makeConstraint(0.0, Double.POSITIVE_INFINITY, "");
+                        c2.setCoefficient(diffPos[pos], 1.0);
+                        c2.setCoefficient(nodePosVar[pos], -1.0);
+                        c2.setCoefficient(nodeNeighborPosVarAncestor[pos], 1.0);
+
+                        // diff_pos[pos] >= node_neighbor_pos_var[pos] - node_pos_var[pos]
+                        MPConstraint c3 = solver.makeConstraint(0.0, Double.POSITIVE_INFINITY, "");
+                        c3.setCoefficient(diffPos[pos], 1.0);
+                        c3.setCoefficient(nodeNeighborPosVarAncestor[pos], -1.0);
+                        c3.setCoefficient(nodePosVar[pos], 1.0);
+
+                        // diff_pos[pos] <= 2 - node_neighbor_pos_var[pos] - node_pos_var[pos]
+                        MPConstraint c4 = solver.makeConstraint(Double.NEGATIVE_INFINITY, 2.0, "");
+                        c4.setCoefficient(diffPos[pos], 1.0);
+                        c4.setCoefficient(nodeNeighborPosVarAncestor[pos], 1.0);
+                        c4.setCoefficient(nodePosVar[pos], 1.0);
+
+                        if (pos == 0) {
+                            MPConstraint c5 = solver.makeConstraint(0, 0, "");
+                            c5.setCoefficient(pen[pos], 1.0);
+                            c5.setCoefficient(diffPos[pos], -1.0);
+                        } else {
+                            MPConstraint c6 = solver.makeConstraint(0, Double.POSITIVE_INFINITY, "");
+                            c6.setCoefficient(pen[pos], 1.0);
+                            c6.setCoefficient(diffPos[pos], -1.0);
+                            c6.setCoefficient(diffPos[pos - 1], 1.0);
+
+                            MPConstraint c7 = solver.makeConstraint(-1.0, Double.POSITIVE_INFINITY);
+                            c7.setCoefficient(pen[pos], 1.0);
+                            c7.setCoefficient(nodePosVar[pos - 1], 1.0);
+                            c7.setCoefficient(nodeNeighborPosVarAncestor[pos], 1.0);
+                            c7.setCoefficient(nodePosVar[pos], -1.0);
+
+                            MPConstraint c8 = solver.makeConstraint(-1.0, Double.POSITIVE_INFINITY, "");
+                            c8.setCoefficient(pen[pos], 1.0);
+                            c8.setCoefficient(nodePosVar[pos], 1.0);
+                            c8.setCoefficient(nodeNeighborPosVarAncestor[pos - 1], 1.0);
+                            c8.setCoefficient(nodePosVar[pos - 1], -1.0);
+                        }
+
+                        objective.setCoefficient(diffPos[pos], 1.0);
+                        objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
+
                     }
                 }
-
-
             }
         }
-
     }
 
 
