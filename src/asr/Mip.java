@@ -1,5 +1,6 @@
 package asr;
 
+import com.google.ortools.linearsolver.MPConstraint;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
@@ -8,11 +9,9 @@ import dat.pog.POAGraph;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.HashMap;
-import com.google.ortools.Loader;
-import com.google.ortools.linearsolver.MPConstraint;
-import com.google.ortools.linearsolver.MPObjective;
-import com.google.ortools.linearsolver.MPSolver;
 import com.google.ortools.linearsolver.MPVariable;
+import com.google.ortools.linearsolver.MPSolver;
+import com.google.ortools.Loader;
 
 public class Mip {
 
@@ -51,6 +50,7 @@ public class Mip {
         assert aln != null;
 
         // Create the linear solver with the SCIP backend.
+        Loader.loadNativeLibraries();
         MPSolver solver = MPSolver.createSolver("SCIP");
         if (solver == null) {
             usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription());
@@ -58,15 +58,16 @@ public class Mip {
 
         // have tree, pog with edges, and binary sequences for extant taxa
         POAGraph alnPog = new POAGraph(aln);
+
         HashMap<String, Enumerable> extantBinarySeqs = createBinarySeqMap(aln);
 
         // Next we create the ancestor penalty array to mirror the tree children array
         double[][] tree_neighbour_alpha_pen = createTreeNeighbourAlphaPen(tree);
 
 
-        HashMap<Integer, MPVariable[]> ancestorPositionVars = addPosConstraintsAncestors(tree, solver, aln.getWidth());
+        HashMap<Integer, MPVariable[]> ancestorPositionVars = createAncestralPositionVariables(tree, solver, aln.getWidth());
 
-        addEdgeConstraintsAncestors();
+        HashMap<EdgeKey, MPVariable> allEdges = addEdgeConstraintsAncestors(tree, alnPog, solver, ancestorPositionVars);
 
         addPenaltyConstraints();
 
@@ -115,13 +116,15 @@ public class Mip {
     }
 
     /**
-     * create position varaibles for ancestor sequences
+     * Create integer position variables for ancestor sequences bounded between 0 and 1. These represent the
+     * actual sequence positions for each ancestor in the tree.
+     *
      * @param tree the phylogenetic tree
      * @param solver the MIP solver
      * @param seqLength the length of the sequences in the alignment
-     * @return
+     * @return a map of ancestor indices to their corresponding position variables
      */
-    private static HashMap<Integer, MPVariable[]> addPosConstraintsAncestors(Tree tree, MPSolver solver, int seqLength) {
+    private static HashMap<Integer, MPVariable[]> createAncestralPositionVariables(Tree tree, MPSolver solver, int seqLength) {
 
         int[] ancestors = tree.getAncestors();
         HashMap<Integer, MPVariable[]> ancestorSeqVars = new HashMap<>();
@@ -139,23 +142,169 @@ public class Mip {
 
     }
 
-    private static void addEdgeConstraintsAncestors() {
+    private static HashMap<EdgeKey, MPVariable> addEdgeConstraintsAncestors(Tree tree, POAGraph alnPOG,
+                                                                            MPSolver solver,
+                                                                            HashMap<Integer, MPVariable[]> ancestralPositionVars) {
 
+        int VIRTUAL_START = -1;
+        int VIRTUAL_END = alnPOG.maxsize();
+
+        HashMap<EdgeKey, MPVariable> allEdgeVars = new HashMap<>();
+
+        int[] ancestors = tree.getAncestors();
+        for (int i = 0; i < ancestors.length; i++) {
+            int ancestorIdx = ancestors[i];
+
+            // VIRTUAL STARTS TO REAL STARTS //
+            int[] startIndices = alnPOG.getStarts();
+            MPVariable[] allEdgesFromVirtualStart = new MPVariable[startIndices.length];
+            for (int positionTo = 0; positionTo < startIndices.length; positionTo++) {
+
+                // Variable for each edge from start node
+                MPVariable edge = solver.makeIntVar(0, 1, "");
+                allEdgesFromVirtualStart[positionTo] = edge;
+
+                // save unique edge/ancestor combination to a map for later use
+                EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, startIndices[positionTo], ancestorIdx);
+                allEdgeVars.put(edgeKey, edge);
+            }
+
+            // Constraint: exactly one edge must be chosen from virtual start to actual starts
+            MPConstraint virtualStartConstraint = solver.makeConstraint(1, 1, "");
+            for (MPVariable edgeVar : allEdgesFromVirtualStart) {
+                virtualStartConstraint.setCoefficient(edgeVar, 1);
+            }
+
+            // FULLY CONNECTED NODES //
+            //alnPOG.getNodeIndices()
+
+            for (int nodeIdx = 0; nodeIdx < alnPOG.maxsize(); nodeIdx++) {
+
+                // EDGES GOING OUT //
+                int[] forwardEdges = alnPOG.getNodeIndices(nodeIdx, true);
+                int numEdgesToEnd = (alnPOG.isEndNode(nodeIdx) ? 1 : 0);
+                int totalForwardEdges = forwardEdges.length + numEdgesToEnd;
+
+                if (totalForwardEdges == 0) {
+                    continue;
+                }
+
+                MPVariable[] forwardEdgesFromNode = new MPVariable[totalForwardEdges];
+                for (int positionTo = 0; positionTo < forwardEdges.length; positionTo++) {
+
+                    MPVariable edge = solver.makeIntVar(0, 1, "");
+                    int edgeEnd = forwardEdges[positionTo];
+                    forwardEdgesFromNode[positionTo] = edge;
+
+                    EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
+                    allEdgeVars.put(edgeKey, edge);
+                }
+
+                if (numEdgesToEnd == 1) {
+                    MPVariable edgeToEnd = solver.makeIntVar(0, 1, "");
+                    forwardEdgesFromNode[totalForwardEdges - 1] = edgeToEnd;
+
+                    EdgeKey edgeKey = new EdgeKey(nodeIdx, VIRTUAL_END, ancestorIdx);
+                    allEdgeVars.put(edgeKey, edgeToEnd);
+                }
+
+                // Constraint: sum(edges) - position variable == 0
+                // Which is equivalent to: sum(edges) == positionVar
+                MPConstraint forwardConstraint = solver.makeConstraint(0, 0, "");
+                for (MPVariable edgeVar : forwardEdgesFromNode) {
+                    forwardConstraint.setCoefficient(edgeVar, 1);
+                }
+                MPVariable ancestralNode = ancestralPositionVars.get(ancestorIdx)[nodeIdx];
+                forwardConstraint.setCoefficient(ancestralNode, -1);
+
+
+                // EDGES COMING IN //
+                int[] backwardEdges = alnPOG.getNodeIndices(nodeIdx, false);
+                int numEdgesFromStart = (alnPOG.isStartNode(nodeIdx) ? 1 : 0);
+                int totalBackwardEdges = backwardEdges.length + numEdgesFromStart;
+
+                MPVariable[] backwardEdgesFromNode = new MPVariable[totalBackwardEdges];
+                for (int positionTo = 0; positionTo < backwardEdges.length; positionTo++) {
+
+                    MPVariable edge = solver.makeIntVar(0, 1, "");
+                    int edgeEnd = backwardEdges[positionTo];
+                    backwardEdgesFromNode[positionTo] = edge;
+
+                    EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
+                    allEdgeVars.put(edgeKey, edge);
+                }
+
+                if (numEdgesFromStart == 1) {
+                    MPVariable edgeFromStart = solver.makeIntVar(0, 1, "");
+                    backwardEdgesFromNode[totalBackwardEdges - 1] = edgeFromStart;
+
+                    EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, nodeIdx, ancestorIdx);
+                    allEdgeVars.put(edgeKey, edgeFromStart);
+                }
+
+                // Constraint: sum(edges) - position variable == 0
+                // Which is equivalent to: sum(edges) == positionVar
+                MPConstraint backwardConstraint = solver.makeConstraint(0, 0, "");
+                for (MPVariable edgeVar : backwardEdgesFromNode) {
+                    backwardConstraint.setCoefficient(edgeVar, 1);
+                }
+                backwardConstraint.setCoefficient(ancestralNode, -1);
+
+            }
+
+
+        }
+
+        return allEdgeVars;
     }
+
+    private static void constrainNumberOfConnectedEdges(int[] outgoingEdges, int isTerminal, MPSolver solver,
+                                                        int nodeIdx, int ancestorIdx,
+                                                        HashMap<EdgeKey, MPVariable> allEdgeVars,
+                                                        HashMap<Integer, MPVariable[]> ancestralPositionVars,
+                                                        int virtualEnd){
+
+        int totalOutgoingEdges = outgoingEdges.length + isTerminal;
+        MPVariable[] outgoingEdgesFromNode = new MPVariable[totalOutgoingEdges];
+        for (int positionTo = 0; positionTo < outgoingEdges.length; positionTo++) {
+
+            MPVariable edge = solver.makeIntVar(0, 1, "");
+            int edgeEnd = outgoingEdges[positionTo];
+            outgoingEdgesFromNode[positionTo] = edge;
+
+            EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
+            allEdgeVars.put(edgeKey, edge);
+        }
+
+        if (isTerminal == 1) {
+            MPVariable edgeToEnd = solver.makeIntVar(0, 1, "");
+            outgoingEdgesFromNode[totalOutgoingEdges - 1] = edgeToEnd;
+
+            EdgeKey edgeKey = new EdgeKey(nodeIdx, virtualEnd, ancestorIdx);
+            allEdgeVars.put(edgeKey, edgeToEnd);
+        }
+
+        // Constraint: sum(edges) - position variable == 0
+        // Which is equivalent to: sum(edges) == positionVar
+        MPConstraint forwardConstraint = solver.makeConstraint(0, 0, "");
+        for (MPVariable edgeVar : outgoingEdgesFromNode) {
+            forwardConstraint.setCoefficient(edgeVar, 1);
+        }
+        MPVariable ancestralNode = ancestralPositionVars.get(ancestorIdx)[nodeIdx];
+        forwardConstraint.setCoefficient(ancestralNode, -1);
+    }
+
 
     private static void addPenaltyConstraints() {
 
     }
 
 
-
-
-
-
-
-
-
-
+    /**
+     * Create a unique key for an edge in the POG associated with a specific ancestor.
+     * Allows this to be used as a key in hash maps.
+     */
+    public record EdgeKey(int from, int to, int ancestorIdx) {}
 
     /**
      * Error codes for the program
