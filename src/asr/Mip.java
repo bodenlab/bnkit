@@ -152,9 +152,7 @@ public class Mip {
         HashMap<EdgeKey, MPVariable> allEdgeVars = new HashMap<>();
 
         int[] ancestors = tree.getAncestors();
-        for (int i = 0; i < ancestors.length; i++) {
-            int ancestorIdx = ancestors[i];
-
+        for (int ancestorIdx : ancestors) {
             // VIRTUAL STARTS TO REAL STARTS //
             int[] startIndices = alnPOG.getStarts();
             MPVariable[] allEdgesFromVirtualStart = new MPVariable[startIndices.length];
@@ -176,18 +174,13 @@ public class Mip {
             }
 
             // FULLY CONNECTED NODES //
-            //alnPOG.getNodeIndices()
-
+            int[] endIndices = alnPOG.getEnds();
             for (int nodeIdx = 0; nodeIdx < alnPOG.maxsize(); nodeIdx++) {
 
                 // EDGES GOING OUT //
                 int[] forwardEdges = alnPOG.getNodeIndices(nodeIdx, true);
                 int numEdgesToEnd = (alnPOG.isEndNode(nodeIdx) ? 1 : 0);
                 int totalForwardEdges = forwardEdges.length + numEdgesToEnd;
-
-                if (totalForwardEdges == 0) {
-                    continue;
-                }
 
                 MPVariable[] forwardEdgesFromNode = new MPVariable[totalForwardEdges];
                 for (int positionTo = 0; positionTo < forwardEdges.length; positionTo++) {
@@ -214,9 +207,9 @@ public class Mip {
                 for (MPVariable edgeVar : forwardEdgesFromNode) {
                     forwardConstraint.setCoefficient(edgeVar, 1);
                 }
+
                 MPVariable ancestralNode = ancestralPositionVars.get(ancestorIdx)[nodeIdx];
                 forwardConstraint.setCoefficient(ancestralNode, -1);
-
 
                 // EDGES COMING IN //
                 int[] backwardEdges = alnPOG.getNodeIndices(nodeIdx, false);
@@ -226,20 +219,18 @@ public class Mip {
                 MPVariable[] backwardEdgesFromNode = new MPVariable[totalBackwardEdges];
                 for (int positionTo = 0; positionTo < backwardEdges.length; positionTo++) {
 
-                    MPVariable edge = solver.makeIntVar(0, 1, "");
-                    int edgeEnd = backwardEdges[positionTo];
-                    backwardEdgesFromNode[positionTo] = edge;
+                    int edgeComingIn = backwardEdges[positionTo];
 
-                    EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
-                    allEdgeVars.put(edgeKey, edge);
+                    EdgeKey edgeKey = new EdgeKey(edgeComingIn, nodeIdx, ancestorIdx);
+                    MPVariable edge = allEdgeVars.get(edgeKey);
+                    backwardEdgesFromNode[positionTo] = edge;
                 }
 
                 if (numEdgesFromStart == 1) {
-                    MPVariable edgeFromStart = solver.makeIntVar(0, 1, "");
-                    backwardEdgesFromNode[totalBackwardEdges - 1] = edgeFromStart;
-
                     EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, nodeIdx, ancestorIdx);
-                    allEdgeVars.put(edgeKey, edgeFromStart);
+                    MPVariable edge = allEdgeVars.get(edgeKey);
+
+                    backwardEdgesFromNode[totalBackwardEdges - 1] = edge;
                 }
 
                 // Constraint: sum(edges) - position variable == 0
@@ -249,50 +240,25 @@ public class Mip {
                     backwardConstraint.setCoefficient(edgeVar, 1);
                 }
                 backwardConstraint.setCoefficient(ancestralNode, -1);
-
             }
 
+            // REAL ENDS TO VIRTUAL ENDS //
+            MPVariable[] allEdgesToVirtualEnd = new MPVariable[endIndices.length];
+            for (int positionFrom = 0; positionFrom < endIndices.length; positionFrom++) {
+                EdgeKey edgeKey = new EdgeKey(endIndices[positionFrom], VIRTUAL_END, ancestorIdx);
+                allEdgesToVirtualEnd[positionFrom] = allEdgeVars.get(edgeKey);
+            }
 
+            MPConstraint virtualEndConstraint = solver.makeConstraint(1, 1, "");
+            for (MPVariable edgeVar : allEdgesToVirtualEnd) {
+                virtualEndConstraint.setCoefficient(edgeVar, 1);
+            }
         }
 
         return allEdgeVars;
     }
 
-    private static void constrainNumberOfConnectedEdges(int[] outgoingEdges, int isTerminal, MPSolver solver,
-                                                        int nodeIdx, int ancestorIdx,
-                                                        HashMap<EdgeKey, MPVariable> allEdgeVars,
-                                                        HashMap<Integer, MPVariable[]> ancestralPositionVars,
-                                                        int virtualEnd){
 
-        int totalOutgoingEdges = outgoingEdges.length + isTerminal;
-        MPVariable[] outgoingEdgesFromNode = new MPVariable[totalOutgoingEdges];
-        for (int positionTo = 0; positionTo < outgoingEdges.length; positionTo++) {
-
-            MPVariable edge = solver.makeIntVar(0, 1, "");
-            int edgeEnd = outgoingEdges[positionTo];
-            outgoingEdgesFromNode[positionTo] = edge;
-
-            EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
-            allEdgeVars.put(edgeKey, edge);
-        }
-
-        if (isTerminal == 1) {
-            MPVariable edgeToEnd = solver.makeIntVar(0, 1, "");
-            outgoingEdgesFromNode[totalOutgoingEdges - 1] = edgeToEnd;
-
-            EdgeKey edgeKey = new EdgeKey(nodeIdx, virtualEnd, ancestorIdx);
-            allEdgeVars.put(edgeKey, edgeToEnd);
-        }
-
-        // Constraint: sum(edges) - position variable == 0
-        // Which is equivalent to: sum(edges) == positionVar
-        MPConstraint forwardConstraint = solver.makeConstraint(0, 0, "");
-        for (MPVariable edgeVar : outgoingEdgesFromNode) {
-            forwardConstraint.setCoefficient(edgeVar, 1);
-        }
-        MPVariable ancestralNode = ancestralPositionVars.get(ancestorIdx)[nodeIdx];
-        forwardConstraint.setCoefficient(ancestralNode, -1);
-    }
 
 
     private static void addPenaltyConstraints() {
