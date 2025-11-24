@@ -80,9 +80,13 @@ public class Mip {
 
         MPSolver.ResultStatus resultStatus = solver.solve();
 
-        if (resultStatus == MPSolver.ResultStatus.OPTIMAL
-                || resultStatus == MPSolver.ResultStatus.FEASIBLE) {
-            System.out.println("Total cost: " + objective.value() + "\n");
+        if (resultStatus == MPSolver.ResultStatus.OPTIMAL) {
+            System.out.println("Total cost: " + objective.value());
+            System.out.println("Problem solved in " + solver.wallTime() + " milliseconds");
+            System.out.println("Problem solved in " + solver.iterations() + " iterations");
+            System.out.println("Problem solved in " + solver.nodes() + " branch-and-bound nodes");
+        } else if (resultStatus == MPSolver.ResultStatus.FEASIBLE) {
+            System.out.println("Feasible objective: " + objective.value() + "\n");
         } else {
             System.err.println("No solution found.");
         }
@@ -361,16 +365,16 @@ public class Mip {
                             // because these neighbours are children, we can just evaluate everything on right hand side
                             // rearrange: pen[pos] + node_pos_var[pos - 1] - node_pos_var[pos] >= node_neighbor_pos_var[pos - 1] + 1 + (1 - node_neighbor_pos_var[pos]) - 3
                             // rearrange: pen[pos] + node_pos_var[pos - 1] - node_pos_var[pos] >= node_neighbor_pos_var[pos - 1] - node_neighbor_pos_var[pos] - 1
-                            double rhs = nodeNeighbourPosVar[pos - 1] - nodeNeighbourPosVar[pos] - 1;
+                            double rhs = nodeNeighbourPosVar[pos - 1] + 1 + (1 - nodeNeighbourPosVar[pos]) - 3;
                             MPConstraint c2 = solver.makeConstraint(rhs, Double.POSITIVE_INFINITY, "");
                             c2.setCoefficient(pen[pos], 1.0);
-                            c2.setCoefficient(nodePosVar[pos -1], 1.0);
+                            c2.setCoefficient(nodePosVar[pos - 1], 1.0);
                             c2.setCoefficient(nodePosVar[pos], -1.0);
 
                             // Constraint: pen[pos] >= node_neighbor_pos_var[pos] + (1 - node_pos_var[pos]) + (1 - node_neighbor_pos_var[pos - 1]) + node_pos_var[pos - 1] - 3
                             // Rearrange: pen[pos] + node_pos_var[pos] - node_pos_var[pos - 1]  >= node_neighbor_pos_var[pos] + 1 + (1 - node_neighbor_pos_var[pos - 1]) - 3
                             // Rearrange: pen[pos] + node_pos_var[pos] - node_pos_var[pos - 1]  >= node_neighbor_pos_var[pos] - node_neighbor_pos_var[pos - 1]) - 1
-                            double rhs3 = nodeNeighbourPosVar[pos] - nodeNeighbourPosVar[pos - 1] - 1;
+                            double rhs3 = nodeNeighbourPosVar[pos] + 1 - (1 - nodeNeighbourPosVar[pos - 1]) - 3;
                             MPConstraint c3 = solver.makeConstraint(rhs3, Double.POSITIVE_INFINITY, "");
                             c3.setCoefficient(pen[pos], 1.0);
                             c3.setCoefficient(nodePosVar[pos], 1.0);
@@ -419,12 +423,14 @@ public class Mip {
 
                             MPConstraint c7 = solver.makeConstraint(-1.0, Double.POSITIVE_INFINITY);
                             c7.setCoefficient(pen[pos], 1.0);
+                            c7.setCoefficient(nodeNeighborPosVarAncestor[pos - 1], -1.0);
                             c7.setCoefficient(nodePosVar[pos - 1], 1.0);
                             c7.setCoefficient(nodeNeighborPosVarAncestor[pos], 1.0);
                             c7.setCoefficient(nodePosVar[pos], -1.0);
 
                             MPConstraint c8 = solver.makeConstraint(-1.0, Double.POSITIVE_INFINITY, "");
                             c8.setCoefficient(pen[pos], 1.0);
+                            c8.setCoefficient(nodeNeighborPosVarAncestor[pos], -1.0);
                             c8.setCoefficient(nodePosVar[pos], 1.0);
                             c8.setCoefficient(nodeNeighborPosVarAncestor[pos - 1], 1.0);
                             c8.setCoefficient(nodePosVar[pos - 1], -1.0);
@@ -432,7 +438,6 @@ public class Mip {
 
                         objective.setCoefficient(diffPos[pos], 1.0);
                         objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
-
                     }
                 }
             }
