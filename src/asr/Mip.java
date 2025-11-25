@@ -7,8 +7,8 @@ import dat.Enumerable;
 import dat.file.Utils;
 import dat.phylo.Tree;
 import dat.pog.POAGraph;
-import java.io.IOException;
-import java.io.PrintStream;
+
+import java.io.*;
 import java.util.HashMap;
 import com.google.ortools.linearsolver.MPVariable;
 import com.google.ortools.linearsolver.MPSolver;
@@ -16,13 +16,13 @@ import com.google.ortools.Loader;
 
 public class Mip {
 
-    private static final int DEFAULT_MODEL = 0;
-    private static final int VIRTUAL_NODES = 2;
+    private static final int DEFAULT_MODEL_IDX = 0;
+    private static int SOLVER_IDX = 0;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int DEFAULT_GAP_PENALTY = 2;
-    private static final int NUM_THREADS = 4;
-
+    private static final int DEFAULT_THREAD_COUNT = 4;
+    public static String[] SOLVERS = new String[] {"SCIP", "Gurobi"};
     public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
     private static final Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
                                                                  Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
@@ -32,15 +32,18 @@ public class Mip {
         String ALIGNMENT = (String) argParser.get("ALIGNMENT");
         String NEWICK = (String) argParser.get("NEWICK");
         Integer MODEL_IDX = (Integer) argParser.get("MODEL_IDX");
+        String OUTPUT = (String) argParser.get("OUTPUT");
+        String PREFIX = (String) argParser.get("PREFIX");
+        int NUM_THREADS = argParser.get("NUM_THREADS") == null ? DEFAULT_THREAD_COUNT : (Integer) argParser.get("NUM_THREADS");
+
 
         Tree tree = null;
         EnumSeq.Alignment<Enumerable> aln = null;
         try {
             tree = Utils.loadTree(NEWICK);
             if (MODEL_IDX == null) {
-                MODEL_IDX = DEFAULT_MODEL;
+                MODEL_IDX = Mip.DEFAULT_MODEL_IDX;
             }
-
             aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
             Utils.checkData(aln, tree);
         } catch (ASRException e) {
@@ -51,15 +54,24 @@ public class Mip {
         assert tree != null;
         assert aln != null;
 
+        if (!allColsOccupied(aln)) {
+            usage(ERROR.ALN.getCode(), "Alignment has at least one column with no sequence content. Please remove these before running indel inference.");
+        }
+
         // Create the linear solver with the SCIP backend.
+        System.out.println("Loading libraries and creating solver...");
+        long startLibraryLoad = System.currentTimeMillis();
         Loader.loadNativeLibraries();
-        MPSolver solver = MPSolver.createSolver("SCIP");
+        MPSolver solver = MPSolver.createSolver(SOLVERS[SOLVER_IDX]);
         if (solver == null) {
-            usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription());
+            usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription() + SOLVERS[SOLVER_IDX]);
         }
         assert solver != null;
+        long endLibraryLoad = System.currentTimeMillis();
+        System.out.println("Loaded libraries and created solver in " + (endLibraryLoad - startLibraryLoad) + " ms");
 
         solver.setNumThreads(NUM_THREADS);
+
         // have tree, pog with edges, and binary sequences for extant taxa
         POAGraph alnPog = new POAGraph(aln);
 
@@ -68,16 +80,19 @@ public class Mip {
         // Next we create the ancestor penalty array to mirror the tree's children array
         double[][] treeNeighbourAlphaPen = createTreeNeighbourAlphaPen(tree);
 
+        System.out.println("Constructing MIP model...");
+        long startModelBuild = System.currentTimeMillis();
         HashMap<Integer, MPVariable[]> ancestorPositionVars = createAncestralPositionVariables(tree, solver, aln.getWidth());
-
         HashMap<EdgeKey, MPVariable> allEdges = addEdgeConstraintsAncestors(tree, alnPog, solver, ancestorPositionVars);
 
         MPObjective objective = solver.objective();
         addPenaltyConstraints(tree, allEdges, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
                 aln.getWidth(), solver, objective);
+        long endModelBuild = System.currentTimeMillis();
+        System.out.println("Constructed MIP model in " + (endModelBuild - startModelBuild) + " ms");
 
         objective.setMinimization();
-
+        System.out.println("Solving MIP formulation...");
         MPSolver.ResultStatus resultStatus = solver.solve();
 
         if (resultStatus == MPSolver.ResultStatus.OPTIMAL) {
@@ -90,20 +105,31 @@ public class Mip {
         } else {
             System.err.println("No solution found.");
         }
+
+        outputAncestralSolutions(tree, ancestorPositionVars, aln, OUTPUT, PREFIX);
+
+    }
+
+    private static boolean allColsOccupied(EnumSeq.Alignment<Enumerable> aln) {
+
+        for (int i = 0; i < aln.getWidth(); i++) {
+            int numSeqsWithContent = aln.getOccupancy(i);
+            if (numSeqsWithContent == 0) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public static HashMap<Integer, Integer[]> createBinarySeqMap(EnumSeq.Alignment<Enumerable> aln, Tree tree) {
 
-        int VIRTUAL_START = 0;
-        int VIRTUAL_END = aln.getWidth() + 1;
         HashMap<Integer, Integer[]> binarySeqMap = new HashMap<>();
 
         for (int i = 0; i < aln.getHeight(); i++) {
 
             EnumSeq<Enumerable> seq = aln.getEnumSeq(i);
             Integer[] binSeqValues = new Integer[aln.getWidth()]; // + VIRTUAL_NODES];
-            //binSeqValues[VIRTUAL_START] = NON_GAP;
-            //binSeqValues[VIRTUAL_END] = NON_GAP;
 
             for (int j = 0; j < aln.getWidth(); j++) {
                 if (seq.get(j) == null) {
@@ -444,6 +470,61 @@ public class Mip {
         }
     }
 
+    private static void outputAncestralSolutions(Tree tree,
+                                                 HashMap<Integer, MPVariable[]> ancestorPositionVars,
+                                                 EnumSeq.Alignment<Enumerable> aln,
+                                                 String OUTPUT,
+                                                 String PREFIX) {
+
+
+        // Create output file path
+        String fastaFilePath = OUTPUT + "/" + PREFIX + "_ancestral_indel.fasta";
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fastaFilePath))) {
+            for (int ancestralIdx : tree.getAncestors()) {
+                MPVariable[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
+
+                // Write FASTA header
+                writer.write(">N" + tree.getLabel(ancestralIdx));
+                writer.newLine();
+
+                StringBuilder sequenceLine = new StringBuilder();
+                for (int pos = 0; pos < aln.getWidth(); pos++) {
+                    sequenceLine.append((int) nodePosVar[pos].solutionValue());
+
+                    // Optional: Add line breaks every 80 characters (standard FASTA format)
+                    if ((pos + 1) % 80 == 0 && pos < aln.getWidth() - 1) {
+                        writer.write(sequenceLine.toString());
+                        writer.newLine();
+                        sequenceLine = new StringBuilder();
+                    }
+                }
+
+                // Write any remaining sequence
+                if (!sequenceLine.isEmpty()) {
+                    writer.write(sequenceLine.toString());
+                    writer.newLine();
+                }
+            }
+
+            System.out.println("Ancestral indel solutions saved to: " + fastaFilePath);
+
+        } catch (IOException e) {
+            System.err.println("Error writing ancestral sequences to file: " + e.getMessage());
+            System.out.println("Sending to standard output instead.");
+
+            for (int ancestralIdx : tree.getAncestors()) {
+                MPVariable[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
+                StringBuilder sb = new StringBuilder();
+                sb.append(">N").append(tree.getLabel(ancestralIdx)).append("\n");
+                for (int pos = 0; pos < aln.getWidth(); pos++) {
+                    sb.append((int)nodePosVar[pos].solutionValue());
+                }
+                System.out.println(sb);
+            }
+        }
+    }
+
 
     /**
      * Create a unique key for an edge in the POG associated with a specific ancestor.
@@ -464,7 +545,8 @@ public class Mip {
         UNKNOWN(3, "Unknown option or missing required argument: "),
         IO(4, "Failed to read or write files: "),
         SUB_MODEL(5, "Could not find model with ID "),
-        MIP_ENGINE(6, "Could not create MIP solver with SCIP"),;
+        MIP_ENGINE(6, "Could not create MIP solver with "),
+        INVALID_SOLVER(7, " is not a valid solver name for option --solver");
 
         private final int code;
         private final String description;
@@ -489,10 +571,14 @@ public class Mip {
             out = System.err;
 
         out.println("""
-                Usage: asr.IndelDist\s
+                Usage: asr.Mip\s
                 \t[-a | --aln <filename>]
                 \t[-n | --nwk <filename>]
                 \t{-s | --substitution-model <JTT(default)}
+                \t{-t | --threads <number>}
+                \t{-pre | --prefix <stub>}
+                \t{-o | --output-folder <foldername>} (default is current working folder, or input folder if available)
+                \t{-so | --solver <SCIP (default) or Gurobi>}
                 \t-h (or --help) will print out this screen
                 """
         );
@@ -525,8 +611,29 @@ public class Mip {
                 String arg = args[a].substring(1);
                 if (((arg.equalsIgnoreCase("-aln")) || (arg.equalsIgnoreCase("a"))) && args.length > a + 1) {
                     argMap.put("ALIGNMENT", args[++a]);
+                } else if ((arg.equalsIgnoreCase("-output-folder") || arg.equalsIgnoreCase("o")) && args.length > a + 1) {
+                    argMap.put("OUTPUT", args[++a]);
                 } else if (((arg.equalsIgnoreCase("-nwk")) || (arg.equalsIgnoreCase("n"))) && args.length > a + 1) {
                     argMap.put("NEWICK", args[++a]);
+                } else if ((arg.equalsIgnoreCase("-prefix") || arg.equalsIgnoreCase("pre")) && args.length > a + 1) {
+                    argMap.put("PREFIX", args[++a]);
+                } else if ((arg.equalsIgnoreCase("-solver") || arg.equalsIgnoreCase("so")) && args.length > a + 1) {
+                    boolean foundSolver = false;
+                    for (int i = 0; i < SOLVERS.length; i++) {
+                        if (args[a + 1].equalsIgnoreCase(SOLVERS[i])) {
+                            SOLVER_IDX = i;
+                            foundSolver = true;
+                        }
+                    }
+                    if (!foundSolver)
+                        usage(ERROR.INVALID_SOLVER.getCode(), args[a + 1] + ERROR.INVALID_SOLVER.getDescription());
+
+                } else if ((arg.equalsIgnoreCase("-threads") || arg.equalsIgnoreCase("t")) && args.length > a + 1) {
+                    try {
+                        argMap.put("THREADS", Integer.parseInt(args[++a]));
+                    } catch (NumberFormatException e) {
+                        System.err.println("Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
+                    }
                 } else if ((arg.equalsIgnoreCase("-substitution-model") || arg.equalsIgnoreCase("s")) && args.length > a + 1) {
                     boolean model_found = false;
                     for (int i = 0; i < MODELS.length; i++) {
@@ -539,6 +646,8 @@ public class Mip {
                     if (!model_found) {
                         usage(ERROR.SUB_MODEL.getCode(), ERROR.SUB_MODEL.getDescription() + args[a + 1]);
                     }
+                } else if ((arg.equalsIgnoreCase("-input-folder") || arg.equalsIgnoreCase("i")) && args.length > a + 1) {
+                    argMap.put("INPUT", args[++a]);
                 } else {
                         usage(ERROR.UNKNOWN.getCode(), ERROR.UNKNOWN.getDescription() + "\" + args[a] + \"");
                     }
@@ -548,10 +657,29 @@ public class Mip {
 
     private static void checkArgsValid(HashMap<String, Object> argMap) {
 
+        String ALIGNMENT = (String) argMap.get("ALIGNMENT");
+        String INPUT = (String) argMap.get("INPUT");
+        String OUTPUT = (String) argMap.get("OUTPUT");
+        String PREFIX = (String) argMap.get("PREFIX");
+
         if (!argMap.containsKey("ALIGNMENT")) {
-            usage(IndelDist.ERROR.ALN.getCode(), IndelDist.ERROR.ALN.getDescription());
+            usage(ERROR.ALN.getCode(), ERROR.ALN.getDescription());
         } else if (!argMap.containsKey("NEWICK")) {
-            usage(IndelDist.ERROR.NWK.getCode(), IndelDist.ERROR.NWK.getDescription());
+            usage(ERROR.NWK.getCode(), ERROR.NWK.getDescription());
+        } else if (OUTPUT == null) {
+            OUTPUT = INPUT == null ? "." : INPUT;
         }
+
+        if (PREFIX == null) { // default prefix is the (prefix of) alignment filename
+            int idx2 = ALIGNMENT == null ? 0 : ALIGNMENT.lastIndexOf(".");
+            if (idx2 == -1)
+                idx2 = ALIGNMENT.length();
+            int idx1 = ALIGNMENT == null ? 0 : ALIGNMENT.lastIndexOf("/") + 1;
+            PREFIX = ALIGNMENT == null ? "" : ALIGNMENT.substring(idx1, idx2);
+        }
+
+        argMap.put("OUTPUT", OUTPUT);
+        argMap.put("PREFIX", PREFIX);
+
     }
 }
