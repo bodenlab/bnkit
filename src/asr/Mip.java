@@ -12,6 +12,8 @@ import java.util.HashMap;
 import com.google.ortools.linearsolver.MPVariable;
 import com.google.ortools.linearsolver.MPSolver;
 import com.google.ortools.Loader;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 public class Mip {
 
@@ -33,7 +35,7 @@ public class Mip {
         Integer MODEL_IDX = (Integer) argParser.get("MODEL_IDX");
         String OUTPUT = (String) argParser.get("OUTPUT");
         String PREFIX = (String) argParser.get("PREFIX");
-        int NUM_THREADS = argParser.get("NUM_THREADS") == null ? DEFAULT_THREAD_COUNT : (Integer) argParser.get("NUM_THREADS");
+        int NUM_THREADS = argParser.get("THREADS") == null ? DEFAULT_THREAD_COUNT : (Integer) argParser.get("THREADS");
 
 
         Tree tree = null;
@@ -58,8 +60,9 @@ public class Mip {
         }
 
         // Create the linear solver with the SCIP backend.
-        System.out.println("Loading libraries and creating solver...");
+        //System.out.println("Loading libraries and creating solver...");
         long startLibraryLoad = System.currentTimeMillis();
+        long programStartTime = System.currentTimeMillis();
         Loader.loadNativeLibraries();
         MPSolver solver = MPSolver.createSolver(SOLVERS[SOLVER_IDX]);
         if (solver == null) {
@@ -67,18 +70,8 @@ public class Mip {
         }
         assert solver != null;
 
-//        if (SOLVERS[SOLVER_IDX].equalsIgnoreCase("Gurobi")) {
-//            solver.setSolverSpecificParametersAsString(
-//                    "MIPGap=0.0001 " +
-//                            "MIPGapAbs=1e-10 " +
-//                            "IntFeasTol=1e-05 " +
-//                            "FeasibilityTol=1e-06 " +
-//                            "OptimalityTol=1e-06"
-//            );
-//        }
-
         long endLibraryLoad = System.currentTimeMillis();
-        System.out.println("Loaded libraries and created solver in " + (endLibraryLoad - startLibraryLoad) + " ms");
+        //System.out.println("Loaded libraries and created solver in " + (endLibraryLoad - startLibraryLoad) + " ms");
 
         solver.setNumThreads(NUM_THREADS);
 
@@ -99,24 +92,31 @@ public class Mip {
         addPenaltyConstraints(tree, allEdges, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
                 aln.getWidth(), solver, objective);
         long endModelBuild = System.currentTimeMillis();
-        System.out.println("Constructed MIP model in " + (endModelBuild - startModelBuild) + " ms");
+        //System.out.println("Constructed MIP model in " + (endModelBuild - startModelBuild) + " ms");
 
         objective.setMinimization();
-        System.out.println("Solving MIP formulation...");
-        MPSolver.ResultStatus resultStatus = solver.solve();
 
-        if (solver.verifySolution(1e-7, true)) {
-            System.out.println("Solution verified.");
-        } else {
-            System.out.println("Solution could not be verified.");
+        try {
+            Process process = new ProcessBuilder("ps", "-o", "rss=", "-p", String.valueOf(ProcessHandle.current().pid())).start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line = reader.readLine();
+            long memoryKB = Long.parseLong(line);
+            System.out.println("Process Memory: " + memoryKB / 1024 + " MB");
+
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
+        MPSolver.ResultStatus resultStatus = solver.solve();
+
+        long progEndTime = System.currentTimeMillis();
+        System.out.println("Total run time: " + (progEndTime - programStartTime) / 1000 + " seconds");
         if (resultStatus == MPSolver.ResultStatus.OPTIMAL) {
             System.out.println("Total cost: " + solver.objective().value());
-            System.out.println("Problem solved in " + solver.wallTime() + " milliseconds");
-            System.out.println("Problem solved in " + solver.iterations() + " iterations");
-            System.out.println(solver.nodes() + " branch-and-bound nodes");
-            System.out.println("Number of variables " + solver.numConstraints());
+            System.out.println("Problem solved in " + solver.wallTime() / 1000 + " seconds");
+            //System.out.println("Problem solved in " + solver.iterations() + " iterations");
+            //System.out.println(solver.nodes() + " branch-and-bound nodes");
+            //System.out.println("Number of variables " + solver.numConstraints());
         } else if (resultStatus == MPSolver.ResultStatus.FEASIBLE) {
             System.out.println("Feasible objective: " + objective.value() + "\n");
         } else {
@@ -187,14 +187,12 @@ public class Mip {
      */
     private static HashMap<Integer, MPVariable[]> createAncestralPositionVariables(Tree tree, MPSolver solver, int seqLength) {
 
-        int[] ancestors = tree.getAncestors();
         HashMap<Integer, MPVariable[]> ancestorSeqVars = new HashMap<>();
-        for (int i = 0; i < ancestors.length; i++) {
-            int ancestorIdx = ancestors[i];
+        for (int ancestorIdx : tree.getAncestors()) {
             MPVariable[] seqVars = new MPVariable[seqLength];
             for (int j = 0; j < seqLength; j++) {
                 // NOTE: May want to check that create labels won't create large memory usage.
-                seqVars[j] = solver.makeIntVar(0, 1, "");
+                seqVars[j] = solver.makeBoolVar(""); //0, 1, "");
             }
             ancestorSeqVars.put(ancestorIdx, seqVars);
         }
@@ -220,7 +218,7 @@ public class Mip {
             for (int positionTo = 0; positionTo < startIndices.length; positionTo++) {
 
                 // Variable for each edge from start node
-                MPVariable edge = solver.makeIntVar(0, 1, "");
+                MPVariable edge = solver.makeBoolVar("");// makeIntVar(0, 1, "");
                 allEdgesFromVirtualStart[positionTo] = edge;
 
                 // save unique edge/ancestor combination to a map for later use
@@ -246,7 +244,7 @@ public class Mip {
                 MPVariable[] forwardEdgesFromNode = new MPVariable[totalForwardEdges];
                 for (int positionTo = 0; positionTo < forwardEdges.length; positionTo++) {
 
-                    MPVariable edge = solver.makeIntVar(0, 1, "");
+                    MPVariable edge = solver.makeBoolVar(""); //0, 1, "");
                     int edgeEnd = forwardEdges[positionTo];
                     forwardEdgesFromNode[positionTo] = edge;
 
@@ -255,7 +253,7 @@ public class Mip {
                 }
 
                 if (numEdgesToEnd == 1) {
-                    MPVariable edgeToEnd = solver.makeIntVar(0, 1, "");
+                    MPVariable edgeToEnd = solver.makeBoolVar(""); //0, 1, "");
                     forwardEdgesFromNode[totalForwardEdges - 1] = edgeToEnd;
 
                     EdgeKey edgeKey = new EdgeKey(nodeIdx, VIRTUAL_END, ancestorIdx);
@@ -343,7 +341,7 @@ public class Mip {
                 Pair nodePair = new Pair(ancestralIdx, childIdx);
                 MPVariable[] pen = new MPVariable[seqLength];
                 for (int i = 0; i < seqLength; i++) {
-                    pen[i] = solver.makeIntVar(0, 1, "");
+                    pen[i] = solver.makeBoolVar("");//0, 1, "");
                 }
 
                 Integer[] nodeNeighbourPosVar = null;
@@ -357,7 +355,7 @@ public class Mip {
 
                     diffPos = new MPVariable[seqLength];
                     for (int i = 0; i < seqLength; i++) {
-                        diffPos[i] = solver.makeIntVar(0, 1, "");
+                        diffPos[i] = solver.makeBoolVar("");// 0, 1, "");
                     }
                     diff.put(nodePair, diffPos);
                 }
@@ -370,17 +368,23 @@ public class Mip {
 
                         // constraint - difference variables
                         if (nodeNeighbourPosVar[pos] == 1) {
-                            // constraint: diff = 1 - nodePosVar[pos]
+                            // constraint: diff == 1 - nodePosVar[pos]
                             // rearrange: diff + nodePosVar[pos] == 1
-                            diffVar = solver.makeIntVar(0, 1, "");
+                            diffVar = solver.makeBoolVar(""); //(0, 1, "");
                             MPConstraint c = solver.makeConstraint(1, 1);
                             c.setCoefficient(diffVar, 1.0);
                             c.setCoefficient(nodePosVar[pos], 1.0);
                         } else {
-                            diffVar = nodePosVar[pos];
-                        }
+                            //diffVar = nodePosVar[pos];
+                            // diffVar - nodePosVar[pos] == 0
+                            diffVar = solver.makeBoolVar(""); //(0, 1, "");
+                            MPConstraint c = solver.makeConstraint(0, 0);
+                            c.setCoefficient(diffVar, 1);
+                            c.setCoefficient(nodePosVar[pos], -1);
 
+                        }
                         diff.put(diffKey, new MPVariable[]{diffVar});
+                        objective.setCoefficient(diffVar, 1.0);
 
                         // penalty constraints
                         if (pos == 0) {
@@ -424,8 +428,8 @@ public class Mip {
                         }
 
 
-                        MPVariable objDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
-                        objective.setCoefficient(objDiffVar, 1.0);
+                        //MPVariable objDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
+                        //objective.setCoefficient(objDiffVar, 1.0);
                         objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
 
                     } else {
