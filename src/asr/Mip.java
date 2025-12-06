@@ -12,8 +12,16 @@ import java.util.HashMap;
 import com.google.ortools.linearsolver.MPVariable;
 import com.google.ortools.linearsolver.MPSolver;
 import com.google.ortools.Loader;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import com.google.ortools.sat.CpModel;
+import com.google.ortools.sat.CpSolver;
+import com.google.ortools.sat.CpSolverStatus;
+import com.google.ortools.sat.LinearExpr;
+import com.google.ortools.sat.LinearExprBuilder;
+import com.google.ortools.sat.Literal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.IntStream;
+
 
 public class Mip {
 
@@ -23,7 +31,7 @@ public class Mip {
     private static final int NON_GAP = 1;
     private static final int DEFAULT_GAP_PENALTY = 2;
     private static final int DEFAULT_THREAD_COUNT = 1;
-    public static String[] SOLVERS = new String[] {"SCIP", "Gurobi"};
+    public static String[] SOLVERS = new String[] {"SCIP", "Gurobi", "CPSAT"};
     public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
     private static final Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
                                                                  Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
@@ -36,7 +44,6 @@ public class Mip {
         String OUTPUT = (String) argParser.get("OUTPUT");
         String PREFIX = (String) argParser.get("PREFIX");
         int NUM_THREADS = argParser.get("THREADS") == null ? DEFAULT_THREAD_COUNT : (Integer) argParser.get("THREADS");
-
 
         Tree tree = null;
         EnumSeq.Alignment<Enumerable> aln = null;
@@ -59,32 +66,172 @@ public class Mip {
             usage(ERROR.ALN.getCode(), "Alignment has at least one column with no sequence content. Please remove these before running indel inference.");
         }
 
-        // Create the linear solver with the SCIP backend.
-        //System.out.println("Loading libraries and creating solver...");
-        long startLibraryLoad = System.currentTimeMillis();
         long programStartTime = System.currentTimeMillis();
         Loader.loadNativeLibraries();
-        MPSolver solver = MPSolver.createSolver(SOLVERS[SOLVER_IDX]);
-        if (solver == null) {
-            usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription() + SOLVERS[SOLVER_IDX]);
-        }
-        assert solver != null;
-
-        long endLibraryLoad = System.currentTimeMillis();
-        //System.out.println("Loaded libraries and created solver in " + (endLibraryLoad - startLibraryLoad) + " ms");
-
-        solver.setNumThreads(NUM_THREADS);
-
-        // have tree, pog with edges, and binary sequences for extant taxa
         POAGraph alnPog = new POAGraph(aln);
-
         HashMap<Integer, Integer[]> extantBinarySeqs = createBinarySeqMap(aln, tree);
 
         // Next we create the ancestor penalty array to mirror the tree's children array
         double[][] treeNeighbourAlphaPen = createTreeNeighbourAlphaPen(tree);
 
         System.out.println("Constructing MIP model...");
-        long startModelBuild = System.currentTimeMillis();
+        String solverName = SOLVERS[SOLVER_IDX];
+        if (solverName.equalsIgnoreCase("CPSAT")) {
+            runCPSolverIndelInference(tree, aln, alnPog, NUM_THREADS);
+        } else {
+            runMPSolverIndelInference(tree, alnPog, extantBinarySeqs, treeNeighbourAlphaPen, aln,
+                    NUM_THREADS, OUTPUT, PREFIX, programStartTime);
+        }
+    }
+
+
+
+    private static void runCPSolverIndelInference(Tree tree, EnumSeq.Alignment<Enumerable> aln ,
+                                                  POAGraph alnPog, int num_threads) {
+
+        CpModel model = new CpModel();
+        HashMap<Integer, Literal[]> ancestorPositionVars = createAncestralPositionVariablesCPModel(tree, model, aln.getWidth());
+        HashMap<EdgeKey, Literal> allEdges = addEdgeConstraintsAncestorsCPSolver(tree, alnPog, model, ancestorPositionVars);
+
+
+        CpSolver solver = new CpSolver();
+        solver.getParameters().setNumWorkers(num_threads);
+        CpSolverStatus status = solver.solve(model);
+    }
+
+    private static HashMap<Integer, Literal[]> createAncestralPositionVariablesCPModel(Tree tree, CpModel model,
+                                                                                       int seqLen)  {
+
+        HashMap<Integer, Literal[]> ancestorSeqVars = new HashMap<>();
+        for (int ancestorIdx : tree.getAncestors()) {
+            Literal[] seqVars = new Literal[seqLen];
+            for (int j = 0; j < seqLen; j++) {
+                seqVars[j] = model.newBoolVar("");
+            }
+
+            ancestorSeqVars.put(ancestorIdx, seqVars);
+        }
+
+        return ancestorSeqVars;
+    }
+
+    private static HashMap<EdgeKey, Literal> addEdgeConstraintsAncestorsCPSolver(Tree tree,
+                                                                                    POAGraph alnPOG,
+                                                                                    CpModel model,
+                                                                                    HashMap<Integer, Literal[]> ancestralPositionVars) {
+
+        int VIRTUAL_START = -1;
+        int VIRTUAL_END = alnPOG.maxsize();
+
+        HashMap<EdgeKey, Literal> allEdgeVars = new HashMap<>();
+
+        int[] ancestors = tree.getAncestors();
+        for (int ancestorIdx : ancestors) {
+            // VIRTUAL STARTS TO REAL STARTS //
+            int[] startIndices = alnPOG.getStarts();
+            Literal[] allEdgesFromVirtualStart = new Literal[startIndices.length];
+            for (int positionTo = 0; positionTo < startIndices.length; positionTo++) {
+
+                // Variable for each edge from start node
+                Literal edge = model.newBoolVar("");// makeIntVar(0, 1, "");
+                allEdgesFromVirtualStart[positionTo] = edge;
+
+                // save unique edge/ancestor combination to a map for later use
+                EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, startIndices[positionTo], ancestorIdx);
+                allEdgeVars.put(edgeKey, edge);
+            }
+
+            // Constraint: exactly one edge must be chosen from virtual start to actual starts
+            // TODO: Check this logic is equivalent to MPConstraint below
+            model.addExactlyOne(allEdgesFromVirtualStart);
+
+            // FULLY CONNECTED NODES //
+            int[] endIndices = alnPOG.getEnds();
+            for (int nodeIdx = 0; nodeIdx < alnPOG.maxsize(); nodeIdx++) {
+
+                // EDGES GOING OUT //
+                int[] forwardEdges = alnPOG.getNodeIndices(nodeIdx, true);
+                int numEdgesToEnd = (alnPOG.isEndNode(nodeIdx) ? 1 : 0);
+                int totalForwardEdges = forwardEdges.length + numEdgesToEnd;
+
+                Literal[] forwardEdgesFromNode = new Literal[totalForwardEdges];
+                for (int positionTo = 0; positionTo < forwardEdges.length; positionTo++) {
+
+                    Literal edge = model.newBoolVar(""); //0, 1, "");
+                    int edgeEnd = forwardEdges[positionTo];
+                    forwardEdgesFromNode[positionTo] = edge;
+
+                    EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
+                    allEdgeVars.put(edgeKey, edge);
+                }
+
+                if (numEdgesToEnd == 1) {
+                    Literal edgeToEnd = model.newBoolVar(""); //0, 1, "");
+                    forwardEdgesFromNode[totalForwardEdges - 1] = edgeToEnd;
+
+                    EdgeKey edgeKey = new EdgeKey(nodeIdx, VIRTUAL_END, ancestorIdx);
+                    allEdgeVars.put(edgeKey, edgeToEnd);
+                }
+
+                // sum(edges) == positionVar
+                Literal ancestralNode = ancestralPositionVars.get(ancestorIdx)[nodeIdx];
+                model.addEquality(ancestralNode, LinearExpr.sum(forwardEdgesFromNode));
+
+                // EDGES COMING IN //
+                int[] backwardEdges = alnPOG.getNodeIndices(nodeIdx, false);
+                int numEdgesFromStart = (alnPOG.isStartNode(nodeIdx) ? 1 : 0);
+                int totalBackwardEdges = backwardEdges.length + numEdgesFromStart;
+
+                Literal[] backwardEdgesFromNode = new Literal[totalBackwardEdges];
+                for (int positionTo = 0; positionTo < backwardEdges.length; positionTo++) {
+
+                    int edgeComingIn = backwardEdges[positionTo];
+
+                    EdgeKey edgeKey = new EdgeKey(edgeComingIn, nodeIdx, ancestorIdx);
+                    Literal edge = allEdgeVars.get(edgeKey);
+                    backwardEdgesFromNode[positionTo] = edge;
+                }
+
+                if (numEdgesFromStart == 1) {
+                    EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, nodeIdx, ancestorIdx);
+                    Literal edge = allEdgeVars.get(edgeKey);
+
+                    backwardEdgesFromNode[totalBackwardEdges - 1] = edge;
+                }
+
+                // Constraint: sum(edges) == position variable
+                model.addEquality(ancestralNode, LinearExpr.sum(backwardEdgesFromNode));
+
+            }
+
+            // REAL ENDS TO VIRTUAL ENDS //
+            Literal[] allEdgesToVirtualEnd = new Literal[endIndices.length];
+            for (int positionFrom = 0; positionFrom < endIndices.length; positionFrom++) {
+                EdgeKey edgeKey = new EdgeKey(endIndices[positionFrom], VIRTUAL_END, ancestorIdx);
+                allEdgesToVirtualEnd[positionFrom] = allEdgeVars.get(edgeKey);
+            }
+
+            model.addExactlyOne(allEdgesToVirtualEnd);
+
+
+        }
+
+        return allEdgeVars;
+    }
+
+    private static void runMPSolverIndelInference(Tree tree, POAGraph alnPog,
+                                                  HashMap<Integer, Integer[]> extantBinarySeqs,
+                                                  double[][] treeNeighbourAlphaPen, EnumSeq.Alignment<Enumerable> aln,
+                                                  int num_threads, String OUTPUT, String PREFIX, long programStartTime) {
+
+        MPSolver solver = MPSolver.createSolver(SOLVERS[SOLVER_IDX]);
+        if (solver == null) {
+            usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription() + SOLVERS[SOLVER_IDX]);
+        }
+        assert solver != null;
+
+        solver.setNumThreads(num_threads);
+
         HashMap<Integer, MPVariable[]> ancestorPositionVars = createAncestralPositionVariables(tree, solver, aln.getWidth());
         HashMap<EdgeKey, MPVariable> allEdges = addEdgeConstraintsAncestors(tree, alnPog, solver, ancestorPositionVars);
 
@@ -95,17 +242,6 @@ public class Mip {
         //System.out.println("Constructed MIP model in " + (endModelBuild - startModelBuild) + " ms");
 
         objective.setMinimization();
-
-        try {
-            Process process = new ProcessBuilder("ps", "-o", "rss=", "-p", String.valueOf(ProcessHandle.current().pid())).start();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line = reader.readLine();
-            long memoryKB = Long.parseLong(line);
-            System.out.println("Process Memory: " + memoryKB / 1024 + " MB");
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
         MPSolver.ResultStatus resultStatus = solver.solve();
 
