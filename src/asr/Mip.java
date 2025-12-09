@@ -90,10 +90,11 @@ public class Mip {
 
         CpModel model = new CpModel();
         HashMap<Integer, Literal[]> ancestorPositionVars = createAncestralPositionVariablesCPModel(tree, model, aln.getWidth());
-        HashMap<EdgeKey, Literal> allEdges = addEdgeConstraintsAncestorsCPSolver(tree, alnPog, model, ancestorPositionVars);
+
+        addEdgeConstraintsAncestorsCPSolver(tree, alnPog, model, ancestorPositionVars);
 
         LinearExprBuilder objective = LinearExpr.newBuilder();
-        addPenaltyConstraintsCPSolver(tree, allEdges, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
+        addPenaltyConstraintsCPSolver(tree, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
                                       aln.getWidth(), model, objective);
 
         model.minimize(objective);
@@ -101,6 +102,7 @@ public class Mip {
         CpSolver solver = new CpSolver();
         solver.getParameters().setNumWorkers(num_threads);
         CpSolverStatus status = solver.solve(model);
+
         if (status == CpSolverStatus.OPTIMAL) {
             System.out.println("Total cost: " + solver.objectiveValue());
             System.out.println("Problem solved in " + solver.wallTime() / 1000 + " seconds");
@@ -185,7 +187,7 @@ public class Mip {
         return ancestorSeqVars;
     }
 
-    private static HashMap<EdgeKey, Literal> addEdgeConstraintsAncestorsCPSolver(Tree tree,
+    private static void addEdgeConstraintsAncestorsCPSolver(Tree tree,
                                                                                     POAGraph alnPOG,
                                                                                     CpModel model,
                                                                                     HashMap<Integer, Literal[]> ancestralPositionVars) {
@@ -212,7 +214,6 @@ public class Mip {
             }
 
             // Constraint: exactly one edge must be chosen from virtual start to actual starts
-            // TODO: Check this logic is equivalent to MPConstraint below
             model.addExactlyOne(allEdgesFromVirtualStart);
 
             // FULLY CONNECTED NODES //
@@ -282,15 +283,10 @@ public class Mip {
             }
 
             model.addExactlyOne(allEdgesToVirtualEnd);
-
-
         }
-
-        return allEdgeVars;
     }
 
     private static void addPenaltyConstraintsCPSolver(Tree tree,
-                                                      HashMap<EdgeKey, Literal> allEdges,
                                                       HashMap<Integer, Integer[]> extantBinarySeqs,
                                                       double[][] treeNeighbourAlphaPen,
                                                       HashMap<Integer, Literal[]> ancestorPositionVars,
@@ -298,16 +294,12 @@ public class Mip {
                                                       CpModel model,
                                                       LinearExprBuilder objective) {
 
-        HashMap<Object, Object> diff = new HashMap<>();
-
         for (int ancestralIdx : tree.getAncestors()) {
 
             Literal[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
 
 
             for (int childIdx : tree.getChildren(ancestralIdx)) {
-
-                Pair nodePair = new Pair(ancestralIdx, childIdx);
                 Literal[] pen = new Literal[seqLength];
                 for (int i = 0; i < seqLength; i++) {
                     pen[i] = model.newBoolVar("");//0, 1, "");
@@ -326,47 +318,44 @@ public class Mip {
                     for (int i = 0; i < seqLength; i++) {
                         diffPos[i] = model.newBoolVar("");// 0, 1, "");
                     }
-                    diff.put(nodePair, diffPos);
                 }
 
+                Literal diffVar = null;
+                Literal prevDiffVar = null;
                 for (int pos = 0; pos < seqLength; pos++) {
-                    Literal diffVar;
-                    Triplet diffKey = new Triplet(ancestralIdx, childIdx, pos);
+
+                    if (pos > 0) {
+                        prevDiffVar = diffVar;
+                    }
 
                     if (tree.isLeaf(childIdx)) {
 
                         // constraint - difference variables
+                        diffVar = model.newBoolVar("");
                         if (nodeNeighbourPosVar[pos] == 1) {
-                            // constraint: diff == 1 - nodePosVar[pos]
-                            // rearrange: diff + nodePosVar[pos] == 1
-                            diffVar = model.newBoolVar(""); //(0, 1, "");
+                            // constraint: diff + nodePosVar[pos] == 1
                             model.addEquality(LinearExpr.sum(new Literal[]{diffVar, nodePosVar[pos]}), 1);
 
                         } else {
-                            //diffVar = nodePosVar[pos];
-                            // diffVar - nodePosVar[pos] == 0
-                            diffVar = model.newBoolVar(""); //(0, 1, "");
+                            // constraint: diffVar = nodePosVar[pos];
                             model.addEquality(diffVar, nodePosVar[pos]);
                         }
-                        diff.put(diffKey, new Literal[]{diffVar});
+                        //diff.put(diffKey, new Literal[]{diffVar});
                         objective.add(diffVar);
 
                         // penalty constraints
                         if (pos == 0) {
                             // pen[0] == diff[0]
-                            Literal curDiffVar = ((Literal[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
-                            model.addEquality(curDiffVar, pen[pos]);
+                            model.addEquality(diffVar, pen[pos]);
 
                         } else {
 
                             // constraint: pen[pos]>= diff[(node, node_neighbor_item, pos)] - diff[(node, node_neighbor_item, pos - 1)])
-                            Literal curDiffVar = ((Literal[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
-                            Literal diffVarPrev = ((Literal[])diff.get(new Triplet(ancestralIdx, childIdx, pos - 1)))[0];
                             model.addGreaterOrEqual(LinearExpr.weightedSum(
                                             new Literal[]{
                                                     pen[pos],
-                                                    curDiffVar,
-                                                    diffVarPrev},
+                                                    diffVar,
+                                                    prevDiffVar},
                                             new long[]{
                                                     1,
                                                     -1,
@@ -408,7 +397,9 @@ public class Mip {
 
                         objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
 
-                    } else {
+                    } else { // Ancestor
+
+
                         //diff_pos[pos] <= node_pos_var[pos] + node_neighbor_pos_var[pos]
                         model.addLessOrEqual(LinearExpr.weightedSum(
                                 new Literal[]{
@@ -518,10 +509,10 @@ public class Mip {
         solver.setNumThreads(num_threads);
 
         HashMap<Integer, MPVariable[]> ancestorPositionVars = createAncestralPositionVariables(tree, solver, aln.getWidth());
-        HashMap<EdgeKey, MPVariable> allEdges = addEdgeConstraintsAncestors(tree, alnPog, solver, ancestorPositionVars);
+        addEdgeConstraintsAncestors(tree, alnPog, solver, ancestorPositionVars);
 
         MPObjective objective = solver.objective();
-        addPenaltyConstraints(tree, allEdges, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
+        addPenaltyConstraints(tree, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
                 aln.getWidth(), solver, objective);
         long endModelBuild = System.currentTimeMillis();
         //System.out.println("Constructed MIP model in " + (endModelBuild - startModelBuild) + " ms");
@@ -622,7 +613,7 @@ public class Mip {
 
     }
 
-    private static HashMap<EdgeKey, MPVariable> addEdgeConstraintsAncestors(Tree tree, POAGraph alnPOG,
+    private static void addEdgeConstraintsAncestors(Tree tree, POAGraph alnPOG,
                                                                             MPSolver solver,
                                                                             HashMap<Integer, MPVariable[]> ancestralPositionVars) {
 
@@ -734,13 +725,10 @@ public class Mip {
                 virtualEndConstraint.setCoefficient(edgeVar, 1);
             }
         }
-
-        return allEdgeVars;
     }
 
 
     private static void addPenaltyConstraints(Tree tree,
-                                              HashMap<EdgeKey, MPVariable> allEdges,
                                               HashMap<Integer, Integer[]> extantBinarySeqs,
                                               double[][] treeNeighbourAlphaPen,
                                               HashMap<Integer, MPVariable[]> ancestorPositionVars,
@@ -749,7 +737,6 @@ public class Mip {
                                               MPObjective objective) {
 
 
-        HashMap<Object, Object> diff = new HashMap<>();
 
         for (int ancestralIdx : tree.getAncestors()) {
 
@@ -758,8 +745,6 @@ public class Mip {
 
             for (int childIdx : tree.getChildren(ancestralIdx)) {
 
-
-                Pair nodePair = new Pair(ancestralIdx, childIdx);
                 MPVariable[] pen = new MPVariable[seqLength];
                 for (int i = 0; i < seqLength; i++) {
                     pen[i] = solver.makeBoolVar("");//0, 1, "");
@@ -778,33 +763,34 @@ public class Mip {
                     for (int i = 0; i < seqLength; i++) {
                         diffPos[i] = solver.makeBoolVar("");// 0, 1, "");
                     }
-                    diff.put(nodePair, diffPos);
                 }
 
+                MPVariable diffVar = null;
+                MPVariable prevDiffVar = null;
                 for (int pos = 0; pos < seqLength; pos++) {
-                    MPVariable diffVar;
-                    Triplet diffKey = new Triplet(ancestralIdx, childIdx, pos);
+
+                    if (pos > 0) {
+                        prevDiffVar = diffVar;
+                    }
 
                     if (tree.isLeaf(childIdx)) {
 
                         // constraint - difference variables
+                        diffVar = solver.makeBoolVar("");
                         if (nodeNeighbourPosVar[pos] == 1) {
                             // constraint: diff == 1 - nodePosVar[pos]
                             // rearrange: diff + nodePosVar[pos] == 1
-                            diffVar = solver.makeBoolVar(""); //(0, 1, "");
                             MPConstraint c = solver.makeConstraint(1, 1);
                             c.setCoefficient(diffVar, 1.0);
                             c.setCoefficient(nodePosVar[pos], 1.0);
                         } else {
                             //diffVar = nodePosVar[pos];
                             // diffVar - nodePosVar[pos] == 0
-                            diffVar = solver.makeBoolVar(""); //(0, 1, "");
                             MPConstraint c = solver.makeConstraint(0, 0);
                             c.setCoefficient(diffVar, 1);
                             c.setCoefficient(nodePosVar[pos], -1);
 
                         }
-                        diff.put(diffKey, new MPVariable[]{diffVar});
                         objective.setCoefficient(diffVar, 1.0);
 
                         // penalty constraints
@@ -813,8 +799,7 @@ public class Mip {
                             // Rewrite as: pen[1] - diff[1] == 0
                             MPConstraint c = solver.makeConstraint(0, 0);
                             c.setCoefficient(pen[pos], 1.0);
-                            MPVariable curDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
-                            c.setCoefficient(curDiffVar, -1.0);
+                            c.setCoefficient(diffVar, -1.0);
                         } else {
 
                             // constraint: pen[pos]>= diff[(node, node_neighbor_item, pos)] - diff[(node, node_neighbor_item, pos - 1)])
@@ -822,11 +807,9 @@ public class Mip {
                             MPConstraint c1 = solver.makeConstraint(0, Double.POSITIVE_INFINITY);
                             c1.setCoefficient(pen[pos], 1.0);
 
-                            MPVariable curDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
-                            c1.setCoefficient(curDiffVar, -1.0);
+                            c1.setCoefficient(diffVar, -1.0);
 
-                            MPVariable diffVarPrev = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos - 1)))[0];
-                            c1.setCoefficient(diffVarPrev, 1.0);
+                            c1.setCoefficient(prevDiffVar, 1.0);
 
                             // Constraint: pen[pos] >= node_neighbor_pos_var[pos - 1] + (1 - node_pos_var[pos - 1]) + (1 - node_neighbor_pos_var[pos]) + node_pos_var[pos] - 3
                             // because these neighbours are children, we can just evaluate everything on right hand side
@@ -972,9 +955,6 @@ public class Mip {
      * Allows this to be used as a key in hash maps.
      */
     public record EdgeKey(int from, int to, int ancestorIdx) {}
-
-    public record Pair(int first, int second) {}
-    public record Triplet(int first, int second, int third) {}
 
     /**
      * Error codes for the program
