@@ -18,10 +18,6 @@ import com.google.ortools.sat.CpSolverStatus;
 import com.google.ortools.sat.LinearExpr;
 import com.google.ortools.sat.LinearExprBuilder;
 import com.google.ortools.sat.Literal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.IntStream;
-
 
 public class Mip {
 
@@ -77,7 +73,8 @@ public class Mip {
         System.out.println("Constructing MIP model...");
         String solverName = SOLVERS[SOLVER_IDX];
         if (solverName.equalsIgnoreCase("CPSAT")) {
-            runCPSolverIndelInference(tree, aln, alnPog, NUM_THREADS, extantBinarySeqs, treeNeighbourAlphaPen);
+            runCPSolverIndelInference(tree, aln, alnPog, NUM_THREADS, extantBinarySeqs, treeNeighbourAlphaPen,
+                    OUTPUT, PREFIX);
         } else {
             runMPSolverIndelInference(tree, alnPog, extantBinarySeqs, treeNeighbourAlphaPen, aln,
                     NUM_THREADS, OUTPUT, PREFIX, programStartTime);
@@ -89,7 +86,7 @@ public class Mip {
     private static void runCPSolverIndelInference(Tree tree, EnumSeq.Alignment<Enumerable> aln ,
                                                   POAGraph alnPog, int num_threads,
                                                   HashMap<Integer, Integer[]> extantBinarySeqs,
-                                                  double[][] treeNeighbourAlphaPen) {
+                                                  double[][] treeNeighbourAlphaPen, String output, String prefix) {
 
         CpModel model = new CpModel();
         HashMap<Integer, Literal[]> ancestorPositionVars = createAncestralPositionVariablesCPModel(tree, model, aln.getWidth());
@@ -99,10 +96,77 @@ public class Mip {
         addPenaltyConstraintsCPSolver(tree, allEdges, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
                                       aln.getWidth(), model, objective);
 
+        model.minimize(objective);
 
         CpSolver solver = new CpSolver();
         solver.getParameters().setNumWorkers(num_threads);
         CpSolverStatus status = solver.solve(model);
+        if (status == CpSolverStatus.OPTIMAL) {
+            System.out.println("Total cost: " + solver.objectiveValue());
+            System.out.println("Problem solved in " + solver.wallTime() / 1000 + " seconds");
+        } else if (status == CpSolverStatus.FEASIBLE) {
+            System.out.println("Feasible objective: " + solver.objectiveValue() + "\n");
+            System.out.println("Problem solved in " + solver.wallTime() / 1000 + " seconds");
+        } else {
+            System.err.println("No solution found.");
+        }
+
+        outputAncestralSolutionsCPSolver(tree, ancestorPositionVars, aln, output, prefix, solver);
+    }
+
+    private static void outputAncestralSolutionsCPSolver(Tree tree,
+                                                 HashMap<Integer, Literal[]> ancestorPositionVars,
+                                                 EnumSeq.Alignment<Enumerable> aln,
+                                                 String OUTPUT,
+                                                 String PREFIX, CpSolver solver) {
+
+
+        // Create output file path
+        String fastaFilePath = OUTPUT + "/" + PREFIX + "_ancestral_indel.fasta";
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fastaFilePath))) {
+            for (int ancestralIdx : tree.getAncestors()) {
+                Literal[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
+
+                // Write FASTA header
+                writer.write(">N" + tree.getLabel(ancestralIdx));
+                writer.newLine();
+
+                StringBuilder sequenceLine = new StringBuilder();
+                for (int pos = 0; pos < aln.getWidth(); pos++) {
+                    sequenceLine.append(solver.value(nodePosVar[pos]));
+
+                    // Optional: Add line breaks every 80 characters (standard FASTA format)
+                    if ((pos + 1) % 80 == 0 && pos < aln.getWidth() - 1) {
+                        writer.write(sequenceLine.toString());
+                        writer.newLine();
+                        sequenceLine = new StringBuilder();
+                    }
+                }
+
+                // Write any remaining sequence
+                if (!sequenceLine.isEmpty()) {
+                    writer.write(sequenceLine.toString());
+                    writer.newLine();
+                }
+            }
+
+            System.out.println("Ancestral indel solutions saved to: " + fastaFilePath);
+
+        } catch (IOException e) {
+            System.err.println("Error writing ancestral sequences to file: " + e.getMessage());
+            System.out.println("Sending to standard output instead.");
+
+            for (int ancestralIdx : tree.getAncestors()) {
+                Literal[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
+                StringBuilder sb = new StringBuilder();
+                sb.append(">N").append(tree.getLabel(ancestralIdx)).append("\n");
+                for (int pos = 0; pos < aln.getWidth(); pos++) {
+                    sb.append(solver.value(nodePosVar[pos]));
+                }
+                System.out.println(sb);
+            }
+        }
     }
 
     private static HashMap<Integer, Literal[]> createAncestralPositionVariablesCPModel(Tree tree, CpModel model,
@@ -234,7 +298,6 @@ public class Mip {
                                                       CpModel model,
                                                       LinearExprBuilder objective) {
 
-        /*
         HashMap<Object, Object> diff = new HashMap<>();
 
         for (int ancestralIdx : tree.getAncestors()) {
@@ -243,7 +306,6 @@ public class Mip {
 
 
             for (int childIdx : tree.getChildren(ancestralIdx)) {
-
 
                 Pair nodePair = new Pair(ancestralIdx, childIdx);
                 Literal[] pen = new Literal[seqLength];
@@ -277,129 +339,169 @@ public class Mip {
                         if (nodeNeighbourPosVar[pos] == 1) {
                             // constraint: diff == 1 - nodePosVar[pos]
                             // rearrange: diff + nodePosVar[pos] == 1
-                            diffVar = model.makeBoolVar(""); //(0, 1, "");
-                            MPConstraint c = solver.makeConstraint(1, 1);
-                            c.setCoefficient(diffVar, 1.0);
-                            c.setCoefficient(nodePosVar[pos], 1.0);
+                            diffVar = model.newBoolVar(""); //(0, 1, "");
+                            model.addEquality(LinearExpr.sum(new Literal[]{diffVar, nodePosVar[pos]}), 1);
+
                         } else {
                             //diffVar = nodePosVar[pos];
                             // diffVar - nodePosVar[pos] == 0
-                            diffVar = solver.makeBoolVar(""); //(0, 1, "");
-                            MPConstraint c = solver.makeConstraint(0, 0);
-                            c.setCoefficient(diffVar, 1);
-                            c.setCoefficient(nodePosVar[pos], -1);
-
+                            diffVar = model.newBoolVar(""); //(0, 1, "");
+                            model.addEquality(diffVar, nodePosVar[pos]);
                         }
-                        diff.put(diffKey, new MPVariable[]{diffVar});
-                        objective.setCoefficient(diffVar, 1.0);
+                        diff.put(diffKey, new Literal[]{diffVar});
+                        objective.add(diffVar);
 
                         // penalty constraints
                         if (pos == 0) {
                             // pen[0] == diff[0]
-                            // Rewrite as: pen[1] - diff[1] == 0
-                            MPConstraint c = solver.makeConstraint(0, 0);
-                            c.setCoefficient(pen[pos], 1.0);
-                            MPVariable curDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
-                            c.setCoefficient(curDiffVar, -1.0);
+                            Literal curDiffVar = ((Literal[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
+                            model.addEquality(curDiffVar, pen[pos]);
+
                         } else {
 
                             // constraint: pen[pos]>= diff[(node, node_neighbor_item, pos)] - diff[(node, node_neighbor_item, pos - 1)])
-                            // rearrange: pen[pos] -  diff[(node, node_neighbor_item, pos)] + diff[(node, node_neighbor_item, pos - 1)]) >= 0
-                            MPConstraint c1 = solver.makeConstraint(0, Double.POSITIVE_INFINITY);
-                            c1.setCoefficient(pen[pos], 1.0);
-
-                            MPVariable curDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
-                            c1.setCoefficient(curDiffVar, -1.0);
-
-                            MPVariable diffVarPrev = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos - 1)))[0];
-                            c1.setCoefficient(diffVarPrev, 1.0);
+                            Literal curDiffVar = ((Literal[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
+                            Literal diffVarPrev = ((Literal[])diff.get(new Triplet(ancestralIdx, childIdx, pos - 1)))[0];
+                            model.addGreaterOrEqual(LinearExpr.weightedSum(
+                                            new Literal[]{
+                                                    pen[pos],
+                                                    curDiffVar,
+                                                    diffVarPrev},
+                                            new long[]{
+                                                    1,
+                                                    -1,
+                                                    1}),
+                                        0);
 
                             // Constraint: pen[pos] >= node_neighbor_pos_var[pos - 1] + (1 - node_pos_var[pos - 1]) + (1 - node_neighbor_pos_var[pos]) + node_pos_var[pos] - 3
                             // because these neighbours are children, we can just evaluate everything on right hand side
                             // rearrange: pen[pos] + node_pos_var[pos - 1] - node_pos_var[pos] >= node_neighbor_pos_var[pos - 1] + 1 + (1 - node_neighbor_pos_var[pos]) - 3
                             // rearrange: pen[pos] + node_pos_var[pos - 1] - node_pos_var[pos] >= node_neighbor_pos_var[pos - 1] - node_neighbor_pos_var[pos] - 1
-                            double rhs2 = nodeNeighbourPosVar[pos - 1] - nodeNeighbourPosVar[pos] - 1;
-                            MPConstraint c2 = solver.makeConstraint(rhs2, Double.POSITIVE_INFINITY);
-                            c2.setCoefficient(pen[pos], 1.0);
-                            c2.setCoefficient(nodePosVar[pos - 1], 1.0);
-                            c2.setCoefficient(nodePosVar[pos], -1.0);
+                            long rhs2 = nodeNeighbourPosVar[pos - 1] - nodeNeighbourPosVar[pos] - 1;
+                            model.addGreaterOrEqual(LinearExpr.weightedSum(
+                                    new Literal[]{
+                                            pen[pos],
+                                            nodePosVar[pos - 1],
+                                            nodePosVar[pos]},
+                                    new long[]{
+                                            1,
+                                            1,
+                                            -1}),
+                                    rhs2);
 
                             // Constraint: pen[pos] >= node_neighbor_pos_var[pos] + (1 - node_pos_var[pos]) + (1 - node_neighbor_pos_var[pos - 1]) + node_pos_var[pos - 1] - 3
                             // Rearrange: pen[pos] + node_pos_var[pos] - node_pos_var[pos - 1]  >= node_neighbor_pos_var[pos] + 1 + (1 - node_neighbor_pos_var[pos - 1]) - 3
                             // Rearrange: pen[pos] + node_pos_var[pos] - node_pos_var[pos - 1]  >= node_neighbor_pos_var[pos] - node_neighbor_pos_var[pos - 1]) - 1
-                            double rhs3 = nodeNeighbourPosVar[pos] - nodeNeighbourPosVar[pos - 1] - 1;
-                            MPConstraint c3 = solver.makeConstraint(rhs3, Double.POSITIVE_INFINITY);
-                            c3.setCoefficient(pen[pos], 1.0);
-                            c3.setCoefficient(nodePosVar[pos], 1.0);
-                            c3.setCoefficient(nodePosVar[pos - 1], -1.0);
+                            long rhs3 = nodeNeighbourPosVar[pos] - nodeNeighbourPosVar[pos - 1] - 1;
+                            model.addGreaterOrEqual(LinearExpr.weightedSum(
+                                    new Literal[]{
+                                            pen[pos],
+                                            nodePosVar[pos],
+                                            nodePosVar[pos - 1]},
+                                    new long[]{
+                                            1,
+                                            1,
+                                            -1}),
+                                    rhs3);
+
                         }
 
-
-                        //MPVariable objDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
-                        //objective.setCoefficient(objDiffVar, 1.0);
-                        objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
+                        objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
 
                     } else {
                         //diff_pos[pos] <= node_pos_var[pos] + node_neighbor_pos_var[pos]
-                        MPConstraint c1 = solver.makeConstraint(Double.NEGATIVE_INFINITY, 0);
-                        c1.setCoefficient(diffPos[pos], 1.0);
-                        c1.setCoefficient(nodePosVar[pos], -1.0);
-                        c1.setCoefficient(nodeNeighborPosVarAncestor[pos], -1.0);
+                        model.addLessOrEqual(LinearExpr.weightedSum(
+                                new Literal[]{
+                                        diffPos[pos],
+                                        nodePosVar[pos],
+                                        nodeNeighborPosVarAncestor[pos]},
+                                new long[]{
+                                        1,
+                                        -1,
+                                        -1}),
+                                0);
 
                         // diff_pos[pos] >= node_pos_var[pos] - node_neighbor_pos_var[pos]
-                        MPConstraint c2 = solver.makeConstraint(0.0, Double.POSITIVE_INFINITY);
-                        c2.setCoefficient(diffPos[pos], 1.0);
-                        c2.setCoefficient(nodePosVar[pos], -1.0);
-                        c2.setCoefficient(nodeNeighborPosVarAncestor[pos], 1.0);
+                        model.addGreaterOrEqual(LinearExpr.weightedSum(
+                                new Literal[]{
+                                        diffPos[pos],
+                                        nodePosVar[pos],
+                                        nodeNeighborPosVarAncestor[pos]},
+                                new long[]{
+                                        1,
+                                        -1,
+                                        1}),
+                                0);
 
                         // diff_pos[pos] >= node_neighbor_pos_var[pos] - node_pos_var[pos]
-                        MPConstraint c3 = solver.makeConstraint(0.0, Double.POSITIVE_INFINITY);
-                        c3.setCoefficient(diffPos[pos], 1.0);
-                        c3.setCoefficient(nodeNeighborPosVarAncestor[pos], -1.0);
-                        c3.setCoefficient(nodePosVar[pos], 1.0);
+                        model.addGreaterOrEqual(LinearExpr.weightedSum(
+                                new Literal[]{
+                                        diffPos[pos],
+                                        nodeNeighborPosVarAncestor[pos],
+                                        nodePosVar[pos]},
+                                new long[]{
+                                        1,
+                                        -1,
+                                        1}),
+                                0);
 
                         // diff_pos[pos] <= 2 - node_neighbor_pos_var[pos] - node_pos_var[pos]
-                        MPConstraint c4 = solver.makeConstraint(Double.NEGATIVE_INFINITY, 2.0);
-                        c4.setCoefficient(diffPos[pos], 1.0);
-                        c4.setCoefficient(nodeNeighborPosVarAncestor[pos], 1.0);
-                        c4.setCoefficient(nodePosVar[pos], 1.0);
+                        model.addLessOrEqual(LinearExpr.weightedSum(
+                                new Literal[]{
+                                        diffPos[pos],
+                                        nodeNeighborPosVarAncestor[pos],
+                                        nodePosVar[pos]},
+                                new long[]{
+                                        1,
+                                        1,
+                                        1}),
+                                2);
 
                         if (pos == 0) {
-                            MPConstraint c5 = solver.makeConstraint(0, 0);
-                            c5.setCoefficient(pen[pos], 1.0);
-                            c5.setCoefficient(diffPos[pos], -1.0);
+                            // constraint: pen[0] == diff[0]
+                            model.addEquality(pen[pos], diffPos[pos]);
+
                         } else {
-                            MPConstraint c6 = solver.makeConstraint(0, Double.POSITIVE_INFINITY);
-                            c6.setCoefficient(pen[pos], 1.0);
-                            c6.setCoefficient(diffPos[pos], -1.0);
-                            c6.setCoefficient(diffPos[pos - 1], 1.0);
+                            // pen[pos] >= diff_pos[pos] - diff_pos[pos-1]
+                            model.addGreaterOrEqual(LinearExpr.weightedSum(
+                                    new Literal[]{
+                                            pen[pos],
+                                            diffPos[pos],
+                                            diffPos[pos - 1]},
+                                    new long[]{
+                                            1,
+                                            -1,
+                                            1}),
+                                    0
+                            );
 
-                            MPConstraint c7 = solver.makeConstraint(-1.0, Double.POSITIVE_INFINITY);
-                            c7.setCoefficient(pen[pos], 1.0);
-                            c7.setCoefficient(nodeNeighborPosVarAncestor[pos - 1], -1.0);
-                            c7.setCoefficient(nodePosVar[pos - 1], 1.0);
-                            c7.setCoefficient(nodeNeighborPosVarAncestor[pos], 1.0);
-                            c7.setCoefficient(nodePosVar[pos], -1.0);
+                            // pen[pos] >= node_neighbor_pos_var[pos-1] + (1 - node_pos_var[pos-1]) + (1 - node_neighbor_pos_var[pos]) + node_pos_var[pos] -3
+                            model.addGreaterOrEqual(LinearExpr.weightedSum(
+                                    new Literal[]{
+                                            pen[pos],
+                                            nodeNeighborPosVarAncestor[pos - 1],
+                                            nodePosVar[pos - 1],
+                                            nodeNeighborPosVarAncestor[pos],
+                                            nodePosVar[pos]},
+                                    new long[]{1, -1, 1, 1, -1}), -1);
 
-                            MPConstraint c8 = solver.makeConstraint(-1.0, Double.POSITIVE_INFINITY);
-                            c8.setCoefficient(pen[pos], 1.0);
-                            c8.setCoefficient(nodeNeighborPosVarAncestor[pos], -1.0);
-                            c8.setCoefficient(nodePosVar[pos], 1.0);
-                            c8.setCoefficient(nodeNeighborPosVarAncestor[pos - 1], 1.0);
-                            c8.setCoefficient(nodePosVar[pos - 1], -1.0);
+                            // pen[pos] >= node_neighbor_pos_var[pos] + (1 - node_pos_var[pos]) + (1 - node_neighbor_pos_var[pos-1]) + node_pos_var[pos-1] - 3
+                            model.addGreaterOrEqual(LinearExpr.weightedSum(
+                                    new Literal[]{
+                                            pen[pos],
+                                            nodeNeighborPosVarAncestor[pos],
+                                            nodePosVar[pos],
+                                            nodeNeighborPosVarAncestor[pos - 1],
+                                            nodePosVar[pos - 1]},
+                                    new long[]{1, -1, 1, 1, -1}), -1);
                         }
 
-                        objective.setCoefficient(diffPos[pos], 1.0);
-                        objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
+                        objective.add(diffPos[pos]);
+                        objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
                     }
                 }
             }
         }
-
-
-        model.minimize(objective);
-
-         */
     }
 
     private static void runMPSolverIndelInference(Tree tree, POAGraph alnPog,
@@ -917,7 +1019,7 @@ public class Mip {
                 \t{-t | --threads <number>}
                 \t{-pre | --prefix <stub>}
                 \t{-o | --output-folder <foldername>} (default is current working folder, or input folder if available)
-                \t{-so | --solver <SCIP (default) or Gurobi>}
+                \t{-so | --solver <SCIP (default), Gurobi, CPSAT>}
                 \t-h (or --help) will print out this screen
                 """
         );
