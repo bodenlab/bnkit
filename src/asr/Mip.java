@@ -105,10 +105,10 @@ public class Mip {
 
         if (status == CpSolverStatus.OPTIMAL) {
             System.out.println("Total cost: " + solver.objectiveValue());
-            System.out.println("Problem solved in " + solver.wallTime() / 1000 + " seconds");
+            System.out.println("Problem solved in " + solver.wallTime() + " seconds");
         } else if (status == CpSolverStatus.FEASIBLE) {
             System.out.println("Feasible objective: " + solver.objectiveValue() + "\n");
-            System.out.println("Problem solved in " + solver.wallTime() / 1000 + " seconds");
+            System.out.println("Problem solved in " + solver.wallTime() + " seconds");
         } else {
             System.err.println("No solution found.");
         }
