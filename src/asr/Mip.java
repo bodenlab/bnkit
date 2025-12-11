@@ -5,6 +5,7 @@ import com.google.ortools.linearsolver.MPObjective;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
+import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.pog.POAGraph;
 import java.io.*;
@@ -72,21 +73,39 @@ public class Mip {
 
         System.out.println("Constructing MIP model...");
         String solverName = SOLVERS[SOLVER_IDX];
+        HashMap<Integer, Integer[]> ancestorPositionVars;
         if (solverName.equalsIgnoreCase("CPSAT")) {
-            runCPSolverIndelInference(tree, aln, alnPog, NUM_THREADS, extantBinarySeqs, treeNeighbourAlphaPen,
-                    OUTPUT, PREFIX);
+            ancestorPositionVars = runCPSolverIndelInference(tree, aln, alnPog,
+                    NUM_THREADS, extantBinarySeqs, treeNeighbourAlphaPen);
         } else {
-            runMPSolverIndelInference(tree, alnPog, extantBinarySeqs, treeNeighbourAlphaPen, aln,
-                    NUM_THREADS, OUTPUT, PREFIX, programStartTime);
+            ancestorPositionVars = runMPSolverIndelInference(tree, alnPog, extantBinarySeqs, treeNeighbourAlphaPen, aln,
+                    NUM_THREADS, SOLVERS[SOLVER_IDX]);
         }
+
+        outputAncestralSolutions(tree, ancestorPositionVars, OUTPUT, PREFIX);
+
+
     }
 
 
-
-    private static void runCPSolverIndelInference(Tree tree, EnumSeq.Alignment<Enumerable> aln ,
-                                                  POAGraph alnPog, int num_threads,
-                                                  HashMap<Integer, Integer[]> extantBinarySeqs,
-                                                  double[][] treeNeighbourAlphaPen, String output, String prefix) {
+    /**
+     * Run the CP-SAT solver for indel inference. There are 4 main steps:
+     * 1. Create ancestral position variables
+     * 2. Add edge constraints to ensure valid paths through the POG for each ancestor
+     * 3. Add penalty constraints to minimize indel events between tree neighbours
+     * 4. Solve the model and output the results
+     *
+     * @param tree the phylogenetic tree
+     * @param aln the sequence alignment
+     * @param alnPog the partial order graph representation of the alignment
+     * @param num_threads number of threads to use
+     * @param extantBinarySeqs map of extant sequences in binary format
+     * @param treeNeighbourAlphaPen penalty matrix for tree neighbours
+     */
+    public static HashMap<Integer, Integer[]> runCPSolverIndelInference(IdxTree tree, EnumSeq.Alignment<Enumerable> aln ,
+                                                                        POAGraph alnPog, int num_threads,
+                                                                        HashMap<Integer, Integer[]> extantBinarySeqs,
+                                                                        double[][] treeNeighbourAlphaPen) {
 
         CpModel model = new CpModel();
         HashMap<Integer, Literal[]> ancestorPositionVars = createAncestralPositionVariablesCPModel(tree, model, aln.getWidth());
@@ -113,14 +132,34 @@ public class Mip {
             System.err.println("No solution found.");
         }
 
-        outputAncestralSolutionsCPSolver(tree, ancestorPositionVars, aln, output, prefix, solver);
+        return extractSolutionCPSolver(ancestorPositionVars, solver);
+
     }
 
-    private static void outputAncestralSolutionsCPSolver(Tree tree,
-                                                 HashMap<Integer, Literal[]> ancestorPositionVars,
-                                                 EnumSeq.Alignment<Enumerable> aln,
+
+
+    private static HashMap<Integer, Integer[]> extractSolutionCPSolver(HashMap<Integer, Literal[]> ancestorPositionVars,
+                                                                       CpSolver solver) {
+
+        HashMap<Integer, Integer[]> ancestralIndels = new HashMap<>();
+
+        for (int ancestralIdx : ancestorPositionVars.keySet()) {
+            Literal[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
+            Integer[] ancestralSeq = new Integer[nodePosVar.length];
+            for (int pos = 0; pos < nodePosVar.length; pos++) {
+                ancestralSeq[pos] = Math.toIntExact(solver.value(nodePosVar[pos]));
+            }
+            ancestralIndels.put(ancestralIdx, ancestralSeq);
+        }
+
+        return ancestralIndels;
+
+    }
+
+    private static void outputAncestralSolutions(Tree tree,
+                                                 HashMap<Integer, Integer[]> ancestorPositionVars,
                                                  String OUTPUT,
-                                                 String PREFIX, CpSolver solver) {
+                                                 String PREFIX) {
 
 
         // Create output file path
@@ -128,18 +167,18 @@ public class Mip {
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(fastaFilePath))) {
             for (int ancestralIdx : tree.getAncestors()) {
-                Literal[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
+                Integer[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
 
                 // Write FASTA header
                 writer.write(">N" + tree.getLabel(ancestralIdx));
                 writer.newLine();
 
                 StringBuilder sequenceLine = new StringBuilder();
-                for (int pos = 0; pos < aln.getWidth(); pos++) {
-                    sequenceLine.append(solver.value(nodePosVar[pos]));
+                for (int pos = 0; pos < nodePosVar.length; pos++) {
+                    sequenceLine.append(nodePosVar[pos]);
 
                     // Optional: Add line breaks every 80 characters (standard FASTA format)
-                    if ((pos + 1) % 80 == 0 && pos < aln.getWidth() - 1) {
+                    if ((pos + 1) % 80 == 0 && pos < nodePosVar.length - 1) {
                         writer.write(sequenceLine.toString());
                         writer.newLine();
                         sequenceLine = new StringBuilder();
@@ -158,20 +197,36 @@ public class Mip {
         } catch (IOException e) {
             System.err.println("Error writing ancestral sequences to file: " + e.getMessage());
             System.out.println("Sending to standard output instead.");
+            printAncestralIndels(tree, ancestorPositionVars);
 
-            for (int ancestralIdx : tree.getAncestors()) {
-                Literal[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
-                StringBuilder sb = new StringBuilder();
-                sb.append(">N").append(tree.getLabel(ancestralIdx)).append("\n");
-                for (int pos = 0; pos < aln.getWidth(); pos++) {
-                    sb.append(solver.value(nodePosVar[pos]));
-                }
-                System.out.println(sb);
-            }
+
         }
     }
 
-    private static HashMap<Integer, Literal[]> createAncestralPositionVariablesCPModel(Tree tree, CpModel model,
+    public static void printAncestralIndels(IdxTree tree, HashMap<Integer, Integer[]> ancestorPositionVars) {
+
+        for (int ancestralIdx : tree.getAncestors()) {
+            Integer[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
+            StringBuilder sb = new StringBuilder();
+            sb.append(">N").append(tree.getLabel(ancestralIdx)).append("\n");
+            for (Integer integer : nodePosVar) {
+                sb.append(integer);
+            }
+            System.out.println(sb);
+        }
+
+    }
+
+    /**
+     * Create integer position variables for ancestor sequences bounded between 0 and 1. These represent the
+     * actual sequence positions for each ancestor in the tree.
+     *
+     * @param tree the phylogenetic tree
+     * @param model the CP model
+     * @param seqLen the length of the sequences in the alignment
+     * @return a map of ancestor indices to their corresponding position variables
+     */
+    private static HashMap<Integer, Literal[]> createAncestralPositionVariablesCPModel(IdxTree tree, CpModel model,
                                                                                        int seqLen)  {
 
         HashMap<Integer, Literal[]> ancestorSeqVars = new HashMap<>();
@@ -187,10 +242,18 @@ public class Mip {
         return ancestorSeqVars;
     }
 
-    private static void addEdgeConstraintsAncestorsCPSolver(Tree tree,
-                                                                                    POAGraph alnPOG,
-                                                                                    CpModel model,
-                                                                                    HashMap<Integer, Literal[]> ancestralPositionVars) {
+    /**
+     * Add edge constraints to the CP model to ensure valid paths through the POG for each ancestor.
+     * At a minimum the POG must start from a virtual start node and end at a virtual end node, with
+     * all intermediate nodes fully connected.
+     *
+     * @param tree the phylogenetic tree
+     * @param alnPOG the partial order graph representation of the alignment
+     * @param model the CP model
+     * @param ancestralPositionVars map of ancestor indices to their corresponding array of position variables
+     */
+    private static void addEdgeConstraintsAncestorsCPSolver(IdxTree tree, POAGraph alnPOG, CpModel model,
+                                                            HashMap<Integer, Literal[]> ancestralPositionVars) {
 
         int VIRTUAL_START = -1;
         int VIRTUAL_END = alnPOG.maxsize();
@@ -222,33 +285,37 @@ public class Mip {
 
                 // EDGES GOING OUT //
                 int[] forwardEdges = alnPOG.getNodeIndices(nodeIdx, true);
+                // this handles the edge case where we are at an end node and need to connect to virtual end
                 int numEdgesToEnd = (alnPOG.isEndNode(nodeIdx) ? 1 : 0);
                 int totalForwardEdges = forwardEdges.length + numEdgesToEnd;
 
                 Literal[] forwardEdgesFromNode = new Literal[totalForwardEdges];
-                for (int positionTo = 0; positionTo < forwardEdges.length; positionTo++) {
+                for (int forwardEdgeIndex = 0; forwardEdgeIndex < forwardEdges.length; forwardEdgeIndex++) {
 
-                    Literal edge = model.newBoolVar(""); //0, 1, "");
-                    int edgeEnd = forwardEdges[positionTo];
-                    forwardEdgesFromNode[positionTo] = edge;
+                    Literal edge = model.newBoolVar("");
+                    int edgeEnd = forwardEdges[forwardEdgeIndex];
+                    forwardEdgesFromNode[forwardEdgeIndex] = edge;
 
                     EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
                     allEdgeVars.put(edgeKey, edge);
                 }
 
+                // If we have a single outgoing edge to virtual end, create that variable too
                 if (numEdgesToEnd == 1) {
-                    Literal edgeToEnd = model.newBoolVar(""); //0, 1, "");
+                    Literal edgeToEnd = model.newBoolVar("");
                     forwardEdgesFromNode[totalForwardEdges - 1] = edgeToEnd;
 
                     EdgeKey edgeKey = new EdgeKey(nodeIdx, VIRTUAL_END, ancestorIdx);
                     allEdgeVars.put(edgeKey, edgeToEnd);
                 }
 
-                // sum(edges) == positionVar
+                // constraint: sum(edges) == positionVar
+                // i.e. We want to enforce that if an edge is present, the node must also have a character and we can
+                // only have a single outgoing edge.
                 Literal ancestralNode = ancestralPositionVars.get(ancestorIdx)[nodeIdx];
                 model.addEquality(ancestralNode, LinearExpr.sum(forwardEdgesFromNode));
 
-                // EDGES COMING IN //
+                // EDGES COMING IN - same as above but looking in the reverse direction//
                 int[] backwardEdges = alnPOG.getNodeIndices(nodeIdx, false);
                 int numEdgesFromStart = (alnPOG.isStartNode(nodeIdx) ? 1 : 0);
                 int totalBackwardEdges = backwardEdges.length + numEdgesFromStart;
@@ -275,7 +342,7 @@ public class Mip {
 
             }
 
-            // REAL ENDS TO VIRTUAL ENDS //
+            // REAL ENDS TO VIRTUAL ENDS - ensure that only one node connects to the virtual end //
             Literal[] allEdgesToVirtualEnd = new Literal[endIndices.length];
             for (int positionFrom = 0; positionFrom < endIndices.length; positionFrom++) {
                 EdgeKey edgeKey = new EdgeKey(endIndices[positionFrom], VIRTUAL_END, ancestorIdx);
@@ -286,7 +353,21 @@ public class Mip {
         }
     }
 
-    private static void addPenaltyConstraintsCPSolver(Tree tree,
+    /**
+     * Add penalty constraints to the CP model to minimize indel events between tree neighbours. There are 2 main
+     * penalties to consider:
+     * 1: A gap opening penalty when a gap is introduced between two adjacent positions
+     * 2: A gap extension penalty for each additional gap position that continues a gap
+     *
+     * @param tree the phylogenetic tree
+     * @param extantBinarySeqs map of extant sequences in binary format
+     * @param treeNeighbourAlphaPen penalty matrix for tree neighbours
+     * @param ancestorPositionVars map of ancestor indices to their corresponding array of position variables
+     * @param seqLength the length of the sequences in the alignment
+     * @param model the CP model
+     * @param objective the objective function to minimize
+     */
+    private static void addPenaltyConstraintsCPSolver(IdxTree tree,
                                                       HashMap<Integer, Integer[]> extantBinarySeqs,
                                                       double[][] treeNeighbourAlphaPen,
                                                       HashMap<Integer, Literal[]> ancestorPositionVars,
@@ -495,14 +576,14 @@ public class Mip {
         }
     }
 
-    private static void runMPSolverIndelInference(Tree tree, POAGraph alnPog,
+    public static HashMap<Integer, Integer[]> runMPSolverIndelInference(IdxTree tree, POAGraph alnPog,
                                                   HashMap<Integer, Integer[]> extantBinarySeqs,
                                                   double[][] treeNeighbourAlphaPen, EnumSeq.Alignment<Enumerable> aln,
-                                                  int num_threads, String OUTPUT, String PREFIX, long programStartTime) {
+                                                  int num_threads, String solverName) {
 
-        MPSolver solver = MPSolver.createSolver(SOLVERS[SOLVER_IDX]);
+        MPSolver solver = MPSolver.createSolver(solverName);
         if (solver == null) {
-            usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription() + SOLVERS[SOLVER_IDX]);
+            usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription() + solverName);
         }
         assert solver != null;
 
@@ -521,8 +602,6 @@ public class Mip {
 
         MPSolver.ResultStatus resultStatus = solver.solve();
 
-        long progEndTime = System.currentTimeMillis();
-        System.out.println("Total run time: " + (progEndTime - programStartTime) / 1000 + " seconds");
         if (resultStatus == MPSolver.ResultStatus.OPTIMAL) {
             System.out.println("Total cost: " + solver.objective().value());
             System.out.println("Problem solved in " + solver.wallTime() / 1000 + " seconds");
@@ -535,7 +614,23 @@ public class Mip {
             System.err.println("No solution found.");
         }
 
-        outputAncestralSolutions(tree, ancestorPositionVars, aln, OUTPUT, PREFIX);
+        return extractSolutionMPSolver(ancestorPositionVars);
+    }
+
+    private static HashMap<Integer, Integer[]> extractSolutionMPSolver(HashMap<Integer, MPVariable[]> ancestorPositionVars) {
+
+        HashMap<Integer, Integer[]> ancestralIndels = new HashMap<>();
+
+        for (int ancestralIdx : ancestorPositionVars.keySet()) {
+            MPVariable[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
+            Integer[] ancestralSeq = new Integer[nodePosVar.length];
+            for (int pos = 0; pos < nodePosVar.length; pos++) {
+                ancestralSeq[pos] = (int) Math.round(nodePosVar[pos].solutionValue());
+            }
+            ancestralIndels.put(ancestralIdx, ancestralSeq);
+        }
+
+        return ancestralIndels;
 
     }
 
@@ -551,7 +646,7 @@ public class Mip {
         return true;
     }
 
-    public static HashMap<Integer, Integer[]> createBinarySeqMap(EnumSeq.Alignment<Enumerable> aln, Tree tree) {
+    public static HashMap<Integer, Integer[]> createBinarySeqMap(EnumSeq.Alignment<Enumerable> aln, IdxTree tree) {
 
         HashMap<Integer, Integer[]> binarySeqMap = new HashMap<>();
 
@@ -574,9 +669,9 @@ public class Mip {
         return binarySeqMap;
     }
 
-    private static double[][] createTreeNeighbourAlphaPen(Tree tree) {
+    public static double[][] createTreeNeighbourAlphaPen(IdxTree tree) {
 
-        double[][] tree_neighbour_alpha_pen = new double[tree.getNParents() + tree.getNLeaves()][];
+        double[][] tree_neighbour_alpha_pen = new double[tree.getSize()][];
         for (int i = 0; i < tree_neighbour_alpha_pen.length; i++) {
             int[] children = tree.getChildren(i);
             tree_neighbour_alpha_pen[i] = new double[children.length];
@@ -597,7 +692,7 @@ public class Mip {
      * @param seqLength the length of the sequences in the alignment
      * @return a map of ancestor indices to their corresponding position variables
      */
-    private static HashMap<Integer, MPVariable[]> createAncestralPositionVariables(Tree tree, MPSolver solver, int seqLength) {
+    private static HashMap<Integer, MPVariable[]> createAncestralPositionVariables(IdxTree tree, MPSolver solver, int seqLength) {
 
         HashMap<Integer, MPVariable[]> ancestorSeqVars = new HashMap<>();
         for (int ancestorIdx : tree.getAncestors()) {
@@ -613,7 +708,7 @@ public class Mip {
 
     }
 
-    private static void addEdgeConstraintsAncestors(Tree tree, POAGraph alnPOG,
+    private static void addEdgeConstraintsAncestors(IdxTree tree, POAGraph alnPOG,
                                                                             MPSolver solver,
                                                                             HashMap<Integer, MPVariable[]> ancestralPositionVars) {
 
@@ -728,7 +823,7 @@ public class Mip {
     }
 
 
-    private static void addPenaltyConstraints(Tree tree,
+    private static void addPenaltyConstraints(IdxTree tree,
                                               HashMap<Integer, Integer[]> extantBinarySeqs,
                                               double[][] treeNeighbourAlphaPen,
                                               HashMap<Integer, MPVariable[]> ancestorPositionVars,
@@ -894,62 +989,6 @@ public class Mip {
         }
     }
 
-    private static void outputAncestralSolutions(Tree tree,
-                                                 HashMap<Integer, MPVariable[]> ancestorPositionVars,
-                                                 EnumSeq.Alignment<Enumerable> aln,
-                                                 String OUTPUT,
-                                                 String PREFIX) {
-
-
-        // Create output file path
-        String fastaFilePath = OUTPUT + "/" + PREFIX + "_ancestral_indel.fasta";
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fastaFilePath))) {
-            for (int ancestralIdx : tree.getAncestors()) {
-                MPVariable[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
-
-                // Write FASTA header
-                writer.write(">N" + tree.getLabel(ancestralIdx));
-                writer.newLine();
-
-                StringBuilder sequenceLine = new StringBuilder();
-                for (int pos = 0; pos < aln.getWidth(); pos++) {
-                    sequenceLine.append((int) nodePosVar[pos].solutionValue());
-
-                    // Optional: Add line breaks every 80 characters (standard FASTA format)
-                    if ((pos + 1) % 80 == 0 && pos < aln.getWidth() - 1) {
-                        writer.write(sequenceLine.toString());
-                        writer.newLine();
-                        sequenceLine = new StringBuilder();
-                    }
-                }
-
-                // Write any remaining sequence
-                if (!sequenceLine.isEmpty()) {
-                    writer.write(sequenceLine.toString());
-                    writer.newLine();
-                }
-            }
-
-            System.out.println("Ancestral indel solutions saved to: " + fastaFilePath);
-
-        } catch (IOException e) {
-            System.err.println("Error writing ancestral sequences to file: " + e.getMessage());
-            System.out.println("Sending to standard output instead.");
-
-            for (int ancestralIdx : tree.getAncestors()) {
-                MPVariable[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
-                StringBuilder sb = new StringBuilder();
-                sb.append(">N").append(tree.getLabel(ancestralIdx)).append("\n");
-                for (int pos = 0; pos < aln.getWidth(); pos++) {
-                    sb.append((int)nodePosVar[pos].solutionValue());
-                }
-                System.out.println(sb);
-            }
-        }
-    }
-
-
     /**
      * Create a unique key for an edge in the POG associated with a specific ancestor.
      * Allows this to be used as a key in hash maps.
@@ -1046,9 +1085,9 @@ public class Mip {
                             foundSolver = true;
                         }
                     }
-                    if (!foundSolver)
+                    if (!foundSolver) {
                         usage(ERROR.INVALID_SOLVER.getCode(), args[a + 1] + ERROR.INVALID_SOLVER.getDescription());
-
+                    }
                 } else if ((arg.equalsIgnoreCase("-threads") || arg.equalsIgnoreCase("t")) && args.length > a + 1) {
                     try {
                         argMap.put("THREADS", Integer.parseInt(args[++a]));

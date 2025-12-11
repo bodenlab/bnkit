@@ -3,7 +3,9 @@ package asr;
 import bn.ctmc.SubstModel;
 import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
+import com.google.ortools.Loader;
 import dat.EnumSeq;
+import dat.Enumerable;
 import dat.Interval1D;
 import dat.IntervalST;
 import dat.file.Newick;
@@ -48,6 +50,8 @@ public class Prediction {
     private final int[][] positidxs;                // position-specific tree indices [aligned pos]["global" branchpoint idx]
     private final EnumDistrib[][] distribs;         // Probability distributions of ancestor states by branchpoint and position index
     private Object[][] states = null;               // Actual values at inferred branch points, indexed by branchpoint index and position
+    private static final int GAP = 0;
+    private static final int NON_GAP = 1;
 
     /**
      * Basic constructor, not intended for use as it forgoes/assumes prior prediction.
@@ -763,7 +767,7 @@ public class Prediction {
                 }
                 // else it is a GAP only (so NOT added to admissible set, NOT an anchor)
             }
-            anchorset.add(nPos);    // finish-up last anchor set
+            anchorset.add(nPos); // finish-up last anchor set
             anchorsets.put(current_anchor, anchorset);
             // next, peruse anchor sets, adding Nodes for all anchored or admissible positions
             for (Map.Entry<Integer, Set<Integer>> entry : anchorsets.entrySet()) {
@@ -1533,4 +1537,93 @@ public class Prediction {
         ancestors = patchAncestorsWithBEP(pogTree, ancestors);
         return new Prediction(pogTree, ancestors);
     }
+
+    public static Prediction PredictByMIP(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln,
+                                          String solver) {
+
+        Map<Object, POGraph> ancestors = new HashMap<>(); // prepare where predictions will go
+        int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
+        IdxTree tree = pogTree.getTree();  // indexed tree (quick access to branch points, no editing)
+
+        Loader.loadNativeLibraries(); // link to Google-OR Tools
+        POAGraph alnPog = new POAGraph(aln);
+        HashMap<Integer, Integer[]> extantBinarySeqs = Mip.createBinarySeqMap(aln, tree);
+        double[][] treeNeighbourAlphaPen = Mip.createTreeNeighbourAlphaPen(tree);
+
+        if (GRASP.VERBOSE) {
+            System.out.println("Constructing and solving MIP indel model using " + solver + "...");
+        }
+
+        HashMap<Integer, Integer[]> ancestorPositionVars; //bpidx to array of position indices
+        if (solver.equalsIgnoreCase("CPSAT")) {
+            ancestorPositionVars = Mip.runCPSolverIndelInference(pogTree.getTree(), aln, alnPog,
+                    GRASP.NTHREADS, extantBinarySeqs, treeNeighbourAlphaPen);
+        } else {
+            ancestorPositionVars = Mip.runMPSolverIndelInference(pogTree.getTree(), alnPog, extantBinarySeqs,
+                    treeNeighbourAlphaPen, aln, GRASP.NTHREADS, solver);
+        }
+
+        if (GRASP.VERBOSE) {
+            System.out.println("MIP Indel inference complete!");
+            Mip.printAncestralIndels(pogTree.getTree(), ancestorPositionVars);
+        }
+
+        // unpack the results, branch point by branch point
+        for (int j = 0; j < tree.getSize(); j ++) {         // for every (indexed) branch point (IdxTree defaults to depth-first order)
+            if (tree.isLeaf(j))             // if leaf, ignore and jump to next branch point
+                continue;
+
+            Integer[] ancestorGapState = ancestorPositionVars.get(j); // retrieve the array gap/non-gap states for this ancestor
+            Object ancID = tree.getBranchPoint(j).getID();  // unique ancestor ID from BranchPoint class (modifiable only before assembled into IdxTree when creating Tree)
+            POGraph pog = new POGraph(nPos);                // blank POG
+            ancestors.put(ancID, pog);                      // put blank POG in place, to be modified below
+
+            // each anchor-set (below) is a range of indices for the POG; the key is a position that MUST be entered, values contain admissible positions that follow
+            Map<Integer, Set<Integer>> anchorsets = new HashMap<>();
+            int current_anchor = -1; // the first jump always from the start position
+            Set<Integer> anchorset = new HashSet<>();
+
+            for (int i = 0; i < nPos; i ++) {   // now traverse all positions, consider if GAP, not-GAP or admissible
+
+                if (ancestorGapState[i] == NON_GAP) { // ALWAYS character (i.e. not-GAP), so required position
+                    anchorset.add(i);
+                    anchorsets.put(current_anchor, anchorset);  // anchor set is linked to the position at which it started
+                    anchorset = new HashSet<>();                // re-set anchor set
+                    current_anchor = i;                         // next anchor set is headed by this, not-GAP required position
+                }
+            }
+
+            anchorset.add(nPos);    // finish-up last anchor set
+            anchorsets.put(current_anchor, anchorset);
+
+            // next, peruse anchor sets, adding Nodes for all anchored or admissible positions
+            for (Map.Entry<Integer, Set<Integer>> entry : anchorsets.entrySet()) {
+                int anchor = entry.getKey();
+                if (anchor >= 0)
+                    if (pog.getNode(anchor) == null)
+                        pog.addNode(anchor, new Node());
+                for (int to : entry.getValue()) { // link anchored Node to each of the admissible nodes in the anchor set
+                    if (to < nPos)
+                        if (pog.getNode(to) == null)
+                            pog.addNode(to, new Node());
+                    pog.addEdge(anchor, to, new POGraph.StatusEdge(true));
+                }
+
+                // don't think we should need this, MIP solution has no ambiguity within anchor sets
+                /*
+                for (int from : entry.getValue()) { // all possible pairs of admissible Nodes are linked
+                    for (int to : entry.getValue()) {
+                        if (from < to)
+                            pog.addEdge(from, to, new POGraph.StatusEdge(true));
+                    }
+                }
+
+                 */
+            }
+        }
+
+        return new Prediction(pogTree, ancestors);
+    }
+
+
 }
