@@ -19,6 +19,7 @@ import com.google.ortools.sat.CpSolverStatus;
 import com.google.ortools.sat.LinearExpr;
 import com.google.ortools.sat.LinearExprBuilder;
 import com.google.ortools.sat.Literal;
+import dat.pog.POGraph;
 
 public class Mip {
 
@@ -63,7 +64,6 @@ public class Mip {
             usage(ERROR.ALN.getCode(), "Alignment has at least one column with no sequence content. Please remove these before running indel inference.");
         }
 
-        long programStartTime = System.currentTimeMillis();
         Loader.loadNativeLibraries();
         POAGraph alnPog = new POAGraph(aln);
         HashMap<Integer, Integer[]> extantBinarySeqs = createBinarySeqMap(aln, tree);
@@ -76,7 +76,7 @@ public class Mip {
         HashMap<Integer, Integer[]> ancestorPositionVars;
         if (solverName.equalsIgnoreCase("CPSAT")) {
             ancestorPositionVars = runCPSolverIndelInference(tree, aln, alnPog,
-                    NUM_THREADS, extantBinarySeqs, treeNeighbourAlphaPen);
+                    NUM_THREADS, extantBinarySeqs, treeNeighbourAlphaPen, null);
         } else {
             ancestorPositionVars = runMPSolverIndelInference(tree, alnPog, extantBinarySeqs, treeNeighbourAlphaPen, aln,
                     NUM_THREADS, SOLVERS[SOLVER_IDX]);
@@ -105,20 +105,40 @@ public class Mip {
     public static HashMap<Integer, Integer[]> runCPSolverIndelInference(IdxTree tree, EnumSeq.Alignment<Enumerable> aln ,
                                                                         POAGraph alnPog, int num_threads,
                                                                         HashMap<Integer, Integer[]> extantBinarySeqs,
-                                                                        double[][] treeNeighbourAlphaPen) {
+                                                                        double[][] treeNeighbourAlphaPen,
+                                                                        Prediction parsimonyPrediction) {
 
         CpModel model = new CpModel();
         HashMap<Integer, Literal[]> ancestorPositionVars = createAncestralPositionVariablesCPModel(tree, model, aln.getWidth());
 
-        addEdgeConstraintsAncestorsCPSolver(tree, alnPog, model, ancestorPositionVars);
+        addEdgeConstraintsAncestorsCPSolver(tree, alnPog, model, ancestorPositionVars, parsimonyPrediction);
 
         LinearExprBuilder objective = LinearExpr.newBuilder();
         addPenaltyConstraintsCPSolver(tree, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
                                       aln.getWidth(), model, objective);
 
+        // set hot-start initial solution if provided
+        if (parsimonyPrediction != null) {
+            for (int bpidx : tree.getAncestors()) {
+                Literal[] nodePosVar = ancestorPositionVars.get(bpidx);
+
+                // have to use the ancestor ID label to get the correct POG as getAncestor tries to convert a label to bpidx
+                POGraph ancestorPog = parsimonyPrediction.getAncestor(tree.getLabel(bpidx));
+
+                for (int pos = 0; pos < nodePosVar.length; pos++) {
+                    boolean hasContent = ancestorPog.isNode(pos);
+                    model.addHint(nodePosVar[pos], hasContent);
+                }
+            }
+        }
+
         model.minimize(objective);
 
         CpSolver solver = new CpSolver();
+        if (GRASP.VERBOSE) {
+            solver.getParameters().setLogSearchProgress(true);
+        }
+
         solver.getParameters().setNumWorkers(num_threads);
         CpSolverStatus status = solver.solve(model);
 
@@ -253,7 +273,8 @@ public class Mip {
      * @param ancestralPositionVars map of ancestor indices to their corresponding array of position variables
      */
     private static void addEdgeConstraintsAncestorsCPSolver(IdxTree tree, POAGraph alnPOG, CpModel model,
-                                                            HashMap<Integer, Literal[]> ancestralPositionVars) {
+                                                            HashMap<Integer, Literal[]> ancestralPositionVars,
+                                                            Prediction parsimonyPrediction) {
 
         int VIRTUAL_START = -1;
         int VIRTUAL_END = alnPOG.maxsize();
@@ -262,13 +283,20 @@ public class Mip {
 
         int[] ancestors = tree.getAncestors();
         for (int ancestorIdx : ancestors) {
+
+            POGraph ancParsimonyPog = parsimonyPrediction.getAncestor(tree.getLabel(ancestorIdx));
+
             // VIRTUAL STARTS TO REAL STARTS //
             int[] startIndices = alnPOG.getStarts();
             Literal[] allEdgesFromVirtualStart = new Literal[startIndices.length];
             for (int positionTo = 0; positionTo < startIndices.length; positionTo++) {
 
                 // Variable for each edge from start node
-                Literal edge = model.newBoolVar("");// makeIntVar(0, 1, "");
+                Literal edge = model.newBoolVar("");
+
+//                boolean hasEdge = checkAncestralPogEdge(ancParsimonyPog, VIRTUAL_START, startIndices[positionTo]);
+//                // hot-start from parsimony prediction
+//                //model.addHint(edge, hasEdge);
                 allEdgesFromVirtualStart[positionTo] = edge;
 
                 // save unique edge/ancestor combination to a map for later use
@@ -293,7 +321,10 @@ public class Mip {
                 for (int forwardEdgeIndex = 0; forwardEdgeIndex < forwardEdges.length; forwardEdgeIndex++) {
 
                     Literal edge = model.newBoolVar("");
+
                     int edgeEnd = forwardEdges[forwardEdgeIndex];
+                    // boolean hasEdge = checkAncestralPogEdge(ancParsimonyPog, nodeIdx, edgeEnd);
+                    //model.addHint(edge, hasEdge);
                     forwardEdgesFromNode[forwardEdgeIndex] = edge;
 
                     EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
@@ -306,6 +337,9 @@ public class Mip {
                     forwardEdgesFromNode[totalForwardEdges - 1] = edgeToEnd;
 
                     EdgeKey edgeKey = new EdgeKey(nodeIdx, VIRTUAL_END, ancestorIdx);
+
+                    // boolean hasEdge = checkAncestralPogEdge(ancParsimonyPog, nodeIdx, VIRTUAL_END);
+                    //model.addHint(edgeToEnd, hasEdge);
                     allEdgeVars.put(edgeKey, edgeToEnd);
                 }
 
@@ -353,6 +387,14 @@ public class Mip {
         }
     }
 
+    private static boolean checkAncestralPogEdge(POGraph ancestorPog, int from, int to) {
+        try {
+            return ancestorPog.getEdge(from, to) != null;
+        } catch (Exception e) { // caused if no edge exists for this ancestor solution
+            return false;
+        }
+    }
+
     /**
      * Add penalty constraints to the CP model to minimize indel events between tree neighbours. There are 2 main
      * penalties to consider:
@@ -381,6 +423,7 @@ public class Mip {
 
 
             for (int childIdx : tree.getChildren(ancestralIdx)) {
+
                 Literal[] pen = new Literal[seqLength];
                 for (int i = 0; i < seqLength; i++) {
                     pen[i] = model.newBoolVar("");//0, 1, "");
@@ -587,7 +630,15 @@ public class Mip {
         }
         assert solver != null;
 
-        solver.setNumThreads(num_threads);
+        if (solverName.equalsIgnoreCase("SCIP")) {
+            // SCIP creates concurrent solvers - appears to be a bug where other workers
+            // are not terminated when a solution is found.
+            solver.setNumThreads(1);
+        } else {
+            solver.setNumThreads(num_threads);
+        }
+
+        solver.enableOutput(); // logging
 
         HashMap<Integer, MPVariable[]> ancestorPositionVars = createAncestralPositionVariables(tree, solver, aln.getWidth());
         addEdgeConstraintsAncestors(tree, alnPog, solver, ancestorPositionVars);
@@ -595,8 +646,6 @@ public class Mip {
         MPObjective objective = solver.objective();
         addPenaltyConstraints(tree, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
                 aln.getWidth(), solver, objective);
-        long endModelBuild = System.currentTimeMillis();
-        //System.out.println("Constructed MIP model in " + (endModelBuild - startModelBuild) + " ms");
 
         objective.setMinimization();
 
@@ -700,6 +749,7 @@ public class Mip {
             for (int j = 0; j < seqLength; j++) {
                 // NOTE: May want to check that create labels won't create large memory usage.
                 seqVars[j] = solver.makeBoolVar(""); //0, 1, "");
+
             }
             ancestorSeqVars.put(ancestorIdx, seqVars);
         }
@@ -710,7 +760,8 @@ public class Mip {
 
     private static void addEdgeConstraintsAncestors(IdxTree tree, POAGraph alnPOG,
                                                                             MPSolver solver,
-                                                                            HashMap<Integer, MPVariable[]> ancestralPositionVars) {
+                                                                            HashMap<Integer, MPVariable[]> ancestralPositionVars
+                                                                            ) {
 
         int VIRTUAL_START = -1;
         int VIRTUAL_END = alnPOG.maxsize();
@@ -719,6 +770,7 @@ public class Mip {
 
         int[] ancestors = tree.getAncestors();
         for (int ancestorIdx : ancestors) {
+
             // VIRTUAL STARTS TO REAL STARTS //
             int[] startIndices = alnPOG.getStarts();
             MPVariable[] allEdgesFromVirtualStart = new MPVariable[startIndices.length];
@@ -752,8 +804,10 @@ public class Mip {
                 for (int positionTo = 0; positionTo < forwardEdges.length; positionTo++) {
 
                     MPVariable edge = solver.makeBoolVar(""); //0, 1, "");
+
                     int edgeEnd = forwardEdges[positionTo];
                     forwardEdgesFromNode[positionTo] = edge;
+
 
                     EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
                     allEdgeVars.put(edgeKey, edge);
@@ -764,6 +818,7 @@ public class Mip {
                     forwardEdgesFromNode[totalForwardEdges - 1] = edgeToEnd;
 
                     EdgeKey edgeKey = new EdgeKey(nodeIdx, VIRTUAL_END, ancestorIdx);
+
                     allEdgeVars.put(edgeKey, edgeToEnd);
                 }
 

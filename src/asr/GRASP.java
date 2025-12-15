@@ -62,7 +62,7 @@ public class GRASP {
                 "\t{-t | --threads <number>}\n" +
                 "\t{-j | --joint (default)}\n" +
                 "\t{-m | --marginal <branchpoint-id>}\n" +
-                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
+                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML SCIP Gurobi CPSAT)\n" +
                 "\t{* --indel-prior <LOWGAP|MEDGAP|HIGHGAP>}\n" +
                 "\t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>}\n" +
                 "\t{--copy-rates Copy substitution rates from reconstructed ancestor\n" +
@@ -114,7 +114,7 @@ public class GRASP {
                 "\tASR: complete reconstruction as JSON, incl. POGs of ancestors and extants, and tree (ASR.json)\n" +
                 "\tDOT: partial-order graphs of ancestors in DOT format\n" +
                 "\tTREES: position-specific trees with ancestor states labelled\n" +
-                "\tTrAVIS: Produce commandline parameters for running TrAVIS" +
+                "\tTrAVIS: Produce commandline parameters for running TrAVIS\n" +
                 "\tSIMUL: Run TrAVIS based on parameters from joint reconstruction, and save tree and alignments");
         out.println("Indel-methods: \n" +
                 "\tBEP: bi-directional edge (maximum) parsimony\n" +
@@ -123,6 +123,9 @@ public class GRASP {
                 "\tSICML: simple indel-coding maximum likelihood (uses uniform evolutionary model)\n" +
                 "\tPSP: position-specific (maximum) parsimony\n" +
                 "\tPSML: position-specific maximum likelihood (uses uniform evolutionary model)\n" +
+                "\tSCIP: infer a globally optimal indel history using the open-source SCIP solver (https://www.scipopt.org/). Does not support multi-threading\n" +
+                "\tGurobi: uses the Gurobi solver to infer a globally optimal indel history. Requires local installation of Gurobi to run (https://www.gurobi.com/downloads/)\n" +
+                "\tCPSAT: infer a globally optimal indel history using Google's open-source CP-SAT solver (https://developers.google.com/optimization). Supports multiple threads\n" +
                 "\tAdd '*' to method name for less conservative setting (if available)\n");
         out.println("Substitution-models: \n" +
                 "\tJTT: Jones-Taylor-Thornton (protein; default)\n" +
@@ -161,7 +164,7 @@ public class GRASP {
         // Alphabet is decided by MODEL_IDX
         Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
         // Indel approaches:
-        String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
+        String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML", "SCIP", "Gurobi", "CPSAT"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
         String INDEL_RATE_DISTRIB = null;
         String INDEL_LENGTH_DISTRIB = null;
@@ -439,6 +442,8 @@ public class GRASP {
                 case 5:
                     indelpred = Prediction.PredictByMaxLhood(pogtree);
                     break;
+                case 6, 7, 8:
+                    indelpred = Prediction.PredictByMIP(pogtree, aln, INDELS[INDEL_IDX]);
                 default:
                     break;
             }

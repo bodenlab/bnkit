@@ -1556,8 +1556,9 @@ public class Prediction {
 
         HashMap<Integer, Integer[]> ancestorPositionVars; //bpidx to array of position indices
         if (solver.equalsIgnoreCase("CPSAT")) {
+            Prediction parsimonyIndels = PredictByParsimony(pogTree); // use parsimony to seed CPSAT
             ancestorPositionVars = Mip.runCPSolverIndelInference(pogTree.getTree(), aln, alnPog,
-                    GRASP.NTHREADS, extantBinarySeqs, treeNeighbourAlphaPen);
+                    GRASP.NTHREADS, extantBinarySeqs, treeNeighbourAlphaPen, parsimonyIndels);
         } else {
             ancestorPositionVars = Mip.runMPSolverIndelInference(pogTree.getTree(), alnPog, extantBinarySeqs,
                     treeNeighbourAlphaPen, aln, GRASP.NTHREADS, solver);
@@ -1565,7 +1566,7 @@ public class Prediction {
 
         if (GRASP.VERBOSE) {
             System.out.println("MIP Indel inference complete!");
-            Mip.printAncestralIndels(pogTree.getTree(), ancestorPositionVars);
+            //Mip.printAncestralIndels(pogTree.getTree(), ancestorPositionVars);
         }
 
         // unpack the results, branch point by branch point
@@ -1608,17 +1609,6 @@ public class Prediction {
                             pog.addNode(to, new Node());
                     pog.addEdge(anchor, to, new POGraph.StatusEdge(true));
                 }
-
-                // don't think we should need this, MIP solution has no ambiguity within anchor sets
-                /*
-                for (int from : entry.getValue()) { // all possible pairs of admissible Nodes are linked
-                    for (int to : entry.getValue()) {
-                        if (from < to)
-                            pog.addEdge(from, to, new POGraph.StatusEdge(true));
-                    }
-                }
-
-                 */
             }
         }
 
