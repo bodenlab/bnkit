@@ -7,6 +7,7 @@ import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
+import dat.phylo.IdxTree;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
@@ -1052,57 +1053,54 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         return 1 - proportionInDistribution;
     }
 
-    public static void main(String[] args) {
+    /**
+     * Calculate the number of indel events across the tree given the ancestral POGs.
+     *
+     * @param pogTree
+     * @param ancestralPogs
+     * @return
+     */
+    public static int calcNumberIndelEvents(POGTree pogTree,
+                                                Map<Object, POGraph> ancestralPogs) {
 
-        EnumSeq.Alignment<Enumerable> aln = null;
-        try {
-            aln = Utils.loadAlignment("/Users/sebs_mac/git_repos/indelDist/data/test_inputs/extants.aln", Enumerable.aacid);
-        } catch (IOException | ASRException e) {
-            e.printStackTrace();
+        int numIndelEvents = 0;
+        IdxTree tree = pogTree.getTree();
+        for (int bpidx: tree.getAncestors()) {
+
+            boolean[] ancBinarySeq = ancestralPogs.get(bpidx).allnodes;
+
+            int[] children = tree.getChildren(bpidx);
+            for (int childIdx : children) {
+                boolean[] extantPog =  pogTree.getExtant(childIdx).allnodes;
+                numIndelEvents += countIndelEventsBetweenParentChild(ancBinarySeq, extantPog);
+            }
         }
-        assert(aln != null);
 
-        int N = 30;
-        POGraph pog;
-        Set<Integer> allNodes = new HashSet<>();
+        return numIndelEvents;
+    }
 
-        pog = new POGraph(N);
-        for (int i = 0; i < N; i ++) {
-            pog.addNode(i, new EnumNode(Enumerable.aacid));
+    /**
+     * Count the number of indel events between an ancestral and child binary sequence.
+     * Note that the extension of a gap is not counted as a new event, therefore an indel
+     * event is only penalised once regardless of the length of the indel.
+     * @param ancestralBinarySeq the ancestral binary sequence
+     * @param childBinarySeq the child binary sequence
+     * @return the number of indel events
+     */
+    private static int countIndelEventsBetweenParentChild(boolean[] ancestralBinarySeq, boolean[] childBinarySeq) {
+        int dis = 0;
+        int prevDist = 0;
+
+        for (int i = 0; i < ancestralBinarySeq.length; i++) {
+            int curDist = (ancestralBinarySeq[i] ? 1 : 0)  - (childBinarySeq[i] ? 1 : 0);
+
+            if (curDist != 0 && curDist != prevDist) {
+                dis += 1;
+            }
+            prevDist = curDist;
         }
-        int last = -1;
-        for (int from = -1; from < N-10; from += 2) {
-            int to = Math.min(from + 2, N);
-            pog.addEdge(from, to);
-            allNodes.add(to);
-            last = to;
-        }
-        if (last < N)
-            pog.addEdge(last, N);
-        for (int from = -1; from < N-10; from += 7) {
-            int to = Math.min(from + 7, N);
-            pog.addEdge(from, to);
-            allNodes.add(to);
-            last = to;
-        }
-        if (last < N)
-            pog.addEdge(last, N);
-        for (int from = -1; from < N-10; from += 9) {
-            int to = Math.min(from + 9, N);
-            pog.addEdge(from, to);
-            allNodes.add(to);
-            last = to;
-        }
-        if (last < N)
-            pog.addEdge(last, N);
 
-        Map<Object, POGraph> ancestralPogs = new HashMap<>();
-        ancestralPogs.put(0, pog);
-
-        //double outOfDist = calcProportionOutOfDistributionAncestors(ancestralPogs, aln);
-        //System.out.println(outOfDist);
-
-
+        return dis;
     }
 
 }
