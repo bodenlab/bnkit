@@ -1612,6 +1612,12 @@ public class Prediction {
             }
         }
 
+        if (GRASP.VERBOSE) {
+            double propOutDist = POGraph.calcProportionOutOfDistributionAncestors(ancestors, alnPog) * 100;
+            System.out.println("Proportion of out-of-distribution positions in ancestral sequences: " +
+                    String.format("%.2f", propOutDist) + "%");
+        }
+
         return new Prediction(pogTree, ancestors);
     }
 
