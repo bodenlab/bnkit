@@ -1065,14 +1065,22 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 
         int numIndelEvents = 0;
         IdxTree tree = pogTree.getTree();
+        int[] leafIndices = tree.getLeaves();
         for (int bpidx: tree.getAncestors()) {
 
-            boolean[] ancBinarySeq = ancestralPogs.get(bpidx).allnodes;
+            boolean[] ancBinarySeq = ancestralPogs.get(tree.getBranchPoint(bpidx).getID()).allnodes;
 
             int[] children = tree.getChildren(bpidx);
             for (int childIdx : children) {
-                boolean[] extantPog =  pogTree.getExtant(childIdx).allnodes;
-                numIndelEvents += countIndelEventsBetweenParentChild(ancBinarySeq, extantPog);
+
+                boolean[] childPog;
+                if (tree.isLeaf(childIdx)) {
+                    childPog =  pogTree.getExtant(childIdx).allnodes;
+                } else {
+                    childPog = ancestralPogs.get(tree.getBranchPoint(childIdx).getID()).allnodes;
+                }
+
+                numIndelEvents += countIndelEventsBetweenParentChild(ancBinarySeq, childPog);
             }
         }
 
