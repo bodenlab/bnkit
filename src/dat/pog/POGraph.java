@@ -4,6 +4,8 @@ import asr.ASRException;
 import asr.ASRRuntimeException;
 import asr.GRASP;
 import bn.prob.EnumDistrib;
+import dat.EnumSeq;
+import dat.Enumerable;
 import dat.file.Utils;
 import json.JSONArray;
 import json.JSONException;
@@ -1006,6 +1008,100 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             }
             return null;
         }
+
+    }
+
+
+    // #############################################################################
+    // Metrics for comparing the quality of ancestral POGs to the extant descendants
+    // #############################################################################
+
+    /**
+     * Calculate the proportion of ancestral POGs that have edges not found in the alignment POG.
+     * @param ancestralPogs a map of ancestral indices to POGs
+     * @param alnPog the POG constructed from the alignment of extant sequences
+     * @return the proportion of ancestral POGs that have edges not found in the alignment POG
+     */
+    public static double calcProportionOutOfDistributionAncestors(Map<Object, POGraph> ancestralPogs,
+                                                                POAGraph alnPog) {
+
+        int numAncestorsInDistribution = 0;
+
+        for (Map.Entry<Object, POGraph> entry : ancestralPogs.entrySet()) {
+
+            //Object ancIdx = entry.getKey();
+            POGraph ancPog = entry.getValue();
+
+
+            boolean allEdgesInDistribution = true;
+            for (int edgeIndex : ancPog.getEdges().keySet()) {
+                try {
+                    alnPog.getEdge(ancPog.getFrom(edgeIndex), ancPog.getTo(edgeIndex));
+                } catch (InvalidIndexRuntimeException e) {
+                    allEdgesInDistribution = false;
+                    break;
+                }
+            }
+
+            if (allEdgesInDistribution) {
+                numAncestorsInDistribution += 1;
+            }
+        }
+
+        double proportionInDistribution = (double) numAncestorsInDistribution / (double) ancestralPogs.size();
+        return 1 - proportionInDistribution;
+    }
+
+    public static void main(String[] args) {
+
+        EnumSeq.Alignment<Enumerable> aln = null;
+        try {
+            aln = Utils.loadAlignment("/Users/sebs_mac/git_repos/indelDist/data/test_inputs/extants.aln", Enumerable.aacid);
+        } catch (IOException | ASRException e) {
+            e.printStackTrace();
+        }
+        assert(aln != null);
+
+        int N = 30;
+        POGraph pog;
+        Set<Integer> allNodes = new HashSet<>();
+
+        pog = new POGraph(N);
+        for (int i = 0; i < N; i ++) {
+            pog.addNode(i, new EnumNode(Enumerable.aacid));
+        }
+        int last = -1;
+        for (int from = -1; from < N-10; from += 2) {
+            int to = Math.min(from + 2, N);
+            pog.addEdge(from, to);
+            allNodes.add(to);
+            last = to;
+        }
+        if (last < N)
+            pog.addEdge(last, N);
+        for (int from = -1; from < N-10; from += 7) {
+            int to = Math.min(from + 7, N);
+            pog.addEdge(from, to);
+            allNodes.add(to);
+            last = to;
+        }
+        if (last < N)
+            pog.addEdge(last, N);
+        for (int from = -1; from < N-10; from += 9) {
+            int to = Math.min(from + 9, N);
+            pog.addEdge(from, to);
+            allNodes.add(to);
+            last = to;
+        }
+        if (last < N)
+            pog.addEdge(last, N);
+
+        Map<Object, POGraph> ancestralPogs = new HashMap<>();
+        ancestralPogs.put(0, pog);
+
+        //double outOfDist = calcProportionOutOfDistributionAncestors(ancestralPogs, aln);
+        //System.out.println(outOfDist);
+
 
     }
 
