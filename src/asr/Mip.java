@@ -10,6 +10,8 @@ import dat.phylo.Tree;
 import dat.pog.POAGraph;
 import java.io.*;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
+
 import com.google.ortools.linearsolver.MPVariable;
 import com.google.ortools.linearsolver.MPSolver;
 import com.google.ortools.Loader;
@@ -71,7 +73,10 @@ public class Mip {
         // Next we create the ancestor penalty array to mirror the tree's children array
         double[][] treeNeighbourAlphaPen = createTreeNeighbourAlphaPen(tree);
 
-        System.out.println("Constructing MIP model...");
+        if (GRASP.VERBOSE) {
+            System.out.println("Constructing MIP model...");
+        }
+
         String solverName = SOLVERS[SOLVER_IDX];
         HashMap<Integer, Integer[]> ancestorPositionVars;
         if (solverName.equalsIgnoreCase("CPSAT")) {
@@ -83,8 +88,6 @@ public class Mip {
         }
 
         outputAncestralSolutions(tree, ancestorPositionVars, OUTPUT, PREFIX);
-
-
     }
 
 
@@ -135,25 +138,42 @@ public class Mip {
         model.minimize(objective);
 
         CpSolver solver = new CpSolver();
+        solver.getParameters().setMaxTimeInSeconds((double) GRASP.MIP_SOLVER_TIME_LIMIT_MINUTES * 60);
+        // Uncomment for logging
+        // solver.getParameters().setLogSearchProgress(true);
+
+        if (num_threads < 8) {
+            System.out.println("CP-SAT is considerably slower when using less than 8 threads. Consider increasing the number of threads or switch --indel-method to SCIP/Gurobi");
+        }
+
         if (GRASP.VERBOSE) {
-            solver.getParameters().setLogSearchProgress(true);
+            System.out.println("CP-SAT model build complete. Starting solver with " + num_threads +  (num_threads == 1 ? " thread..." : " threads..."));
         }
 
         solver.getParameters().setNumWorkers(num_threads);
         CpSolverStatus status = solver.solve(model);
 
         if (status == CpSolverStatus.OPTIMAL) {
-            System.out.println("Total cost: " + solver.objectiveValue());
-            System.out.println("Problem solved in " + solver.wallTime() + " seconds");
+            System.out.println("Optimal solution found");
+            System.out.println("Objective value: " + solver.objectiveValue());
+            System.out.printf("Indel solution found in %d min, %d sec%n", TimeUnit.SECONDS.toMinutes((long) solver.wallTime()),
+                    (long) solver.wallTime() - TimeUnit.MINUTES.toSeconds(TimeUnit.SECONDS.toMinutes((long) solver.wallTime())));
+
         } else if (status == CpSolverStatus.FEASIBLE) {
-            System.out.println("Feasible objective: " + solver.objectiveValue() + "\n");
-            System.out.println("Problem solved in " + solver.wallTime() + " seconds");
-        } else {
-            System.err.println("No solution found.");
+
+            System.out.println("Feasible solution found");
+            System.out.println("Objective value: " + solver.objectiveValue());
+            System.out.printf("Indel solution found in %d min, %d sec%n", TimeUnit.SECONDS.toMinutes((long) solver.wallTime()),
+                    (long) solver.wallTime() - TimeUnit.MINUTES.toSeconds(TimeUnit.SECONDS.toMinutes((long) solver.wallTime())));
+        } else if (status == CpSolverStatus.INFEASIBLE) {
+            System.err.println("No solution found. A feasible solution could not be identified.");
+            return null;
+        } else if (status == CpSolverStatus.UNKNOWN) {
+            System.err.println("No solution found. A solution could not be identified with the given time limit.");
+            return null;
         }
 
         return extractSolutionCPSolver(ancestorPositionVars, solver);
-
     }
 
 
@@ -630,15 +650,8 @@ public class Mip {
         }
         assert solver != null;
 
-        if (solverName.equalsIgnoreCase("SCIP")) {
-            // SCIP creates concurrent solvers - appears to be a bug where other workers
-            // are not terminated when a solution is found.
-            solver.setNumThreads(1);
-        } else {
-            solver.setNumThreads(num_threads);
-        }
-
-        solver.enableOutput(); // logging
+        // Uncomment for logging
+        //solver.enableOutput();
 
         HashMap<Integer, MPVariable[]> ancestorPositionVars = createAncestralPositionVariables(tree, solver, aln.getWidth());
         addEdgeConstraintsAncestors(tree, alnPog, solver, ancestorPositionVars);
@@ -649,18 +662,42 @@ public class Mip {
 
         objective.setMinimization();
 
+        int actualThreadsUsed = num_threads;
+        if (solverName.equalsIgnoreCase("SCIP")) {
+            // SCIP creates concurrent solvers - appears to be a bug where other workers
+            // are not terminated when a solution is found.
+            solver.setNumThreads(1);
+            actualThreadsUsed = 1;
+        } else {
+            solver.setNumThreads(num_threads);
+        }
+
+        if (GRASP.VERBOSE) {
+            System.out.println(solverName + " model build complete. Starting solver with " + actualThreadsUsed + (actualThreadsUsed == 1 ? " thread..." : " threads..."));
+        }
+
+        solver.setTimeLimit((long) GRASP.MIP_SOLVER_TIME_LIMIT_MINUTES * 60 * 1000); // convert to milliseconds
         MPSolver.ResultStatus resultStatus = solver.solve();
 
         if (resultStatus == MPSolver.ResultStatus.OPTIMAL) {
-            System.out.println("Total cost: " + solver.objective().value());
-            System.out.println("Problem solved in " + solver.wallTime() / 1000 + " seconds");
-            //System.out.println("Problem solved in " + solver.iterations() + " iterations");
-            //System.out.println(solver.nodes() + " branch-and-bound nodes");
-            //System.out.println("Number of variables " + solver.numConstraints());
+            System.out.println("Optimal solution found");
+            System.out.println("Objective value: " + objective.value());
+            System.out.printf("Indel solution found in %d min, %d sec%n", TimeUnit.MILLISECONDS.toMinutes(solver.wallTime()),
+                    TimeUnit.MILLISECONDS.toSeconds(solver.wallTime()) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(solver.wallTime())));
+
         } else if (resultStatus == MPSolver.ResultStatus.FEASIBLE) {
-            System.out.println("Feasible objective: " + objective.value() + "\n");
-        } else {
-            System.err.println("No solution found.");
+
+            System.out.println("Feasible solution found");
+            System.out.println("Objective value: " + objective.value());
+            System.out.printf("Indel solution found in %d min, %d sec%n", TimeUnit.MILLISECONDS.toMinutes(solver.wallTime()),
+                    TimeUnit.MILLISECONDS.toSeconds(solver.wallTime()) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(solver.wallTime())));
+
+        } else if (resultStatus == MPSolver.ResultStatus.INFEASIBLE) {
+            System.err.println("A feasible solution could not be identified.");
+            return null;
+        } else if (resultStatus == MPSolver.ResultStatus.NOT_SOLVED) {
+            System.err.println("No solution found or a solution could not be identified with the given time limit.");
+            return null;
         }
 
         return extractSolutionMPSolver(ancestorPositionVars);

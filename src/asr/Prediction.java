@@ -1551,7 +1551,7 @@ public class Prediction {
         double[][] treeNeighbourAlphaPen = Mip.createTreeNeighbourAlphaPen(tree);
 
         if (GRASP.VERBOSE) {
-            System.out.println("Constructing and solving MIP indel model using " + solver + "...");
+            System.out.println("Constructing MIP indel model using " + solver + "...");
         }
 
         HashMap<Integer, Integer[]> ancestorPositionVars; //bpidx to array of position indices
@@ -1564,9 +1564,9 @@ public class Prediction {
                     treeNeighbourAlphaPen, aln, GRASP.NTHREADS, solver);
         }
 
-        if (GRASP.VERBOSE) {
-            System.out.println("MIP Indel inference complete!");
-            //Mip.printAncestralIndels(pogTree.getTree(), ancestorPositionVars);
+        if (ancestorPositionVars == null) {
+            System.out.println("Defaulting to bi-directional edge parsimony for indel inference");
+            return PredictByBidirEdgeParsimony(pogTree);
         }
 
         // unpack the results, branch point by branch point

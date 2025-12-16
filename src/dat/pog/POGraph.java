@@ -1065,7 +1065,6 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 
         int numIndelEvents = 0;
         IdxTree tree = pogTree.getTree();
-        int[] leafIndices = tree.getLeaves();
         for (int bpidx: tree.getAncestors()) {
 
             boolean[] ancBinarySeq = ancestralPogs.get(tree.getBranchPoint(bpidx).getID()).allnodes;
