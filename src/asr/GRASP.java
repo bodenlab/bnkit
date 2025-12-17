@@ -15,7 +15,6 @@ import dat.pog.POGTree;
 import dat.pog.POGraph;
 import stats.*;
 import java.io.IOException;
-
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -37,7 +36,7 @@ public class GRASP {
     public static boolean INDEL_CONSERVATIVE = true;
     // Mode for BEP
     public static boolean RECODE_NULL = true;
-
+    public static int MIP_SOLVER_TIME_LIMIT_MINUTES = 720; // 12 hours
     public static boolean REMOVE_INDEL_ORPHANS = true;
     public enum Inference {
         JOINT,
@@ -62,7 +61,7 @@ public class GRASP {
                 "\t{-t | --threads <number>}\n" +
                 "\t{-j | --joint (default)}\n" +
                 "\t{-m | --marginal <branchpoint-id>}\n" +
-                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML)\n" +
+                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML SCIP Gurobi CPSAT)\n" +
                 "\t{* --indel-prior <LOWGAP|MEDGAP|HIGHGAP>}\n" +
                 "\t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>}\n" +
                 "\t{--copy-rates Copy substitution rates from reconstructed ancestor\n" +
@@ -104,6 +103,7 @@ public class GRASP {
                 "\t--nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end\n" +
                 "\t--orphans de-activates the removal of orphaned indel trees\n" +
                 "\t--exclude-noedge removes non-existing edge as an option for parsimony in BEP\n" +
+                "\t--solver-time-limit the maximum time the MIP solver can run for in minutes before defaulting to BEP indel inference\n" +
                 "\t--verbose prints out information about steps undertaken, and --time the time it took to finish\n" +
                 "\t-h (or --help) will print out this screen\n");
         out.println("Files/formats: \n" +
@@ -114,7 +114,7 @@ public class GRASP {
                 "\tASR: complete reconstruction as JSON, incl. POGs of ancestors and extants, and tree (ASR.json)\n" +
                 "\tDOT: partial-order graphs of ancestors in DOT format\n" +
                 "\tTREES: position-specific trees with ancestor states labelled\n" +
-                "\tTrAVIS: Produce commandline parameters for running TrAVIS" +
+                "\tTrAVIS: Produce commandline parameters for running TrAVIS\n" +
                 "\tSIMUL: Run TrAVIS based on parameters from joint reconstruction, and save tree and alignments");
         out.println("Indel-methods: \n" +
                 "\tBEP: bi-directional edge (maximum) parsimony\n" +
@@ -123,6 +123,9 @@ public class GRASP {
                 "\tSICML: simple indel-coding maximum likelihood (uses uniform evolutionary model)\n" +
                 "\tPSP: position-specific (maximum) parsimony\n" +
                 "\tPSML: position-specific maximum likelihood (uses uniform evolutionary model)\n" +
+                "\tSCIP: infer a globally optimal indel history using the open-source SCIP solver (https://www.scipopt.org/). Does not support multi-threading\n" +
+                "\tGurobi: uses the Gurobi solver to infer a globally optimal indel history. Requires local installation of Gurobi to run (https://www.gurobi.com/downloads/)\n" +
+                "\tCPSAT: infer a globally optimal indel history using Google's open-source CP-SAT solver (https://developers.google.com/optimization). Should use a minimum of 8 threads for reliable performance\n" +
                 "\tAdd '*' to method name for less conservative setting (if available)\n");
         out.println("Substitution-models: \n" +
                 "\tJTT: Jones-Taylor-Thornton (protein; default)\n" +
@@ -161,7 +164,7 @@ public class GRASP {
         // Alphabet is decided by MODEL_IDX
         Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
         // Indel approaches:
-        String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML"};
+        String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML", "SCIP", "Gurobi", "CPSAT"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
         String INDEL_RATE_DISTRIB = null;
         String INDEL_LENGTH_DISTRIB = null;
@@ -314,7 +317,7 @@ public class GRASP {
                     try {
                         NTHREADS = Integer.parseInt(args[++a]);
                     } catch (NumberFormatException e) {
-                        System.err.println("Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
+                        usage(2, "Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
                     }
                 } else if (arg.equalsIgnoreCase("-nogap")) {
                     GAPPY = false;
@@ -324,6 +327,13 @@ public class GRASP {
                     TIME = true;
                 } else if (arg.equalsIgnoreCase("-nonibble")) {
                     NIBBLE = false;
+                } else if (arg.equalsIgnoreCase("-solver-time-limit")) {
+                    try {
+                        MIP_SOLVER_TIME_LIMIT_MINUTES = Integer.parseInt(args[++a]);
+                    } catch (NumberFormatException e) {
+                        usage(2, "Failed to set time limit for MIP solver: " + args[a] + " is not a valid integer");
+                    }
+
                 } else if (arg.equalsIgnoreCase("-orphans")) {
                     REMOVE_INDEL_ORPHANS = false;
                 } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
@@ -439,6 +449,8 @@ public class GRASP {
                 case 5:
                     indelpred = Prediction.PredictByMaxLhood(pogtree);
                     break;
+                case 6, 7, 8:
+                    indelpred = Prediction.PredictByMIP(pogtree, aln, INDELS[INDEL_IDX]);
                 default:
                     break;
             }

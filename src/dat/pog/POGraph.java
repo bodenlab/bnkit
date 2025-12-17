@@ -4,7 +4,10 @@ import asr.ASRException;
 import asr.ASRRuntimeException;
 import asr.GRASP;
 import bn.prob.EnumDistrib;
+import dat.EnumSeq;
+import dat.Enumerable;
 import dat.file.Utils;
+import dat.phylo.IdxTree;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
@@ -1007,6 +1010,104 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
             return null;
         }
 
+    }
+
+
+    // #############################################################################
+    // Metrics for comparing the quality of ancestral POGs to the extant descendants
+    // #############################################################################
+
+    /**
+     * Calculate the proportion of ancestral POGs that have edges not found in the alignment POG.
+     * @param ancestralPogs a map of ancestral indices to POGs
+     * @param alnPog the POG constructed from the alignment of extant sequences
+     * @return the proportion of ancestral POGs that have edges not found in the alignment POG
+     */
+    public static double calcProportionOutOfDistributionAncestors(Map<Object, POGraph> ancestralPogs,
+                                                                POAGraph alnPog) {
+
+        int numAncestorsInDistribution = 0;
+
+        for (Map.Entry<Object, POGraph> entry : ancestralPogs.entrySet()) {
+
+            //Object ancIdx = entry.getKey();
+            POGraph ancPog = entry.getValue();
+
+
+            boolean allEdgesInDistribution = true;
+            for (int edgeIndex : ancPog.getEdges().keySet()) {
+                try {
+                    alnPog.getEdge(ancPog.getFrom(edgeIndex), ancPog.getTo(edgeIndex));
+                } catch (InvalidIndexRuntimeException e) {
+                    allEdgesInDistribution = false;
+                    break;
+                }
+            }
+
+            if (allEdgesInDistribution) {
+                numAncestorsInDistribution += 1;
+            }
+        }
+
+        double proportionInDistribution = (double) numAncestorsInDistribution / (double) ancestralPogs.size();
+        return 1 - proportionInDistribution;
+    }
+
+    /**
+     * Calculate the number of indel events across the tree given the ancestral POGs.
+     *
+     * @param pogTree
+     * @param ancestralPogs
+     * @return
+     */
+    public static int calcNumberIndelEvents(POGTree pogTree,
+                                                Map<Object, POGraph> ancestralPogs) {
+
+        int numIndelEvents = 0;
+        IdxTree tree = pogTree.getTree();
+        for (int bpidx: tree.getAncestors()) {
+
+            boolean[] ancBinarySeq = ancestralPogs.get(tree.getBranchPoint(bpidx).getID()).allnodes;
+
+            int[] children = tree.getChildren(bpidx);
+            for (int childIdx : children) {
+
+                boolean[] childPog;
+                if (tree.isLeaf(childIdx)) {
+                    childPog =  pogTree.getExtant(childIdx).allnodes;
+                } else {
+                    childPog = ancestralPogs.get(tree.getBranchPoint(childIdx).getID()).allnodes;
+                }
+
+                numIndelEvents += countIndelEventsBetweenParentChild(ancBinarySeq, childPog);
+            }
+        }
+
+        return numIndelEvents;
+    }
+
+    /**
+     * Count the number of indel events between an ancestral and child binary sequence.
+     * Note that the extension of a gap is not counted as a new event, therefore an indel
+     * event is only penalised once regardless of the length of the indel.
+     * @param ancestralBinarySeq the ancestral binary sequence
+     * @param childBinarySeq the child binary sequence
+     * @return the number of indel events
+     */
+    private static int countIndelEventsBetweenParentChild(boolean[] ancestralBinarySeq, boolean[] childBinarySeq) {
+        int dis = 0;
+        int prevDist = 0;
+
+        for (int i = 0; i < ancestralBinarySeq.length; i++) {
+            int curDist = (ancestralBinarySeq[i] ? 1 : 0)  - (childBinarySeq[i] ? 1 : 0);
+
+            if (curDist != 0 && curDist != prevDist) {
+                dis += 1;
+            }
+            prevDist = curDist;
+        }
+
+        return dis;
     }
 
 }
