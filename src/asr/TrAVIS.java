@@ -886,6 +886,7 @@ public class TrAVIS {
                         double toss = params.rand.nextDouble();
                         // indel rate (rho) is separate from site-specific substitution rate, and is node-specific
                         double p = Math.exp(-(rho*t * (params.SUBST_RATE_INFLUENCES_INDELS ? rates[paridx][i]:1)));
+                        // p = (1-p)/2 + p; // FIX halve-it see how things change....
                         // make decision of what happens in child for the current site i
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution (r is evolutionary rate and t is branch distance)
                             EnumDistrib d = params.substmodel.getDistrib(parseq[i], rates[paridx][i]*t); // probability of child states GIVEN parent state

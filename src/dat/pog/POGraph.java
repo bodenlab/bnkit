@@ -178,6 +178,31 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         return ret;
     }
 
+    public static POGraph[] getAsPOGs(dat.EnumSeq.Alignment<Enumerable> aln) {
+        POGraph[] arr = new POGraph[aln.getHeight()];
+        for (int k = 0; k < aln.getHeight(); k ++) {
+            arr[k] = new POGraph(aln.getWidth());
+            // add nodes for sequence
+            EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(k);
+            int idx = -1;
+            for (int i = 0; i < aln.getWidth(); i ++) {
+                Object sym = gseq.get(i);
+                if (sym != null) {
+                    EnumNode node = new EnumNode();
+                    node.add(sym);
+                    node.setLabel(sym.toString());
+                    node.setXLabel(i + 1);
+                    int tmpidx = arr[k].addNode(node); // Create the node
+                    arr[k].addEdge(idx, tmpidx);
+                    idx = tmpidx;
+                }
+            }
+            // add last edge
+            arr[k].addEdge(idx, aln.getWidth());
+        }
+        return arr;
+    }
+
 
     /**
      * Determine the node indices that are ahead (forward direction). Note that it terminates at last node, so will not return the end marker.
@@ -392,22 +417,56 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
      * Retrieve all pairs of jump edges, i.e. edges that skip at least one position
      * @return
      */
-    public Set<int[]> getIndels() {
+    public Set<int[]> getJumps() {
         Set<int[]> ivset = new HashSet<>();
         for (int from = -1; from < nNodes; from++) {
-            for (int to : getNodeIndices(from, true))
-                if (Math.abs(to - from) > 1)
-                    ivset.add(new int[] {from, to});
-            if (isEndNode(from))
-                if (maxsize() - from > 1)
-                    ivset.add(new int[] {from, maxsize()});
+            if (this.isNode(from)) {
+                for (int to : getNodeIndices(from, true))
+                    if (Math.abs(to - from) > 1)
+                        ivset.add(new int[] {from, to});
+                if (isEndNode(from))
+                    if (maxsize() - from > 1)
+                        ivset.add(new int[] {from, maxsize()});
+            }
         }
         return ivset;
+    }
+
+    /**
+     * Determine the number of positions skipped by each edge indexed by start position (0..N)
+     * @return a positions-skipped array, indexed by start position,
+     * i.e. [startpos] = skipped-positions (where skipped-positions is 0 when positions are linked continuously)
+     */
+    public int[] getSkipovers() {
+        int[] ret = new int[this.nNodes];
+        for (int[] pair : getJumps())
+            if (pair != null)
+                ret[pair[0]] += pair[1] - pair[0] - 1;
+        return ret;
+    }
+
+    /**
+     * Determine the difference between skipover arrays, an operation that makes sense when looking at indel changes between branchpoints
+     * @param skips1 skipovers for node 1
+     * @param skips2 skipovers for node 2
+     * @return the difference, i.e. 0 for positions that are unchanged, negative if skips are reduced in length, positive if skips are extended in length;
+     * if node 1 is the ancestor of node 2, negative values represent insertions, positives represent deletions
+     */
+    public static int[] getDiffSkipovers(int[] skips1, int[] skips2) {
+        if (skips1 == null || skips2 == null)
+            return null;
+        if (skips1.length != skips2.length)
+            return null;
+        int[] ret = new int[skips1.length];
+        for (int i = 0; i < skips1.length; i++)
+            ret[i] = skips1[i] == skips2[i] ? 0 : skips2[i] - skips1[i];
+        return ret;
     }
 
     static public Boolean GAP_STATUS_PRESENT = true;
     static public Boolean GAP_STATUS_ABSENT = false;
     static public Boolean GAP_STATUS_UNKNOWN = null;
+
 
     /**
      * Check for this POG if the query indel is present, if it is absent, or if it is permissible.
@@ -801,40 +860,6 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
     /**
-     * Count the number of gap starts in this POG
-     * @return number of gap starts
-     */
-    private int getNumGapStarts() {
-        int count = 0;
-        boolean inGap = false;
-        for (int i = 0; i < nNodes; i++) {
-            if (!isNode(i) && !inGap) {
-                count++;
-                inGap = true;
-            } else {
-                inGap = false;
-            }
-        }
-
-        return count;
-    }
-
-    /**
-     * Count the number of gaps in this POG
-     * @return number of gaps
-     */
-    private int getNumGaps() {
-        int count = 0;
-        for (int i = 0; i < nNodes; i++) {
-            if (!isNode(i)) {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    /**
      * Define the standard type of node for POGs that allow for tracing POG consistency
      */
     public static class StatusNode extends Node {
@@ -1047,64 +1072,137 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
 
+    /**
+     * Class to process pairs of POGraphs.
+     */
+    public static class PairedAdjacency {
+        final private boolean[][] m;
+        final private boolean[] masked; // indices that are masked because they are never referenced
+
+        /**
+         * Construct an adjacency matrix for TWO POGs, which indicate only the PRESENCE of edges, enabling the
+         * tracking of overlapping edges BETWEEN POGs.
+         * @param pog1 POG 1
+         * @param pog2 POG 2
+         * @param unique_only omit edges that are shared between the POGs
+         */
+        public PairedAdjacency(POGraph pog1, POGraph pog2, boolean unique_only) {
+            if (pog1.nNodes != pog2.nNodes)
+                throw new IllegalArgumentException("POGraphs must be defined over the same range of positions");
+            this.m = new boolean[pog1.nNodes][pog2.nNodes];
+            this.masked = new boolean[pog1.nNodes];
+            int[][] pairs1 = pog1.getPairs();
+            int[][] pairs2 = pog2.getPairs();
+            for (int[] p1 : pairs1) // add each pog1 edge, assuming that we don't care if unique or (if we do) that pog2 does not have it
+                m[p1[0]][p1[1]] = true;
+            for (int[] p2 : pairs2) {
+                if (!unique_only)   // we don't mind non-unique edges, hence we don't care if pog1 has it...
+                    m[p2[1]][p2[0]] = true;
+                else if (m[p2[0]][p2[1]]) // we do only include unique edges, so if pog1 has it, we won't add it for pog2...
+                    m[p2[0]][p2[1]] = false; // then we erase the pog1 instance
+            }
+            for (int i = 0; i < pog1.nNodes; i++) {
+                boolean referenced = false;
+                for (int j = 0; j < pog2.nNodes; j++) {
+                    if (m[i][j]) {
+                        referenced = true;
+                        break;
+                    }
+                }
+                masked[i] = referenced; // if not referenced, we mask it against future use
+            }
+        }
+
+        /**
+         * Construct an adjacency matrix for TWO POGs, which indicate only the PRESENCE of edges, enabling the
+         * tracking of overlapping edges BETWEEN POGs. This constructor does NOT care whether an edge is unique
+         * to a POG or not.
+         * @param pog1 POG 1
+         * @param pog2 POG 2
+         */
+        public PairedAdjacency(POGraph pog1, POGraph pog2) {
+            this(pog1, pog2, false);
+        }
+
+        /**
+         * Return the size or length of the matrix
+         * @return the length of each POG, or equivalently size of (squared) adjacency matrix
+         */
+        public int length() {
+            return m.length;
+        }
+
+        /**
+         * Return true if both POGs have the edge
+         * @param from edge start index
+         * @param to edge end index
+         * @return
+         */
+        public boolean isShared(int from, int to) {
+            return m[from][to] & m[to][from];
+        }
+
+        /**
+         * Follow the index that in turn defines both POGs, which is always in ascending order and can never be less than zero.
+         * Values that are not indices of either POG are never returned.
+         * @param from current value of index
+         * @return the next value of index, or -1 if the current value is the end of the index
+         */
+        public int getNext(int from) {
+            for (int i = from; i < masked.length; i++)
+                if (!masked[i])
+                    return i;
+            return -1;
+        }
+
+        /**
+         * Follow the edge one step, to return the next edge if any
+         * @param from
+         * @param to
+         * @return
+         */
+        public int[] getNext(int from, int to) {
+            if (from < to)
+                return new int[] {to, getNext(to)};
+            else if (from > to)
+                return new int[] {from, getNext(from)};
+            else
+                return null;
+        }
+
+        public void print() {
+            if (length() <= 100) {
+                System.out.print(" ");
+                for (int i = 0; i < length(); i++) {
+                    if (!masked[i])
+                        System.out.print(String.format("%02d", i) + (getNext(i) > 0 ? "|" : "\n"));
+                }
+                for (int i = 0; i < length(); i++) {
+                    if (!masked[i])
+                        System.out.print("---");
+                }
+                System.out.println("---");
+                for (int i = 0; i < length(); i++) {
+                    if (!masked[i]) {
+                        System.out.print(String.format("%02d", i) + "|");
+                        for (int j = 0; j < length(); j++) {
+                            if (!masked[i])
+                                System.out.print((m[i][j] ? " X" : "  ") + (getNext(i) > 0 ? " " : "\n"));
+                        }
+                    }
+                }
+            } else
+                System.out.println("Matrix is too large to show");
+        }
+    }
+
+
+
+
 
     // #############################################################################
     // Metrics for comparing the quality of ancestral POGs to the extant descendants
     // #############################################################################
-
-    public static double getMeanGapLength(Map<Object, POGraph> ancestralPogs) {
-        int numGapStarts = 0;
-        int numGaps = 0;
-
-        for (Map.Entry<Object, POGraph> entry: ancestralPogs.entrySet()) {
-            POGraph g = entry.getValue();
-            numGapStarts += g.getNumGapStarts();
-            numGaps += g.getNumGaps();
-        }
-
-        return (double) numGaps / (double) numGapStarts;
-    }
-
-    public static double getAverageSeqLength(Map<Object, POGraph> ancestralPogs) {
-
-        int alnWidth = ancestralPogs.values().iterator().next().nNodes;
-        double gapProportion = getGapProportion(ancestralPogs);
-        double nonGapProportion = 1.0 - gapProportion;
-
-        return (int) (nonGapProportion * (double) alnWidth);
-    }
-
-    public static int getGapCount(Map<Object, POGraph> ancestralPogs) {
-        int totalNumGapsAncestors = 0;
-        POGraph g = null;
-        for (Map.Entry<Object, POGraph> entry: ancestralPogs.entrySet()) {
-            g = entry.getValue();
-            totalNumGapsAncestors += g.getNumGaps();
-        }
-
-        return totalNumGapsAncestors;
-    }
-
-    public static int getGapStartCounts(Map<Object, POGraph> ancestralPogs) {
-        int totalNumGapStartsAncestors = 0;
-        POGraph g = null;
-        for (Map.Entry<Object, POGraph> entry: ancestralPogs.entrySet()) {
-            g = entry.getValue();
-            totalNumGapStartsAncestors += g.getNumGapStarts();
-        }
-
-        return totalNumGapStartsAncestors;
-    }
-
-    public static double getGapProportion(Map<Object, POGraph> ancestralPogs) {
-
-        int totalNumGapsAncestors = getGapCount(ancestralPogs);
-
-        int alnWidth = ancestralPogs.values().iterator().next().nNodes;
-        int alnHeight = ancestralPogs.size();
-
-        return (double) totalNumGapsAncestors / (double) (alnWidth * alnHeight);
-    }
 
     /**
      * Calculate the proportion of ancestral POGs that have edges not found in the alignment POG.
@@ -1143,85 +1241,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
     /**
-     * Count the number of phylogenetically incorrect events in the ancestral POGs. A phylogenetically incorrect event is defined
-     * according to Dollo's Law: once a character is lost in a lineage, it cannot be regained.
-     * @param pogTree a POGTree containing the phylogenetic tree and extant POGs
-     * @param ancestralPogs a map of ancestral indices to POGs
-     * @param aln the alignment of extant sequences
-     * @return the number of phylogenetically incorrect events
-     */
-    public static int countNumberOfPhylogeneticallyIncorrectEvents(POGTree pogTree, Map<Object,
-                                                                      POGraph> ancestralPogs,
-                                                                      EnumSeq.Alignment<Enumerable> aln) {
-        int ROOT_IDX = 0;
-        int violationCount = 0;
-
-        IdxTree tree = pogTree.getTree();
-
-        for (int alnPosition = 0; alnPosition < aln.getWidth(); alnPosition++) {
-            Iterator<Integer> dfs = tree.getDepthFirstIterator();
-
-            Map<Integer, Boolean> deletionInLineage = new HashMap<>();
-
-            while (dfs.hasNext()) {
-
-                int bpidx = dfs.next();
-                if (bpidx == ROOT_IDX) {
-                    deletionInLineage.put(bpidx, false);
-                    continue;
-                }
-
-                boolean currentNodeHasContent = doesNodeHaveContentAtPosition(tree, bpidx, pogTree,
-                                                                                alnPosition, ancestralPogs);
-
-                int parentIdx = tree.getParent(bpidx);
-                boolean parentHasContent = doesNodeHaveContentAtPosition(tree, parentIdx, pogTree,
-                                                                                alnPosition, ancestralPogs);
-                boolean deletionInParentLineage = deletionInLineage.getOrDefault(parentIdx, false);
-
-                if (deletionInParentLineage && currentNodeHasContent) {
-                    String currentNodeLabel = (String) tree.getBranchPoint(bpidx).getLabel();
-                    if (!tree.isLeaf(bpidx)) {
-                        currentNodeLabel = "N" + currentNodeLabel;
-                    }
-
-                    System.out.println("Phylogenetic violation at aln pos " + (alnPosition + 1) +" at node " + currentNodeLabel);
-                    violationCount += 1;
-                }
-
-                // Update deletion status for current node
-                if (!currentNodeHasContent && parentHasContent) {
-                    deletionInLineage.put(bpidx, true);
-                } else if (deletionInParentLineage || (!parentHasContent && !currentNodeHasContent)) {
-                    deletionInLineage.put(bpidx, true);
-                } else {
-                    deletionInLineage.put(bpidx, false);
-                }
-            }
-        }
-
-        return violationCount;
-    }
-
-    private static boolean doesNodeHaveContentAtPosition(IdxTree tree, int bpidx,
-                                                         POGTree pogTree, int alnPosition,
-                                                         Map<Object, POGraph> ancestralPogs) {
-        boolean currentNodeHasContent;
-        if (tree.isLeaf(bpidx)) {
-            currentNodeHasContent =  pogTree.getExtant(bpidx).allnodes[alnPosition];
-        } else {
-            currentNodeHasContent = ancestralPogs.get(tree.getBranchPoint(bpidx).getID()).allnodes[alnPosition];
-        }
-
-        return currentNodeHasContent;
-
-    }
-
-
-    /**
      * Calculate the number of indel events across the tree given the ancestral POGs.
      *
-     * @param pogTree 
+     * @param pogTree
      * @param ancestralPogs
      * @return
      */

@@ -272,7 +272,7 @@ public class Prediction {
 
     /**
      * Retrieve position-specific index tree that is based on the original phylogenetic tree but has only indices for ancestor nodes,
-     * which are not marked as absent indels.
+     * which are not marked as absent (indels).
      * The index tree is cached inside this class instance, so that it can be quickly retrieved when required again.
      * @param position index in alignment/POG
      * @return index tree for specified position in alignment/POG
@@ -448,6 +448,27 @@ public class Prediction {
                         ancestors.put(phylotree.getLabel(idx), pog);
                     }
                 }
+            }
+        }
+        return ancestors;
+    }
+
+    /**
+     * Retrieve all labels for predictions.
+     * Ancestors that have not been inferred are NOT included in the returned map.
+     * @param mode inference mode, currently JOINT and MARGINAL are supported (see enum defined in GRASP class)
+     * @return list with labels (in the same order as they are returned by #getAncestors.
+     */
+    public List<Object> getLabels(GRASP.Inference mode) {
+        List<Object> ancestors = new ArrayList<>();
+        // iterate through all ancestors, and extracting names from those that have been inferred
+        for (int idx : getAncestorIndices()) {
+            if (mode == GRASP.Inference.JOINT) {
+                if (states != null)
+                    ancestors.add(phylotree.getLabel(idx));
+            } else if (mode == GRASP.Inference.MARGINAL) {
+                if (distribs[idx] != null)
+                    ancestors.add(phylotree.getLabel(idx));
             }
         }
         return ancestors;
@@ -722,6 +743,99 @@ public class Prediction {
             Newick.save(getTreeInstance(pos, GRASP.Inference.JOINT), name);
         }
     }
+
+    /**
+     * Determine for each ancestor POG the number of positions skipped by edges
+     * @return a positions-skipped matrix, index by branchpoint, then start position,
+     * i.e. [bpidx][startpos] = skipped-positions (where skipped-positions is 0 when positions are linked continuously)
+     */
+    public int[][] getSkipovers() {
+        IdxTree idxtree = this.pogTree.getTree();
+        int[][] ret = new int[idxtree.getSize()][];
+        for (int i : idxtree) {
+            POGraph pog = idxtree.isLeaf(i) ? this.pogTree.getExtant(i) : this.ancarr[i];
+            ret[i] = pog.getSkipovers();
+        }
+        return ret;
+    }
+
+    /**
+     * Determine for each ancestor POG the number of positions skipped by edges
+     * @return a positions-skipped matrix, index by branchpoint, then start position,
+     * i.e. [bpidx][startpos] = skipped-positions (where skipped-positions is 0 when positions are linked continuously)
+     */
+    public int[][] getDiffSkipovers() {
+        IdxTree idxtree = this.pogTree.getTree();
+        int[][] ret = new int[idxtree.getSize()][];
+        for (int i : idxtree) {
+            int parent = idxtree.getParent(i);
+            if (parent >= 0) { // i does have a parent (so i is not root)
+                POGraph cpog = idxtree.isLeaf(i) ? this.pogTree.getExtant(i) : this.ancarr[i];
+                POGraph ppog = this.ancarr[parent];
+                ret[i] = POGraph.getDiffSkipovers(ppog.getSkipovers(), cpog.getSkipovers());
+            } else
+                ret[i] = new int[getPositions()];
+        }
+        return ret;
+    }
+
+    /**
+     * Determine the (most supported) sequences in a reconstruction by recovering the predicted ancestor POGs;
+     * this involves determining a path to assemble each linear sequence, indexed by the branchpoint.
+     * The path determination is done by Dijkstra or A* star, based on weights assigned during inference.
+     * Ancestors that have not been inferred are NOT included in the returned map.
+     * @param mode inference mode, e.g. GRASP.Inference.JOINT
+     * @param gappy if true, the sequences should include "gaps" to indicate the presence of indels in the evolutionary history
+     * @return
+     */
+    public Object[][] getSequences(GRASP.Inference mode, boolean gappy) {
+        Map<Object, POGraph> pogs = getAncestors(mode);
+        Object[][] ancseqs = new Object[pogs.size()][];
+        int ii = 0;
+        try {
+            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                if (mode == GRASP.Inference.MARGINAL) {
+                    ancseqs[0] = this.getSequence(entry.getKey(), mode, gappy);
+                    break;
+                }
+                ancseqs[(Integer) entry.getKey()] = this.getSequence(entry.getKey(), mode, gappy);
+                ii++;
+            }
+        } catch (NumberFormatException exc) {
+            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+                ancseqs[ii] = this.getSequence(entry.getKey(), mode, gappy);
+            }
+        }
+        return ancseqs;
+    }
+
+    /**
+     * Retrieve the names of the predicted ancestor POGs.
+     * Ancestors that have not been inferred are NOT included in the returned map.
+     * @param mode inference mode, e.g. GRASP.Inference.JOINT
+     * @return
+     */
+    public String[] getNames(GRASP.Inference mode) {
+        List<Object> labels = getLabels(mode);
+        String[] names = new String[labels.size()];
+        int ii = 0;
+        try {
+            for (Object entry : labels) {
+                if (mode == GRASP.Inference.MARGINAL) {
+                    names[0] = "N" + entry.toString();
+                    break;
+                }
+                names[(Integer)entry] = "N" + entry.toString();
+                ii++;
+            }
+        } catch (NumberFormatException exc) {
+            for (Object entry : labels)
+                names[ii] = "N" + entry.toString();
+        }
+        return names;
+    }
+
+
 
     // --------------------------------------------------------------------------------------------------------------- //
     // static "factory" methods for constructing Prediction instances

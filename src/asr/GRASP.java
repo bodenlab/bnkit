@@ -65,6 +65,7 @@ public class GRASP {
                 "\t{-j | --joint (default)}\n" +
                 "\t{-m | --marginal <branchpoint-id>}\n" +
                 "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML SCIP Gurobi CPSAT)\n" +
+                "\t{--reuse-tree Re-use the reconstructed tree for TrAVIS}\n" +
                 "\t{* --indel-prior <LOWGAP|MEDGAP|HIGHGAP>}\n" +
                 "\t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>}\n" +
                 "\t{--copy-rates Copy substitution rates from reconstructed ancestor\n" +
@@ -158,6 +159,7 @@ public class GRASP {
         String PREFIX = null;
         String RATESFILE = null;
         double[] RATES = null;
+        boolean REUSE_TREE = false;
         boolean CONFLATE_RATES = false;
         boolean COPY_SUBST_RATES = false;
 
@@ -314,6 +316,8 @@ public class GRASP {
                 } else if (arg.equalsIgnoreCase("-indel-length-distrib") && args.length > a + 1) {
                     //  --indel-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>
                     INDEL_LENGTH_DISTRIB = args[++a];
+                } else if (arg.equalsIgnoreCase("-reuse-tree")) {
+                    REUSE_TREE = true;
                 } else if (arg.equalsIgnoreCase("-copy-rates")) {
                     COPY_SUBST_RATES = true;
                 } else if (arg.equalsIgnoreCase("-conflate-rates")) {
@@ -916,6 +920,10 @@ public class GRASP {
                                 // collect indel lengths as well, distinguishing between insertions and deletions
                                 int[] ins_total = new int[0];
                                 int[] del_total = new int[0];
+
+                                Object[] labels = mytree.getLabels();
+                                int[][] skips = indelpred.getDiffSkipovers();
+
                                 // Go through the tree, and look at each ancestor sequence, recording predicted indel events
                                 for (int idx : mytree) { // go through the original, user-provided tree
                                     int parent = mytree.getParent(idx);
@@ -971,6 +979,9 @@ public class GRASP {
                                 } else
                                     // (2) we need to try all and pick the one with greatest log-likelihood
                                     indelrateDist = RateModel.bestfit(rarray, SEED);
+                                if (VERBOSE && indelrateDist != null)
+                                    System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS() + " \\");
+
                                 // now, turn to indel lengths...
                                 int[] indel_total = TrAVIS.mergeCounts(ins_total, del_total);
                                 int[] ins_data = TrAVIS.unfoldCounts(ins_total);
@@ -998,6 +1009,8 @@ public class GRASP {
                                     insertion_length_distrib = IndelModel.bestfit(ins_data, SEED);
                                     deletion_length_distrib = IndelModel.bestfit(del_data, SEED);
                                 }
+                                if (VERBOSE)
+                                    System.out.println("--indel-length-distrib " + indel_length_distrib.getTrAVIS() + " \\");
 
                                 int ninsertions = Arrays.stream(ins_total).sum();
                                 int ndeletions = Arrays.stream(del_total).sum();
@@ -1008,7 +1021,11 @@ public class GRASP {
                                 EnumSeq[] seqs = null;
                                 EnumSeq[] seqs_ex = null;
                                 while (tracker == null) {
-                                    TrAVIS.TrackTree.Params params = new TrAVIS.TrackTree.Params(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL);
+                                    TrAVIS.TrackTree.Params params = null;
+                                    if (REUSE_TREE)
+                                        params = new TrAVIS.TrackTree.Params(tree, EnumSeq.parseProtein(n0.toString()), MODEL);
+                                    else
+                                        params = new TrAVIS.TrackTree.Params(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL);
                                     if (RATES != null && COPY_SUBST_RATES) {
                                         // recover rates for N0, appropriately indexed
                                         int[] n0idxs = indelpred.getConsensus(0);

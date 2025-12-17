@@ -156,7 +156,7 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
         if (OUT_FILE == null)
             usage(3, "No output file given");
         if (NWK_FILE == null && MARG_NODE != null)
-            usage(2, "No tree file given, so cannot determine where ancestor\"" + MARG_NODE + "\" is");
+            usage(2, "No tree file given, so cannot determine where ancestor \"" + MARG_NODE + "\" is");
         try {
             EnumSeq.Alignment aln = Utils.loadAlignment(ALN_FILE, Enumerable.aacid);
             if (NWK_FILE != null) {

@@ -918,6 +918,19 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     /**
+     * Get the labels of all nodes in this tree, as indexed by the tree.
+     * @return array with labels (in order of increasing branch point index, from 0 to N-1, where N is the number of nodes in the tree)
+     */
+    public Object[] getLabels() {
+        Object[] ret = new Object[getSize()];
+        for (int i : this) {
+            ret[i] = this.getLabel(i);
+        }
+        return ret;
+    }
+
+
+    /**
      * Get the branch point indices for all leaf nodes in this tree.
      * @return the subset of indices that identify leaves/extant species
      */
