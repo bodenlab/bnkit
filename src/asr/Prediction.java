@@ -1615,9 +1615,12 @@ public class Prediction {
         if (GRASP.VERBOSE) {
             double propOutDist = POGraph.calcProportionOutOfDistributionAncestors(ancestors, alnPog) * 100;
             int numIndelEvents = POGraph.calcNumberIndelEvents(pogTree, ancestors);
+            int numPhylogeneticViolations = POGraph.countNumberOfPhylogeneticallyIncorrectEvents(pogTree, ancestors, aln);
+
             System.out.println("Proportion of out-of-distribution positions in ancestral sequences: " +
                     String.format("%.2f", propOutDist) + "%");
             System.out.println("Number of inferred indel events across the tree: " + numIndelEvents);
+            System.out.println("Number of phylogenetic violations (Dollo's Law) in inferred indel events: " + numPhylogeneticViolations);
         }
 
         return new Prediction(pogTree, ancestors);

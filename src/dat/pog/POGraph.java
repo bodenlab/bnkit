@@ -1054,9 +1054,84 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
     /**
+     * Count the number of phylogenetically incorrect events in the ancestral POGs. A phylogenetically incorrect event is defined
+     * according to Dollo's Law: once a character is lost in a lineage, it cannot be regained.
+     * @param pogTree a POGTree containing the phylogenetic tree and extant POGs
+     * @param ancestralPogs a map of ancestral indices to POGs
+     * @param aln the alignment of extant sequences
+     * @return the number of phylogenetically incorrect events
+     */
+    public static int countNumberOfPhylogeneticallyIncorrectEvents(POGTree pogTree, Map<Object,
+                                                                      POGraph> ancestralPogs,
+                                                                      EnumSeq.Alignment<Enumerable> aln) {
+        int ROOT_IDX = 0;
+        int violationCount = 0;
+
+        IdxTree tree = pogTree.getTree();
+        Iterator<Integer> dfs = tree.getDepthFirstIterator();
+        for (int alnPosition = 0; alnPosition < aln.getWidth(); alnPosition++) {
+
+            Map<Integer, Boolean> deletionInLineage = new HashMap<>();
+
+            while (dfs.hasNext()) {
+
+                int bpidx = dfs.next();
+                if (bpidx == ROOT_IDX) {
+                    deletionInLineage.put(bpidx, false);
+                    continue;
+                }
+
+                boolean currentNodeHasContent = doesNodeHaveContentAtPosition(tree, bpidx, pogTree,
+                                                                                alnPosition, ancestralPogs);
+
+                int parentIdx = tree.getParent(bpidx);
+                boolean parentHasContent = doesNodeHaveContentAtPosition(tree, parentIdx, pogTree,
+                                                                                alnPosition, ancestralPogs);
+                boolean deletionInParentLineage = deletionInLineage.getOrDefault(parentIdx, false);
+
+                if (deletionInParentLineage && currentNodeHasContent) {
+                    String currentNodeLabel = (String) tree.getBranchPoint(bpidx).getLabel();
+                    if (!tree.isLeaf(bpidx)) {
+                        currentNodeLabel = "N" + currentNodeLabel;
+                    }
+
+                    System.out.println("Phylogenetic violation at aln pos " + alnPosition +" at node " + currentNodeLabel);
+                    violationCount += 1;
+                }
+
+                // Update deletion status for current node
+                if (!currentNodeHasContent && parentHasContent) {
+                    deletionInLineage.put(bpidx, true);
+                } else if (deletionInParentLineage || (!parentHasContent && !currentNodeHasContent)) {
+                    deletionInLineage.put(bpidx, true);
+                } else {
+                    deletionInLineage.put(bpidx, false);
+                }
+            }
+        }
+
+        return violationCount;
+    }
+
+    private static boolean doesNodeHaveContentAtPosition(IdxTree tree, int bpidx,
+                                                         POGTree pogTree, int alnPosition,
+                                                         Map<Object, POGraph> ancestralPogs) {
+        boolean currentNodeHasContent;
+        if (tree.isLeaf(bpidx)) {
+            currentNodeHasContent =  pogTree.getExtant(bpidx).allnodes[alnPosition];
+        } else {
+            currentNodeHasContent = ancestralPogs.get(tree.getBranchPoint(bpidx).getID()).allnodes[alnPosition];
+        }
+
+        return currentNodeHasContent;
+
+    }
+
+
+    /**
      * Calculate the number of indel events across the tree given the ancestral POGs.
      *
-     * @param pogTree
+     * @param pogTree 
      * @param ancestralPogs
      * @return
      */

@@ -123,9 +123,9 @@ public class GRASP {
                 "\tSICML: simple indel-coding maximum likelihood (uses uniform evolutionary model)\n" +
                 "\tPSP: position-specific (maximum) parsimony\n" +
                 "\tPSML: position-specific maximum likelihood (uses uniform evolutionary model)\n" +
-                "\tSCIP: infer a globally optimal indel history using the open-source SCIP solver (https://www.scipopt.org/). Does not support multi-threading\n" +
-                "\tGurobi: uses the Gurobi solver to infer a globally optimal indel history. Requires local installation of Gurobi to run (https://www.gurobi.com/downloads/)\n" +
-                "\tCPSAT: infer a globally optimal indel history using Google's open-source CP-SAT solver (https://developers.google.com/optimization). Should use a minimum of 8 threads for reliable performance\n" +
+                "\tSCIP: infer a globally optimal indel history using the open-source\n\t\tSCIP solver (https://www.scipopt.org/). Does not support multi-threading\n" +
+                "\tGurobi: uses the Gurobi solver to infer a globally optimal indel history.\n\t\tRequires local installation of Gurobi to run (https://www.gurobi.com/downloads/)\n" +
+                "\tCPSAT: infer a globally optimal indel history using Google's open-source\n\t\tCP-SAT solver (https://developers.google.com/optimization). Should use a minimum of 8 threads for reliable performance\n" +
                 "\tAdd '*' to method name for less conservative setting (if available)\n");
         out.println("Substitution-models: \n" +
                 "\tJTT: Jones-Taylor-Thornton (protein; default)\n" +

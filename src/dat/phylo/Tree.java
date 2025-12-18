@@ -300,7 +300,7 @@ public class Tree extends IdxTree {
 
         Map<String, Integer> alnMap = aln.getMap();
         // construct map of bpidx to id
-        int nNodes = getNLeaves() + getNParents();
+        int nNodes = getSize();
 
         // Indicator array - 1 means all children of the node have gaps and 0 otherwise
         Double[] containsGaps = containsGaps(aln, colIdx);
