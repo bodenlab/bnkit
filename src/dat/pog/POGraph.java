@@ -801,6 +801,40 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
     /**
+     * Count the number of gap starts in this POG
+     * @return number of gap starts
+     */
+    private int getNumGapStarts() {
+        int count = 0;
+        boolean inGap = false;
+        for (int i = 0; i < nNodes; i++) {
+            if (isNode(i) && !inGap) {
+                count++;
+                inGap = true;
+            } else {
+                inGap = false;
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Count the number of gaps in this POG
+     * @return number of gaps
+     */
+    private int getNumGaps() {
+        int count = 0;
+        for (int i = 0; i < nNodes; i++) {
+            if (!isNode(i)) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
      * Define the standard type of node for POGs that allow for tracing POG consistency
      */
     public static class StatusNode extends Node {
@@ -1013,9 +1047,64 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
 
+
     // #############################################################################
     // Metrics for comparing the quality of ancestral POGs to the extant descendants
     // #############################################################################
+
+    public static double getMeanGapLength(Map<Object, POGraph> ancestralPogs) {
+        int numGapStarts = 0;
+        int numGaps = 0;
+
+        for (Map.Entry<Object, POGraph> entry: ancestralPogs.entrySet()) {
+            POGraph g = entry.getValue();
+            numGapStarts += g.getNumGapStarts();
+            numGaps += g.getNumGaps();
+        }
+
+        return (double) numGaps / (double) numGapStarts;
+    }
+
+    public static double getAverageSeqLength(Map<Object, POGraph> ancestralPogs) {
+
+        int alnWidth = ancestralPogs.values().iterator().next().nNodes;
+        double gapProportion = getGapProportion(ancestralPogs);
+        double nonGapProportion = 1.0 - gapProportion;
+
+        return (int) (nonGapProportion * (double) alnWidth);
+    }
+
+    public static int getGapCount(Map<Object, POGraph> ancestralPogs) {
+        int totalNumGapsAncestors = 0;
+        POGraph g = null;
+        for (Map.Entry<Object, POGraph> entry: ancestralPogs.entrySet()) {
+            g = entry.getValue();
+            totalNumGapsAncestors += g.getNumGaps();
+        }
+
+        return totalNumGapsAncestors;
+    }
+
+    public static int getGapStartCounts(Map<Object, POGraph> ancestralPogs) {
+        int totalNumGapStartsAncestors = 0;
+        POGraph g = null;
+        for (Map.Entry<Object, POGraph> entry: ancestralPogs.entrySet()) {
+            g = entry.getValue();
+            totalNumGapStartsAncestors += g.getNumGapStarts();
+        }
+
+        return totalNumGapStartsAncestors;
+    }
+
+    public static double getGapProportion(Map<Object, POGraph> ancestralPogs) {
+
+        int totalNumGapsAncestors = getGapCount(ancestralPogs);
+
+        int alnWidth = ancestralPogs.values().iterator().next().nNodes;
+        int alnHeight = ancestralPogs.size();
+
+        return (double) totalNumGapsAncestors / (double) (alnWidth * alnHeight);
+    }
 
     /**
      * Calculate the proportion of ancestral POGs that have edges not found in the alignment POG.
