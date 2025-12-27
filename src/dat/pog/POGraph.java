@@ -808,7 +808,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         int count = 0;
         boolean inGap = false;
         for (int i = 0; i < nNodes; i++) {
-            if (isNode(i) && !inGap) {
+            if (!isNode(i) && !inGap) {
                 count++;
                 inGap = true;
             } else {
