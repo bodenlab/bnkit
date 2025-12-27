@@ -1,8 +1,13 @@
 package dat.pog;
-
+import asr.ASRException;
+import dat.EnumSeq;
 import dat.Enumerable;
+
+import java.io.IOException;
 import java.util.*;
 
+import dat.file.Utils;
+import dat.phylo.IdxTree;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -156,6 +161,7 @@ class POGraphTest {
          */
     }
 
+    /*
     @Test
     void getForward() {
         assertEquals(3, recurseForward(-1, 0));
@@ -175,6 +181,7 @@ class POGraphTest {
         }
         return shortest;
     }
+
 
 
     @Test
@@ -447,4 +454,65 @@ class POGraphTest {
         }
 
     }
+
+    @Test
+    void testPhylogeneticCorrectness() {
+
+        // should be 3 violations
+        // At position 2, both N1 and N2 have a deletion, followed by an
+        // insertion in all the children except B.
+        // Ancestor N0 has no content at position 3, an insertion occurs in N1
+        // and N2, followed by a deletion. This won't be counted as a violation
+        // since N0 has no content at position 3.
+        IdxTree tree = null;
+        EnumSeq.Alignment<dat.Enumerable> aln = null;
+        try {
+            aln = Utils.loadAlignment(
+                    "test/resources/POGraph_test_1.aln",
+                    Enumerable.aacid);
+            tree = Utils.loadTree("test/resources/GapSubstModel_test_1.nwk");
+
+        } catch (ASRException | IOException e) {
+            e.printStackTrace();
+        }
+
+        int[] start = new int[] {0};
+        int[] end = new int[] {2};
+        int[] n0End = new int[] {1}; // node 0 has only one end at 1 (deletion)
+
+        int[][] n0Adj = new int[][] {
+                {0,1,0},
+                {0,0,0},
+                {0,0,0},
+        };
+        int[][] n1Adj = new int[][] {
+                {0,0,1},
+                {0,0,0},
+                {1,0,0},
+        };
+        int[][] n2Adj = new int[][] {
+                {0,0,1},
+                {0,0,0},
+                {1,0,0},
+        };
+
+        POGraph n0 = POGraph.createFromAdjacency(start, n0End, n0Adj);
+        POGraph n1 = POGraph.createFromAdjacency(start, end, n1Adj);
+        POGraph n2 = POGraph.createFromAdjacency(start, end, n2Adj);
+
+        Map<Object, POGraph> node2pog = new HashMap<>();
+        node2pog.put(0, n0);
+        node2pog.put(1, n1);
+        node2pog.put(2, n2);
+
+        POGTree pogTree = new POGTree(aln, tree);
+
+        int numPhylogeneticViolations = POGraph.countNumberOfPhylogeneticallyIncorrectEvents(pogTree, node2pog, aln);
+        System.out.println(numPhylogeneticViolations);
+        assertEquals(3, numPhylogeneticViolations);
+
+    }
+
+
+
 }

@@ -1615,8 +1615,7 @@ public class Prediction {
         if (GRASP.VERBOSE) {
             double propOutDist = POGraph.calcProportionOutOfDistributionAncestors(ancestors, alnPog) * 100;
             int numIndelEvents = POGraph.calcNumberIndelEvents(pogTree, ancestors);
-            // TODO: need to verify this is working correctly first on some test cases - logic seems sound though
-            // int numPhylogeneticViolations = POGraph.countNumberOfPhylogeneticallyIncorrectEvents(pogTree, ancestors, aln);
+            int numPhylogeneticViolations = POGraph.countNumberOfPhylogeneticallyIncorrectEvents(pogTree, ancestors, aln);
             double meanGapLength = POGraph.getMeanGapLength(ancestors);
             double averageAncestorLength = POGraph.getAverageSeqLength(ancestors);
             double gapProportion = POGraph.getGapProportion(ancestors);
@@ -1625,7 +1624,7 @@ public class Prediction {
             System.out.println("Proportion of out-of-distribution positions in ancestral sequences: " +
                     String.format("%.2f", propOutDist) + "%");
             System.out.println("Number of inferred indel events across the tree: " + numIndelEvents);
-            // System.out.println("Number of phylogenetic violations (Dollo's Law) in inferred indel events: " + numPhylogeneticViolations);
+            System.out.println("Number of phylogenetic violations (Dollo's Law) in inferred indel events: " + numPhylogeneticViolations);
             System.out.println("Mean gap length in ancestral sequences: " + String.format("%.2f", meanGapLength) + " positions");
             System.out.println("Average ancestral sequence length: " + String.format("%.2f", averageAncestorLength) + " positions");
             System.out.println("Overall gap percentage in ancestral sequences: " + String.format("%.2f", gapProportion * 100) + "%");

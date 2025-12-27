@@ -1157,8 +1157,9 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         int violationCount = 0;
 
         IdxTree tree = pogTree.getTree();
-        Iterator<Integer> dfs = tree.getDepthFirstIterator();
+
         for (int alnPosition = 0; alnPosition < aln.getWidth(); alnPosition++) {
+            Iterator<Integer> dfs = tree.getDepthFirstIterator();
 
             Map<Integer, Boolean> deletionInLineage = new HashMap<>();
 
@@ -1184,7 +1185,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                         currentNodeLabel = "N" + currentNodeLabel;
                     }
 
-                    System.out.println("Phylogenetic violation at aln pos " + alnPosition +" at node " + currentNodeLabel);
+                    System.out.println("Phylogenetic violation at aln pos " + (alnPosition + 1) +" at node " + currentNodeLabel);
                     violationCount += 1;
                 }
 
