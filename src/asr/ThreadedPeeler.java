@@ -4,6 +4,7 @@ import bn.ctmc.GapSubstModel;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.phylo.BranchPoint;
+import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import smile.math.MathEx;
 import java.util.*;
@@ -67,7 +68,7 @@ public class ThreadedPeeler {
      *
      * @return the log likelihood of the alignment given the tree and model
      */
-    public static double calcProbAlnGivenTree(Tree tree, GapSubstModel model, EnumSeq.Alignment<Enumerable> aln,
+    public static double calcProbAlnGivenTree(IdxTree tree, GapSubstModel model, EnumSeq.Alignment<Enumerable> aln,
                                               double geometricSeqLenParam, Enumerable alpha, int nThreads) {
 
         int numCols = aln.getWidth();
@@ -104,7 +105,7 @@ public class ThreadedPeeler {
 
         EnumSeq.Alignment<Enumerable> gap_aln = new EnumSeq.Alignment<>(seqArray);
         //  Normalisation: log P★ - log(1 - P(col_gap))
-        double gapColumnProb = logProbColGivenRate(tree, gap_aln, 1.0, model, 0, geometricSeqLenParam);
+        double gapColumnProb = logProbColGivenRate((Tree) tree, gap_aln, 1.0, model, 0, geometricSeqLenParam);
         double unobservedCols = MathEx.logm1exp(gapColumnProb);
 
         double normalisationTerm = probExtraCol - unobservedCols;
@@ -124,7 +125,7 @@ public class ThreadedPeeler {
      *
      * @return normalisation term for the alignment
      */
-    public static double probExtraCol(Tree tree, GapSubstModel model, double geometricSeqLenParam) {
+    public static double probExtraCol(IdxTree tree, GapSubstModel model, double geometricSeqLenParam) {
 
 
         int nNodes = tree.getNLeaves() + tree.getNParents();
@@ -206,7 +207,7 @@ public class ThreadedPeeler {
 
 
     public static class Peeler {
-        private final Tree tree;
+        private final IdxTree tree;
         private final EnumSeq.Alignment<Enumerable> aln;
         private final Double colIndelRate;
         private final GapSubstModel model;
@@ -215,7 +216,7 @@ public class ThreadedPeeler {
         private double col_prob;
 
 
-        public Peeler(Tree tree, EnumSeq.Alignment<Enumerable> aln, Double colIndelRate,
+        public Peeler(IdxTree tree, EnumSeq.Alignment<Enumerable> aln, Double colIndelRate,
                        GapSubstModel model, int col_idx, double geometricSeqLenParam) {
 
             this.tree = tree;
@@ -227,7 +228,7 @@ public class ThreadedPeeler {
         }
 
         public void decorate() {
-            this.col_prob = logProbColGivenRate(tree, aln, colIndelRate, model, colIdx, geometricSeqLenParam);
+            this.col_prob = logProbColGivenRate((Tree) tree, aln, colIndelRate, model, colIdx, geometricSeqLenParam);
         }
 
         public double getDecoration() {

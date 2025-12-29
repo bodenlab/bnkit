@@ -1,5 +1,8 @@
 package asr;
 
+import bn.ctmc.GapSubstModel;
+import bn.ctmc.matrix.JCGap;
+import bn.ctmc.matrix.JTTGap;
 import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
 import dat.EnumSeq;
@@ -9,6 +12,7 @@ import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.pog.POAGraph;
 import java.io.*;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -27,16 +31,40 @@ public class Mip {
 
     private static final int DEFAULT_MODEL_IDX = 0;
     private static int SOLVER_IDX = 0;
+    public static double MIN_MU_LAMBDA_VALUE = 0;
+    public static double MAX_MU_LAMBDA_VALUE = 0.5;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int DEFAULT_GAP_PENALTY = 2;
     private static final int DEFAULT_THREAD_COUNT = 1;
+    private static final double[] GAP_PENALTIES = new double[] {2.0, 4.0, 6.0, 8.0};
     public static String[] SOLVERS = new String[] {"SCIP", "Gurobi", "CPSAT"};
     public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
     private static final Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
                                                                  Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
 
     public static void main(String[] args) {
+
+        Tree tree = null;
+        EnumSeq.Alignment<Enumerable> aln = null;
+        try {
+            tree = Utils.loadTree("test/resources/GapSubstModel_test_1.nwk");
+        } catch (ASRException | IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        double[][] tree_neighbour_alpha_pen = new double[tree.getSize()][];
+        for (int i = 0; i < tree_neighbour_alpha_pen.length; i++) {
+            int[] children = tree.getChildren(i);
+            tree_neighbour_alpha_pen[i] = new double[children.length];
+            for (int j = 0; j < children.length; j++) {
+                tree_neighbour_alpha_pen[i][j] = DEFAULT_GAP_PENALTY;
+                int childIdx = children[j];
+                double dist = tree.getDistance(childIdx);
+                double pen = dist * DEFAULT_GAP_PENALTY;
+            }
+        }
+        /*
         HashMap<String, Object> argParser = createArgMap(args);
         String ALIGNMENT = (String) argParser.get("ALIGNMENT");
         String NEWICK = (String) argParser.get("NEWICK");
@@ -88,6 +116,8 @@ public class Mip {
         }
 
         outputAncestralSolutions(tree, ancestorPositionVars, OUTPUT, PREFIX);
+
+         */
     }
 
 
@@ -539,6 +569,7 @@ public class Mip {
 
                         }
 
+                        //double penaltyVal = treeNeighbourAlphaPen[]
                         objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
 
                     } else { // Ancestor
@@ -755,18 +786,89 @@ public class Mip {
         return binarySeqMap;
     }
 
-    public static double[][] createTreeNeighbourAlphaPen(IdxTree tree) {
+    /**
+     * Each column in the alignment is first assigned to a particular indel rate category. Then, the branch
+     * distances are adjusted for each column based on the assigned rate category. Finally, the adjusted distances
+     * are binned into discrete gap penalties ranging from 2 to 8 in increments of 2. If the distance based option
+     * is not chosen, then the default gap penalty is assigned to all positions.
+     * @param tree the phylogenetic tree
+     * @param aln the alignment
+     * @param substModelName the substitution model name
+     * @return a matrix where the rows are alignment columns and the columns are the gap opening penalties for each
+     * node in the tree. The array matches the order of nodes in the IdxTree.
+     */
+    public static double[][] createTreeNeighbourAlphaPen(IdxTree tree, EnumSeq.Alignment<Enumerable> aln,
+            String substModelName) {
 
-        double[][] tree_neighbour_alpha_pen = new double[tree.getSize()][];
-        for (int i = 0; i < tree_neighbour_alpha_pen.length; i++) {
-            int[] children = tree.getChildren(i);
-            tree_neighbour_alpha_pen[i] = new double[children.length];
-            for (int j = 0; j < children.length; j++) {
-                tree_neighbour_alpha_pen[i][j] = DEFAULT_GAP_PENALTY;
+        double[][] treeNeighbourAlphaPen = new double[aln.getWidth()][tree.getSize()];
+
+        if (GRASP.DISTANCE_BASED_MIP) {
+
+            double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
+            if (GRASP.VERBOSE) {
+                System.out.println("Optimising indel parameters for distance-based MIP...");
+            }
+            double optimal_mu = IndelDist.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
+                    tree, geometric_seq_len_param, aln);
+
+            GapSubstModel gapModel;
+            switch (substModelName) {
+                case "JTT" -> gapModel = new JTTGap(optimal_mu, optimal_mu);
+                case "JC" -> gapModel = new JCGap(optimal_mu, optimal_mu);
+                default -> throw new IllegalArgumentException("Unrecognized gap substitution model: " + substModelName);
+            }
+
+            if (GRASP.VERBOSE) {
+                System.out.println("Computing column priors under different rate categories...");
+            }
+            Double[][] columnPriors = IndelDist.computeColumnPriors(gapModel, (Tree) tree, aln,
+                    IndelDist.MEAN_RATES.get(IndelDist.RATE_CATEGORY.HIGH), geometric_seq_len_param);
+
+            if (GRASP.VERBOSE) {
+                System.out.println("Computing prefix sums for segment assignment...");
+            }
+            double[][] prefix_sums = IndelDist.computePrefixSums(columnPriors);
+
+            if (GRASP.VERBOSE) {
+                System.out.println("Assigning optimal rate segments...");
+            }
+
+            int[][] segments = IndelDist.assignSegments(columnPriors.length, IndelDist.RATE_PRIORS,
+                    prefix_sums, IndelDist.RHO);
+
+            int[] columnRateCategories = IndelDist.expandSegmentOrder(segments);
+
+
+            // TODO: This needs to become an option
+            double[] rates = IndelDist.MEAN_RATES.get(IndelDist.RATE_CATEGORY.HIGH);
+            for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+
+                // adjust each length by the assigned rate category
+                for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                    treeNeighbourAlphaPen[colIdx][bpidx] = rates[columnRateCategories[colIdx]] * tree.getDistance(bpidx);
+                }
+
+                double minDist = Arrays.stream(treeNeighbourAlphaPen[colIdx]).min().orElseThrow();
+                double maxDist = Arrays.stream(treeNeighbourAlphaPen[colIdx]).max().orElseThrow();
+                double binRange = (maxDist - minDist) / 2;
+
+                // assign each distance to a bin
+                for (int i = 0; i < treeNeighbourAlphaPen[colIdx].length; i++) {
+                    int assignedBin = Math.min(GAP_PENALTIES.length - 1, (int) ((treeNeighbourAlphaPen[colIdx][i] + binRange / 2 - minDist) / binRange));
+                    treeNeighbourAlphaPen[colIdx][i] = GAP_PENALTIES[assignedBin];
+                }
+
+            }
+        } else {
+            for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+                for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                    treeNeighbourAlphaPen[colIdx][bpidx] = DEFAULT_GAP_PENALTY;
+                }
+
             }
         }
 
-        return tree_neighbour_alpha_pen;
+        return treeNeighbourAlphaPen;
     }
 
     /**

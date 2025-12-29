@@ -7,6 +7,7 @@ import bn.ctmc.matrix.JTTGap;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
+import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -24,13 +25,15 @@ public class IndelDist {
     private static final int START = 0;
     private static final int RATE_ASSIGNED = 1;
     private static final int DEFAULT_MODEL = 0;
+    private static final double EXPECTED_INDEL_SEGMENT_LENGTH = 20.0;
+    public static final double RHO = 1 / EXPECTED_INDEL_SEGMENT_LENGTH;
     public static int NTHREADS = 4;
     public static double MIN_MU_LAMBDA_VALUE = 0;
     public static double MAX_MU_LAMBDA_VALUE = 0.5;
     public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
     private static final Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
                                                                  Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
-    private static final double[] RATE_PRIORS = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
+    public static final double[] RATE_PRIORS = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
 
 
     public enum RATE_CATEGORY {
@@ -39,11 +42,11 @@ public class IndelDist {
         HIGH
     }
 
-    private static final Map<RATE_CATEGORY, Double[]> MEAN_RATES =
+    public static final Map<RATE_CATEGORY, double[]> MEAN_RATES =
             Map.of(
-                    RATE_CATEGORY.LOW, new Double[]{0.05109101808171236, 0.13936648207205818, 0.2548798168737909, 0.5313293496383602},
-                    RATE_CATEGORY.MEDIUM, new Double[]{0.10822622872656855, 0.3236414936793391, 0.6232831770054337, 1.368582433909853},
-                    RATE_CATEGORY.HIGH, new Double[]{0.11819301147978692, 0.3823224943520077, 0.7695135589733401, 1.7645916247946944}
+                    RATE_CATEGORY.LOW, new double[]{0.05109101808171236, 0.13936648207205818, 0.2548798168737909, 0.5313293496383602},
+                    RATE_CATEGORY.MEDIUM, new double[]{0.10822622872656855, 0.3236414936793391, 0.6232831770054337, 1.368582433909853},
+                    RATE_CATEGORY.HIGH, new double[]{0.11819301147978692, 0.3823224943520077, 0.7695135589733401, 1.7645916247946944}
             );
 
 
@@ -239,7 +242,7 @@ public class IndelDist {
         double optimal_mu = 0.0;
         try {
             long startOptCalc = System.currentTimeMillis();
-            optimal_mu = optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, MODEL_IDX, tree, geometric_seq_len_param, aln);
+            optimal_mu = optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, MODELS[MODEL_IDX], tree, geometric_seq_len_param, aln);
             long endOptCalc = System.currentTimeMillis();
             long OptDuration = endOptCalc - startOptCalc;
             System.out.println("Gap augmented substitution model optimisation time: " + OptDuration / 1000 + " s");
@@ -269,12 +272,9 @@ public class IndelDist {
         long prefixDuration = System.currentTimeMillis() - startPrefixTime;
         System.out.println("Prefix sum calculation time: " + prefixDuration / 1000 + " s");
 
-
-        double expected_segment_length = 20.0;
-        double rho = 1 / expected_segment_length;
         System.out.println("Assigning optimal rate segments...");
         long startSegAssign = System.currentTimeMillis();
-        int[][] segments = assignSegments(columnPriors.length, RATE_PRIORS, prefix_sums, rho);
+        int[][] segments = assignSegments(columnPriors.length, RATE_PRIORS, prefix_sums, RHO);
         long segAssignDuration = System.currentTimeMillis() - startSegAssign;
         System.out.println("Segment assignment time: " + segAssignDuration / 1000 + " s");
 
@@ -297,7 +297,7 @@ public class IndelDist {
      * @return matrix of shape (M, K): Each column, M, and likelihood with rate K
      */
     public static Double[][] computeColumnPriors(GapSubstModel model, Tree tree, EnumSeq.Alignment<Enumerable> aln,
-                                                 Double[] mean_rates, double geometric_seq_len_param) {
+                                                 double[] mean_rates, double geometric_seq_len_param) {
 
 
         int numCols = aln.getWidth();
@@ -310,7 +310,7 @@ public class IndelDist {
     }
 
     private static Peeler[] createPeelingJobs(EnumSeq.Alignment<Enumerable> aln, int numCols, int numRates,
-                                                Double[] mean_rates, GapSubstModel model, Tree tree,
+                                                double[] mean_rates, GapSubstModel model, Tree tree,
                                                 double geometric_seq_len_param) {
 
         Peeler[] peelers = new Peeler[numCols * numRates];
@@ -482,6 +482,28 @@ public class IndelDist {
     }
 
     /**
+     * Expand the segment order into an array of length equal to the number of columns
+     * where each entry is the indel rate category assigned to that column.
+     * @param segments list of segments
+     * @return array of length equal to number of columns with indel rate category for each column
+     */
+    public static int[] expandSegmentOrder(int[][] segments) {
+
+        int numCols = segments[segments.length - 1][SEG_END] + 1;
+        int[] colRates = new int[numCols];
+        for (int[] segment: segments) {
+            int start = segment[SEG_START];
+            int end = segment[SEG_END];
+            int rate = segment[SEG_RATE];
+            for (int col = start; col <= end; col++) {
+                colRates[col] = rate;
+            }
+        }
+
+        return colRates;
+    }
+
+    /**
      * Want to penalise the model for having segments that are too long.
      * Can use a Geometric distribution. Expected value is 1/rho. i.e.
      * seg_len = 1/rho therefore for a segment length of 20 rho = 0.05.
@@ -500,30 +522,30 @@ public class IndelDist {
      * according to equation 29 in <a href="https://doi.org/10.1371/journal.pcbi.1000172"> Rivas & Eddy, 2008</a>
      * @param min_val smallest value to search
      * @param max_val largest value to search
-     * @param model_idx index of the substitution model to use
+     * @param substModelName index of the substitution model to use
      * @param tree phylogenetic tree
      * @param geometricSeqLenParam geometric sequence length param for the alignment
      * @param aln the alignment
      * @return the optimal mu and lambda value
      * @throws IllegalArgumentException if the model is not supported
      */
-    public static double optimiseMuLambda(double min_val, double max_val, int model_idx, Tree tree,
+    public static double optimiseMuLambda(double min_val, double max_val, String substModelName, IdxTree tree,
                                           double geometricSeqLenParam,
                                           EnumSeq.Alignment<Enumerable> aln) throws IllegalArgumentException {
 
         double[] F;
         double[][] IRM;
         Enumerable alpha;
-        if (MODELS[model_idx].equals("JTT")) {
+        if (substModelName.equals("JTT")) {
             F = JTT.F;
             IRM = JTT.Q;
             alpha = new Enumerable(JTT.S);
-        } else if (MODELS[model_idx].equals("JC")) {
+        } else if (substModelName.equals("JC")) {
             F = JC.F(JC.S.length);
             IRM = JC.Q(1, JC.S.length);
             alpha = new Enumerable(JC.S);
         } else {
-            throw new IllegalArgumentException(MODELS[model_idx] + "not implemented yet");
+            throw new IllegalArgumentException(substModelName + " not implemented yet");
         }
 
         AlnLikelihood alnLikelihood = new AlnLikelihood(tree, aln, F, IRM, alpha, geometricSeqLenParam);
@@ -539,11 +561,11 @@ public class IndelDist {
         double[] F;
         double[][] IRM;
         Enumerable alpha;
-        Tree tree;
+        IdxTree tree;
         EnumSeq.Alignment<Enumerable> aln;
         double geometricSeqLenParam;
 
-        public AlnLikelihood(Tree tree, EnumSeq.Alignment<Enumerable> aln, double[] F, double[][] IRM,
+        public AlnLikelihood(IdxTree tree, EnumSeq.Alignment<Enumerable> aln, double[] F, double[][] IRM,
                              Enumerable alpha, double geometricSeqLenParam) {
             this.tree = tree;
             this.aln = aln;

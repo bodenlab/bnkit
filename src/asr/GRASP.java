@@ -34,6 +34,7 @@ public class GRASP {
     public static int     NTHREADS = 4;
     public static boolean NIBBLE   = true;
     public static boolean INDEL_CONSERVATIVE = true;
+    public static boolean DISTANCE_BASED_MIP = false;
     // Mode for BEP
     public static boolean RECODE_NULL = true;
     public static int MIP_SOLVER_TIME_LIMIT_MINUTES = 720; // 12 hours
@@ -41,6 +42,11 @@ public class GRASP {
     public enum Inference {
         JOINT,
         MARGINAL
+    }
+    public enum IndelPrior {
+        LOW_GAP,
+        MED_GAP,
+        HIGH_GAP
     }
 
     public static void usage() {
@@ -123,10 +129,10 @@ public class GRASP {
                 "\tSICML: simple indel-coding maximum likelihood (uses uniform evolutionary model)\n" +
                 "\tPSP: position-specific (maximum) parsimony\n" +
                 "\tPSML: position-specific maximum likelihood (uses uniform evolutionary model)\n" +
-                "\tSCIP: infer a globally optimal indel history using the open-source\n\t\tSCIP solver (https://www.scipopt.org/). Does not support multi-threading\n" +
-                "\tGurobi: uses the Gurobi solver to infer a globally optimal indel history.\n\t\tRequires local installation of Gurobi to run (https://www.gurobi.com/downloads/)\n" +
-                "\tCPSAT: infer a globally optimal indel history using Google's open-source\n\t\tCP-SAT solver (https://developers.google.com/optimization). Should use a minimum of 8 threads for reliable performance\n" +
-                "\tAdd '*' to method name for less conservative setting (if available)\n");
+                "\tSCIP: globally optimal parsimony-based indel history using the open-source\n\t\tSCIP solver (https://www.scipopt.org/). Does not support multi-threading\n" +
+                "\tGurobi: globally optimal parsimony-based indel history.\n\t\tRequires local installation of Gurobi to run (https://www.gurobi.com/downloads/)\n" +
+                "\tCPSAT: globally optimal parsimony-based indel history using Google's open-source\n\t\tCP-SAT solver (https://developers.google.com/optimization). Should use a minimum of 8 threads for reliable performance\n" +
+                "\tAdd '*' to method name for less conservative setting (if available) or to use distance based globally optimal parsimony\n");
         out.println("Substitution-models: \n" +
                 "\tJTT: Jones-Taylor-Thornton (protein; default)\n" +
                 "\tDayhoff: Dayhoff-Schwartz-Orcutt (protein)\n" +
@@ -234,8 +240,10 @@ public class GRASP {
                         if (args[a + 1].startsWith(INDELS[i])) {
                             INDEL_IDX = i;
                             found_indel = true;
-                            if (args[a + 1].endsWith("*"))
+                            if (args[a + 1].endsWith("*")) {
                                 INDEL_CONSERVATIVE = false;
+                                DISTANCE_BASED_MIP = true;
+                            }
                         }
                     }
                     if (!found_indel)
@@ -450,7 +458,9 @@ public class GRASP {
                     indelpred = Prediction.PredictByMaxLhood(pogtree);
                     break;
                 case 6, 7, 8:
-                    indelpred = Prediction.PredictByMIP(pogtree, aln, INDELS[INDEL_IDX]);
+
+                    double[][] treeNeighbourAlphaPen = Mip.createTreeNeighbourAlphaPen(tree, aln, MODELS[MODEL_IDX]);
+                    indelpred = Prediction.PredictByMIP(pogtree, aln, INDELS[INDEL_IDX], treeNeighbourAlphaPen);
                 default:
                     break;
             }

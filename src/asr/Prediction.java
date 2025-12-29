@@ -1539,7 +1539,7 @@ public class Prediction {
     }
 
     public static Prediction PredictByMIP(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln,
-                                          String solver) {
+                                          String solver, double[][] treeNeighbourAlphaPen) {
 
         Map<Object, POGraph> ancestors = new HashMap<>(); // prepare where predictions will go
         int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
@@ -1548,7 +1548,6 @@ public class Prediction {
         Loader.loadNativeLibraries(); // link to Google-OR Tools
         POAGraph alnPog = new POAGraph(aln);
         HashMap<Integer, Integer[]> extantBinarySeqs = Mip.createBinarySeqMap(aln, tree);
-        double[][] treeNeighbourAlphaPen = Mip.createTreeNeighbourAlphaPen(tree);
 
         if (GRASP.VERBOSE) {
             System.out.println("Constructing MIP indel model using " + solver + "...");
