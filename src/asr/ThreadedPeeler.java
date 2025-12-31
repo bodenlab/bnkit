@@ -201,7 +201,6 @@ public class ThreadedPeeler {
 
         double weightedLogSumResidueProb = MathEx.logsumexp(residueTerms) + Math.log(geometricSeqLenParam);
         double[] finalColTerms = {rootGapProb, weightedLogSumResidueProb};
-
         return MathEx.logsumexp(finalColTerms);
     }
 

@@ -40,7 +40,7 @@ public class Minimise {
      * @param i iteration counter
      * @return minimum
      *
-     * source: <a href="https://github.com/osveliz/numerical-veliz/blob/master/src/minimization/BrentJarratt.fsx">...</a>
+     * source: <a href="https://github.com/osveliz/numerical-veliz/blob/master/src/minimization/BrentJarratt.fsx">BrentJarrat.fsx</a>
      */
     public static double brent(Function func,  double a, double b, double v,
                                double w, double x, double dold, double eold, int i) {
@@ -50,9 +50,8 @@ public class Minimise {
         double fx = func.apply(x);
         int new_i = i + 1;
         double m = 0.5 * (a + b);
-        System.out.println("Iteration " + i);
         if (b - a <= EPS) {
-            System.out.println("Number of iterations: " + i);
+            System.out.println("Number of iterations: " + (i + 1));
             System.out.println("Solution: " + m);
             return m;
         } else if (i > MAX) {

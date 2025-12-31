@@ -1,5 +1,6 @@
 package asr;
 
+
 import bn.ctmc.GapSubstModel;
 import bn.ctmc.matrix.JC;
 import bn.ctmc.matrix.JTT;
@@ -395,6 +396,7 @@ public class IndelDist {
      */
     public static int[][] assignSegments(int num_cols, double[] rate_priors,
                                          double[][] prefix_sums, double rho) {
+
 
         Double[] dp_path = new Double[num_cols + 1];
         Arrays.fill(dp_path, Double.NEGATIVE_INFINITY);

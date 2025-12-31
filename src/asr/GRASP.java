@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import asr.IndelDist.RATE_CATEGORY;
 
 /**
  * Command line version of GRASP.
@@ -43,11 +44,7 @@ public class GRASP {
         JOINT,
         MARGINAL
     }
-    public enum IndelPrior {
-        LOW_GAP,
-        MED_GAP,
-        HIGH_GAP
-    }
+    public static RATE_CATEGORY INDEL_RATE = RATE_CATEGORY.LOW;
 
     public static void usage() {
         usage(0, null);
@@ -132,7 +129,7 @@ public class GRASP {
                 "\tSCIP: globally optimal parsimony-based indel history using the open-source\n\t\tSCIP solver (https://www.scipopt.org/). Does not support multi-threading\n" +
                 "\tGurobi: globally optimal parsimony-based indel history.\n\t\tRequires local installation of Gurobi to run (https://www.gurobi.com/downloads/)\n" +
                 "\tCPSAT: globally optimal parsimony-based indel history using Google's open-source\n\t\tCP-SAT solver (https://developers.google.com/optimization). Should use a minimum of 8 threads for reliable performance\n" +
-                "\tAdd '*' to method name for less conservative setting (if available) or to use distance based globally optimal parsimony\n");
+                "\tAdd '*' to method name for less conservative setting (if available) or to use globally optimal distance based parsimony \n");
         out.println("Substitution-models: \n" +
                 "\tJTT: Jones-Taylor-Thornton (protein; default)\n" +
                 "\tDayhoff: Dayhoff-Schwartz-Orcutt (protein)\n" +
@@ -329,6 +326,15 @@ public class GRASP {
                     }
                 } else if (arg.equalsIgnoreCase("-nogap")) {
                     GAPPY = false;
+                } else if (arg.equalsIgnoreCase("-indel-prior")) {
+
+                    switch (args[++a].toUpperCase()) {
+                        case "LOWGAP" -> {INDEL_RATE = RATE_CATEGORY.LOW;}
+                        case "MEDGAP" -> {INDEL_RATE = RATE_CATEGORY.MEDIUM;}
+                        case "HIGHGAP" -> {INDEL_RATE = RATE_CATEGORY.HIGH;}
+                        default -> usage(25, args[a] + " is not a valid indel prior (choose from LOWGAP, MEDGAP, HIGHGAP)");
+                    }
+
                 } else if (arg.equalsIgnoreCase("-verbose")) {
                     VERBOSE = true;
                 } else if (arg.equalsIgnoreCase("-time")) {

@@ -17,8 +17,6 @@
  */
 
 package bn.ctmc;
-
-import asr.ASRRuntimeException;
 import bn.math.Matrix;
 import bn.prob.EnumDistrib;
 import dat.EnumTable;
@@ -27,10 +25,8 @@ import dat.Enumerable;
 import bn.ctmc.matrix.*;
 import bn.math.Matrix.Exp;
 import json.JSONObject;
-
 import java.util.HashMap;
 import java.util.Map;
-import java.util.PriorityQueue;
 
 /**
  * Conditional probability table for CTMC based on discrete alphabets

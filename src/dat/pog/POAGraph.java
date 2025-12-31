@@ -1,11 +1,9 @@
 package dat.pog;
 
 import asr.ASRException;
-import asr.GRASP;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Utils;
-import dat.phylo.BranchPoint;
 import dat.phylo.Tree;
 
 import java.io.IOException;
@@ -189,6 +187,5 @@ public class POAGraph extends IdxEdgeGraph<SeqEdge> {
         } catch (ASRException e) {
             usage(4, e.getMessage());
         }
-
     }
 }

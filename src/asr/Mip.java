@@ -15,10 +15,8 @@ import java.io.*;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
-
 import com.google.ortools.linearsolver.MPVariable;
 import com.google.ortools.linearsolver.MPSolver;
-import com.google.ortools.Loader;
 import com.google.ortools.sat.CpModel;
 import com.google.ortools.sat.CpSolver;
 import com.google.ortools.sat.CpSolverStatus;
@@ -37,7 +35,7 @@ public class Mip {
     private static final int NON_GAP = 1;
     private static final int DEFAULT_GAP_PENALTY = 2;
     private static final int DEFAULT_THREAD_COUNT = 1;
-    private static final double[] GAP_PENALTIES = new double[] {2.0, 4.0, 6.0, 8.0};
+    private static final double[] GAP_PENALTIES = new double[] {8.0, 6.0, 4.0, 2.0};
     public static String[] SOLVERS = new String[] {"SCIP", "Gurobi", "CPSAT"};
     public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
     private static final Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
@@ -45,25 +43,20 @@ public class Mip {
 
     public static void main(String[] args) {
 
+
         Tree tree = null;
         EnumSeq.Alignment<Enumerable> aln = null;
         try {
             tree = Utils.loadTree("test/resources/GapSubstModel_test_1.nwk");
+            aln = Utils.loadAlignment("test/resources/GapSubstModel_test_1.aln", Enumerable.aacid);
         } catch (ASRException | IOException e) {
             throw new RuntimeException(e);
         }
 
-        double[][] tree_neighbour_alpha_pen = new double[tree.getSize()][];
-        for (int i = 0; i < tree_neighbour_alpha_pen.length; i++) {
-            int[] children = tree.getChildren(i);
-            tree_neighbour_alpha_pen[i] = new double[children.length];
-            for (int j = 0; j < children.length; j++) {
-                tree_neighbour_alpha_pen[i][j] = DEFAULT_GAP_PENALTY;
-                int childIdx = children[j];
-                double dist = tree.getDistance(childIdx);
-                double pen = dist * DEFAULT_GAP_PENALTY;
-            }
-        }
+        GRASP.DISTANCE_BASED_MIP = true;
+        createTreeNeighbourAlphaPen(tree, aln, "JTT");
+
+
         /*
         HashMap<String, Object> argParser = createArgMap(args);
         String ALIGNMENT = (String) argParser.get("ALIGNMENT");
@@ -570,7 +563,9 @@ public class Mip {
                         }
 
                         //double penaltyVal = treeNeighbourAlphaPen[]
-                        objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
+
+                        //objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
+                        objective.addTerm(pen[pos], (long) treeNeighbourAlphaPen[pos][childIdx]);
 
                     } else { // Ancestor
 
@@ -663,7 +658,8 @@ public class Mip {
                         }
 
                         objective.add(diffPos[pos]);
-                        objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
+                        //objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
+                        objective.addTerm(pen[pos], (long) treeNeighbourAlphaPen[pos][childIdx]);
                     }
                 }
             }
@@ -821,8 +817,10 @@ public class Mip {
             if (GRASP.VERBOSE) {
                 System.out.println("Computing column priors under different rate categories...");
             }
+
+            double[] rates = IndelDist.MEAN_RATES.get(GRASP.INDEL_RATE);
             Double[][] columnPriors = IndelDist.computeColumnPriors(gapModel, (Tree) tree, aln,
-                    IndelDist.MEAN_RATES.get(IndelDist.RATE_CATEGORY.HIGH), geometric_seq_len_param);
+                    rates, geometric_seq_len_param);
 
             if (GRASP.VERBOSE) {
                 System.out.println("Computing prefix sums for segment assignment...");
@@ -838,33 +836,38 @@ public class Mip {
 
             int[] columnRateCategories = IndelDist.expandSegmentOrder(segments);
 
+            double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
 
-            // TODO: This needs to become an option
-            double[] rates = IndelDist.MEAN_RATES.get(IndelDist.RATE_CATEGORY.HIGH);
-            for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
-
-                // adjust each length by the assigned rate category
+            double minDist = Double.POSITIVE_INFINITY;
+            double maxDist = Double.NEGATIVE_INFINITY;
+            // adjust each length by the assigned rate category
+            for (int rateIdx = 0; rateIdx < rates.length; rateIdx++) {
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                    treeNeighbourAlphaPen[colIdx][bpidx] = rates[columnRateCategories[colIdx]] * tree.getDistance(bpidx);
+                    // adjust each length by the assigned rate category
+                    double adjustedDist = rates[rateIdx] * tree.getDistance(bpidx);
+                    rateAdjustedDists[rateIdx][bpidx] = adjustedDist;
+                    if (adjustedDist < minDist) {
+                        minDist = adjustedDist;
+                    }
+                    if (adjustedDist > maxDist) {
+                        maxDist = adjustedDist;
+                    }
                 }
-
-                double minDist = Arrays.stream(treeNeighbourAlphaPen[colIdx]).min().orElseThrow();
-                double maxDist = Arrays.stream(treeNeighbourAlphaPen[colIdx]).max().orElseThrow();
-                double binRange = (maxDist - minDist) / 2;
-
-                // assign each distance to a bin
-                for (int i = 0; i < treeNeighbourAlphaPen[colIdx].length; i++) {
-                    int assignedBin = Math.min(GAP_PENALTIES.length - 1, (int) ((treeNeighbourAlphaPen[colIdx][i] + binRange / 2 - minDist) / binRange));
-                    treeNeighbourAlphaPen[colIdx][i] = GAP_PENALTIES[assignedBin];
-                }
-
             }
+
+            double binRange = (maxDist - minDist) / 2;
+
+            for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+                int rateIdx = columnRateCategories[colIdx];
+                for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                    int assignedBin = Math.min(GAP_PENALTIES.length - 1, (int) ((rateAdjustedDists[rateIdx][bpidx] + (binRange / 2) - minDist) / binRange));
+                    treeNeighbourAlphaPen[colIdx][bpidx] = GAP_PENALTIES[assignedBin];
+                }
+            }
+
         } else {
             for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
-                for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                    treeNeighbourAlphaPen[colIdx][bpidx] = DEFAULT_GAP_PENALTY;
-                }
-
+                Arrays.fill(treeNeighbourAlphaPen[colIdx], DEFAULT_GAP_PENALTY);
             }
         }
 
@@ -1123,7 +1126,8 @@ public class Mip {
 
                         //MPVariable objDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
                         //objective.setCoefficient(objDiffVar, 1.0);
-                        objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
+                        //objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
+                        objective.setCoefficient(pen[pos], treeNeighbourAlphaPen[pos][childIdx]);
 
                     } else {
                         //diff_pos[pos] <= node_pos_var[pos] + node_neighbor_pos_var[pos]
@@ -1176,7 +1180,8 @@ public class Mip {
                         }
 
                         objective.setCoefficient(diffPos[pos], 1.0);
-                        objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
+                        //objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
+                        objective.setCoefficient(pen[pos], treeNeighbourAlphaPen[pos][childIdx]);
                     }
                 }
             }
