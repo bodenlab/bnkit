@@ -394,8 +394,8 @@ class POGraphTest {
     }
 
     @Test
-    void getIndels() {
-        Set<int[]> ivset = pog.getIndels();
+    void getJumps() {
+        Set<int[]> ivset = pog.getJumps();
         for (int[] ival : ivset) {
             System.out.println("<" + ival[0] + ", " + ival[1] + ">");
         }

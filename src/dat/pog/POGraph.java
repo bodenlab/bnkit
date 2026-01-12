@@ -178,6 +178,12 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         return ret;
     }
 
+    /**
+     * Convert an alignment to an array of POGraphs
+     * Not tested!
+     * @param aln
+     * @return
+     */
     public static POGraph[] getAsPOGs(dat.EnumSeq.Alignment<Enumerable> aln) {
         POGraph[] arr = new POGraph[aln.getHeight()];
         for (int k = 0; k < aln.getHeight(); k ++) {
@@ -860,6 +866,40 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     }
 
     /**
+     * Count the number of gap starts in this POG
+     * @return number of gap starts
+     */
+    private int getNumGapStarts() {
+        int count = 0;
+        boolean inGap = false;
+        for (int i = 0; i < nNodes; i++) {
+            if (!isNode(i) && !inGap) {
+                count++;
+                inGap = true;
+            } else {
+                inGap = false;
+            }
+        }
+
+        return count;
+    }
+
+    /**
+     * Count the number of gaps in this POG
+     * @return number of gaps
+     */
+    private int getNumGaps() {
+        int count = 0;
+        for (int i = 0; i < nNodes; i++) {
+            if (!isNode(i)) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /**
      * Define the standard type of node for POGs that allow for tracing POG consistency
      */
     public static class StatusNode extends Node {
@@ -1074,6 +1114,7 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
 
     /**
      * Class to process pairs of POGraphs.
+     * Not tested!
      */
     public static class PairedAdjacency {
         final private boolean[][] m;
@@ -1204,6 +1245,60 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
     // Metrics for comparing the quality of ancestral POGs to the extant descendants
     // #############################################################################
 
+    public static double getMeanGapLength(Map<Object, POGraph> ancestralPogs) {
+        int numGapStarts = 0;
+        int numGaps = 0;
+
+        for (Map.Entry<Object, POGraph> entry: ancestralPogs.entrySet()) {
+            POGraph g = entry.getValue();
+            numGapStarts += g.getNumGapStarts();
+            numGaps += g.getNumGaps();
+        }
+
+        return (double) numGaps / (double) numGapStarts;
+    }
+
+    public static double getAverageSeqLength(Map<Object, POGraph> ancestralPogs) {
+
+        int alnWidth = ancestralPogs.values().iterator().next().nNodes;
+        double gapProportion = getGapProportion(ancestralPogs);
+        double nonGapProportion = 1.0 - gapProportion;
+
+        return (int) (nonGapProportion * (double) alnWidth);
+    }
+
+    public static int getGapCount(Map<Object, POGraph> ancestralPogs) {
+        int totalNumGapsAncestors = 0;
+        POGraph g = null;
+        for (Map.Entry<Object, POGraph> entry: ancestralPogs.entrySet()) {
+            g = entry.getValue();
+            totalNumGapsAncestors += g.getNumGaps();
+        }
+
+        return totalNumGapsAncestors;
+    }
+
+    public static int getGapStartCounts(Map<Object, POGraph> ancestralPogs) {
+        int totalNumGapStartsAncestors = 0;
+        POGraph g = null;
+        for (Map.Entry<Object, POGraph> entry: ancestralPogs.entrySet()) {
+            g = entry.getValue();
+            totalNumGapStartsAncestors += g.getNumGapStarts();
+        }
+
+        return totalNumGapStartsAncestors;
+    }
+
+    public static double getGapProportion(Map<Object, POGraph> ancestralPogs) {
+
+        int totalNumGapsAncestors = getGapCount(ancestralPogs);
+
+        int alnWidth = ancestralPogs.values().iterator().next().nNodes;
+        int alnHeight = ancestralPogs.size();
+
+        return (double) totalNumGapsAncestors / (double) (alnWidth * alnHeight);
+    }
+
     /**
      * Calculate the proportion of ancestral POGs that have edges not found in the alignment POG.
      * @param ancestralPogs a map of ancestral indices to POGs
@@ -1239,6 +1334,82 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         double proportionInDistribution = (double) numAncestorsInDistribution / (double) ancestralPogs.size();
         return 1 - proportionInDistribution;
     }
+
+    /**
+     * Count the number of phylogenetically incorrect events in the ancestral POGs. A phylogenetically incorrect event is defined
+     * according to Dollo's Law: once a character is lost in a lineage, it cannot be regained.
+     * @param pogTree a POGTree containing the phylogenetic tree and extant POGs
+     * @param ancestralPogs a map of ancestral indices to POGs
+     * @param aln the alignment of extant sequences
+     * @return the number of phylogenetically incorrect events
+     */
+    public static int countNumberOfPhylogeneticallyIncorrectEvents(POGTree pogTree, Map<Object,
+                                                                      POGraph> ancestralPogs,
+                                                                      EnumSeq.Alignment<Enumerable> aln) {
+        int ROOT_IDX = 0;
+        int violationCount = 0;
+
+        IdxTree tree = pogTree.getTree();
+
+        for (int alnPosition = 0; alnPosition < aln.getWidth(); alnPosition++) {
+            Iterator<Integer> dfs = tree.getDepthFirstIterator();
+
+            Map<Integer, Boolean> deletionInLineage = new HashMap<>();
+
+            while (dfs.hasNext()) {
+
+                int bpidx = dfs.next();
+                if (bpidx == ROOT_IDX) {
+                    deletionInLineage.put(bpidx, false);
+                    continue;
+                }
+
+                boolean currentNodeHasContent = doesNodeHaveContentAtPosition(tree, bpidx, pogTree,
+                                                                                alnPosition, ancestralPogs);
+
+                int parentIdx = tree.getParent(bpidx);
+                boolean parentHasContent = doesNodeHaveContentAtPosition(tree, parentIdx, pogTree,
+                                                                                alnPosition, ancestralPogs);
+                boolean deletionInParentLineage = deletionInLineage.getOrDefault(parentIdx, false);
+
+                if (deletionInParentLineage && currentNodeHasContent) {
+                    String currentNodeLabel = (String) tree.getBranchPoint(bpidx).getLabel();
+                    if (!tree.isLeaf(bpidx)) {
+                        currentNodeLabel = "N" + currentNodeLabel;
+                    }
+
+                    System.out.println("Phylogenetic violation at aln pos " + (alnPosition + 1) +" at node " + currentNodeLabel);
+                    violationCount += 1;
+                }
+
+                // Update deletion status for current node
+                if (!currentNodeHasContent && parentHasContent) {
+                    deletionInLineage.put(bpidx, true);
+                } else if (deletionInParentLineage || (!parentHasContent && !currentNodeHasContent)) {
+                    deletionInLineage.put(bpidx, true);
+                } else {
+                    deletionInLineage.put(bpidx, false);
+                }
+            }
+        }
+
+        return violationCount;
+    }
+
+    private static boolean doesNodeHaveContentAtPosition(IdxTree tree, int bpidx,
+                                                         POGTree pogTree, int alnPosition,
+                                                         Map<Object, POGraph> ancestralPogs) {
+        boolean currentNodeHasContent;
+        if (tree.isLeaf(bpidx)) {
+            currentNodeHasContent =  pogTree.getExtant(bpidx).allnodes[alnPosition];
+        } else {
+            currentNodeHasContent = ancestralPogs.get(tree.getBranchPoint(bpidx).getID()).allnodes[alnPosition];
+        }
+
+        return currentNodeHasContent;
+
+    }
+
 
     /**
      * Calculate the number of indel events across the tree given the ancestral POGs.
