@@ -7,18 +7,15 @@ import bn.ctmc.matrix.JC;
 import bn.node.GDT;
 import bn.prob.EnumDistrib;
 import bn.prob.GaussianDistrib;
-import bn.prob.MixtureDistrib;
 import dat.Enumerable;
 import dat.file.Newick;
 import dat.file.TSVFile;
 import dat.file.Utils;
-import dat.phylo.IdxTree;
 import dat.phylo.PhyloBN;
 import dat.phylo.Tree;
 import dat.phylo.TreeInstance;
 import json.JSONException;
 import json.JSONObject;
-import stats.ZScore;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -241,11 +238,11 @@ public class AnnotAceR {
             String[] xalpha = null; // if applicable, nominated discrete values conditioned on latent states
 
             if (LABEL != null) {
-                valcol = tsv.getColumn(LABEL); // label is given so make sure to adjust column
+                valcol = tsv.getColumnIndex(LABEL); // label is given so make sure to adjust column
                 if (valcol == -1)
                     usage(13, "Invalid name of column: " + LABEL);
             }
-            Object[] ENTRIES_OBJ = tsv.getCol(0);       // entry-names as an array of Object (perhaps a mix of String and Integer, since GRASP uses numeric ancestor IDs)
+            Object[] ENTRIES_OBJ = tsv.getColData(0);       // entry-names as an array of Object (perhaps a mix of String and Integer, since GRASP uses numeric ancestor IDs)
             String[] ENTRIES = new String[ENTRIES_OBJ.length];      // entry-names as an array of String
             Set<Object> ENTRIES_SET = new HashSet<>();
             for (int i = 0; i < ENTRIES.length; i ++) {
@@ -259,7 +256,7 @@ public class AnnotAceR {
 //                    ENTRIES_SET.add(tree.getLabel(bpidx));
 //                }
             }
-            Object[] ENTRY_VALUES = tsv.getCol(valcol, COLPARSER);             // values associated with entries
+            Object[] ENTRY_VALUES = tsv.getColData(valcol, COLPARSER);             // values associated with entries
 
             //
             // mode is "LATENT",
@@ -366,7 +363,7 @@ public class AnnotAceR {
                         case 0: // TSV
                             tmptsv.save(OUTPUT); break;
                         case 1: // TREE
-                            Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
+                            Newick.save(tree, OUTPUT, tmptsv.getColData(1)); break;
                         case 3: // ITOL
                             Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
                             TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;
@@ -430,7 +427,7 @@ public class AnnotAceR {
                         case 0: // TSV
                             tmptsv.save(OUTPUT); break;
                         case 1: // TREE
-                            Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
+                            Newick.save(tree, OUTPUT, tmptsv.getColData(1)); break;
                         case 3: // ITOL
                             Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
                             TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;
@@ -581,7 +578,7 @@ public class AnnotAceR {
                             case 0: // TSV
                                 tmptsv.save(OUTPUT); break;
                             case 1: // TREE
-                                Newick.save(tree, OUTPUT, tmptsv.getCol(0), tmptsv.getCol(1)); break;
+                                Newick.save(tree, OUTPUT, tmptsv.getColData(0), tmptsv.getColData(1)); break;
                             case 3: // ITOL
                                 Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
                                 TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], matrix[2], tsv.getHeader(valcol), NBINS, TSVFile.getMin(ENTRY_VALUES), TSVFile.getMax(ENTRY_VALUES)); break;
@@ -615,7 +612,7 @@ public class AnnotAceR {
                             case 0: // TSV
                                 tmptsv.save(OUTPUT); break;
                             case 1: // TREE
-                                Newick.save(tree, OUTPUT, tmptsv.getCol(1)); break;
+                                Newick.save(tree, OUTPUT, tmptsv.getColData(1)); break;
                             case 3: // ITOL
                                 Object[][] matrix = TSVFile.Transpose(tmptsv.getRows());
                                 TSVFile.save2iTOL(OUTPUT, matrix[0], matrix[1], tsv.getHeader(valcol)); break;

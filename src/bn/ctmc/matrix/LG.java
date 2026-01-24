@@ -61,6 +61,10 @@ public class LG extends SubstModel {
     public LG() {
         super(F, Q, new Enumerable(S));
     }
+
+    public LG(double[] empiricalF) {
+        super(empiricalF, Q, new Enumerable(S));
+    }
     
     public String getName() {
         return "LG";

@@ -3,7 +3,6 @@ package api;
 import asr.Prediction;
 import bn.node.CPT;
 import bn.node.GDT;
-import bn.prob.GaussianDistrib;
 import dat.*;
 import dat.file.FastaReader;
 import dat.file.Newick;
@@ -14,7 +13,6 @@ import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -349,10 +347,10 @@ class GRequestTest {
      */
     JSONUtils.DataSet getProperty(String propname) throws IOException {
         TSVFile tsv = new TSVFile("data/3_2_1_1_annotations.txt", true);
-        int col = tsv.getColumn(propname);
+        int col = tsv.getColumnIndex(propname);
         if (col == -1)
             return null;
-        Object[] vals = tsv.getCol(col);
+        Object[] vals = tsv.getColData(col);
         Object[] curated = new Object[vals.length];
         for (int i = 0; i < vals.length; i ++) {
             if (vals == null)
@@ -400,9 +398,9 @@ class GRequestTest {
         }
         String[] features = new String[vals.length];
         Object[][] values = new Object[1][vals.length];
-        int entrycol = tsv.getColumn("Entry");
+        int entrycol = tsv.getColumnIndex("Entry");
         for (int i = 0; i < vals.length; i ++) {
-            features[i] = tsv.getCol(entrycol)[i].toString();
+            features[i] = tsv.getColData(entrycol)[i].toString();
             values[0][i] = curated[i];
         }
         JSONUtils.DataSet ds = new JSONUtils.DataSet(features, values);
@@ -962,20 +960,20 @@ class GRequestTest {
                 TSVFile.DEFAULT_SHAPE = 2;
                 TSVFile.DEFAULT_FILL = 1;
                 TSVFile.DEFAULT_SIZE = 3;
-                TSVFile.save2iTOL(folder + "test_" + i + ".itol", tsv_tst.getCol(0), tsv_tst.getCol(i+1), "Tm(test)", 12, 35., 65.);
+                TSVFile.save2iTOL(folder + "test_" + i + ".itol", tsv_tst.getColData(0), tsv_tst.getColData(i+1), "Tm(test)", 12, 35., 65.);
                 TSVFile.DEFAULT_SHAPE = 4;
-                TSVFile.save2iTOL(folder + "trn_" + i + ".itol", tsv_trn.getCol(0), tsv_trn.getCol(i+1), "Tm(trn)", 12, 35., 65.);
+                TSVFile.save2iTOL(folder + "trn_" + i + ".itol", tsv_trn.getColData(0), tsv_trn.getColData(i+1), "Tm(trn)", 12, 35., 65.);
                 TSVFile.DEFAULT_SHAPE = 3;
                 TSVFile.DEFAULT_FILL = 1;
                 TSVFile.DEFAULT_SIZE = 5;
-                TSVFile.save2iTOL(folder + "exp_" + i + ".itol", tsv_trn.getCol(0), tsv_trn.getCol(1), "Tm(exp)", 12, 35., 65.);
-                Object[] match = new Boolean[tsv_tst.getCol(0).length];
+                TSVFile.save2iTOL(folder + "exp_" + i + ".itol", tsv_trn.getColData(0), tsv_trn.getColData(1), "Tm(exp)", 12, 35., 65.);
+                Object[] match = new Boolean[tsv_tst.getColData(0).length];
                 Double[] myexp = new Double[match.length];
                 Double[] mytst = new Double[match.length];
                 int cnt_match = 0;
                 for (int j = 0; j < match.length; j ++) {
-                    myexp[j] = (Double) tsv_trn.getCol(1)[j];
-                    mytst[j] = (Double) tsv_tst.getCol(i + 1)[j];
+                    myexp[j] = (Double) tsv_trn.getColData(1)[j];
+                    mytst[j] = (Double) tsv_tst.getColData(i + 1)[j];
                     if (mytst[j] != null && myexp[j] != null) {
                         match[j] = (Math.abs(myexp[j] - mytst[j]) / myexp[j] < 0.05);
                         if ((Boolean)match[j])
@@ -983,7 +981,7 @@ class GRequestTest {
                     }
                 }
                 System.out.println("Job index " + i + " has " + cnt_match + " matches");
-                TSVFile.save2iTOL(folder + "mat_" + i + ".itol", tsv_trn.getCol(0), match, "Match", 12, 35., 65.);
+                TSVFile.save2iTOL(folder + "mat_" + i + ".itol", tsv_trn.getColData(0), match, "Match", 12, 35., 65.);
 
             }
             TSVFile.saveObjects(folder + "results.tsv", out);

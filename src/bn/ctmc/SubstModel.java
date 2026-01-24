@@ -368,6 +368,22 @@ public abstract class SubstModel {
         return null;
     }
 
+    public static SubstModel createModel(String name, double[] empiricalFreqs) {
+
+        SubstModel model;
+        switch (name) {
+            case "JTT" -> model = new JTT(empiricalFreqs);
+            case "WAG" -> model = new WAG(empiricalFreqs);
+            case "LG" -> model = new LG(empiricalFreqs);
+            case "Dayhoff" -> model = new Dayhoff(empiricalFreqs);
+            case "Yang" -> model = new Yang(empiricalFreqs);
+            case "JC" -> model = new JC(1, Enumerable.nacid);
+            default -> model = null;
+        }
+
+        return model;
+    }
+
     public static String getModelName(SubstModel model) {
         if (predef_reverse.containsKey(model))
             return predef_reverse.get(model);

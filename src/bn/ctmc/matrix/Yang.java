@@ -45,6 +45,10 @@ public class Yang extends SubstModel {
     public Yang() {
         super(F, Q, new Enumerable((S)), false);
     }
+
+    public Yang(double[] empiricalFreqs) {
+        super(empiricalFreqs, Q, new Enumerable((S)), false);
+    }
     public String getName() {
         return "Yang";
     }

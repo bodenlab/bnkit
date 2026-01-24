@@ -63,6 +63,10 @@ public class JTT extends SubstModel {
     public JTT() {
         super(F, Q, new Enumerable(S));
     }
+
+    public JTT(double[] empiricalF) {
+        super(empiricalF, Q, new Enumerable(S));
+    }
     
     public String getName() {
         return "JTT";

@@ -1,11 +1,7 @@
 package dat.file;
 
-import json.JSONObject;
-
 import java.io.*;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Utility class to work with tabulated files, sometimes labeled, sometimes not.
@@ -336,7 +332,7 @@ public class TSVFile {
      * @param header name of column
      * @return the column index (starting at 0); returns -1 if not found
      */
-    public int getColumn(String header) {
+    public int getColumnIndex(String header) {
         Integer col = headers.get(header);
         if (col == null)
             return -1;
@@ -546,7 +542,7 @@ public class TSVFile {
      * @param column_index the index of the column
      * @return values in specified column in order of row
      */
-    public Object[] getCol(int column_index) {
+    public Object[] getColData(int column_index) {
         Object[] ret = new Object[rows.size()];
         for (int i = 0; i < rows.size(); i ++)
             ret[i] = getRow(i)[column_index];
@@ -559,7 +555,7 @@ public class TSVFile {
      * @param parser parser (e.g. Double, BRENDA)
      * @return values in specified column in order of row, that all conform to type
      */
-    public Object[] getCol(int column_index, String parser) {
+    public Object[] getColData(int column_index, String parser) {
         Object[] ret = new Object[rows.size()];
         for (int i = 0; i < rows.size(); i ++) {
             ret[i] = getRow(i)[column_index];
@@ -891,6 +887,69 @@ public class TSVFile {
 
     public static void save2iTOL(String filename, Object[] items, Object[] values, String dataset_label) throws IOException {
         save2iTOL(filename, items, values, dataset_label, 10, null, null);
+    }
+
+    public static double[] loadEmpiricalFreqFile(String filename, String modelName) throws IOException {
+
+        TSVFile empiricalFreqFile = new TSVFile(filename, true);
+        int characterColIndex = empiricalFreqFile.getColumnIndex("Character");
+        int frequencyColIndex = empiricalFreqFile.getColumnIndex("Proportion");
+
+        if (characterColIndex == -1 || frequencyColIndex == -1) {
+            throw new RuntimeException("Empirical frequency file must contain 'Character' and 'Proportion' columns.");
+        }
+
+        // extract data
+        Object[] characters = empiricalFreqFile.getColData(characterColIndex);
+        Object[] freqs = empiricalFreqFile.getColData(frequencyColIndex);
+
+        if (characters.length != freqs.length) {
+            throw new RuntimeException("Empirical frequency file has mismatched number of characters and frequencies.");
+        }
+
+        HashMap<String, Integer> characterToIndex = getOrderedAlphabetMap(modelName);
+
+        if (characterToIndex.size() != freqs.length) {
+            throw new RuntimeException("Empirical frequency file has incorrect number of entries for model " + modelName + ".");
+        }
+
+        double[] empiricalFreqs = new double[freqs.length];
+        for (int i = 0; i < empiricalFreqs.length; i++) {
+            try {
+
+                if (!characterToIndex.containsKey(String.valueOf(characters[i]))) {
+                    throw new ClassCastException("Empirical frequency file contains an invalid character: " + characters[i]);
+                }
+
+                int characterIndex = characterToIndex.get(String.valueOf(characters[i]));
+                empiricalFreqs[characterIndex] = (double) freqs[i];
+
+            } catch (NumberFormatException e) {
+                throw new NumberFormatException("Empirical frequency file has an invalid number format: " + freqs[i]);
+            } catch (ClassCastException e) {
+                throw new ClassCastException("Empirical frequency file has an invalid character: " + characters[i]);
+            }
+        }
+
+        return empiricalFreqs;
+    }
+
+    private static HashMap<String, Integer> getOrderedAlphabetMap(String modelName) {
+
+        HashMap<String, Integer> characterToIndex = new HashMap<>();
+        String[] orderedAlpha;
+        if (modelName.equals("LG") || modelName.equals("JTT") || modelName.equals("WAG") || modelName.equals("Dayhoff")) {
+            orderedAlpha = new String[]{"A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K", "M","F","P","S","T", "W","Y","V"};
+        } else if (modelName.equals("Yang")) {
+            orderedAlpha =  new String[]{"A", "C", "G", "T"};
+        } else {
+            throw new IllegalArgumentException("Model " + modelName + " is not supported for empirical frequencies.");
+        }
+
+        for (int i = 0; i < orderedAlpha.length; i++) {
+            characterToIndex.put(orderedAlpha[i], i);
+        }
+        return characterToIndex;
     }
 
     public static void main(String[] args) {

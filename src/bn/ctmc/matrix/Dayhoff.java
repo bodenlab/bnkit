@@ -63,6 +63,10 @@ public class Dayhoff extends SubstModel {
         super(F, Q, new Enumerable(S));
     }
 
+    public Dayhoff(double[] empiricalF) {
+        super(empiricalF, Q, new Enumerable(S));
+    }
+
     public String getName() {
         return "Dayhoff";
     }

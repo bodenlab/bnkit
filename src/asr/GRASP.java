@@ -99,6 +99,7 @@ public class GRASP {
                 "\t-indel (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
                 "\t-s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)\n" +
                 "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific substitution rates\n\t\tWe recommend the use of this generally, but specifically for trees with great distances, and with biologically diverse entries\n\t\tAs an example, IQ-TREE produces rates on the accepted format with the --rate option (--mlrate is NOT supported yet).\n" +
+                "\t-ef (or --empirical-freqs) specifies a tabulated file with the headers Character & Proportion that specifies state frequencies of characters from the alphabet. Currently only supports protein models.\n" +
                 "\t--indel-prior (not implemented but intended for TrAVIS) specifies Gamma priors pre-determined from Pfam alignments that have few, moderate, or large numbers of gaps.\n" +
                 "\t--indel-length-distrib specifies the indel length distribution function, which serves to model both deletions and insertions in TrAVIS\n" +
                 "\t--indel-rate-distrib the indel rate distribution, which serves to model both insertions and deletions in TrAVIS\n"+
@@ -162,6 +163,8 @@ public class GRASP {
         boolean REUSE_TREE = false;
         boolean CONFLATE_RATES = false;
         boolean COPY_SUBST_RATES = false;
+        String EMPIRICAL_FREQS_FILE = null;
+        double[] EMPIRICAL_FREQS = null;
 
         String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
         int MODEL_IDX = 0; // default model is that above indexed 0
@@ -318,6 +321,8 @@ public class GRASP {
                     INDEL_LENGTH_DISTRIB = args[++a];
                 } else if (arg.equalsIgnoreCase("-reuse-tree")) {
                     REUSE_TREE = true;
+                } else if ((arg.equalsIgnoreCase("-empirical-freqs") || arg.equalsIgnoreCase("ef")) && args.length > a + 1) {
+                    EMPIRICAL_FREQS_FILE = args[++a];
                 } else if (arg.equalsIgnoreCase("-copy-rates")) {
                     COPY_SUBST_RATES = true;
                 } else if (arg.equalsIgnoreCase("-conflate-rates")) {
@@ -376,7 +381,37 @@ public class GRASP {
             int idx1 = ALIGNMENT == null ? 0 : ALIGNMENT.lastIndexOf("/") + 1;
             PREFIX = ALIGNMENT == null ? "" : ALIGNMENT.substring(idx1, idx2);
         }
-        MODEL = SubstModel.createModel(MODELS[MODEL_IDX]);
+
+        if (EMPIRICAL_FREQS_FILE != null) {
+            double totalFreq = 0.0;
+            try {
+                EMPIRICAL_FREQS = TSVFile.loadEmpiricalFreqFile(EMPIRICAL_FREQS_FILE, MODELS[MODEL_IDX]);
+
+                for (double empiricalFreq : EMPIRICAL_FREQS) {
+                    totalFreq += empiricalFreq;
+                }
+
+                if (Math.abs(totalFreq - 1) > 1e-4) {
+                    usage(31, "Empirical frequencies do not sum to 1.0 (sum is " + totalFreq + ")");
+                }
+
+            } catch (ClassCastException e) {
+                usage(29, e.getMessage());
+            } catch (NumberFormatException e) {
+                usage(28, e.getMessage());
+            } catch (IOException e) {
+                usage(30, "Empirical frequencies file could not be opened or read: " + EMPIRICAL_FREQS_FILE);
+            } catch (RuntimeException e) {
+                usage(27, e.getMessage());
+            }
+        }
+
+        if (EMPIRICAL_FREQS_FILE != null) {
+            MODEL = SubstModel.createModel(MODELS[MODEL_IDX], EMPIRICAL_FREQS);
+        } else {
+            MODEL = SubstModel.createModel(MODELS[MODEL_IDX]);
+        }
+
         if (MODEL == null)
             usage(1, "Model " + MODELS[MODEL_IDX] + " could not be created");
         if (!SAVE_AS && MODE == Inference.JOINT) { // set default files to save for joint
@@ -394,14 +429,14 @@ public class GRASP {
         if (RATESFILE != null) {
             try {
                 TSVFile ratesfile = new TSVFile(RATESFILE, true);
-                int rates_col = ratesfile.getColumn("Rate");
-                int index_col = ratesfile.getColumn("Site");
+                int rates_col = ratesfile.getColumnIndex("Rate");
+                int index_col = ratesfile.getColumnIndex("Site");
                 if (rates_col == -1)  // not there
                     rates_col = 0;
-                Object[] rateobjs = ratesfile.getCol(rates_col);
+                Object[] rateobjs = ratesfile.getColData(rates_col);
                 Object[] idxobjs = null;
                 if (index_col != -1)
-                    idxobjs = ratesfile.getCol(index_col);
+                    idxobjs = ratesfile.getColData(index_col);
                 RATES = new double[rateobjs.length];
                 for (int i = 0; i < RATES.length; i++) {
                     try {

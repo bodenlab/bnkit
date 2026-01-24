@@ -150,12 +150,12 @@ public class TF2Gene {
             // build the rest of the BN, namely the TF->Gene relations, including only genes that were found in training data
             int DOWNSAMPLE = 2; // accept this many TFs per gene, else downsample to this number
             for (String gene : gene2tf.keySet()) {
-                if (genedata.getColumn(gene) >= 0) { // gene is in the data
+                if (genedata.getColumnIndex(gene) >= 0) { // gene is in the data
                     EnumVariable genevar = gene2var.get(gene);
                     Set<String> tfs = gene2tf.get(gene);
                     Set<String> tfs_in_data = new HashSet<>();
                     for (String tf : tfs) {
-                        if (tfdata.getColumn(tf) >= 0)
+                        if (tfdata.getColumnIndex(tf) >= 0)
                             tfs_in_data.add(tf);
                     }
                     int n = tfs_in_data.size();

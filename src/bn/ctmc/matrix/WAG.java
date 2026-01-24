@@ -61,6 +61,10 @@ public class WAG extends SubstModel {
     public WAG() {
         super(F, Q, new Enumerable(S));
     }
+
+    public WAG(double[] empiricalF) {
+        super(empiricalF, Q, new Enumerable(S));
+    }
     
     public String getName() {
         return "WAG";

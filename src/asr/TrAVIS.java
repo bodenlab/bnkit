@@ -4,7 +4,6 @@ import bn.Distrib;
 import bn.ctmc.SubstModel;
 import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
-import bn.prob.GaussianDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.AlnWriter;
@@ -254,14 +253,14 @@ public class TrAVIS {
         if (SRATESFILE != null) {
             try {
                 TSVFile ratesfile = new TSVFile(SRATESFILE, true);
-                int rates_col = ratesfile.getColumn("Rate");
-                int index_col = ratesfile.getColumn("Site");
+                int rates_col = ratesfile.getColumnIndex("Rate");
+                int index_col = ratesfile.getColumnIndex("Site");
                 if (rates_col == -1)  // not there
                     rates_col = 0;
-                Object[] rateobjs = ratesfile.getCol(rates_col);
+                Object[] rateobjs = ratesfile.getColData(rates_col);
                 Object[] idxobjs = null;
                 if (index_col != -1)
-                    idxobjs = ratesfile.getCol(index_col);
+                    idxobjs = ratesfile.getColData(index_col);
                 SRATES = new double[rateobjs.length];
                 for (int i = 0; i < SRATES.length; i++) {
                     try {
