@@ -99,7 +99,7 @@ public class GRASP {
                 "\t-indel (or --indel-method) specifies what method to use for inferring indels (see below)\n" +
                 "\t-s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)\n" +
                 "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific substitution rates\n\t\tWe recommend the use of this generally, but specifically for trees with great distances, and with biologically diverse entries\n\t\tAs an example, IQ-TREE produces rates on the accepted format with the --rate option (--mlrate is NOT supported yet).\n" +
-                "\t-ef (or --empirical-freqs) specifies a tabulated file with the headers Character & Proportion that specifies state frequencies of characters from the alphabet. Currently only supports protein models.\n" +
+                "\t-ef (or --empirical-freqs) specifies a tabulated file with the headers Character & Proportion that contain\n\t\tstationary character frequencies for the chosen substitution model. The standard stationary character frequencies of a\n\t\tchosen substitution model are used by default when -ef is not specified\n" +
                 "\t--indel-prior (not implemented but intended for TrAVIS) specifies Gamma priors pre-determined from Pfam alignments that have few, moderate, or large numbers of gaps.\n" +
                 "\t--indel-length-distrib specifies the indel length distribution function, which serves to model both deletions and insertions in TrAVIS\n" +
                 "\t--indel-rate-distrib the indel rate distribution, which serves to model both insertions and deletions in TrAVIS\n"+
@@ -130,7 +130,6 @@ public class GRASP {
                 "\tPSML: position-specific maximum likelihood (uses uniform evolutionary model)\n" +
                 "\tSCIP: globally optimal parsimony-based indel history using the open-source\n\t\tSCIP solver (https://www.scipopt.org/). Does not support multi-threading\n" +
                 "\tGurobi: globally optimal parsimony-based indel history.\n\t\tRequires local installation of Gurobi to run (https://www.gurobi.com/downloads/)\n" +
-                "\tCPSAT: globally optimal parsimony-based indel history using Google's open-source\n\t\tCP-SAT solver (https://developers.google.com/optimization). Should use a minimum of 8 threads for reliable performance\n" +
                 "\tAdd '*' to method name for less conservative setting (if available) or to use globally optimal distance based parsimony \n");
         out.println("Substitution-models: \n" +
                 "\tJTT: Jones-Taylor-Thornton (protein; default)\n" +
@@ -172,7 +171,7 @@ public class GRASP {
         // Alphabet is decided by MODEL_IDX
         Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
         // Indel approaches:
-        String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML", "SCIP", "Gurobi", "CPSAT"};
+        String[] INDELS = new String[] {"BEP", "BEML", "SICP", "SICML", "PSP", "PSML", "SCIP", "Gurobi"};
         int INDEL_IDX = 0; // default indel approach is that above indexed 0
         String INDEL_RATE_DISTRIB = null;
         String INDEL_LENGTH_DISTRIB = null;
@@ -391,8 +390,12 @@ public class GRASP {
                     totalFreq += empiricalFreq;
                 }
 
-                if (Math.abs(totalFreq - 1) > 1e-4) {
-                    usage(31, "Empirical frequencies do not sum to 1.0 (sum is " + totalFreq + ")");
+                double tolerance = 1e-4;
+                if (Math.abs(totalFreq - 1.0) <= tolerance) {
+                    System.out.println("WARNING: Empirical frequencies do not sum to 1.0 (sum is " + totalFreq + ")\n Renormalizing frequencies.");
+                    for (int i = 0; i < EMPIRICAL_FREQS_FILE.length(); i++) {
+                        EMPIRICAL_FREQS[i] = EMPIRICAL_FREQS[i] / totalFreq;
+                    }
                 }
 
             } catch (ClassCastException e) {
@@ -502,7 +505,7 @@ public class GRASP {
                 case 5:
                     indelpred = Prediction.PredictByMaxLhood(pogtree);
                     break;
-                case 6, 7, 8:
+                case 6, 7:
 
                     double[][] treeNeighbourAlphaPen = Mip.createTreeNeighbourAlphaPen(tree, aln, MODELS[MODEL_IDX]);
                     indelpred = Prediction.PredictByMIP(pogtree, aln, INDELS[INDEL_IDX], treeNeighbourAlphaPen);
