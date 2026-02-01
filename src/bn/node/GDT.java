@@ -615,7 +615,13 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
         for (int i=0; i<observations.length; i++) {
             if (observations[i] == null)
                 continue;
-            Double y=(Double)observations[i];
+            Double y;
+            if (observations[i] instanceof Integer) {
+                // catches ClassCastExceptions for integer values
+                y = ((Integer) observations[i]).doubleValue();
+            } else {
+                y = (Double) observations[i];
+            }
             sum+=y;
             if (i==0)
                 max=min=y;
@@ -631,8 +637,14 @@ public class GDT implements BNode, TiedNode<GDT>, Serializable {
         for (int i=0; i<observations.length; i++) {
             if (observations[i] == null)
                 continue;
-            Double y=(Double)observations[i];
-                var+=(mean-y)*(mean-y);
+            Double y;
+            if (observations[i] instanceof Integer) {
+                // catches ClassCastExceptions for integer values
+                y = ((Integer) observations[i]).doubleValue();
+            } else {
+                y = (Double) observations[i];
+            }
+            var+=(mean-y)*(mean-y);
         }
         var/=cnt;
         int nrows= table.getSize();

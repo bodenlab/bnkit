@@ -5,6 +5,7 @@ import dat.Continuous;
 import dat.Enumerable;
 import json.JSONArray;
 import json.JSONObject;
+import smile.math.special.Erf;
 
 import java.io.Serializable;
 import java.util.Random;
@@ -213,6 +214,19 @@ public class GaussianDistrib implements Distrib, Serializable {
             return null;
         GaussianDistrib gd = new GaussianDistrib(mean, diff / samples.length);
         return gd;
+    }
+
+    public double cdf(double x) {
+
+        if (sigma == 0) {
+            if (x < mu) {
+                return 0.0;
+            } else {
+                return 1.0;
+            }
+        }
+
+        return 0.5 * Erf.erfc(-0.707106781186547524 * (x - mu) / sigma);
     }
     
     /**

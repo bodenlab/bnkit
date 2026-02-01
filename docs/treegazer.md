@@ -1,22 +1,22 @@
-# Annotate Ancestral Reconstruction (AnnotAceR)
+# TreeGazer
 
-AnnotAceR is a tool to annotate ancestors and extant nodes in a phylogenetic tree by 
+TreeGazer is a tool to annotate ancestors and extant nodes in a phylogenetic tree by 
 reference to a subset of nodes with known properties. These properties are represented by either 
 discrete or continuous variables. In the latter case, it also uses latent discrete variables 
 to mix (Gaussian) distributions of the observable continuous variables. (The parameters for these
 mixtures are shared between all nodes in the tree; the states at the nodes are governed by an
 evolutionary model.) The use of latent variables is optional for discrete observables.
-AnnotAceR forms part of the GRASP-suite (Foley et al., 2022).
+TreeGazer forms part of the GRASP-suite (Foley et al., 2022).
 
-### Using AnnotAceR
+### Using TreeGazer
 
-`Usage: asr.AnnotAceR`
+`Usage: asr.TreeGazer`
 
     [-nwk <tree-file> -in {<label>{:<parser>}@}<input-file> -out <output-file>]
     
     {-model <uniform(default)>}
     
-    {-gamma <gamma-value(default 1.0)>}
+    {-gamma <value (default 1.0)>}
     
     {-params <JSON-file>}
     
@@ -30,36 +30,57 @@ AnnotAceR forms part of the GRASP-suite (Foley et al., 2022).
     
     {-seed <seed>}
     
-    {-joint (default) | -marg {<branchpoint-id>}}
+    {-joint (default) | -marg {<branchpoint-id>} }
     
     {-format <TSV(default), TREE, STDOUT, ITOL>}
+    
+    {-lambda <value (default 5.0)>}
     
     {-help|-h}
     
     {-verbose|-v}
 
-    where
-    tree-file is a phylogenetic tree on Newick format.
+    where:
+    tree-file is a phylogenetic tree on Newick format
+    
     input-file is a table with sequence or ancestor names in the first column, and corresponding values
-    (empty or None or null implies not assigned) on TSV format.
+    (empty or None or null implies not assigned) on TSV format
+    
     label flags that a header is used in the input-file and identifies the column with values to be modelled;
-    if no label is given, headers are assumed absent and values from the second column will be modelled
-    parser identifies a parser to use on the column with values (e.g. BRENDA).
+        if no label is given, headers are assumed absent and values from the second column will be modelled
+        parser identifies a parser to use on the column with values (e.g. BRENDA).
+    
     output-file will contain:
-    inferred branch point states on specified format (TSV by default, TREE is a labelled tree on Newick format, 
-    ITOL is a dataset to decorate trees in iTOL.embl.de).
-    gamma-value is parameter to the uniform model (n-state generalisation of Jukes-Cantor).
-    JSON-file contains a JSON string specifying the distribution for latent nodes (if latent mode is used).
-    latent indicates that the tree consists of latent values only (latent mode), with specified values 
-    as extensions to the leaves.
-    #states is the number of latent states to learn (should not exceed 25, labelled A-Z).
-    internal indicates that internal nodes are also extended with user-specified or learned distributions 
-    (default leaves-only).
+    - inferred branch point states on specified format (TSV by default, TREE is a labelled tree on Newick format, ITOL is a dataset to decorate trees in iTOL.embl.de), or
+    gamma-value is parameter to the uniform model (n-state generalisation of Jukes-Cantor)
+    
+    lambda is the multiplier for the upper confidence bound of predicted values (used only when latent mode with real values is applied)
+    
+    params contains a JSON string specifying the distribution for latent nodes (if latent mode is used)
+    
+    latent indicates that the tree consists of latent values only (latent mode), with specified values as extensions to the leaves.
+      - #states is the number of latent states to learn (should not exceed 25, labelled A-Z).
+    
+    internal indicates that internal nodes are also extended with user-specified or learned distributions (default leaves-only).
+      
     learn excludes inference and instead prompts EM learning of parameters, using input data as training data.
-    tied implies that the variance learned is the same across the latent states (only applicable when 
-    EM-learning GDTs; default is off).
+
+    tied implies that the variance learned is the same across the latent states (only applicable when EM-learning GDTs; default is off).
+
     help prints out commandline arguments (this screen).
+
     verbose completes the requested steps while printing out messages about the process.
+
+    Notes:
+    Evolutionary models of substitution are currently limited to uniform, which is an adaptation of Jukes-Cantor for arbitrary number of states.
+    - gamma-value is used by this model
+    
+    If specified values are real, a conditional Gaussian mixture distribution conditioned on latent state is learned.
+    
+    If specified values are discrete, a multinomial distribution conditioned on latent state is learned.
+    
+    Inference is either joint (default) or marginal (marginal allows a branch-point to be nominated;
+    if one is not given all uninstantiated nodes are inferred)
 
 ### Notes:
 
@@ -113,7 +134,7 @@ First, learning the distribution shared by all nodes (external and internal, as 
 `NADPH_kcat_1`, `NADPH_kcat_2`, ... These are not shown by default in marginal inference, as the method 
 instead opts to sample the continuous distribution many times to arrive at a mean value. 
 
-`asr.AnnotAceR -nwk kari_ancestors.nwk -in NADPH_kcat@experiments.txt -latent 3 -learn -internal -params params_NADPH_kcat.json -out trn_NADPH_kcat.txt -format ITOL -seed 1 -tied`
+`asr.TreeGazer -nwk kari_ancestors.nwk -in NADPH_kcat@experiments.txt -latent 3 -learn -internal -params params_NADPH_kcat.json -out trn_NADPH_kcat.txt -format ITOL -seed 1 -tied`
 
 Experimental values are available for a group of ancestors in `experiments.txt` (TSV file; note that 
 ancestor names are numbers as generated by GRASP, not including the 'N' prefix). Note also that when no 
@@ -146,7 +167,7 @@ and shows up like this.
 
 Now, let's run the inference. 
 
-`asr.AnnotAceR -nwk kari_ancestors.nwk -in NADPH_kcat@experiments.txt -latent 3 -marg -internal -params params_NADPH_kcat.json -out tst_NADPH_kcat.txt -format ITOL -seed 1 -tied`
+`asr.TreeGazer -nwk kari_ancestors.nwk -in NADPH_kcat@experiments.txt -latent 3 -marg -internal -params params_NADPH_kcat.json -out tst_NADPH_kcat.txt -format ITOL -seed 1 -tied`
 
 Sampling from Gaussian mixture at each uninstantiated node gives:
 
@@ -169,7 +190,7 @@ N7	0.44623041036501315
 
 #### Example 3
 
-`asr.AnnotAceR -nwk ancestors.nwk -in BRENDA_TS_DATA:BRENDA@annotations.txt -learn -tied -latent 3 -internal -params params_BRENDA_TS_DATA.json -out tst_BRENDA_TS_DATA.txt -format ITOL -seed 2`
+`asr.TreeGazer -nwk ancestors.nwk -in BRENDA_TS_DATA:BRENDA@annotations.txt -learn -tied -latent 3 -internal -params params_BRENDA_TS_DATA.json -out tst_BRENDA_TS_DATA.txt -format ITOL -seed 2`
 
 learns a single mixture of Gaussians for the continuous property values in the column `BRENDA_TS_DATA` extracted by the parser `BRENDA`. The mixture is saved in a file `params_BRENDA_TS_DATA.json`; 
 the training data is re-saved for visualisation in iTOL as `tst_BRENDA_TS_DATA.txt`. Notice that the `-tied` variance option was used ensuring that the
@@ -194,7 +215,7 @@ The iTOL file follows the dataset format, so can be dropped into the iTOL webtoo
 The inference for all other nodes can be done with the following command, making reference to the Gaussian mixture
 generated above:
 
-`asr.AnnotAceR -nwk ancestors.nwk -in BRENDA_TS_DATA:BRENDA@annotations.txt -marg -tied -latent 3 -internal -params params_BRENDA_TS_DATA.json -out trn_BRENDA_TS_DATA.txt -format ITOL -seed 2`
+`asr.TreeGazer -nwk ancestors.nwk -in BRENDA_TS_DATA:BRENDA@annotations.txt -marg -tied -latent 3 -internal -params params_BRENDA_TS_DATA.json -out trn_BRENDA_TS_DATA.txt -format ITOL -seed 2`
 
 The inference generates another file, in this case again on the iTOL format, enabling it to be used as a second dataset
 for visualisation. If you'd like it to be presented as a TSV file, use `-format TSV`.

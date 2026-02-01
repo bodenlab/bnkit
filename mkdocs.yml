@@ -7,6 +7,6 @@ theme:
 nav:
     - 'index.md'
     - 'travis.md'
-    - 'annotacer.md'
+    - 'treegazer.md'
     - 'phylotree.md'
     - 'json-api.md'

@@ -173,6 +173,15 @@ public class TreeInstance {
         return encode(true);
     }
 
+    /**
+     * Set a value at a branch point
+     * @param index the index of the branch point in tree
+     * @param value the value to place at that branch point
+     */
+    public void setInstance(int index, Object value) {
+        instance[index] = value;
+    }
+
 
     /**
      * Use the supplied key to convert the existing values to those provided through the key.

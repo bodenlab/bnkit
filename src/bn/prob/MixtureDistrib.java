@@ -20,7 +20,7 @@ package bn.prob;
 
 import bn.Distrib;
 import json.JSONObject;
-
+import smile.stat.distribution.GaussianDistribution;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -333,7 +333,28 @@ public class MixtureDistrib implements Distrib {
     	}
     	
     	return true;
-    } 
+    }
+
+    /**
+     * Cumulative distribution function of mixtures. That is the probability to the left of x
+     * @param x value of the random variable.
+     * @return the probability
+     */
+    public double cdf(double x) {
+
+        double cumulative_cdf = 0.0;
+        for (int i = 0; i < weights.size(); ++i) {
+            try {
+                double weight_i = weights.get(i);
+                GaussianDistrib gaussianDistrib = (GaussianDistrib) getDistrib(i);
+                cumulative_cdf += weight_i * gaussianDistrib.cdf(x);
+            } catch (ClassCastException e) {
+                throw new RuntimeException("Can only compute CDF with GaussianDistrib");
+            }
+        }
+
+        return cumulative_cdf;
+    }
 
     /**
      * Sample the mixture distribution.
