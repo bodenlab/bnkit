@@ -513,7 +513,7 @@ public class TreeGazer {
 
         MaxLhoodJoint mlj = new MaxLhoodJoint(pbn);
         mlj.decorate(ti);
-        String[] headers = new String[] {tsv.getHeader(0), tsv.getHeader(1)};
+        String[] headers = new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valcol)};
         Object[][] save = new Object[tree.getSize()][headers.length];
         int bpcnt = 0;
         for (int bpidx : tree) {
@@ -553,7 +553,7 @@ public class TreeGazer {
                 bpcnt += 1;
             }
         }
-        TSVFile tempTsv = new TSVFile(new String[] {tsv.getHeader(0), tsv.getHeader(valcol)}, save);
+        TSVFile tempTsv = new TSVFile(new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valcol)}, save);
         saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, null, null);
     }
 
@@ -583,7 +583,7 @@ public class TreeGazer {
             if (distrib != null) {
                 if (headers == null) {
                     headers = new String[1 + distrib.getDomain().size()];
-                    headers[0] = tsv.getHeader(0);
+                    headers[0] = tsv.getHeader(DEFAULT_ENTRIES_IDX);
                     for (int i = 0; i < distrib.getDomain().size(); i++)
                         headers[1 + i] = distrib.getDomain().get(i).toString();
                 }
@@ -739,17 +739,17 @@ public class TreeGazer {
         return example;
     }
 
-    private static String[] buildTsvHeader(PhyloBN pbn, BNode exampleNode, TSVFile tsv) {
+    private static String[] buildTsvHeader(PhyloBN pbn, BNode exampleNode, TSVFile tsv, int valCol) {
         String[] headers;
         if (pbn.getMasterCPT() == null && pbn.getMasterGDT() != null) { // Gaussian, so real value
-            headers = new String[] {tsv.getHeader(0), tsv.getHeader(1)+" (Mean)", tsv.getHeader(1)+" (SD)", tsv.getHeader(1)+" (IWD)", tsv.getHeader(1)+" (UCB)"};
+            headers = new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valCol)+" (Mean)", tsv.getHeader(valCol)+" (SD)", tsv.getHeader(valCol)+" (IWD)", tsv.getHeader(valCol)+" (UCB)"};
 
         } else if (pbn.getMasterCPT() != null && pbn.getMasterGDT() == null) { // Discrete
 
             // extract possible values so that we work out what probs/states that are available
             Enumerable ed = (Enumerable) exampleNode.getVariable().getDomain();
             headers = new String[1 + ed.size()];
-            headers[0] = tsv.getHeader(0);
+            headers[0] = tsv.getHeader(DEFAULT_ENTRIES_IDX);
             for (int i = 0; i < ed.size(); i++)
                 headers[1 + i] = ed.get(i).toString(); // header to use for column
         } else {
@@ -844,7 +844,7 @@ public class TreeGazer {
 
         // find one node which has a distribution to check what kind it is
         BNode exampleNode = findExampleNode(bpidxs, pbn);
-        String[] headers = buildTsvHeader(pbn, exampleNode, tsv);
+        String[] headers = buildTsvHeader(pbn, exampleNode, tsv, valcol);
 
         save = new Object[bpidxs.length][headers.length];
         int bpcnt = 0; // count nodes that are inferred (excl those that are null)
