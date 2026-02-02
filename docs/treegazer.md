@@ -26,7 +26,7 @@ TreeGazer forms part of the GRASP-suite (Foley et al., 2022).
     
     {-learn}
     
-    {-tied}
+    {-untied}
     
     {-seed <seed>}
     
@@ -65,7 +65,7 @@ TreeGazer forms part of the GRASP-suite (Foley et al., 2022).
       
     learn excludes inference and instead prompts EM learning of parameters, using input data as training data.
 
-    tied implies that the variance learned is the same across the latent states (only applicable when EM-learning GDTs; default is off).
+    untied implies that the variance learned is NOT the same across the latent states (only applicable when EM-learning GDTs; default is on).
 
     help prints out commandline arguments (this screen).
 

@@ -69,7 +69,7 @@ public class TreeGazer {
                 \t- #states is the number of latent states to learn (should not exceed 25, labelled A-Z).
                 \tinternal indicates that internal nodes are also extended with user-specified or learned distributions (default leaves-only).
                 \tlearn excludes inference and instead prompts EM learning of parameters, using input data as training data.
-                \ttied implies that the variance learned is the same across the latent states (only applicable when EM-learning GDTs; default is off).
+                \tuntied implies that the variance learned is NOT the same across the latent states (only applicable when EM-learning GDTs; default is on).
                 \thelp prints out commandline arguments (this screen).
                 \tverbose completes the requested steps while printing out messages about the process.
                 """);
@@ -117,7 +117,7 @@ public class TreeGazer {
         boolean VERBOSE = false; // print out various messages during processing to inform the user
         boolean LEARN = false; // train (when true) or infer (when false, default)
         boolean LEAVES_ONLY = true; // leaves-only are equipped with distributions (when true, default), or all nodes including internal (when false)
-        boolean TIED_VARIANCE = false;
+        boolean TIED_VARIANCE = true;
         Object MARG_LABEL = null;
         double GAMMA = 1.0;
         double LAMBDA = 5.0; // for upper confidence bound of predicted values
@@ -146,8 +146,8 @@ public class TreeGazer {
                         }
                         INPUT = INPUT.substring(atsign + 1);
                     }
-                } else if (arg.equalsIgnoreCase("tied")) {
-                    TIED_VARIANCE = true;
+                } else if (arg.equalsIgnoreCase("untied")) {
+                    TIED_VARIANCE = false;
                 } else if (arg.equalsIgnoreCase("joint")) {
                     INFERENCE_MODE = asr.GRASP.Inference.JOINT;
                 } else if (arg.equalsIgnoreCase("marg")) {
@@ -291,7 +291,7 @@ public class TreeGazer {
         Object[] ENTRIES_OBJ = tsv.getColData(DEFAULT_ENTRIES_IDX); // entry-names as an array of Object (perhaps a mix of String and Integer, since GRASP uses numeric ancestor IDs)
         String[] ENTRIES = new String[ENTRIES_OBJ.length]; // entry-names as an array of String
         Set<Object> ENTRIES_SET = new HashSet<>();
-        unpackEntryNames(ENTRIES_OBJ, ENTRIES, ENTRIES_SET, tree);
+        unpackEntryNames(ENTRIES_OBJ, ENTRIES, ENTRIES_SET, tree, LEAVES_ONLY, MODE, INPUT);
 
         Object[] ENTRY_VALUES = tsv.getColData(valcol, COLPARSER); // values associated with entries
 
@@ -392,17 +392,30 @@ public class TreeGazer {
      * @param tree
      */
     private static void unpackEntryNames(Object[] entryObjects, String[] entryStrings,
-                                         Set<Object> entrySet, Tree tree) {
+                                         Set<Object> entrySet, Tree tree, boolean leavesOnly, MODEL_MODE mode,
+                                         String input) {
+
+        boolean ancestorFound = false;
+        boolean missingNode = false;
         for (int i = 0; i < entryStrings.length; i ++) {
-            int bpidx = tree.getIndex(entryObjects[i]); // this search for branchpoint, does not care if ancestor is specified as string with "N" prefix or as ancestor number (Integer)
+            // this search for branchpoint, does not care if ancestor is specified as string with "N" prefix or as ancestor number (Integer)
+            int bpidx = tree.getIndex(entryObjects[i]);
             if (bpidx < 0) { // not found
-                System.err.println("No node in tree with label or ancestor ID \"" + entryObjects[i] + "\". Ignored.");
-                entryStrings[i] = entryObjects[i].toString();
-                entrySet.add(entryObjects[i]);
+                System.err.println("No node in tree with label or ancestor ID \"" + entryObjects[i] + "\".");
+                missingNode = true;
             } else {
+                if (!tree.isLeaf(bpidx)) {
+                    ancestorFound = true;
+                }
                 entryStrings[i] = tree.getLabel(bpidx).toString(); //
                 entrySet.add(tree.getLabel(bpidx));
             }
+        }
+
+        if ((ancestorFound && leavesOnly) && (mode == MODEL_MODE.LATENT)) {
+            usage(17, "Internal nodes with annotations were identified in " + input + ". Use -internal to avoid failure of learning/inference.");
+        } else if (missingNode) {
+            usage(18, "Input TSV contains node labels that are not present in the tree.");
         }
     }
 
