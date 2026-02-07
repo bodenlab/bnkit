@@ -393,7 +393,7 @@ public class GRASP {
                 double tolerance = 1e-4;
                 if (Math.abs(totalFreq - 1.0) <= tolerance) {
                     System.out.println("WARNING: Empirical frequencies do not sum to 1.0 (sum is " + totalFreq + ")\n Renormalizing frequencies.");
-                    for (int i = 0; i < EMPIRICAL_FREQS_FILE.length(); i++) {
+                    for (int i = 0; i < EMPIRICAL_FREQS.length; i++) {
                         EMPIRICAL_FREQS[i] = EMPIRICAL_FREQS[i] / totalFreq;
                     }
                 }
