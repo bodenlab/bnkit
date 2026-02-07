@@ -1,0 +1,616 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>GRASP command-line interface (CLI) - bnkit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#grasp-command-line-interface-cli" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="bnkit" class="md-header__button md-logo" aria-label="bnkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            bnkit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              GRASP command-line interface (CLI)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="bnkit" class="md-nav__button md-logo" aria-label="bnkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    bnkit
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bnkit documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../travis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tracing Ancestors Via Indels and Substitutions (TrAVIS)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../treegazer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TreeGazer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../phylotree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    phylotree
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../json-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#asrgrasp-what-can-it-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        asr.GRASP: What can it do?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#asrgrasp-how-do-i-make-it-work-on-my-computer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        asr.GRASP: How do I make it work on my computer?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#asrgrasp-how-do-i-run-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        asr.GRASP: How do I run it?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-else" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What else?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="grasp-command-line-interface-cli">GRASP command-line interface (CLI)</h1>
+<p>The best way to run GRASP is via its command-line interface. 
+It can prove useful if you want to automate tasks, run reconstructions on your own dedicated hardware, and/or access the latest features. 
+The command-line version allows access to a variety of indel inference approaches. 
+Beyond the default bi-directional edge encoding (BE), indels are available by either Position Specific (PS), or Simple Indel Coding (SIC). 
+Regardless of encoding, indels can be inferred using either Parsimony (P) or Maximum Likelihood (ML) methods. 
+his gives six methods: PS-P, PS-ML, SIC-P, SIC-ML, BE-P, BE-ML.</p>
+<p>The command-line version accepts a file with evolutionary rates inferred with the tree, as produced by several tools incl. IQ-TREE2. 
+The command-line interface is implemented in <a href="https://github.com/bodenlab/bnkit">bnkit</a> as a class <code>asr.GRASP</code>.</p>
+<h3 id="asrgrasp-what-can-it-do">asr.GRASP: What can it do?</h3>
+<p>asr.GRASP accepts an alignment (FASTA or Clustal formats) and a phylogenetic tree (Newick format) with concordant labels, to infer ancestor sequences by joint or marginal reconstruction by maximum likelihood. In the process, the program also infers insertion and deletion events, which are internally represented via partial-order graphs; it also identifies the <em>most supported</em> path of sequence inclusions at each ancestor.</p>
+<p>The program can save all ancestor sequences (in the case of joint reconstruction) or one sequence (in the case of marginal reconstrution; optionally with character state distributions as a TSV file). It can save the partial-order graphs in JSON or as DOT files, which can be visualised with GraphViz. It can also re-save the tree with assigned ancestor labels.</p>
+<p>GRASP was designed primarily for protein sequences but the command-line version incorporates DNA models too. At this stage we have not tested DNA sequence functionality extensively, nor have we developed specific features around DNA sequences (codon-centric analyses, user-provided background stats, etc).</p>
+<h3 id="asrgrasp-how-do-i-make-it-work-on-my-computer">asr.GRASP: How do I make it work on my computer?</h3>
+<p>First, you will need Java version 11 or newer. Any operating system with Java should work, including Mac OS, MS Windows and Linux.</p>
+<p>You then clone <a href="https://github.com/bodenlab/bnkit">bnkit</a> in its entirety. You may need JUnit 5 testing to get everything working; this is only required if you want to run software tests, say if you are a developer.</p>
+<h3 id="asrgrasp-how-do-i-run-it">asr.GRASP: How do I run it?</h3>
+<ol>
+<li>Compile the jar file</li>
+</ol>
+<p>We suggest that you then follow steps 2 onwards, but likely you can simply run it from the directory to which it was downloaded, e.g. <code>java -jar ~/Downloads/bnkit.jar</code> should produce the help info below.</p>
+<ol>
+<li>Create a bash script grasp that contains the following two lines, replacing the path with the path to your downloaded jar</li>
+</ol>
+<p><code>console
+   #!/bin/sh
+   java -jar -Xmx16g &lt;/path/to/bnkit.jar&gt; $@</code></p>
+<p>(the <code>-Xmx</code> is optional; see below)</p>
+<ol>
+<li>Change permissions on the bash script</li>
+</ol>
+<pre><code class="language-console">chmod 755 grasp
+</code></pre>
+<ol>
+<li>Place the file <code>grasp</code> where you store your executable files, for example <code>/usr/local/bin</code></li>
+</ol>
+<pre><code class="language-console">mv grasp /usr/local/bin
+</code></pre>
+<ol>
+<li>Check that it works</li>
+</ol>
+<pre><code class="language-console">grasp -h
+</code></pre>
+<p>This will print out the arguments that specifies your input data and options.</p>
+<p>A typical command may look like this</p>
+<pre><code>grasp --aln 500_2112_dhad_18032019.aln --nwk r_500_2112_dhad_18032019.nwk -output-folder recon_0500 --verbose --threads 5
+</code></pre>
+<p>Full help information</p>
+<pre><code class="language-text">Usage: asr.GRASP 
+    [-a | --aln &lt;filename&gt;]
+    [-n | --nwk &lt;filename&gt;]
+    {-o | --output-folder &lt;foldername&gt;} (default is current working folder, or input folder if available)
+    {-i | --input-folder &lt;foldername&gt;}
+    {-pre | --prefix &lt;stub&gt;}
+    {-rf | --rates-file &lt;filename&gt;}
+    {-s | --substitution-model &lt;JTT(default)|Dayhoff|LG|WAG|JC|Yang&gt;}
+    {-t | --threads &lt;number&gt;}
+    {-j | --joint (default)}
+    {-m | --marginal &lt;branchpoint-id&gt;}
+    {--indel-method &lt;methodname&gt;} (select one from BEP(default) BEML SICP SICML PSP PSML)
+    {--supported-path &lt;methodname&gt;} (select one from DIJKSTRA(default) ASTAR)
+    {--nogap}
+    {--nonibble}
+    {--exclude-noedge}
+    {--save-as &lt;list-of-formats&gt;} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES TrAVIS)
+    {--save-all} (saves reconstruction with ALL formats)
+    {--save-tree} (bypasses inference and re-saves the tree with ancestor nodes labelled as per GRASP's
+    depth-first labelling scheme starting with N0)
+    {--save-poag { &lt;branchpoint-id&gt; } (bypasses inference and saves the input alignment as a POAG
+    (partial order alignment graph of extant sequences under specified ancestor [default N0])
+    {--time}{--verbose}{--help}
+
+Inference is a two-stage process:
+    (1) A history of indel events is inferred by either maximum likelihood or maximum parsimony and 
+    mapped onto the tree to determine what positions contain actual sequence content
+    (2) For each ancestral position, the most probable character is assigned to each phylogenetic branch 
+    point when performing a joint reconstruction. Alternatively, for each 
+    position at a nominated branch point, the probability distribution over all possible 
+    characters is inferred when performing a marginal reconstruction.
+    Finally, edges are drawn to represent all inferred combinations of indels to form an ancestor POG 
+    with nodes that can form a valid sequence with inferred content; a preferred path
+    through the POG is then inferred, nominating a single, best supported sequence.
+
+Mode of character inference:
+    -j (or --joint) activates joint reconstruction (default), 
+    -m (or --marginal) activates marginal reconstruction (requires a branch-point to be nominated)
+    --onlyindel disengages the stage of character state inference
+
+Required arguments:
+    -a (or --aln) must specify the name of a multiple-sequence alignment file on FASTA or CLUSTAL format
+    -n (or --nwk) must specify the name of a phylogenetic-tree file on Newick format
+
+Optional arguments:
+    -o (or --output-folder) specifies the folder that will be used to save output files,
+        e.g. inferred ancestor or ancestors, tree, etc. as specified by format
+    -i (or --input-folder) skips indel inference, and loads a previous reconstruction from specified folder
+    -sa (or --save-as) lists the files and formats to be generated (see below)
+    --save-all nominates all
+    -pre (or --prefix) specifies a stub that is added to result filenames (default is the prefix of the alignment file)
+    -indel (or --indel-method) specifies what method to use for inferring indels (see below)
+    -s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)
+    -rf (or --rates-file) specifies a tabulated file with relative, position-specific substitution rates
+        We recommend the use of this generally, but specifically for trees with great distances, and with biologically diverse entries
+        As an example, IQ-TREE produces rates on the accepted format
+    --include-extants means that extants are included in output files (when the format allows)
+    --nogap means that the gap-character is excluded in the resulting output (when the format allows)
+    --nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end
+    --orphans de-activates the removal of orphaned indel trees
+    --exclude-noedge removes non-existing edge as an option for parsimony in BEP
+    --verbose prints out information about steps undertaken, and --time the time it took to finish
+    -h (or --help) will print out this screen
+
+Files/formats: 
+    FASTA: sequences (most preferred path at each ancestor, gapped or not gapped)
+    CLUSTAL: sequences (most preferred path at each ancestor, gapped)
+    TREE: phylogenetic tree with ancestor nodes labelled
+    DISTRIB: character distributions for each position (indexed by POG, only available for marginal reconstruction)
+    ASR: complete reconstruction as JSON, incl. POGs of ancestors and extants, and tree (ASR.json)
+    DOT: partial-order graphs of ancestors in DOT format
+    TREES: position-specific trees with ancestor states labelled
+    TrAVIS: Produce a report for reconstruction
+
+Indel-methods: 
+    BEP: bi-directional edge (maximum) parsimony
+    BEML: bi-directional edge maximum likelihood (uses uniform evolutionary model akin to JC)
+    SICP: simple indel-coding (maximum) parsimony (based on Simmons and Ochoterena)
+    SICML: simple indel-coding maximum likelihood (uses uniform evolutionary model)
+    PSP: position-specific (maximum) parsimony
+    PSML: position-specific maximum likelihood (uses uniform evolutionary model)
+    Add '*' to method name for less conservative setting (if available)
+
+Substitution-models: 
+    JTT: Jones-Taylor-Thornton (protein; default)
+    Dayhoff: Dayhoff-Schwartz-Orcutt (protein)
+    LG: Le-Gasquel (protein)
+    WAG: Whelan-Goldman (protein)
+    JC: Jukes-Cantor (DNA)
+    Yang: Yang's general reversible process model (DNA)
+
+Notes: 
+    Greater number of threads may improve processing time up to a point when coordination chokes performance; default is 4 threads.
+    Running GRASP requires large memory and in most cases Java needs to be run with the option -Xmx20g, 
+    where 20g specifies that 20GB of RAM should be available.
+
+~ This is version 25-Mar-2025 ~
+</code></pre>
+<h3 id="what-else">What else?</h3>
+<p>Running the command-line version is typically a quicker affair, at least for smaller reconstructions, but it requires decent hardware. A reconstruction of less than 1,000 sequences should take less than 10 minutes.</p>
+<p>You can probably run a reconstruction with 10,000 sequences on a server, but how "gappy" the alignment is will also play a part in deciding this. If the alignment is reasonably clean, a powerful, modern laptop with at least 16GB of memory, can do this in under a day. If the alignment covers a diverse family, you will probably need a lot more memory. We recommend you set the Java heap size to 60GB RAM, which you can using the option <code>-Xmx60000m</code>.</p>
+<p>The rough estimates above assume you use multiple threads; we recommend 5 or so on decent hardware (<code>--threads 5</code>).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
