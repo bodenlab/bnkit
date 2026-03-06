@@ -848,9 +848,16 @@ public class TSVFile {
             for (int i = 0; i < nbins; i ++) {
                 shapes.append(DEFAULT_SHAPE + " ");
                 colors.append(bhex[i] + " ");
-                // FIXME: figure out suitable number of decimal places,
-                //  e.g. range is 0 - 100 and 10 bins, 0 decimals, range is -3 to -2.5 and 10 bins, 2 decimals
-                labels.append(String.format("%.2f ", bins[i]));
+
+                //  e.g. range is 0 - 100 and 10 bins, 0 decimals, range is -3 to -2.5 and 10 bins, 1 decimals
+
+                double precisionNeeded = binrange / 2.0;
+                int decimals = (int)Math.ceil(Math.log10(1.0 / precisionNeeded));
+                decimals = Math.max(0, decimals);
+
+                double scale = Math.pow(10, decimals);
+                double rounded = Math.round((scale * bins[i])) / scale;
+                labels.append(rounded).append(" ");
             }
             bd.write(shapes.toString()); bd.newLine();
             bd.write(colors.toString()); bd.newLine();

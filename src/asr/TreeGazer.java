@@ -44,11 +44,13 @@ public class TreeGazer {
                 \t{-latent <#states>}
                 \t{-internal}
                 \t{-learn}
-                \t{-tied}\s
+                \t{-untied}\s
                 \t{-seed <seed>}\s
                 \t{-joint (default) | -marg {<branchpoint-id>} }\s
                 \t{-format <TSV(default), TREE, STDOUT, ITOL>}
                 \t{-lambda <value (default 5.0)>}
+                \t{-cmin <value (default: min of -in values)>}
+                \t{-cmax <value (default max of -in values)>}
                 \t{-help|-h}
                 \t{-verbose|-v}
                 """);
@@ -70,6 +72,7 @@ public class TreeGazer {
                 \tinternal indicates that internal nodes are also extended with user-specified or learned distributions (default leaves-only).
                 \tlearn excludes inference and instead prompts EM learning of parameters, using input data as training data.
                 \tuntied implies that the variance learned is NOT the same across the latent states (only applicable when EM-learning GDTs; default is on).
+                \tcmax and cmin specify the maximum and minimum values for the colour scale of iTOL output (only applicable when latent mode with real values is applied; default is to use the max and min of the input values).
                 \thelp prints out commandline arguments (this screen).
                 \tverbose completes the requested steps while printing out messages about the process.
                 """);
@@ -121,11 +124,14 @@ public class TreeGazer {
         Object MARG_LABEL = null;
         double GAMMA = 1.0;
         double LAMBDA = 5.0; // for upper confidence bound of predicted values
-        Long SEED = 1L;
+        long SEED = 1L;
         Integer NSTATES = null; // number of states if continuous; if discrete, the same as the number of used values in the input file
         JSONObject PARAMS = null; // optional parameters as JSON
         int NBINS = 10; // ITOL save double vals binned in this many
         int NSAMPLES = 500; // when estimating mean and variance of inferred mixture of Gaussians
+        Double CMAX = null;
+        Double CMIN = null;
+
 
         for (int a = 0; a < args.length; a ++) {
             if (args[a].startsWith("-")) {
@@ -138,11 +144,11 @@ public class TreeGazer {
                     INPUT = args[++a];
                     int atsign = INPUT.indexOf('@');
                     if (atsign >= 0) { // there is a label to extract
-                        LABEL = INPUT.substring(0, Math.max(0, atsign));
+                        LABEL = INPUT.substring(0, atsign);
                         int colon = LABEL.indexOf(':');
                         if (colon >= 0) {
                             COLPARSER = LABEL.substring(colon + 1);
-                            LABEL = LABEL.substring(0, Math.max(0, colon));
+                            LABEL = LABEL.substring(0, colon);
                         }
                         INPUT = INPUT.substring(atsign + 1);
                     }
@@ -239,7 +245,20 @@ public class TreeGazer {
                     LEARN = true;
                 } else if (arg.equalsIgnoreCase("internal")) {
                     LEAVES_ONLY = false;
-                } else if ((arg.equalsIgnoreCase("help"))  || (arg.equalsIgnoreCase("h"))) {
+
+                } else if (arg.equalsIgnoreCase("cmax") && args.length > a + 1) {
+                    try {
+                        CMAX = Double.parseDouble(args[a + 1]);
+                    } catch (NumberFormatException e) {
+                        usage(3, args[a + 1] + " is not a valid cmax value (must be a real value)");
+                    }
+                } else if (arg.equalsIgnoreCase("cmin") && args.length > a + 1) {
+                    try {
+                        CMIN = Double.parseDouble(args[a + 1]);
+                    } catch (NumberFormatException e) {
+                        usage(3, args[a + 1] + " is not a valid cmin value (must be a real value)");
+                    }
+                }else if ((arg.equalsIgnoreCase("help"))  || (arg.equalsIgnoreCase("h"))) {
                     usage();
                 } else if ((arg.equalsIgnoreCase("verbose")) || (arg.equalsIgnoreCase("v"))) {
                     VERBOSE = true;
@@ -358,10 +377,12 @@ public class TreeGazer {
 
         // now decide type of operation...
         if (MODE == MODEL_MODE.DIRECT && INFERENCE_MODE == GRASP.Inference.JOINT) {
-            performDirectJointInference(tree, SUBST_MODEL, ti, ENTRIES_SET, FORMAT_IDX, tsv, OUTPUT, valcol);
+            performDirectJointInference(tree, SUBST_MODEL, ti, ENTRIES_SET, FORMAT_IDX, tsv,
+                    OUTPUT, valcol, CMAX, CMIN);
 
         } else if (MODE == MODEL_MODE.DIRECT && INFERENCE_MODE == GRASP.Inference.MARGINAL) {
-            performDirectMarginalInference(MARG_LABEL, tree, ENTRIES_SET, tsv, FORMAT_IDX, ti, SUBST_MODEL, OUTPUT, valcol);
+            performDirectMarginalInference(MARG_LABEL, tree, ENTRIES_SET, tsv, FORMAT_IDX, ti, SUBST_MODEL,
+                    OUTPUT, valcol, CMAX, CMIN);
 
         } else if (MODE == MODEL_MODE.LATENT) {
 
@@ -375,10 +396,10 @@ public class TreeGazer {
             } else if (INFERENCE_MODE == GRASP.Inference.MARGINAL) {
 
                 performLatentMarginalInference(tree, MARG_LABEL, ENTRY_VALUES,  tsv,  FORMAT_IDX, ti,  pbn,
-                        OUTPUT,  valcol, NSAMPLES,  LAMBDA,  NBINS);
+                        OUTPUT,  valcol, NSAMPLES,  LAMBDA,  NBINS, CMAX, CMIN);
 
             } else if (INFERENCE_MODE == GRASP.Inference.JOINT) {
-                performLatentJointInference(tree, pbn, tsv, ti, ENTRIES_SET, FORMAT_IDX, OUTPUT, valcol);
+                performLatentJointInference(tree, pbn, tsv, ti, ENTRIES_SET, FORMAT_IDX, OUTPUT, valcol, CMAX, CMIN);
             }
         }
     }
@@ -482,8 +503,9 @@ public class TreeGazer {
 
     }
 
-    private static void saveDirectOutput(int FORMAT_IDX, String OUTPUT,
-                                   Tree tree, TSVFile tsv, int valCol, TSVFile tempTSV, Integer NBINS, Object[] ENTRY_VALUES) {
+    private static void saveDirectOutput(int FORMAT_IDX, String OUTPUT, Tree tree,
+                                         TSVFile tsv, int valCol, TSVFile tempTSV,
+                                         Integer NBINS, Object[] ENTRY_VALUES, Double CMAX, Double CMIN) {
         try {
             switch (FORMAT_IDX) {
                 case TSV:
@@ -493,9 +515,44 @@ public class TreeGazer {
                 case ITOL:
                     Object[][] matrix = TSVFile.Transpose(tempTSV.getRows());
                     if (ENTRY_VALUES == null) {
-                        TSVFile.save2iTOL(OUTPUT + ".itol", matrix[NODE], matrix[MEAN], tsv.getHeader(valCol));
+                        TSVFile.save2iTOL(
+                                OUTPUT + ".itol",
+                                matrix[NODE],
+                                matrix[MEAN],
+                                tsv.getHeader(valCol)
+                        );
                     } else {
-                        TSVFile.save2iTOL(OUTPUT + ".itol", matrix[NODE], matrix[MEAN], matrix[SD], tsv.getHeader(valCol), NBINS, TSVFile.getMin(ENTRY_VALUES), TSVFile.getMax(ENTRY_VALUES));
+
+                        double dataMax = TSVFile.getMax(ENTRY_VALUES);
+                        double dataMin = TSVFile.getMin(ENTRY_VALUES);
+
+                        if (CMAX == null) {
+                            CMAX = dataMax;
+                        }
+
+                        if (CMIN == null) {
+                            CMIN = dataMin;
+                        }
+
+                        if (dataMin < CMIN) {
+                            CMIN = dataMin;
+                            System.err.println("Warning: data contains values less than than -cmin; adjusting cmin to " + CMIN);
+                        } else if (dataMax > CMAX) {
+                            CMAX = dataMax;
+                            System.err.println("Warning: data contains values greater than -cmax; adjusting cmax to " + CMAX);
+                        }
+
+
+                        TSVFile.save2iTOL(
+                                OUTPUT + ".itol",
+                                matrix[NODE],
+                                matrix[MEAN],
+                                matrix[SD],
+                                tsv.getHeader(valCol),
+                                NBINS,
+                                CMIN,
+                                CMAX
+                        );
                     }
 
                     break;
@@ -509,7 +566,8 @@ public class TreeGazer {
      * Joint inference of all nodes in the tree under a latent model.
      */
     private static void performLatentJointInference(Tree tree, PhyloBN pbn, TSVFile tsv, TreeInstance ti,
-                                                    Set<Object> ENTRIES_SET, int FORMAT_IDX, String OUTPUT, int valcol) {
+                                                    Set<Object> ENTRIES_SET, int FORMAT_IDX, String OUTPUT, int valcol,
+                                                    Double CMAX, Double CMIN) {
 
         MaxLhoodJoint mlj = new MaxLhoodJoint(pbn);
         mlj.decorate(ti);
@@ -527,7 +585,7 @@ public class TreeGazer {
             }
         }
         TSVFile tempTsv = new TSVFile(headers, save);
-        saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, null, null);
+        saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, null, null, CMAX, CMIN);
     }
 
 
@@ -537,7 +595,7 @@ public class TreeGazer {
      */
     private static void performDirectJointInference(Tree tree, SubstModel SUBST_MODEL, TreeInstance ti,
                                                     Set<Object> ENTRIES_SET, int FORMAT_IDX, TSVFile tsv,
-                                                    String OUTPUT, int valcol) {
+                                                    String OUTPUT, int valcol, Double CMAX, Double CMIN) {
 
         MaxLhoodJoint inf = new MaxLhoodJoint(tree, SUBST_MODEL);
         inf.decorate(ti); // attach states to instantiated nodes and perform (joint) inference (based on model and tree)
@@ -554,7 +612,7 @@ public class TreeGazer {
             }
         }
         TSVFile tempTsv = new TSVFile(new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valcol)}, save);
-        saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, null, null);
+        saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, null, null, CMAX, CMIN);
     }
 
     /**
@@ -566,7 +624,7 @@ public class TreeGazer {
      */
     private static void performDirectMarginalInference(Object MARG_LABEL, Tree tree, Set<Object> ENTRIES_SET,
                                                        TSVFile tsv, int FORMAT_IDX, TreeInstance ti, SubstModel SUBST_MODEL,
-                                                       String OUTPUT, int valcol) {
+                                                       String OUTPUT, int valcol, Double CMAX, Double CMIN) {
 
         Integer[] bpidxs = collectNodesForDirectInference(MARG_LABEL, tree, ENTRIES_SET);
 
@@ -598,7 +656,7 @@ public class TreeGazer {
         }
 
         TSVFile tempTsv = new TSVFile(headers, save);
-        saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, null, null);
+        saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, null, null, CMAX, CMIN);
 
     }
 
@@ -836,7 +894,8 @@ public class TreeGazer {
     private static void performLatentMarginalInference(Tree tree, Object MARG_LABEL,
                                                        Object[] ENTRY_VALUES, TSVFile tsv, int FORMAT_IDX,
                                                        TreeInstance ti, PhyloBN pbn, String OUTPUT, int valcol,
-                                                       int NSAMPLES, double LAMBDA, Integer NBINS) {
+                                                       int NSAMPLES, double LAMBDA, Integer NBINS, Double CMAX,
+                                                       Double CMIN) {
 
         Object[][] save; // the matrix in which all results are stored, incl the entry-name then the probability distribution (or sample thereof)
         // marginal inference of ONE or ALL nodes in the tree
@@ -869,7 +928,7 @@ public class TreeGazer {
         }
 
         TSVFile tempTsv = new TSVFile(headers, save);
-        saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, NBINS, ENTRY_VALUES);
+        saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, NBINS, ENTRY_VALUES, CMAX, CMIN);
 
     }
 }
