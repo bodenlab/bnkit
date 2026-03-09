@@ -8,7 +8,6 @@ import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
 import dat.EnumSeq;
 import dat.Enumerable;
-import dat.file.Utils;
 import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.pog.POAGraph;
@@ -17,12 +16,6 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import com.google.ortools.linearsolver.MPVariable;
 import com.google.ortools.linearsolver.MPSolver;
-import com.google.ortools.sat.CpModel;
-import com.google.ortools.sat.CpSolver;
-import com.google.ortools.sat.CpSolverStatus;
-import com.google.ortools.sat.LinearExpr;
-import com.google.ortools.sat.LinearExprBuilder;
-import com.google.ortools.sat.Literal;
 import dat.pog.POGraph;
 
 public class Mip {
@@ -49,6 +42,7 @@ public class Mip {
     private final int[] nodeWeights;
     private HashMap<Integer, MPVariable[]> ancestorPositionVars;
     private MPObjective objective;
+    private HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
 
     public Mip (IdxTree tree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
                 int nThreads, boolean useBranchLengths) {
@@ -173,7 +167,7 @@ public class Mip {
         }
 
         createAncestralPositionVariables();
-        addEdgeConstraintsAncestors();
+        createEdgeVariables();
         objective = solver.objective();
 
         addPenaltyConstraints();
@@ -386,118 +380,69 @@ public class Mip {
         this.ancestorPositionVars = ancestorSeqVars;
     }
 
-    private void addEdgeConstraintsAncestors() {
+    private void createEdgeVariables() {
 
         int VIRTUAL_START = -1;
-        int VIRTUAL_END = alnPog.maxsize();
 
-        HashMap<EdgeKey, MPVariable> allEdgeVars = new HashMap<>();
+        int[] startIndices = alnPog.getStarts();
+        int[] endIndices = alnPog.getEnds();
+        for (int node: startIndices) {
+            // don't need to perform check as will only remove if present
+            this.nodesConnectedToPreviousNode.remove(node + 1);
+        }
+        for (int node: endIndices) {
+            this.nodesConnectedToPreviousNode.remove(node);
+        }
 
-        int[] ancestors = tree.getAncestors();
-        for (int ancestorIdx : ancestors) {
+        for (int ancestorIdx : tree.getAncestors()) {
 
             // VIRTUAL STARTS TO REAL STARTS //
-            int[] startIndices = alnPog.getStarts();
-            MPVariable[] allEdgesFromVirtualStart = new MPVariable[startIndices.length];
-            for (int positionTo = 0; positionTo < startIndices.length; positionTo++) {
-
-                // Variable for each edge from start node
+            for (int edgeEnd : startIndices) {
+                // Variable for each edge from virtual start to a "real" start node
                 MPVariable edge = solver.makeBoolVar("");// makeIntVar(0, 1, "");
-                allEdgesFromVirtualStart[positionTo] = edge;
-
-                // save unique edge/ancestor combination to a map for later use
-                EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, startIndices[positionTo], ancestorIdx);
-                allEdgeVars.put(edgeKey, edge);
+                EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, edgeEnd, ancestorIdx);
+                edges.put(edgeKey, edge);
             }
 
-            // Constraint: exactly one edge must be chosen from virtual start to actual starts
-            MPConstraint virtualStartConstraint = solver.makeConstraint(1, 1);
-            for (MPVariable edgeVar : allEdgesFromVirtualStart) {
-                virtualStartConstraint.setCoefficient(edgeVar, 1);
-            }
-
-            // FULLY CONNECTED NODES //
-            int[] endIndices = alnPog.getEnds();
             for (int nodeIdx = 0; nodeIdx < alnPog.maxsize(); nodeIdx++) {
 
-                // EDGES GOING OUT //
-                int[] forwardEdges = alnPog.getNodeIndices(nodeIdx, true);
-                int numEdgesToEnd = (alnPog.isEndNode(nodeIdx) ? 1 : 0);
-                int totalForwardEdges = forwardEdges.length + numEdgesToEnd;
+                // first go through and find nodes where we actually need edge variables
+                if (!this.nodesToSkip.contains(nodeIdx + 1)) { // next node is not skipped
 
-                MPVariable[] forwardEdgesFromNode = new MPVariable[totalForwardEdges];
-                for (int positionTo = 0; positionTo < forwardEdges.length; positionTo++) {
+                    int[] forwardEdges = alnPog.getNodeIndices(nodeIdx, true);
+                    if (!this.nodesConnectedToPreviousNode.contains(nodeIdx + 1)) { // current node not connected to adjacent node
+                        if (forwardEdges.length == 1) {
+                            // node has one outgoing edge, outgoing edge is implicit on this node being activated
+                            EdgeKey edgeKey = new EdgeKey(nodeIdx, forwardEdges[0], ancestorIdx);
+                            this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
+                        } else {
 
-                    MPVariable edge = solver.makeBoolVar(""); //0, 1, "");
-
-                    int edgeEnd = forwardEdges[positionTo];
-                    forwardEdgesFromNode[positionTo] = edge;
-
-
-                    EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
-                    allEdgeVars.put(edgeKey, edge);
+                            for (int posTo : forwardEdges) {
+                                EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
+                                MPVariable edge;
+                                int[] backwardEdges = alnPog.getNodeIndices(posTo, false);
+                                if (backwardEdges.length == 1) {
+                                    edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
+                                } else {
+                                    edge = solver.makeBoolVar("");
+                                }
+                                this.edges.put(edgeKey, edge);
+                            }
+                        }
+                    } else { // connected to the adjacent node
+                        for (int posTo : forwardEdges) {
+                            if (posTo == (nodeIdx + 1)) {
+                                continue;
+                            }
+                            int[] backwardEdges = alnPog.getNodeIndices(posTo, false);
+                            if (backwardEdges.length != 1) {
+                                EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
+                                MPVariable edge = solver.makeBoolVar("");
+                                this.edges.put(edgeKey, edge);
+                            }
+                        }
+                    }
                 }
-
-                if (numEdgesToEnd == 1) {
-                    MPVariable edgeToEnd = solver.makeBoolVar(""); //0, 1, "");
-                    forwardEdgesFromNode[totalForwardEdges - 1] = edgeToEnd;
-
-                    EdgeKey edgeKey = new EdgeKey(nodeIdx, VIRTUAL_END, ancestorIdx);
-
-                    allEdgeVars.put(edgeKey, edgeToEnd);
-                }
-
-                // Constraint: sum(edges) - position variable == 0
-                // Which is equivalent to: sum(edges) == positionVar
-                MPConstraint forwardConstraint = solver.makeConstraint(0, 0);
-                for (MPVariable edgeVar : forwardEdgesFromNode) {
-                    forwardConstraint.setCoefficient(edgeVar, 1);
-                }
-
-                MPVariable ancestralNode = this.ancestorPositionVars.get(ancestorIdx)[nodeIdx];
-                forwardConstraint.setCoefficient(ancestralNode, -1);
-
-                // EDGES COMING IN //
-                int[] backwardEdges = alnPog.getNodeIndices(nodeIdx, false);
-                int numEdgesFromStart = (alnPog.isStartNode(nodeIdx) ? 1 : 0);
-                int totalBackwardEdges = backwardEdges.length + numEdgesFromStart;
-
-                MPVariable[] backwardEdgesFromNode = new MPVariable[totalBackwardEdges];
-                for (int positionTo = 0; positionTo < backwardEdges.length; positionTo++) {
-
-                    int edgeComingIn = backwardEdges[positionTo];
-
-                    EdgeKey edgeKey = new EdgeKey(edgeComingIn, nodeIdx, ancestorIdx);
-                    MPVariable edge = allEdgeVars.get(edgeKey);
-                    backwardEdgesFromNode[positionTo] = edge;
-                }
-
-                if (numEdgesFromStart == 1) {
-                    EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, nodeIdx, ancestorIdx);
-                    MPVariable edge = allEdgeVars.get(edgeKey);
-
-                    backwardEdgesFromNode[totalBackwardEdges - 1] = edge;
-                }
-
-                // Constraint: sum(edges) - position variable == 0
-                // Which is equivalent to: sum(edges) == positionVar
-                MPConstraint backwardConstraint = solver.makeConstraint(0, 0);
-                for (MPVariable edgeVar : backwardEdgesFromNode) {
-                    backwardConstraint.setCoefficient(edgeVar, 1);
-                }
-                backwardConstraint.setCoefficient(ancestralNode, -1);
-            }
-
-            // REAL ENDS TO VIRTUAL ENDS //
-            MPVariable[] allEdgesToVirtualEnd = new MPVariable[endIndices.length];
-            for (int positionFrom = 0; positionFrom < endIndices.length; positionFrom++) {
-                EdgeKey edgeKey = new EdgeKey(endIndices[positionFrom], VIRTUAL_END, ancestorIdx);
-                allEdgesToVirtualEnd[positionFrom] = allEdgeVars.get(edgeKey);
-            }
-
-            MPConstraint virtualEndConstraint = solver.makeConstraint(1, 1);
-            for (MPVariable edgeVar : allEdgesToVirtualEnd) {
-                virtualEndConstraint.setCoefficient(edgeVar, 1);
             }
         }
     }
