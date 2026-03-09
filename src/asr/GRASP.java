@@ -506,9 +506,7 @@ public class GRASP {
                     indelpred = Prediction.PredictByMaxLhood(pogtree);
                     break;
                 case 6, 7:
-
-                    double[][] treeNeighbourAlphaPen = Mip.createTreeNeighbourAlphaPen(tree, aln, MODELS[MODEL_IDX]);
-                    indelpred = Prediction.PredictByMIP(pogtree, aln, INDELS[INDEL_IDX], treeNeighbourAlphaPen);
+                    indelpred = Prediction.PredictByMIP(pogtree, aln, INDELS[INDEL_IDX], MODELS[MODEL_IDX]);
                 default:
                     break;
             }
