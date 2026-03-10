@@ -342,12 +342,11 @@ public class IndelDist {
         Double[][] column_priors = new Double[numCols][numRates];
         ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, IndelDist.NTHREADS);
         try {
-            Map<Integer, Peeler> ret = thread_pool.runBatch();
+            Map<Integer, Double> ret = thread_pool.runBatch();
             for (int col_idx = 0; col_idx < numCols; ++col_idx) {
                 for (int rate_idx = 0; rate_idx < numRates; ++rate_idx) {
                     int idx = col_idx * numRates + rate_idx;
-                    Peeler peeler = ret.get(idx);
-                    column_priors[col_idx][rate_idx] = peeler.getDecoration();
+                    column_priors[col_idx][rate_idx] = ret.get(idx);
                 }
             }
         } catch (InterruptedException | ExecutionException e) {

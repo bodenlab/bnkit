@@ -31,7 +31,7 @@ public class ThreadedPeeler {
         }
     }
 
-    public Map<Integer, Peeler> runBatch() throws InterruptedException, ExecutionException {
+    public Map<Integer, Double> runBatch() throws InterruptedException, ExecutionException {
 
         for (Map.Entry<Integer, Job> entry: jobsToDo.entrySet()) {
             Callable<Peeler> worker = entry.getValue();
@@ -40,13 +40,14 @@ public class ThreadedPeeler {
         }
 
         // retrieve results
-        Map<Integer, Peeler> results = new HashMap<>();
+        Map<Integer, Double> results = new HashMap<>();
         for (Map.Entry<Integer, Future<Peeler>> entry: jobsDone.entrySet()) {
             Integer tag = entry.getKey();
             Future<Peeler> future = entry.getValue();
             try {
-                Peeler res = future.get();
+                Double res = future.get().getDecoration();
                 results.put(tag, res);
+
             } catch (InterruptedException | ExecutionException e) {
                 System.err.println("Failed with thread for " + tag + " with future " + future);
                 e.printStackTrace();
@@ -82,10 +83,9 @@ public class ThreadedPeeler {
         double LL = 0.0;
         ThreadedPeeler threadPool = new ThreadedPeeler(peelers, nThreads);
         try {
-            Map<Integer, Peeler> ret = threadPool.runBatch();
+            Map<Integer, Double> ret = threadPool.runBatch();
             for (int i = 0; i < numCols; i++) {
-                Peeler peeler = ret.get(i);
-                LL += peeler.getDecoration(); // add each column likelihood
+                LL += ret.get(i); // add each column likelihood
             }
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();

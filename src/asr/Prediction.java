@@ -1653,20 +1653,20 @@ public class Prediction {
     }
 
     public static Prediction PredictByMIP(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln,
-                                          String solver, String substModelName) {
+                                          String solver, String substModelName, int nThreads, boolean useDistances) {
 
         Map<Object, POGraph> ancestors = new HashMap<>(); // prepare where predictions will go
         int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
         IdxTree tree = pogTree.getTree();  // indexed tree (quick access to branch points, no editing)
 
-        Mip mipInstance = new Mip(tree, aln, solver, substModelName, GRASP.NTHREADS, GRASP.DISTANCE_BASED_MIP);
+        Mip mipSolver = new Mip(tree, aln, solver, substModelName, nThreads, useDistances);
 
         if (GRASP.VERBOSE) {
             System.out.println("Constructing MIP indel model using " + solver + "...");
         }
 
         //bpidx to array of position indices
-        HashMap<Integer, Integer[]> ancestorPositionVars =  mipInstance.runMPSolverIndelInference();
+        HashMap<Integer, Integer[]> ancestorPositionVars =  mipSolver.runMPSolverIndelInference();
 
         if (ancestorPositionVars == null) {
             System.out.println("Defaulting to bi-directional edge parsimony for indel inference");

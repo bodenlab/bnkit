@@ -33,17 +33,17 @@ public class Mip {
     private final IdxTree tree;
     private final EnumSeq.Alignment<Enumerable> aln;
     private final int nThreads;
-    private String solverName;
-    private String SubstModelName;
+    private final String solverName;
+    private final String substModelName;
     double[][] treeNeighbourAlphaPen;
     boolean useBranchLengths;
     private MPSolver solver;
     private final Set<Integer> nodesToSkip = new HashSet<>();
-    private Set<Integer> nodesConnectedToPreviousNode = new HashSet<>();
+    private final Set<Integer> nodesConnectedToPreviousNode = new HashSet<>();
     private final int[] nodeWeights;
     private HashMap<Integer, MPVariable[]> ancestorPositionVars;
     private MPObjective objective;
-    private HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
+    private final HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
 
     public Mip (IdxTree tree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
                 int nThreads, boolean useBranchLengths) {
@@ -55,11 +55,12 @@ public class Mip {
         this.aln = aln;
         this.nThreads = nThreads;
         this.solverName = solverName;
-        this.SubstModelName = substModelName;
+        this.substModelName = substModelName;
         this.useBranchLengths = useBranchLengths;
         this.nodeWeights = new int[this.nPos];
         Arrays.fill(this.nodeWeights, 1);
         this.identifyNodesToSkip();
+        this.treeNeighbourAlphaPen = createTreeNeighbourAlphaPen();
 
     }
 
@@ -159,7 +160,7 @@ public class Mip {
     public HashMap<Integer, Integer[]> runMPSolverIndelInference() {
 
         // Uncomment for logging
-        //solver.enableOutput();
+        solver.enableOutput();
 
         Loader.loadNativeLibraries(); // link to Google-OR Tools
         this.solver = MPSolver.createSolver(solverName);
@@ -167,11 +168,11 @@ public class Mip {
             asr.GRASP.usage(6, "Could not create MIP solver with " + solverName);
         }
 
+        objective = solver.objective();
+
         createAncestralPositionVariables();
         createEdgeVariables();
         addEdgeConstraints();
-        objective = solver.objective();
-
         addPenaltyConstraints();
         objective.setMinimization();
 
@@ -273,14 +274,11 @@ public class Mip {
      * distances are adjusted for each column based on the assigned rate category. Finally, the adjusted distances
      * are binned into discrete gap penalties ranging from 2 to 8 in increments of 2. If the distance based option
      * is not chosen, then the default gap penalty is assigned to all positions.
-     * @param tree the phylogenetic tree
-     * @param aln the alignment
-     * @param substModelName the substitution model name
+
      * @return a matrix where the rows are alignment columns and the columns are the gap opening penalties for each
      * node in the tree. The array matches the order of nodes in the IdxTree.
      */
-    public double[][] createTreeNeighbourAlphaPen(IdxTree tree, EnumSeq.Alignment<Enumerable> aln,
-            String substModelName) {
+    private double[][] createTreeNeighbourAlphaPen() {
 
         double[][] treeNeighbourAlphaPen = new double[this.aln.getWidth()][this.tree.getSize()];
 
