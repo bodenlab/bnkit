@@ -24,6 +24,7 @@ public class Mip {
     public static double MAX_MU_LAMBDA_VALUE = 0.5;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
+    private static final int VIRTUAL_START = -1;
     private static final int DEFAULT_GAP_PENALTY = 2;
     private static final double[] GAP_PENALTIES = new double[] {8.0, 6.0, 4.0, 2.0};
     private final HashMap<Integer, Integer[]> extantBinarySeqs;
@@ -168,6 +169,7 @@ public class Mip {
 
         createAncestralPositionVariables();
         createEdgeVariables();
+        addEdgeConstraints();
         objective = solver.objective();
 
         addPenaltyConstraints();
@@ -382,7 +384,6 @@ public class Mip {
 
     private void createEdgeVariables() {
 
-        int VIRTUAL_START = -1;
 
         int[] startIndices = alnPog.getStarts();
         int[] endIndices = alnPog.getEnds();
@@ -447,6 +448,66 @@ public class Mip {
         }
     }
 
+    private void addEdgeConstraints() {
+        for (int ancestorIdx : tree.getAncestors()) {
+            for (int pos = 0; pos < nPos; pos++) {
+
+                if (this.nodesToSkip.contains(pos)) {
+                    continue;
+                }
+
+                // iPrime is the immediate upstream node to this position (NOT always pos - 1)
+                int iPrimeIndex = Arrays.stream(this.alnPog.getNodeIndices(pos, false)).max().orElseThrow();
+                MPVariable nodeStateIPrime = null;
+                double constant = 0.0;
+                if (iPrimeIndex != VIRTUAL_START) {
+                    nodeStateIPrime = this.ancestorPositionVars.get(ancestorIdx)[iPrimeIndex];
+                } else {
+                    constant = 1.0;
+                }
+
+                MPConstraint constraint = solver.makeConstraint(constant, constant);
+
+                List<MPVariable> edgesBypassingI = new LinkedList<>();
+                for (int posTo : this.alnPog.getNodeIndices(iPrimeIndex, true)) {
+                    if (posTo > pos) {
+                        MPVariable edge;
+                        if (this.alnPog.getNodeIndices(posTo, true).length == 1) {
+                            edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
+                        } else {
+                            edge = this.edges.get(new EdgeKey(iPrimeIndex, posTo, ancestorIdx));
+                        }
+
+                        edgesBypassingI.add(edge);
+                    }
+                }
+
+                List<MPVariable> edgesBypassingIPrime = new LinkedList<>();
+                for (int posFrom : alnPog.getNodeIndices(pos, false)) {
+                    if (posFrom < iPrimeIndex) {
+                        MPVariable edge = this.edges.get(new EdgeKey(posFrom, pos, ancestorIdx));
+                        edgesBypassingIPrime.add(edge);
+                    }
+                }
+
+                // Constraint: a_i = a_i` - sum(edges_bypassing_i) + sum(edges_bypassing_i`)
+                // Constraint: a_i - a_i` + sum(edges_bypassing_i) - sum(edges_bypassing_i`) = 0
+                constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[pos], 1.0);
+                if (nodeStateIPrime != null) {
+                    constraint.setCoefficient(nodeStateIPrime, -1.0);
+                }
+
+                addConstraintSum(constraint, edgesBypassingI, 1.0);
+                addConstraintSum(constraint, edgesBypassingIPrime, -1.0);
+            }
+        }
+    }
+
+    private void addConstraintSum(MPConstraint constraint, List<MPVariable> vars, double coefficient) {
+        for (MPVariable var: vars) {
+            constraint.setCoefficient(var, coefficient);
+        }
+    }
 
     private void addPenaltyConstraints() {
 
