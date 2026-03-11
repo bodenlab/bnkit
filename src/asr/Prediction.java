@@ -1,7 +1,12 @@
 package asr;
 
+import bn.BNode;
+import bn.ctmc.GapSubstModel;
 import bn.ctmc.SubstModel;
+import bn.ctmc.SubstNode;
 import bn.ctmc.matrix.JC;
+import bn.ctmc.matrix.JCGap;
+import bn.ctmc.matrix.JTTGap;
 import bn.prob.EnumDistrib;
 import com.google.ortools.Loader;
 import dat.EnumSeq;
@@ -1652,6 +1657,20 @@ public class Prediction {
         return new Prediction(pogTree, ancestors);
     }
 
+
+    public static void indelPred(POGTree pogTree, SubstModel model, double geometricSeqLenParam) {
+
+
+        IndelPeeler[] inf = new IndelPeeler[pogTree.getPositions()];
+
+        for (int pos = 0; pos < inf.length; pos++) {
+            inf[pos] = new IndelPeeler(pogTree, model, pos, geometricSeqLenParam);
+        }
+
+
+
+    }
+
     public static Prediction PredictByMIP(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln,
                                           String solver, String substModelName, int nThreads, boolean useDistances) {
 
@@ -1659,7 +1678,15 @@ public class Prediction {
         int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
         IdxTree tree = pogTree.getTree();  // indexed tree (quick access to branch points, no editing)
 
-        Mip mipSolver = new Mip(tree, aln, solver, substModelName, nThreads, useDistances);
+        GapSubstModel gapModel;
+        switch (substModelName) {
+            case "JTT" -> gapModel = new JTTGap(0.05, 0.05);
+            case "JC" -> gapModel = new JCGap(0.05, 0.05);
+            default -> throw new IllegalArgumentException("Unrecognized gap substitution model: " + substModelName);
+        }
+
+        double geometricSeqLenParam = (double) 1 / aln.getAvgSeqLength();
+        Mip mipSolver = new Mip(pogTree, aln, solver, substModelName, nThreads, useDistances);
 
         if (GRASP.VERBOSE) {
             System.out.println("Constructing MIP indel model using " + solver + "...");

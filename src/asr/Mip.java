@@ -16,6 +16,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import com.google.ortools.linearsolver.MPVariable;
 import com.google.ortools.linearsolver.MPSolver;
+import dat.pog.POGTree;
 import dat.pog.POGraph;
 
 public class Mip {
@@ -29,6 +30,7 @@ public class Mip {
     private static final double[] GAP_PENALTIES = new double[] {8.0, 6.0, 4.0, 2.0};
     private final HashMap<Integer, Integer[]> extantBinarySeqs;
     private final POAGraph alnPog;
+    private final POGTree pogTree;
     private final int nPos;
     private final IdxTree tree;
     private final EnumSeq.Alignment<Enumerable> aln;
@@ -45,13 +47,14 @@ public class Mip {
     private MPObjective objective;
     private final HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
 
-    public Mip (IdxTree tree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
+    public Mip (POGTree pogTree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
                 int nThreads, boolean useBranchLengths) {
 
+        this.pogTree = pogTree;
+        this.tree = pogTree.getTree();
         this.extantBinarySeqs = createBinarySeqMap(aln, tree);
         this.alnPog = new POAGraph(aln);
         this.nPos = aln.getWidth();
-        this.tree = tree;
         this.aln = aln;
         this.nThreads = nThreads;
         this.solverName = solverName;
@@ -159,14 +162,14 @@ public class Mip {
 
     public HashMap<Integer, Integer[]> runMPSolverIndelInference() {
 
-        // Uncomment for logging
-        solver.enableOutput();
-
         Loader.loadNativeLibraries(); // link to Google-OR Tools
         this.solver = MPSolver.createSolver(solverName);
         if (this.solver == null) {
             asr.GRASP.usage(6, "Could not create MIP solver with " + solverName);
         }
+
+        // Uncomment for logging
+        solver.enableOutput();
 
         objective = solver.objective();
 
@@ -288,7 +291,7 @@ public class Mip {
             if (GRASP.VERBOSE) {
                 System.out.println("Optimising indel parameters for distance-based MIP...");
             }
-            double optimal_mu = IndelDist.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
+            double optimal_mu = IndelPeeler.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
                     tree, geometric_seq_len_param, aln);
 
             GapSubstModel gapModel;
@@ -303,8 +306,7 @@ public class Mip {
             }
 
             double[] rates = IndelDist.MEAN_RATES.get(GRASP.INDEL_RATE);
-            Double[][] columnPriors = IndelDist.computeColumnPriors(gapModel, (Tree) tree, aln,
-                    rates, geometric_seq_len_param);
+            double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel, geometric_seq_len_param, rates, GRASP.NTHREADS);
 
             if (GRASP.VERBOSE) {
                 System.out.println("Computing prefix sums for segment assignment...");
