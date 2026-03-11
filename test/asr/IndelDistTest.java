@@ -21,7 +21,7 @@ public class IndelDistTest {
     public void testSingleColumnTwoRates() {
         int numCols = 1;
         double[] priors = {0.9, 0.1};  // two rates, rate 0 favored
-        Double[][] ll = {{2.0, -1.0}};  // one column,
+        double[][] ll = {{2.0, -1.0}};  // one column,
         double[][] prefix = IndelDist.computePrefixSums(ll);
 
 
@@ -37,7 +37,7 @@ public class IndelDistTest {
     @Test
     public void testTwoColumnsSameRate() {
         double[] priors = {0.1, 0.9};
-        Double[][] ll = {
+        double[][] ll = {
                 {-5.0, 5.0},   // col 1
                 {-5.0, 5.0}    // col 2
         };
@@ -58,7 +58,7 @@ public class IndelDistTest {
         // rate0=good for col1, rate1=good for col2
         double[] priors = {0.8, 0.2};
 
-        Double[][] ll = {
+        double[][] ll = {
                 {5.0, 0.0},  // col1 strongly prefers rate0
                 {0.0, 4.0}   // col2 strongly prefers rate1
         };
@@ -81,7 +81,7 @@ public class IndelDistTest {
     @Test
     public void testMaxSegmentLength() {
         double[] priors = {1.0};
-        Double[][] ll = {
+        double[][] ll = {
                 {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0},
                 {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0},
                 {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0},
@@ -107,7 +107,7 @@ public class IndelDistTest {
         double[] priors = {0.0, 0.0};
 
         // col1 prefers rate0, col2 prefers rate0, col3 prefers rate1
-        Double[][] ll = {
+        double[][] ll = {
                 {3.0, 0.0},
                 {3.0, 0.0},
                 {0.0, 5.0}
