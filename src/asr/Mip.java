@@ -4,6 +4,7 @@ import bn.ctmc.GapSubstModel;
 import bn.ctmc.matrix.JCGap;
 import bn.ctmc.matrix.JTTGap;
 import com.google.ortools.Loader;
+import com.google.ortools.init.CppBridge;
 import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
 import dat.EnumSeq;
@@ -152,17 +153,10 @@ public class Mip {
 
     }
 
-    private static boolean checkAncestralPogEdge(POGraph ancestorPog, int from, int to) {
-        try {
-            return ancestorPog.getEdge(from, to) != null;
-        } catch (Exception e) { // caused if no edge exists for this ancestor solution
-            return false;
-        }
-    }
-
     public HashMap<Integer, Integer[]> runMPSolverIndelInference() {
 
         Loader.loadNativeLibraries(); // link to Google-OR Tools
+        CppBridge.loadGurobiSharedLibrary("/media/WorkingSpace/Seb/gurobi1301/linux64/lib/libgurobi.so.13.0.1");
         this.solver = MPSolver.createSolver(solverName);
         if (this.solver == null) {
             asr.GRASP.usage(6, "Could not create MIP solver with " + solverName);
@@ -285,7 +279,7 @@ public class Mip {
 
         double[][] treeNeighbourAlphaPen = new double[this.aln.getWidth()][this.tree.getSize()];
 
-        if (GRASP.DISTANCE_BASED_MIP) {
+        if (useBranchLengths) {
 
             double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
             if (GRASP.VERBOSE) {
@@ -324,30 +318,31 @@ public class Mip {
 
             double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
 
-            double minDist = Double.POSITIVE_INFINITY;
-            double maxDist = Double.NEGATIVE_INFINITY;
+//            double minDist = Double.POSITIVE_INFINITY;
+//            double maxDist = Double.NEGATIVE_INFINITY;
             // adjust each length by the assigned rate category
             for (int rateIdx = 0; rateIdx < rates.length; rateIdx++) {
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                     // adjust each length by the assigned rate category
                     double adjustedDist = rates[rateIdx] * tree.getDistance(bpidx);
                     rateAdjustedDists[rateIdx][bpidx] = adjustedDist;
-                    if (adjustedDist < minDist) {
-                        minDist = adjustedDist;
-                    }
-                    if (adjustedDist > maxDist) {
-                        maxDist = adjustedDist;
-                    }
+//                    if (adjustedDist < minDist) {
+//                        minDist = adjustedDist;
+//                    }
+//                    if (adjustedDist > maxDist) {
+//                        maxDist = adjustedDist;
+//                    }
                 }
             }
 
-            double binRange = (maxDist - minDist) / 2;
-
+//            double binRange = (maxDist - minDist) / 2;
+//
             for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                 int rateIdx = columnRateCategories[colIdx];
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                    int assignedBin = Math.min(GAP_PENALTIES.length - 1, (int) ((rateAdjustedDists[rateIdx][bpidx] + (binRange / 2) - minDist) / binRange));
-                    treeNeighbourAlphaPen[colIdx][bpidx] = GAP_PENALTIES[assignedBin];
+//                    int assignedBin = Math.min(GAP_PENALTIES.length - 1, (int) ((rateAdjustedDists[rateIdx][bpidx] + (binRange / 2) - minDist) / binRange));
+//                    treeNeighbourAlphaPen[colIdx][bpidx] = GAP_PENALTIES[assignedBin];
+                    treeNeighbourAlphaPen[colIdx][bpidx] = rateAdjustedDists[rateIdx][bpidx];
                 }
             }
 
@@ -457,7 +452,15 @@ public class Mip {
                 }
 
                 // iPrime is the immediate upstream node to this position (NOT always pos - 1)
-                int iPrimeIndex = Arrays.stream(this.alnPog.getNodeIndices(pos, false)).max().orElseThrow();
+                int[] backwardEdges = this.alnPog.getNodeIndices(pos, false);
+                int iPrimeIndex;
+                if (backwardEdges.length == 0) {
+                    // connected to virtual start node
+                    iPrimeIndex = VIRTUAL_START;
+                } else {
+                    iPrimeIndex = Arrays.stream(backwardEdges).max().orElseThrow();
+                }
+
                 MPVariable nodeStateIPrime = null;
                 double constant = 0.0;
                 if (iPrimeIndex != VIRTUAL_START) {

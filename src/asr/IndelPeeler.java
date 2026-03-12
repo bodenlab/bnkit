@@ -71,18 +71,43 @@ public class IndelPeeler {
     }
 
 
+    /**
+     * Calculates the likelihood of observing each column (independently)
+     * given a particular indel rate.
+     *
+     * @param pogTree the partial order graph tree representing the alignment and phylogeny
+     * @param model the gap augmented substitution model
+     * @param geometricSeqLenParam the geometric sequence length parameter
+     * @param rates the indel rates to calculate the column likelihoods for
+     * @param nThreads the number of threads to use for parallelisation
+     *
+     * @return matrix of shape (numRates, numColumns) where each entry is the log likelihood of observing that column
+     * given the tree, model, geometric sequence length parameter and indel rate.
+     */
     public static double[][] computeColumnPriors(POGTree pogTree, SubstModel model,
                                                  double geometricSeqLenParam, double[] rates, int nThreads) {
 
         int numRates = rates.length;
         int numCols = pogTree.getPositions();
-        double[][] columnPriors = new double[numRates][];
+        double[][] columnPriors = new double[numCols][numRates];
 
-        for (int rate_idx = 0; rate_idx < numRates; ++rate_idx) {
+        IndelPeeler[] peelers = new IndelPeeler[numRates * numCols];
+        for (int colIdx = 0; colIdx < numCols; ++colIdx) {
+            for (int rateIdx = 0; rateIdx < numRates; ++rateIdx) {
+                int idx = colIdx * numRates + rateIdx;
+                peelers[idx] = new IndelPeeler(pogTree, model, rates[rateIdx], colIdx, geometricSeqLenParam);
+            }
+        }
 
-            IndelPeeler[] peelers = createPeelingJobs(pogTree, model, geometricSeqLenParam, numCols, rates[rate_idx]);
-            double[] column = runPeelingJobs(peelers, nThreads);
-            columnPriors[rate_idx] = column;
+        // get back the results
+        double[] results = runPeelingJobs(peelers, nThreads);
+
+        for (int colIdx = 0; colIdx < numCols; ++colIdx) {
+            for (int rateIdx = 0; rateIdx < numRates; ++rateIdx) {
+                int idx = colIdx * numRates + rateIdx;
+                columnPriors[colIdx][rateIdx] = results[idx];
+
+            }
         }
 
         return columnPriors;
@@ -173,19 +198,19 @@ public class IndelPeeler {
 
     private static double[] runPeelingJobs(IndelPeeler[] peelers, int nThreads) {
 
-        double[] column_priors = new double[peelers.length];
+        double[] results = new double[peelers.length];
         ThreadedPeeler thread_pool = new ThreadedPeeler(peelers, nThreads);
         try {
             Map<Integer, Double> ret = thread_pool.runBatch();
             for (int col_idx = 0; col_idx < peelers.length; ++col_idx) {
-                column_priors[col_idx] = ret.get(col_idx);
+                results[col_idx] = ret.get(col_idx);
             }
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
             throw new RuntimeException("Failed to run peeling jobs");
         }
 
-        return column_priors;
+        return results;
     }
 
     /**
@@ -199,8 +224,8 @@ public class IndelPeeler {
         double rootGapProb = nodeGapProbs[ROOT_INDEX];
 
         // sum over possible residue assignments
-        double[] residueTerms = new double[alphabetSize]; // number of alphabet letters
-        for (int resIdx = 0; resIdx < alphabetSize; resIdx++) {
+        double[] residueTerms = new double[numResidues]; // number of alphabet letters
+        for (int resIdx = 0; resIdx < numResidues; resIdx++) {
             double priorProb = Math.log(model.getProb(alphabet[resIdx]));
             double rootResidueProb = nodeResidueProbs[ROOT_INDEX][resIdx];
             residueTerms[resIdx] = priorProb + rootResidueProb; // weight by prior prob of residue
@@ -367,7 +392,7 @@ public class IndelPeeler {
         SubstNode substNode = (SubstNode) pbn.getBNode(bpidx);
 
         double insertionProb = ksiT(substNode.getTime());
-        double stationaryFreqResidue = substNode.getProb(state);
+        double stationaryFreqResidue = model.getProb(state);//  substNode.getProb(state);
 
         return insertionProb * stationaryFreqResidue;
     }
@@ -448,7 +473,8 @@ public class IndelPeeler {
             throw new IllegalArgumentException(substModelName + " not implemented yet");
         }
 
-        IndelPeeler.AlnLikelihood alnLikelihood = new IndelPeeler.AlnLikelihood(tree, aln, F, IRM, alpha, geometricSeqLenParam);
+        IndelPeeler.AlnLikelihood alnLikelihood = new IndelPeeler.AlnLikelihood(tree, aln, F, IRM,
+                alpha, geometricSeqLenParam);
 
         return Minimise.brent(alnLikelihood, min_val, max_val);
     }

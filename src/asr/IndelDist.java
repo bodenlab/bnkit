@@ -43,7 +43,7 @@ public class IndelDist {
         for (int k = 0; k < numRates; k++) {
             double total = 0.0;
             for (int i = 1; i < numberOfCols; i++)  {
-                total += column_likelihoods[k][i - 1];
+                total += column_likelihoods[i - 1][k];
                 partial_sums[i][k] = total;
             }
         }
