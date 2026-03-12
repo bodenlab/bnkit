@@ -156,7 +156,6 @@ public class Mip {
     public HashMap<Integer, Integer[]> runMPSolverIndelInference() {
 
         Loader.loadNativeLibraries(); // link to Google-OR Tools
-        CppBridge.loadGurobiSharedLibrary("/media/WorkingSpace/Seb/gurobi1301/linux64/lib/libgurobi.so.13.0.1");
         this.solver = MPSolver.createSolver(solverName);
         if (this.solver == null) {
             asr.GRASP.usage(6, "Could not create MIP solver with " + solverName);

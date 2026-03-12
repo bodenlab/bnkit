@@ -29,7 +29,7 @@ public class IndelPeeler {
     private final POGTree pogTree;
     final private IdxTree tree;
     private final PhyloBN pbn;
-    private  final int columnIdx;
+    private final int columnIdx;
     private final double[][] nodeResidueProbs;
     private final double[] nodeGapProbs;
     private double[] containsGap = null;
@@ -39,7 +39,7 @@ public class IndelPeeler {
     private final double geometricSeqLenParam;
     private double treeProb;
 
-    public IndelPeeler(POGTree pogTree, SubstModel model, Double rate, int columnIdx, double geometricSeqLenParam) {
+    public IndelPeeler(POGTree pogTree, SubstModel model, Double rate, int columnIdx, double geometricSeqLenParam, PhyloBN pbn) {
         this.pogTree = pogTree;
         this.tree = pogTree.getTree();
         this.model = (GapSubstModel) model;
@@ -58,16 +58,24 @@ public class IndelPeeler {
             nodeGapProbs[i] = Double.NEGATIVE_INFINITY;
         }
 
-        if (rate == null) {
-            this.pbn = PhyloBN.create(tree, model);
+        if (pbn == null) {
+            if (rate == null) {
+                this.pbn = PhyloBN.create(tree, model);
+            } else {
+                this.pbn = PhyloBN.create(tree, model, rate);
+            }
         } else {
-            this.pbn = PhyloBN.create(tree, model, rate);
+            this.pbn = pbn;
         }
 
     }
 
+    public IndelPeeler(POGTree pogTree, SubstModel model, Double rate, int columnIdx, double geometricSeqLenParam) {
+        this(pogTree, model, rate, columnIdx, geometricSeqLenParam, null);
+    }
+
     public IndelPeeler(POGTree pogTree, SubstModel model, int columnIdx, double geometricSeqLenParam) {
-        this(pogTree, model, null, columnIdx, geometricSeqLenParam);
+        this(pogTree, model, null, columnIdx, geometricSeqLenParam, null);
     }
 
 
@@ -75,12 +83,11 @@ public class IndelPeeler {
      * Calculates the likelihood of observing each column (independently)
      * given a particular indel rate.
      *
-     * @param pogTree the partial order graph tree representing the alignment and phylogeny
-     * @param model the gap augmented substitution model
+     * @param pogTree              the partial order graph tree representing the alignment and phylogeny
+     * @param model                the gap augmented substitution model
      * @param geometricSeqLenParam the geometric sequence length parameter
-     * @param rates the indel rates to calculate the column likelihoods for
-     * @param nThreads the number of threads to use for parallelisation
-     *
+     * @param rates                the indel rates to calculate the column likelihoods for
+     * @param nThreads             the number of threads to use for parallelisation
      * @return matrix of shape (numRates, numColumns) where each entry is the log likelihood of observing that column
      * given the tree, model, geometric sequence length parameter and indel rate.
      */
@@ -92,19 +99,21 @@ public class IndelPeeler {
         double[][] columnPriors = new double[numCols][numRates];
 
         IndelPeeler[] peelers = new IndelPeeler[numRates * numCols];
-        for (int colIdx = 0; colIdx < numCols; ++colIdx) {
-            for (int rateIdx = 0; rateIdx < numRates; ++rateIdx) {
-                int idx = colIdx * numRates + rateIdx;
-                peelers[idx] = new IndelPeeler(pogTree, model, rates[rateIdx], colIdx, geometricSeqLenParam);
+        for (int rateIdx = 0; rateIdx < numRates; ++rateIdx) {
+            PhyloBN pbn = PhyloBN.create(pogTree.getTree(), model, rates[rateIdx]);
+            for (int colIdx = 0; colIdx < numCols; ++colIdx) {
+                //int idx = colIdx * numRates + rateIdx;
+                int idx = rateIdx * numCols + colIdx;
+                peelers[idx] = new IndelPeeler(pogTree, model, rates[rateIdx], colIdx, geometricSeqLenParam, pbn);
             }
         }
 
         // get back the results
         double[] results = runPeelingJobs(peelers, nThreads);
-
-        for (int colIdx = 0; colIdx < numCols; ++colIdx) {
-            for (int rateIdx = 0; rateIdx < numRates; ++rateIdx) {
-                int idx = colIdx * numRates + rateIdx;
+        for (int rateIdx = 0; rateIdx < numRates; ++rateIdx) {
+            for (int colIdx = 0; colIdx < numCols; ++colIdx) {
+                //int idx = colIdx * numRates + rateIdx;
+                int idx = rateIdx * numCols + colIdx;
                 columnPriors[colIdx][rateIdx] = results[idx];
 
             }
@@ -119,7 +128,9 @@ public class IndelPeeler {
 
         double logLikelihood = 0.0;
         int numCols = aln.getWidth();
-        IndelPeeler[] peelers = createPeelingJobs(pogTree, model, geometricSeqLenParam, numCols, 1.0);
+
+        PhyloBN pbn = PhyloBN.create(pogTree.getTree(), model, 1.0);
+        IndelPeeler[] peelers = createPeelingJobs(pogTree, model, geometricSeqLenParam, numCols, null, pbn);
         double[] columnProbs = runPeelingJobs(peelers, nThreads);
         for (int colIdx = 0; colIdx < numCols; colIdx++) {
             logLikelihood += columnProbs[colIdx];
@@ -159,7 +170,7 @@ public class IndelPeeler {
 
         // First calculate the likelihood of an all gap column
         double[] pStar = new double[nNodes];
-        Arrays.fill(pStar,  Double.NEGATIVE_INFINITY);
+        Arrays.fill(pStar, Double.NEGATIVE_INFINITY);
         for (int bpidx = nNodes - 1; bpidx >= 0; bpidx--) {
             BranchPoint node = tree.getBranchPoint(bpidx);
 
@@ -169,7 +180,7 @@ public class IndelPeeler {
                 // ancestor
                 int[] childrenBpindices = tree.getChildren(bpidx);
                 double childrenLL = 0.0;
-                for (int childBpidx: childrenBpindices) {
+                for (int childBpidx : childrenBpindices) {
                     childrenLL += pStar[childBpidx];
                     // add probability of gap remaining
                     childrenLL += Math.log(1 - model.ksiT(tree.getDistance(childBpidx)));
@@ -186,11 +197,11 @@ public class IndelPeeler {
     }
 
     private static IndelPeeler[] createPeelingJobs(POGTree pogTree, SubstModel model,
-                                                   double geometricSeqLenParam, int numCols, double rate) {
+                                                   double geometricSeqLenParam, int numCols, Double rate, PhyloBN pbn) {
 
         IndelPeeler[] peelers = new IndelPeeler[numCols];
         for (int colIdx = 0; colIdx < numCols; ++colIdx) {
-            peelers[colIdx] = new IndelPeeler(pogTree, model, rate, colIdx, geometricSeqLenParam);
+            peelers[colIdx] = new IndelPeeler(pogTree, model, rate, colIdx, geometricSeqLenParam, pbn);
         }
 
         return peelers;
@@ -215,6 +226,7 @@ public class IndelPeeler {
 
     /**
      * logProbColGivenRate
+     *
      * @return
      */
     public double decorate() {
@@ -445,12 +457,13 @@ public class IndelPeeler {
      * Optimises mu and lambda (insertion and deletion rates) assuming they are equal. Uses Brent's method to find
      * the optimal value that maximises the likelihood of the alignment given the tree. The likelihood is calculated
      * according to equation 29 in <a href="https://doi.org/10.1371/journal.pcbi.1000172"> Rivas & Eddy, 2008</a>
-     * @param min_val smallest value to search
-     * @param max_val largest value to search
-     * @param substModelName index of the substitution model to use
-     * @param tree phylogenetic tree
+     *
+     * @param min_val              smallest value to search
+     * @param max_val              largest value to search
+     * @param substModelName       index of the substitution model to use
+     * @param tree                 phylogenetic tree
      * @param geometricSeqLenParam geometric sequence length param for the alignment
-     * @param aln the alignment
+     * @param aln                  the alignment
      * @return the optimal mu and lambda value
      * @throws IllegalArgumentException if the model is not supported
      */
@@ -473,8 +486,11 @@ public class IndelPeeler {
             throw new IllegalArgumentException(substModelName + " not implemented yet");
         }
 
-        IndelPeeler.AlnLikelihood alnLikelihood = new IndelPeeler.AlnLikelihood(tree, aln, F, IRM,
-                alpha, geometricSeqLenParam);
+
+        LikelihoodEvaluator evaluator =
+                new LikelihoodEvaluator(tree, aln, F, IRM, alpha, geometricSeqLenParam);
+
+        IndelPeeler.AlnLikelihood alnLikelihood = new IndelPeeler.AlnLikelihood(evaluator);
 
         return Minimise.brent(alnLikelihood, min_val, max_val);
     }
@@ -484,39 +500,90 @@ public class IndelPeeler {
      */
     public static class AlnLikelihood implements Function {
 
-        double[] F;
-        double[][] IRM;
-        Enumerable alpha;
-        IdxTree tree;
+        LikelihoodEvaluator evaluator;
+
+        public AlnLikelihood(LikelihoodEvaluator evaluator) {
+            this.evaluator = evaluator;
+        }
+
+        @Override
+        public double f(double muLambda) {
+            return -evaluator.evaluate(muLambda);
+        }
+    }
+
+    public static class LikelihoodEvaluator {
+
+        final POGTree pogTree;
+        GapSubstModel model;
+        final double[] F;
+        final double[][] IRM;
+        final Enumerable alpha;
         EnumSeq.Alignment<Enumerable> aln;
         double geometricSeqLenParam;
 
-        public AlnLikelihood(IdxTree tree, EnumSeq.Alignment<Enumerable> aln, double[] F, double[][] IRM,
-                             Enumerable alpha, double geometricSeqLenParam) {
-            this.tree = tree;
+        public LikelihoodEvaluator(
+                IdxTree tree,
+                EnumSeq.Alignment<Enumerable> aln,
+                double[] F,
+                double[][] IRM,
+                Enumerable alpha,
+                double geometricSeqLenParam
+        ) {
+
+            this.pogTree = new POGTree(aln, tree);
             this.aln = aln;
             this.geometricSeqLenParam = geometricSeqLenParam;
             this.F = F;
             this.IRM = IRM;
             this.alpha = alpha;
+
         }
 
-        /**
-         * Get the log likelihood of a particular alignment given the tree and gap augmented substitution model.
-         * This is used by a minimisation routine to find optimal params for the substitution model.
-         * @param muLambda Assumes mu (deletion rate) and lambda (insertion rate) are equal
-         * @return likelihood of the alignment given the tree + mu + lambda.
-         */
-        @Override
-        public double f(double muLambda) {
-
-            GapSubstModel newModel = new GapSubstModel(this.F, this.IRM, this.alpha, muLambda, muLambda);
-
+        public double evaluate(double muLambda) {
+            model = new GapSubstModel(this.F, this.IRM, this.alpha, muLambda, muLambda);
             // trying to maximise the log likelihood
-            POGTree pogTree = new POGTree(aln, tree);
-            return -1.0 * IndelPeeler.calcProbAlnGivenTree(pogTree, newModel, aln, geometricSeqLenParam, alpha, GRASP.NTHREADS);
+            return IndelPeeler.calcProbAlnGivenTree(pogTree, model, aln, geometricSeqLenParam, alpha, GRASP.NTHREADS);
+
         }
     }
-
-
 }
+
+
+//
+//        double[] F;
+//        double[][] IRM;
+//        Enumerable alpha;
+//        IdxTree tree;
+//        EnumSeq.Alignment<Enumerable> aln;
+//        double geometricSeqLenParam;
+//        POGTree pogTree;
+//        GapSubstModel model;
+//
+//        public AlnLikelihood(IdxTree tree, EnumSeq.Alignment<Enumerable> aln, double[] F, double[][] IRM,
+//                             Enumerable alpha, double geometricSeqLenParam) {
+//            this.tree = tree;
+//            this.aln = aln;
+//            this.geometricSeqLenParam = geometricSeqLenParam;
+//            this.F = F;
+//            this.IRM = IRM;
+//            this.alpha = alpha;
+//            this.pogTree = new POGTree(aln, tree);
+//        }
+//
+//        /**
+//         * Get the log likelihood of a particular alignment given the tree and gap augmented substitution model.
+//         * This is used by a minimisation routine to find optimal params for the substitution model.
+//         * @param muLambda Assumes mu (deletion rate) and lambda (insertion rate) are equal
+//         * @return likelihood of the alignment given the tree + mu + lambda.
+//         */
+//        @Override
+//        public double f(double muLambda) {
+//
+//            model = new GapSubstModel(this.F, this.IRM, this.alpha, muLambda, muLambda);
+//
+//            // trying to maximise the log likelihood
+//            return -1.0 * IndelPeeler.calcProbAlnGivenTree(pogTree, model, aln, geometricSeqLenParam, alpha, GRASP.NTHREADS);
+//        }
+
+
