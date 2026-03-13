@@ -1678,14 +1678,7 @@ public class Prediction {
         int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
         IdxTree tree = pogTree.getTree();  // indexed tree (quick access to branch points, no editing)
 
-        GapSubstModel gapModel;
-        switch (substModelName) {
-            case "JTT" -> gapModel = new JTTGap(0.05, 0.05);
-            case "JC" -> gapModel = new JCGap(0.05, 0.05);
-            default -> throw new IllegalArgumentException("Unrecognized gap substitution model: " + substModelName);
-        }
 
-        double geometricSeqLenParam = (double) 1 / aln.getAvgSeqLength();
         Mip mipSolver = new Mip(pogTree, aln, solver, substModelName, nThreads, useDistances);
 
         if (GRASP.VERBOSE) {
