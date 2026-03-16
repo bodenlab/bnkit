@@ -74,10 +74,24 @@ public class Mip {
         int previousNode = 0;
         for (int nodeIdx = 0; nodeIdx < nPos - 1; nodeIdx++) {
             int[] forwardEdges = alnPog.getNodeIndices(nodeIdx, true);
+            int isEndNode = alnPog.isEndNode(nodeIdx) ? 1 : 0;
+            int numForwardEdges = forwardEdges.length + isEndNode;
+
+            int closestForwardNodeIdx = alnPog.isEndNode(nodeIdx) ? virtualEndIdx : Integer.MAX_VALUE;
+            for (int posTo : forwardEdges) {
+                if (posTo < closestForwardNodeIdx) {
+                    closestForwardNodeIdx = posTo;
+                }
+            }
+
+
             int[] nextNodeBackwardEdges = alnPog.getNodeIndices(nodeIdx + 1, false);
-            if ((forwardEdges.length == 1)
-                    && Arrays.stream(forwardEdges).min().orElseThrow() == (nodeIdx + 1)
-                    && nextNodeBackwardEdges.length == 1) {
+            int isNextNodeStartNode = alnPog.isStartNode(nodeIdx + 1) ? 1 : 0;
+            int nextNodeNumBackwardEdges = nextNodeBackwardEdges.length + isNextNodeStartNode;
+
+            if ((numForwardEdges == 1)
+                    && closestForwardNodeIdx == (nodeIdx + 1)
+                    && nextNodeNumBackwardEdges == 1) {
 
                 this.nodesToSkip.add(nodeIdx + 1);
                 this.nodeWeights[previousNode] += 1;
@@ -88,6 +102,12 @@ public class Mip {
                     if (forwardEdge == nextNode) {
                         this.nodesConnectedToPreviousNode.add(nextNode);
                         break;
+                    }
+                }
+
+                if (alnPog.isEndNode(nodeIdx)) {
+                    if (nextNode == virtualEndIdx) {
+                        this.nodesConnectedToPreviousNode.add(nextNode);
                     }
                 }
             }
@@ -410,11 +430,22 @@ public class Mip {
                 if (!this.nodesToSkip.contains(nodeIdx + 1)) { // next node is not skipped
 
                     int[] forwardEdges = alnPog.getNodeIndices(nodeIdx, true);
+                    int isEndNode = alnPog.isEndNode(nodeIdx) ? 1 : 0;
+                    int totalForwardEdges = forwardEdges.length + isEndNode;
+
                     if (!this.nodesConnectedToPreviousNode.contains(nodeIdx + 1)) { // current node not connected to adjacent node
-                        if (forwardEdges.length == 1) {
-                            // node has one outgoing edge, outgoing edge is implicit on this node being activated
-                            EdgeKey edgeKey = new EdgeKey(nodeIdx, forwardEdges[0], ancestorIdx);
-                            this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
+                        if (totalForwardEdges == 1) {
+
+                            for (int posTo : forwardEdges) {
+                                // node has one outgoing edge, outgoing edge is implicit on this node being activated
+                                EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
+                                this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
+                            }
+
+                            if (alnPog.isEndNode(nodeIdx)) {
+                                EdgeKey edgeKey = new EdgeKey(nodeIdx, virtualEndIdx, ancestorIdx);
+                                this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
+                            }
 
                         } else {
 
@@ -422,7 +453,10 @@ public class Mip {
                                 EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
                                 MPVariable edge;
                                 int[] backwardEdges = alnPog.getNodeIndices(posTo, false);
-                                if (backwardEdges.length == 1) {
+                                int isStartNode = alnPog.isStartNode(posTo) ? 1 : 0;
+                                int totalBackwardEdges = backwardEdges.length + isStartNode;
+
+                                if (totalBackwardEdges == 1) {
                                     edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
                                 } else {
                                     edge = solver.makeBoolVar("");
@@ -432,7 +466,7 @@ public class Mip {
 
                             if (alnPog.isEndNode(nodeIdx)) {
                                 EdgeKey edgeKey = new EdgeKey(nodeIdx, virtualEndIdx, ancestorIdx);
-                                if (forwardEdges.length == 0) {
+                                if (endIndices.length == 1) {
                                     // this edge the only one leaving the code so is implicit on this node being activated
                                     this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
                                 } else {
@@ -443,16 +477,20 @@ public class Mip {
 
                         }
                     } else { // connected to the adjacent node
+
                         for (int posTo : forwardEdges) {
                             if (posTo == (nodeIdx + 1)) {
                                 continue;
                             }
                             int[] backwardEdges = alnPog.getNodeIndices(posTo, false);
-                            if (backwardEdges.length != 1) {
+                            int isPosToEndNode = alnPog.isStartNode(posTo) ? 1 : 0;
+                            int posToTotalBackwardEdges = backwardEdges.length + isPosToEndNode;
+
+                            if (posToTotalBackwardEdges != 1) {
                                 EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
                                 MPVariable edge = solver.makeBoolVar("");
                                 this.edges.put(edgeKey, edge);
-                            }
+                          }
                         }
 
                         // need to check if there is an edge from here to the virtual end
@@ -460,14 +498,12 @@ public class Mip {
                             if (virtualEndIdx == (nodeIdx + 1)) {
                                 continue; // edge is implicit in this node being activated
                             }
-                            if (endIndices.length > 1) {
+                            if (endIndices.length != 1) {
                                 EdgeKey edgeKey = new EdgeKey(nodeIdx, virtualEndIdx, ancestorIdx);
                                 MPVariable edge = solver.makeBoolVar("");
                                 this.edges.put(edgeKey, edge);
                             }
-
                         }
-
                     }
                 }
             }
@@ -511,8 +547,8 @@ public class Mip {
                         MPVariable edge;
                         if (this.alnPog.getNodeIndices(posTo, false).length == 1 && !this.alnPog.isStartNode(posTo)) {
                             edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
-                        //} else if () {
-
+                        } else if (this.alnPog.getNodeIndices(posTo, false).length == 0 && this.alnPog.isStartNode(posTo)) {
+                            edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
                         } else {
                             edge = this.edges.get(new EdgeKey(iPrimeIndex, posTo, ancestorIdx));
                         }
@@ -522,12 +558,7 @@ public class Mip {
                 }
 
                 if (alnPog.isEndNode(iPrimeIndex)) {
-                    if (nodesConnectedToVirtualEnd.length == 1) {
-                        // edge from iPrime to virtual end is implicit in iPrime being activated
-                        edgesBypassingI.add(this.ancestorPositionVars.get(ancestorIdx)[iPrimeIndex]);
-                    } else {
-                        edgesBypassingI.add(this.edges.get(new EdgeKey(iPrimeIndex, virtualEndIdx, ancestorIdx)));
-                    }
+                    edgesBypassingI.add(this.edges.get(new EdgeKey(iPrimeIndex, virtualEndIdx, ancestorIdx)));
                 }
 
 
@@ -712,7 +743,7 @@ public class Mip {
                                 int[] backwardEdges = alnPog.getNodeIndices(posTo, false);
                                 MPVariable parentEdge;
                                 MPVariable childEdge;
-                                if (backwardEdges.length == 1) {
+                                if (backwardEdges.length == 1 && !alnPog.isStartNode(posTo)) {
                                     parentEdge = nodePosVar[posTo];
                                     childEdge = nodeNeighborPosVarAncestor[posTo];
                                 } else {
@@ -745,7 +776,7 @@ public class Mip {
 
                                 MPVariable parentEdge;
                                 MPVariable childEdge;
-                                if (backwardEdges.length == 1) {
+                                if (backwardEdges.length == 1 && !alnPog.isStartNode(pos)) {
                                     parentEdge = nodePosVar[pos];
                                     childEdge = nodeNeighborPosVarAncestor[pos];
                                 } else {
@@ -757,7 +788,7 @@ public class Mip {
                                 childEdgesBypassingIMinus1.add(childEdge);
                             }
 
-                            if (alnPog.isStartNode(pos) && (pos - 1) != VIRTUAL_START) {
+                            if (alnPog.isStartNode(pos)) {
                                 parentEdgesBypassingIMinus1.add(this.edges.get(new EdgeKey(VIRTUAL_START, pos, ancestralIdx)));
                                 childEdgesBypassingIMinus1.add(this.edges.get(new EdgeKey(VIRTUAL_START, pos, childIdx)));
                             }
