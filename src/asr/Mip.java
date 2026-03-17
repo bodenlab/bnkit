@@ -28,7 +28,7 @@ public class Mip {
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
     private static final int DEFAULT_GAP_PENALTY = 2;
-    private static final double[] GAP_PENALTIES = new double[] {8.0, 6.0, 4.0, 2.0};
+    private static final double[] GAP_PENALTIES = new double[]{8.0, 6.0, 4.0, 2.0};
     private final HashMap<Integer, Integer[]> extantBinarySeqs;
     private final POAGraph alnPog;
     private final POGTree pogTree;
@@ -49,8 +49,8 @@ public class Mip {
     private final HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
     private final int virtualEndIdx;
 
-    public Mip (POGTree pogTree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
-                int nThreads, boolean useBranchLengths) {
+    public Mip(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
+               int nThreads, boolean useBranchLengths) {
 
         this.pogTree = pogTree;
         this.tree = pogTree.getTree();
@@ -190,7 +190,6 @@ public class Mip {
 
         createAncestralPositionVariables();
         createEdgeVariables();
-        addEdgeConstraints();
         addPenaltyConstraints();
         objective.setMinimization();
 
@@ -282,7 +281,7 @@ public class Mip {
             }
 
             binarySeqMap.put(tree.getIndex(seq.getName()), binSeqValues);
-         }
+        }
 
         return binarySeqMap;
     }
@@ -292,7 +291,7 @@ public class Mip {
      * distances are adjusted for each column based on the assigned rate category. Finally, the adjusted distances
      * are binned into discrete gap penalties ranging from 2 to 8 in increments of 2. If the distance based option
      * is not chosen, then the default gap penalty is assigned to all positions.
-
+     *
      * @return a matrix where the rows are alignment columns and the columns are the gap opening penalties for each
      * node in the tree. The array matches the order of nodes in the IdxTree.
      */
@@ -398,6 +397,12 @@ public class Mip {
         this.ancestorPositionVars = ancestorSeqVars;
     }
 
+    public static int[] append(int[] arr, int val) {
+        int[] out = Arrays.copyOf(arr, arr.length + 1);
+        out[arr.length] = val;
+        return out;
+    }
+
     private void createEdgeVariables() {
 
 
@@ -406,13 +411,6 @@ public class Mip {
         this.nodesConnectedToPreviousNode.remove(VIRTUAL_START + 1);
         this.nodesConnectedToPreviousNode.remove(virtualEndIdx);
 
-//        for (int node: startIndices) {
-//            // don't need to perform check as will only remove if present
-//            this.nodesConnectedToPreviousNode.remove(node + 1);
-//        }
-//        for (int node: endIndices) {
-//            this.nodesConnectedToPreviousNode.remove(node);
-//        }
 
         for (int ancestorIdx : tree.getAncestors()) {
 
@@ -430,33 +428,29 @@ public class Mip {
                 if (!this.nodesToSkip.contains(nodeIdx + 1)) { // next node is not skipped
 
                     int[] forwardEdges = alnPog.getNodeIndices(nodeIdx, true);
-                    int isEndNode = alnPog.isEndNode(nodeIdx) ? 1 : 0;
-                    int totalForwardEdges = forwardEdges.length + isEndNode;
+                    if (alnPog.isEndNode(nodeIdx)) {
+                        forwardEdges = append(forwardEdges, virtualEndIdx);
+                    }
 
                     if (!this.nodesConnectedToPreviousNode.contains(nodeIdx + 1)) { // current node not connected to adjacent node
-                        if (totalForwardEdges == 1) {
-
+                        if (forwardEdges.length == 1) {
                             for (int posTo : forwardEdges) {
                                 // node has one outgoing edge, outgoing edge is implicit on this node being activated
                                 EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
                                 this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
                             }
-
-                            if (alnPog.isEndNode(nodeIdx)) {
-                                EdgeKey edgeKey = new EdgeKey(nodeIdx, virtualEndIdx, ancestorIdx);
-                                this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
-                            }
-
                         } else {
 
                             for (int posTo : forwardEdges) {
                                 EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
                                 MPVariable edge;
-                                int[] backwardEdges = alnPog.getNodeIndices(posTo, false);
-                                int isStartNode = alnPog.isStartNode(posTo) ? 1 : 0;
-                                int totalBackwardEdges = backwardEdges.length + isStartNode;
 
-                                if (totalBackwardEdges == 1) {
+                                int[] backwardEdges = alnPog.getNodeIndices(posTo, false);
+                                if (alnPog.isStartNode(posTo)) {
+                                    backwardEdges = append(backwardEdges, VIRTUAL_START);
+                                }
+
+                                if (backwardEdges.length == 1) {
                                     edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
                                 } else {
                                     edge = solver.makeBoolVar("");
@@ -464,128 +458,142 @@ public class Mip {
                                 this.edges.put(edgeKey, edge);
                             }
 
-                            if (alnPog.isEndNode(nodeIdx)) {
-                                EdgeKey edgeKey = new EdgeKey(nodeIdx, virtualEndIdx, ancestorIdx);
-                                if (endIndices.length == 1) {
-                                    // this edge the only one leaving the code so is implicit on this node being activated
-                                    this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
-                                } else {
-                                    MPVariable edge = solver.makeBoolVar("");
-                                    this.edges.put(edgeKey, edge);
-                                }
-                            }
-
+                            addEdgeConstraint(nodeIdx, ancestorIdx);
                         }
                     } else { // connected to the adjacent node
 
+                        List<MPVariable> edgesBypassingI = new ArrayList<>();
                         for (int posTo : forwardEdges) {
                             if (posTo == (nodeIdx + 1)) {
                                 continue;
                             }
+
                             int[] backwardEdges = alnPog.getNodeIndices(posTo, false);
-                            int isPosToEndNode = alnPog.isStartNode(posTo) ? 1 : 0;
-                            int posToTotalBackwardEdges = backwardEdges.length + isPosToEndNode;
+                            if (alnPog.isStartNode(posTo)) {
+                                backwardEdges = append(backwardEdges, VIRTUAL_START);
+                            }
 
-                            if (posToTotalBackwardEdges != 1) {
+                            MPVariable edge;
+                            if (backwardEdges.length == 1) {
+                                edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
+                            } else {
                                 EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
-                                MPVariable edge = solver.makeBoolVar("");
+                                edge = solver.makeBoolVar("");
                                 this.edges.put(edgeKey, edge);
-                          }
+                            }
+
+                            edgesBypassingI.add(edge);
                         }
 
-                        // need to check if there is an edge from here to the virtual end
-                        if (alnPog.isEndNode(nodeIdx)) {
-                            if (virtualEndIdx == (nodeIdx + 1)) {
-                                continue; // edge is implicit in this node being activated
-                            }
-                            if (endIndices.length != 1) {
-                                EdgeKey edgeKey = new EdgeKey(nodeIdx, virtualEndIdx, ancestorIdx);
-                                MPVariable edge = solver.makeBoolVar("");
-                                this.edges.put(edgeKey, edge);
-                            }
+                        List<MPVariable> edgesBypassingIPrime = new LinkedList<>();
+                        int[] backwardEdgesToI = alnPog.getNodeIndices(nodeIdx + 1, false);
+                        if (alnPog.isStartNode(nodeIdx + 1)) {
+                            backwardEdgesToI = append(backwardEdgesToI, VIRTUAL_START);
                         }
+
+                        for (int posFrom : backwardEdgesToI) {
+                            if (posFrom == nodeIdx) {
+                                continue;
+                            }
+
+                            MPVariable edge = this.edges.get(new EdgeKey(posFrom, nodeIdx + 1, ancestorIdx));
+                            edgesBypassingIPrime.add(edge);
+                        }
+
+                        MPConstraint constraint = solver.makeConstraint(0, 0);
+                        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx + 1], 1);
+                        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx], -1);
+                        addConstraintSum(constraint, edgesBypassingI, 1);
+                        addConstraintSum(constraint, edgesBypassingIPrime, -1);
+                    }
+                }
+
+                if (!this.nodesToSkip.contains(nodeIdx) && !this.nodesConnectedToPreviousNode.contains(nodeIdx)) {
+
+                    int[] backwardEdges = alnPog.getNodeIndices(nodeIdx, false);
+                    if (alnPog.isStartNode(nodeIdx)) {
+                        backwardEdges = append(backwardEdges, VIRTUAL_START);
+                    }
+                    int minBackwardEdgeStart = Arrays.stream(backwardEdges).min().orElseThrow();
+
+                    int[] forwardEdges;
+                    if (minBackwardEdgeStart == VIRTUAL_START) {
+                        forwardEdges = alnPog.getStarts();
+                    } else {
+                        forwardEdges = alnPog.getNodeIndices(minBackwardEdgeStart, true);
+                    }
+                    if (alnPog.isEndNode(minBackwardEdgeStart)) {
+                        forwardEdges = append(forwardEdges, virtualEndIdx);
+                    }
+
+                    if (backwardEdges.length > 1 || forwardEdges.length == 1) {
+                        addEdgeConstraint(nodeIdx, ancestorIdx);
                     }
                 }
             }
         }
     }
 
-    private void addEdgeConstraints() {
-
-        int[] nodesConnectedToVirtualEnd = alnPog.getEnds();
-        for (int ancestorIdx : tree.getAncestors()) {
-            for (int pos = 0; pos < nPos; pos++) {
-
-                if (this.nodesToSkip.contains(pos)) {
-                    continue;
-                }
-
-                // iPrime is the immediate upstream node to this position (NOT always pos - 1)
-                int[] backwardEdges = this.alnPog.getNodeIndices(pos, false);
-                int iPrimeIndex;
-                if (backwardEdges.length == 0) {
-                    // connected to virtual start node
-                    iPrimeIndex = VIRTUAL_START;
-                } else {
-                    iPrimeIndex = Arrays.stream(backwardEdges).max().orElseThrow();
-                }
-
-                MPVariable nodeStateIPrime = null;
-                double constant = 0.0;
-                if (iPrimeIndex != VIRTUAL_START) {
-                    nodeStateIPrime = this.ancestorPositionVars.get(ancestorIdx)[iPrimeIndex];
-                } else {
-                    constant = 1.0;
-                }
-
-                MPConstraint constraint = solver.makeConstraint(constant, constant);
-
-                List<MPVariable> edgesBypassingI = new LinkedList<>();
-                int[] forwardEdges = this.alnPog.getNodeIndices(iPrimeIndex, true);
-                for (int posTo : forwardEdges) {
-                    if (posTo > pos) {
-                        MPVariable edge;
-                        if (this.alnPog.getNodeIndices(posTo, false).length == 1 && !this.alnPog.isStartNode(posTo)) {
-                            edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
-                        } else if (this.alnPog.getNodeIndices(posTo, false).length == 0 && this.alnPog.isStartNode(posTo)) {
-                            edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
-                        } else {
-                            edge = this.edges.get(new EdgeKey(iPrimeIndex, posTo, ancestorIdx));
-                        }
-
-                        edgesBypassingI.add(edge);
-                    }
-                }
-
-                if (alnPog.isEndNode(iPrimeIndex)) {
-                    edgesBypassingI.add(this.edges.get(new EdgeKey(iPrimeIndex, virtualEndIdx, ancestorIdx)));
-                }
+    private void addEdgeConstraint(int nodeIdx, int ancestorIdx) {
 
 
-                List<MPVariable> edgesBypassingIPrime = new LinkedList<>();
-                for (int posFrom : alnPog.getNodeIndices(pos, false)) {
-                    if (posFrom < iPrimeIndex) {
-                        MPVariable edge = this.edges.get(new EdgeKey(posFrom, pos, ancestorIdx));
-                        edgesBypassingIPrime.add(edge);
-                    }
-                }
-
-                if (alnPog.isStartNode(pos) && iPrimeIndex != VIRTUAL_START) {
-                    edgesBypassingIPrime.add(this.edges.get(new EdgeKey(VIRTUAL_START, pos, ancestorIdx)));
-                }
-
-                // Constraint: a_i = a_i` - sum(edges_bypassing_i) + sum(edges_bypassing_i`)
-                // Constraint: a_i - a_i` + sum(edges_bypassing_i) - sum(edges_bypassing_i`) = 0
-                constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[pos], 1.0);
-                if (nodeStateIPrime != null) {
-                    constraint.setCoefficient(nodeStateIPrime, -1.0);
-                }
-
-                addConstraintSum(constraint, edgesBypassingI, 1.0);
-                addConstraintSum(constraint, edgesBypassingIPrime, -1.0);
-            }
+        int[] backwardEdges = this.alnPog.getNodeIndices(nodeIdx, false);
+        if (alnPog.isStartNode(nodeIdx)) {
+            backwardEdges = append(backwardEdges, VIRTUAL_START);
         }
+        int iPrimeIndex = Arrays.stream(backwardEdges).max().orElseThrow();
+
+        MPVariable nodeStateIPrime = null;
+        double constant = 0.0;
+        if (iPrimeIndex != VIRTUAL_START) {
+            nodeStateIPrime = this.ancestorPositionVars.get(ancestorIdx)[iPrimeIndex];
+        } else {
+            constant = 1.0;
+        }
+
+        //
+        List<MPVariable> edgesBypassingI = new LinkedList<>();
+        int[] iPrimeForwardEdges = this.alnPog.getNodeIndices(iPrimeIndex, true);
+        if (alnPog.isEndNode(iPrimeIndex)) {
+            iPrimeForwardEdges = append(iPrimeForwardEdges, virtualEndIdx);
+        }
+        for (int posTo : iPrimeForwardEdges) {
+            if (posTo <= nodeIdx) {
+                continue;
+            }
+
+            int[] posToBackwardEdges = alnPog.getNodeIndices(posTo, false);
+            if (alnPog.isStartNode(posTo)) {
+                posToBackwardEdges = append(posToBackwardEdges, VIRTUAL_START);
+            }
+
+            MPVariable edge;
+            if (posToBackwardEdges.length == 1) {
+                edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
+            } else {
+                edge = this.edges.get(new EdgeKey(iPrimeIndex, posTo, ancestorIdx));
+            }
+            edgesBypassingI.add(edge);
+        }
+
+        List<MPVariable> edgesBypassingIPrime = new LinkedList<>();
+        for (int posFrom : backwardEdges) {
+            if (posFrom == iPrimeIndex) {
+                continue;
+            }
+            edgesBypassingIPrime.add(this.edges.get(new EdgeKey(posFrom, nodeIdx, ancestorIdx)));
+        }
+
+        MPConstraint constraint = solver.makeConstraint(constant, constant);
+        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx], 1.0);
+        if (nodeStateIPrime != null) {
+            constraint.setCoefficient(nodeStateIPrime, -1.0);
+        }
+
+        addConstraintSum(constraint, edgesBypassingI, 1.0);
+        addConstraintSum(constraint, edgesBypassingIPrime, -1.0);
     }
+
 
     private void addConstraintSum(MPConstraint constraint, List<MPVariable> vars, double coefficient) {
         for (MPVariable var: vars) {
@@ -596,7 +604,6 @@ public class Mip {
     private void addPenaltyConstraints() {
 
 
-        int[] nodesConnectedToVirtualEnd = alnPog.getEnds();
         for (int ancestralIdx : tree.getAncestors()) {
 
             MPVariable[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
@@ -648,7 +655,6 @@ public class Mip {
                             MPConstraint c = solver.makeConstraint(0, 0);
                             c.setCoefficient(diffVar, 1);
                             c.setCoefficient(nodePosVar[pos], -1);
-
                         }
 
                         // gap penalty constraints
@@ -697,7 +703,6 @@ public class Mip {
                         pen[pos] = solver.makeBoolVar("");
 
                         //Absolute difference constraints
-
                         //diff_pos[pos] <= node_pos_var[pos] + node_neighbor_pos_var[pos]
                         MPConstraint c1 = solver.makeConstraint(-MPSolver.infinity(), 0);
                         c1.setCoefficient(diffPos[pos], 1.0);
@@ -733,17 +738,26 @@ public class Mip {
 
                             List<MPVariable> parentEdgesBypassingI = new LinkedList<>();
                             List<MPVariable> childEdgesBypassingI = new LinkedList<>();
+                            int[] forwardEdges = this.alnPog.getNodeIndices(pos - 1, true);
+                            if (alnPog.isEndNode(pos-1)) {
+                                forwardEdges = append(forwardEdges, virtualEndIdx);
+                            }
+
                             // get the set of edges that leave i-1 AND BYPASS i
-                            for (int posTo : this.alnPog.getNodeIndices(pos - 1, true)) {
+                            for (int posTo : forwardEdges) {
 
                                 if (posTo <= pos) {
                                     continue;
                                 }
 
                                 int[] backwardEdges = alnPog.getNodeIndices(posTo, false);
+                                if (alnPog.isStartNode(posTo)) {
+                                    backwardEdges = append(backwardEdges, VIRTUAL_START);
+                                }
+
                                 MPVariable parentEdge;
                                 MPVariable childEdge;
-                                if (backwardEdges.length == 1 && !alnPog.isStartNode(posTo)) {
+                                if (backwardEdges.length == 1) {
                                     parentEdge = nodePosVar[posTo];
                                     childEdge = nodeNeighborPosVarAncestor[posTo];
                                 } else {
@@ -754,20 +768,15 @@ public class Mip {
                                 childEdgesBypassingI.add(childEdge);
                             }
 
-                            if (alnPog.isEndNode(pos - 1)) {
-                                if (nodesConnectedToVirtualEnd.length == 1) {
-                                    parentEdgesBypassingI.add(this.ancestorPositionVars.get(ancestralIdx)[pos - 1]);
-                                    childEdgesBypassingI.add(nodeNeighborPosVarAncestor[pos - 1]);
-                                } else {
-                                    parentEdgesBypassingI.add(this.edges.get(new EdgeKey(pos - 1, virtualEndIdx, ancestralIdx)));
-                                    childEdgesBypassingI.add(this.edges.get(new EdgeKey(pos - 1, virtualEndIdx, childIdx)));
-                                }
-                            }
-
                             // get the set of edges that enter i and bypass i-1
                             List<MPVariable> parentEdgesBypassingIMinus1 = new LinkedList<>();
                             List<MPVariable> childEdgesBypassingIMinus1 = new LinkedList<>();
+
                             int[] backwardEdges = this.alnPog.getNodeIndices(pos, false);
+                            if (alnPog.isStartNode(pos)) {
+                                backwardEdges = append(backwardEdges, VIRTUAL_START);
+                            }
+
                             for (int posFrom : backwardEdges) {
 
                                 if (posFrom >= pos - 1) {
@@ -776,7 +785,7 @@ public class Mip {
 
                                 MPVariable parentEdge;
                                 MPVariable childEdge;
-                                if (backwardEdges.length == 1 && !alnPog.isStartNode(pos)) {
+                                if (backwardEdges.length == 1) {
                                     parentEdge = nodePosVar[pos];
                                     childEdge = nodeNeighborPosVarAncestor[pos];
                                 } else {
@@ -786,11 +795,6 @@ public class Mip {
 
                                 parentEdgesBypassingIMinus1.add(parentEdge);
                                 childEdgesBypassingIMinus1.add(childEdge);
-                            }
-
-                            if (alnPog.isStartNode(pos)) {
-                                parentEdgesBypassingIMinus1.add(this.edges.get(new EdgeKey(VIRTUAL_START, pos, ancestralIdx)));
-                                childEdgesBypassingIMinus1.add(this.edges.get(new EdgeKey(VIRTUAL_START, pos, childIdx)));
                             }
 
                             MPConstraint parentConstraint = solver.makeConstraint(-1, MPSolver.infinity());
