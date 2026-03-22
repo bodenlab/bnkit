@@ -462,13 +462,18 @@ public class Mip {
                         }
 
                         MPConstraint constraint = solver.makeConstraint(0, 0);
-                        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx + 1], 1);
-                        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx], -1);
+                        double existingNodeiplusone = constraint.getCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx + 1]);
+                        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx + 1], existingNodeiplusone + 1);
+
+                        double existingNodei = constraint.getCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
+                        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx], existingNodei + -1);
                         for (MPVariable var : all_edges_from_pos) {
-                            constraint.setCoefficient(var, 1);
+                            double existing = constraint.getCoefficient(var);
+                            constraint.setCoefficient(var, existing + 1);
                         }
                         for (MPVariable var : all_edges_to_pos1) {
-                            constraint.setCoefficient(var, -1);
+                            double existing = constraint.getCoefficient(var);
+                            constraint.setCoefficient(var, existing + -1);
                         }
                     }
                 }
@@ -517,15 +522,19 @@ public class Mip {
         }
 
         MPConstraint constraint = solver.makeConstraint(constant, constant);
-        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx], 1);
+        double ancExisting = constraint.getCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
+        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx], ancExisting + 1);
         if (aKIPrime != null) {
-            constraint.setCoefficient(aKIPrime, -1);
+            double existing = constraint.getCoefficient(aKIPrime);
+            constraint.setCoefficient(aKIPrime, existing + -1);
         }
         for (MPVariable var : edgesBypassingI) {
-            constraint.setCoefficient(var, 1);
+            double existing = constraint.getCoefficient(var);
+            constraint.setCoefficient(var, existing + 1);
         }
         for (MPVariable var : edgesBypassingIPrime) {
-            constraint.setCoefficient(var, -1);
+            double existing = constraint.getCoefficient(var);
+            constraint.setCoefficient(var, existing + -1);
         }
     }
 
@@ -600,7 +609,8 @@ public class Mip {
                         if (this.nodesToSkip.contains(pos)) {
                             diffPos[pos] = lastVar;
                         } else {
-                            lastVar = diffPos[pos] = solver.makeBoolVar("");
+                            diffPos[pos] = solver.makeBoolVar("");
+                            lastVar = diffPos[pos];
                         }
                     }
                 }
@@ -620,14 +630,19 @@ public class Mip {
                             // constraint: diff == 1 - nodePosVar[pos]
                             // rearrange: diff + nodePosVar[pos] == 1
                             MPVariable diffVar = solver.makeBoolVar("");
-                            this.diff.put(new DiffKey(ancestralIdx, childIdx, pos), diffVar);
                             MPConstraint c = solver.makeConstraint(1, 1);
                             c.setCoefficient(diffVar, 1.0);
                             c.setCoefficient(nodePosVar[pos], 1.0);
+                            this.diff.put(new DiffKey(ancestralIdx, childIdx, pos), diffVar);
+
                         } else if (nodeNeighbourPosVar[pos] == 0) {
                             //diffVar = nodePosVar[pos];
                             // diffVar - nodePosVar[pos] == 0
-                            this.diff.put(new DiffKey(ancestralIdx, childIdx, pos), nodePosVar[pos]);
+                            MPConstraint c = solver.makeConstraint(0, 0);
+                            MPVariable diffVar = solver.makeBoolVar("");
+                            c.setCoefficient(diffVar, 1.0);
+                            c.setCoefficient(nodePosVar[pos], -1.0);
+                            this.diff.put(new DiffKey(ancestralIdx, childIdx, pos), diffVar);
                         }
 
                         // gap penalty constraints
@@ -641,19 +656,24 @@ public class Mip {
 
                             if (nodeNeighbourPosVar[pos - 1] == 1 && nodeNeighbourPosVar[pos] == 0) {
                                 // pen[pos] == nodePosVar[pos],
-                                pen[pos] = nodePosVar[pos];
+                                pen[pos] = solver.makeBoolVar("");
+                                MPConstraint constraint = solver.makeConstraint(0, 0);
+                                constraint.setCoefficient(pen[pos], 1);
+                                constraint.setCoefficient(nodePosVar[pos], -1);
 
                             } else if (nodeNeighbourPosVar[pos - 1] == 0 && nodeNeighbourPosVar[pos] == 1) {
                                 pen[pos] = solver.makeBoolVar("");
                                 MPConstraint constraint = solver.makeConstraint(1,1);
                                 constraint.setCoefficient(pen[pos], 1);
                                 constraint.setCoefficient(nodePosVar[pos], 1);
+
                             } else if (nodeNeighbourPosVar[pos - 1] == 1 && nodeNeighbourPosVar[pos] == 1) {
                                 pen[pos] = solver.makeBoolVar("");
                                 MPConstraint constraint = solver.makeConstraint(0,Double.POSITIVE_INFINITY);
                                 constraint.setCoefficient(pen[pos], 1.0);
                                 constraint.setCoefficient(nodePosVar[pos - 1], -1.0);
                                 constraint.setCoefficient(nodePosVar[pos], 1.0);
+
                             } else if (nodeNeighbourPosVar[pos - 1] == 0 && nodeNeighbourPosVar[pos] == 0) {
                                 pen[pos] = solver.makeBoolVar("");
                                 MPConstraint constraint = solver.makeConstraint(0, Double.POSITIVE_INFINITY);
@@ -663,8 +683,11 @@ public class Mip {
                             }
                         }
 
-                        objective.setCoefficient(pen[pos], treeNeighbourAlphaPen[pos][childIdx]);
-                        objective.setCoefficient(this.diff.get(new DiffKey(ancestralIdx, childIdx, pos)), this.nodeWeights[pos]);
+                        double existingPen = objective.getCoefficient(pen[pos]);
+                        objective.setCoefficient(pen[pos], existingPen + treeNeighbourAlphaPen[pos][childIdx]);
+
+                        double existingDiff = objective.getCoefficient(this.diff.get(new DiffKey(ancestralIdx, childIdx, pos)));
+                        objective.setCoefficient(this.diff.get(new DiffKey(ancestralIdx, childIdx, pos)), existingDiff + this.nodeWeights[pos]);
 
                     } else {
 
@@ -755,7 +778,6 @@ public class Mip {
                             addConstraintSum(parentConstraint, parentEdgesBypassingI, -1);
                             addConstraintSum(parentConstraint, parentEdgesBypassingIMinus1, -1);
 
-
                             MPConstraint childConstraint = solver.makeConstraint(-1, Double.POSITIVE_INFINITY);
                             childConstraint.setCoefficient(pen[pos], 1.0);
                             childConstraint.setCoefficient(diffPos[pos], -1.0);
@@ -764,8 +786,10 @@ public class Mip {
 
                         }
 
-                        objective.setCoefficient(pen[pos], treeNeighbourAlphaPen[pos][childIdx]);
-                        objective.setCoefficient(diffPos[pos], this.nodeWeights[pos]);
+                        double existingPen = objective.getCoefficient(pen[pos]);
+                        objective.setCoefficient(pen[pos], existingPen + treeNeighbourAlphaPen[pos][childIdx]);
+                        double existingDiff = objective.getCoefficient(diffPos[pos]);
+                        objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
 
                     }
                 }
