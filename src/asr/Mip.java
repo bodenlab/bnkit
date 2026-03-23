@@ -95,7 +95,7 @@ public class Mip {
             }
         }
 
-        System.out.println("Skipping " + nodesToSkip.toArray().length + " " + nodesConnectedToPreviousNode.toArray().length);
+        //System.out.println("Skipping " + nodesToSkip.toArray().length + " " + nodesConnectedToPreviousNode.toArray().length);
     }
 
     private static void outputAncestralSolutions(Tree tree,
@@ -182,6 +182,7 @@ public class Mip {
         if (solverName.equalsIgnoreCase("SCIP")) {
             // SCIP creates concurrent solvers - appears to be a bug where other workers
             // are not terminated when a solution is found.
+            System.out.println("SCIP solver detected - setting number of threads to 1 for optimisation.");
             solver.setNumThreads(1);
             actualThreadsUsed = 1;
         } else {
@@ -189,7 +190,7 @@ public class Mip {
         }
 
         if (GRASP.VERBOSE) {
-            System.out.println(solverName + " model build complete. Starting solver with " + actualThreadsUsed + (actualThreadsUsed == 1 ? " thread..." : " threads..."));
+            System.out.println(solverName + "(" + solver.solverVersion().strip() + ") model build complete. Starting solver with " + actualThreadsUsed + (actualThreadsUsed == 1 ? " thread..." : " threads..."));
         }
 
         solver.setTimeLimit((long) GRASP.MIP_SOLVER_TIME_LIMIT_MINUTES * 60 * 1000); // convert to milliseconds
@@ -319,7 +320,7 @@ public class Mip {
             }
 
             int[][] segments = IndelDist.assignSegments(columnPriors.length, IndelDist.RATE_PRIORS,
-                    prefix_sums, IndelDist.RHO);
+                    prefix_sums);
 
             int[] columnRateCategories = IndelDist.expandSegmentOrder(segments);
 

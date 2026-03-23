@@ -1,6 +1,7 @@
 package asr;
 
 
+import stats.Zipf;
 import java.util.*;
 
 public class IndelDist {
@@ -10,8 +11,10 @@ public class IndelDist {
     private static final int SEG_RATE = 2;
     private static final int START = 0;
     private static final int RATE_ASSIGNED = 1;
-    private static final double EXPECTED_INDEL_SEGMENT_LENGTH = 20.0;
-    public static final double RHO = 1 / EXPECTED_INDEL_SEGMENT_LENGTH;
+//    private static final double EXPECTED_INDEL_SEGMENT_LENGTH = 20.0;
+//    public static final double RHO = 1 / EXPECTED_INDEL_SEGMENT_LENGTH;
+    private static final double DEFAULT_ZIPF_EXPONENT = 1.7;
+    private static final int DEFAULT_ZIPF_MAX_SAMPLE_RANGE = 50;
     public static final double[] RATE_PRIORS = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
 
 
@@ -65,7 +68,7 @@ public class IndelDist {
      * @return A list of tuples (start, end, rate_category) representing the optimal segmentation of the MSA columns.
      */
     public static int[][] assignSegments(int num_cols, double[] rate_priors,
-                                         double[][] prefix_sums, double rho) {
+                                         double[][] prefix_sums) {
 
 
         Double[] dp_path = new Double[num_cols + 1];
@@ -86,7 +89,8 @@ public class IndelDist {
                 for (int k = 0; k < K; k++) {
                     double LL = prefix_sums[j][k] - prefix_sums[i - 1][k]; // prob of this segment at this indel rate
                     // longer segments penalised more heavily
-                    double segment_length_penalty = calcLogSegmentLengthPenalty(L, rho);
+                    double segment_length_penalty = logZipfIndelLengthPenalty(L, DEFAULT_ZIPF_EXPONENT,
+                            DEFAULT_ZIPF_MAX_SAMPLE_RANGE); // logGeometricIndelLengthPenalty(L, rho);
                     double prior_prob_rate = rate_priors[k];
                     // include score from last most likely pos
                     double score = dp_path[i - 1] + LL + prior_prob_rate + segment_length_penalty;
@@ -184,8 +188,23 @@ public class IndelDist {
      * @param rho the geometric sequence length param for a segment.
      * @return the log penalty for a segment of this length
      */
-    public static double calcLogSegmentLengthPenalty(int segment_length, double rho) {
+    public static double logGeometricIndelLengthPenalty(int segment_length, double rho) {
         return (segment_length - 1) * Math.log(1 - rho) + Math.log(rho);
     }
 
+    public static double logZipfIndelLengthPenalty(int segmentLength, Double a, Integer maxK) {
+        double exponent = 1.7; // default AliSim indel length distribution parameters
+        if (a != null) {
+            exponent = a;
+        }
+
+        int maxSamplingRange = 50;
+        if (maxK != null) {
+            maxSamplingRange = maxK;
+        }
+
+        Zipf zipf = new Zipf(exponent, maxSamplingRange);
+        return zipf.getLogLikelihood(new int[] {segmentLength});
+
+    }
 }

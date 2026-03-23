@@ -27,7 +27,7 @@ public class IndelDistTest {
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
-        int[][] segs = IndelDist.assignSegments(numCols, priors, prefix, rho);
+        int[][] segs = IndelDist.assignSegments(numCols, priors, prefix);
 
         assertEquals(1, segs.length);
         assertArrayEquals(new int[]{0,0,0}, segs[0]);  // start=0 end=0 rate=0
@@ -46,7 +46,7 @@ public class IndelDistTest {
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
-        int[][] segs = IndelDist.assignSegments(2, priors, prefix, rho);
+        int[][] segs = IndelDist.assignSegments(2, priors, prefix);
 
         // One long segment is optimal: length = 2
         assertEquals(1, segs.length);
@@ -68,7 +68,7 @@ public class IndelDistTest {
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
-        int[][] segs = IndelDist.assignSegments(2, priors, prefix, rho);
+        int[][] segs = IndelDist.assignSegments(2, priors, prefix);
 
         assertEquals(2, segs.length);
 
@@ -94,7 +94,7 @@ public class IndelDistTest {
         double expected_segment_length = 50.0;
         double rho = 1 / expected_segment_length;
 
-        int[][] segs = IndelDist.assignSegments(52, priors, prefix, rho);
+        int[][] segs = IndelDist.assignSegments(52, priors, prefix);
 
         // Entire segment should be chosen
         assertEquals(2, segs.length);
@@ -118,7 +118,7 @@ public class IndelDistTest {
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
 
-        int[][] segs = IndelDist.assignSegments(3, priors, prefix, rho);
+        int[][] segs = IndelDist.assignSegments(3, priors, prefix);
 
         assertEquals(2, segs.length);
         assertArrayEquals(new int[]{0, 1, 0}, segs[0]);  // cols 0–1 rate0
