@@ -4,10 +4,8 @@ import bn.ctmc.GapSubstModel;
 import bn.ctmc.matrix.JCGap;
 import bn.ctmc.matrix.JTTGap;
 import com.google.ortools.Loader;
-import com.google.ortools.init.CppBridge;
 import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
-import com.google.ortools.sat.LinearExpr;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.phylo.IdxTree;
@@ -49,7 +47,6 @@ public class Mip {
     private final HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
     private final HashMap<DiffKey, MPVariable> diff = new HashMap<>();
     private final int virtualEndIdx;
-    int objectiveCount = 0;
 
     public Mip(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
                int nThreads, boolean useBranchLengths) {
@@ -170,8 +167,6 @@ public class Mip {
             GRASP.usage(6, "Could not create MIP solver with " + solverName);
         }
 
-        // Uncomment for logging
-        solver.enableOutput();
 
         objective = solver.objective();
 
@@ -179,6 +174,9 @@ public class Mip {
         createEdgeVariables();
         addPenaltyConstraints();
         objective.setMinimization();
+
+        // Uncomment for logging
+        solver.enableOutput();
 
         int actualThreadsUsed = this.nThreads;
         if (solverName.equalsIgnoreCase("SCIP")) {
@@ -462,19 +460,13 @@ public class Mip {
                         }
 
                         MPConstraint constraint = solver.makeConstraint(0, 0);
-                        double existingNodeiplusone = constraint.getCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx + 1]);
-                        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx + 1], existingNodeiplusone + 1);
+                        MPVariable nodePlusOne = this.ancestorPositionVars.get(ancestorIdx)[nodeIdx + 1];
+                        constraint.setCoefficient(nodePlusOne, constraint.getCoefficient(nodePlusOne) + 1);
 
-                        double existingNodei = constraint.getCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
-                        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx], existingNodei + -1);
-                        for (MPVariable var : all_edges_from_pos) {
-                            double existing = constraint.getCoefficient(var);
-                            constraint.setCoefficient(var, existing + 1);
-                        }
-                        for (MPVariable var : all_edges_to_pos1) {
-                            double existing = constraint.getCoefficient(var);
-                            constraint.setCoefficient(var, existing + -1);
-                        }
+                        MPVariable node = this.ancestorPositionVars.get(ancestorIdx)[nodeIdx];
+                        constraint.setCoefficient(node, constraint.getCoefficient(node) + -1);
+                        addConstraintSum(constraint, all_edges_from_pos, 1);
+                        addConstraintSum(constraint, all_edges_to_pos1, -1);
                     }
                 }
 
@@ -522,20 +514,15 @@ public class Mip {
         }
 
         MPConstraint constraint = solver.makeConstraint(constant, constant);
+        // nodes can also exist as edges, need to account for this in the constraint coefficients
         double ancExisting = constraint.getCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
         constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx], ancExisting + 1);
         if (aKIPrime != null) {
             double existing = constraint.getCoefficient(aKIPrime);
             constraint.setCoefficient(aKIPrime, existing + -1);
         }
-        for (MPVariable var : edgesBypassingI) {
-            double existing = constraint.getCoefficient(var);
-            constraint.setCoefficient(var, existing + 1);
-        }
-        for (MPVariable var : edgesBypassingIPrime) {
-            double existing = constraint.getCoefficient(var);
-            constraint.setCoefficient(var, existing + -1);
-        }
+        addConstraintSum(constraint, edgesBypassingI, 1);
+        addConstraintSum(constraint, edgesBypassingIPrime, -1);
     }
 
     private int[] getForwardEdges(int nodeIdx) {
@@ -636,13 +623,7 @@ public class Mip {
                             this.diff.put(new DiffKey(ancestralIdx, childIdx, pos), diffVar);
 
                         } else if (nodeNeighbourPosVar[pos] == 0) {
-                            //diffVar = nodePosVar[pos];
-                            // diffVar - nodePosVar[pos] == 0
-                            MPConstraint c = solver.makeConstraint(0, 0);
-                            MPVariable diffVar = solver.makeBoolVar("");
-                            c.setCoefficient(diffVar, 1.0);
-                            c.setCoefficient(nodePosVar[pos], -1.0);
-                            this.diff.put(new DiffKey(ancestralIdx, childIdx, pos), diffVar);
+                            this.diff.put(new DiffKey(ancestralIdx, childIdx, pos), nodePosVar[pos]);
                         }
 
                         // gap penalty constraints
@@ -655,11 +636,7 @@ public class Mip {
                         } else {
 
                             if (nodeNeighbourPosVar[pos - 1] == 1 && nodeNeighbourPosVar[pos] == 0) {
-                                // pen[pos] == nodePosVar[pos],
-                                pen[pos] = solver.makeBoolVar("");
-                                MPConstraint constraint = solver.makeConstraint(0, 0);
-                                constraint.setCoefficient(pen[pos], 1);
-                                constraint.setCoefficient(nodePosVar[pos], -1);
+                                pen[pos] = nodePosVar[pos];
 
                             } else if (nodeNeighbourPosVar[pos - 1] == 0 && nodeNeighbourPosVar[pos] == 1) {
                                 pen[pos] = solver.makeBoolVar("");
@@ -683,11 +660,10 @@ public class Mip {
                             }
                         }
 
-                        double existingPen = objective.getCoefficient(pen[pos]);
-                        objective.setCoefficient(pen[pos], existingPen + treeNeighbourAlphaPen[pos][childIdx]);
 
-                        double existingDiff = objective.getCoefficient(this.diff.get(new DiffKey(ancestralIdx, childIdx, pos)));
-                        objective.setCoefficient(this.diff.get(new DiffKey(ancestralIdx, childIdx, pos)), existingDiff + this.nodeWeights[pos]);
+                        objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
+                        DiffKey diffKey = new DiffKey(ancestralIdx, childIdx, pos);
+                        objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos]);
 
                     } else {
 
@@ -790,7 +766,6 @@ public class Mip {
                         objective.setCoefficient(pen[pos], existingPen + treeNeighbourAlphaPen[pos][childIdx]);
                         double existingDiff = objective.getCoefficient(diffPos[pos]);
                         objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
-
                     }
                 }
             }
