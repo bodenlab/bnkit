@@ -18,7 +18,7 @@ import java.io.IOException;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import asr.IndelDist.RATE_CATEGORY;
+import asr.IndelSegmentation.RATE_CATEGORY;
 
 /**
  * Command line version of GRASP.
@@ -28,7 +28,7 @@ import asr.IndelDist.RATE_CATEGORY;
  */
 public class GRASP {
 
-    public static String VERSION = "30-Jan-2026";
+    public static String VERSION = "24-Mar-2026";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
@@ -506,9 +506,8 @@ public class GRASP {
                     indelpred = Prediction.PredictByMaxLhood(pogtree);
                     break;
                 case 6, 7:
-
-                    double[][] treeNeighbourAlphaPen = Mip.createTreeNeighbourAlphaPen(tree, aln, MODELS[MODEL_IDX]);
-                    indelpred = Prediction.PredictByMIP(pogtree, aln, INDELS[INDEL_IDX], treeNeighbourAlphaPen);
+                    indelpred = Prediction.PredictByMIP(pogtree, aln, INDELS[INDEL_IDX], MODELS[MODEL_IDX],
+                            GRASP.NTHREADS, GRASP.DISTANCE_BASED_MIP);
                 default:
                     break;
             }

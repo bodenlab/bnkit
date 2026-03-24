@@ -1,222 +1,100 @@
 package asr;
 
 import bn.ctmc.GapSubstModel;
-import bn.ctmc.matrix.JCGap;
-import bn.ctmc.matrix.JTTGap;
+import bn.ctmc.matrix.*;
+import com.google.ortools.Loader;
 import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
 import dat.EnumSeq;
 import dat.Enumerable;
-import dat.file.Utils;
 import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.pog.POAGraph;
 import java.io.*;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import com.google.ortools.linearsolver.MPVariable;
 import com.google.ortools.linearsolver.MPSolver;
-import com.google.ortools.sat.CpModel;
-import com.google.ortools.sat.CpSolver;
-import com.google.ortools.sat.CpSolverStatus;
-import com.google.ortools.sat.LinearExpr;
-import com.google.ortools.sat.LinearExprBuilder;
-import com.google.ortools.sat.Literal;
-import dat.pog.POGraph;
+import dat.pog.POGTree;
 
 public class Mip {
 
-    private static final int DEFAULT_MODEL_IDX = 0;
-    private static int SOLVER_IDX = 0;
     public static double MIN_MU_LAMBDA_VALUE = 0;
     public static double MAX_MU_LAMBDA_VALUE = 0.5;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
+    private static final int VIRTUAL_START = -1;
     private static final int DEFAULT_GAP_PENALTY = 2;
-    private static final int DEFAULT_THREAD_COUNT = 1;
-    private static final double[] GAP_PENALTIES = new double[] {8.0, 6.0, 4.0, 2.0};
-    public static String[] SOLVERS = new String[] {"SCIP", "Gurobi", "CPSAT"};
-    public static String[] MODELS = new String[] {"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
-    private static final Enumerable[] ALPHAS = new Enumerable[] {Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,
-                                                                 Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
+    private static final double[] GAP_PENALTIES = new double[]{8.0, 6.0, 4.0, 2.0};
+    private final HashMap<Integer, Integer[]> extantBinarySeqs;
+    private final POAGraph alnPog;
+    private final POGTree pogTree;
+    private final int nPos;
+    private final IdxTree tree;
+    private final EnumSeq.Alignment<Enumerable> aln;
+    private final int nThreads;
+    private final String solverName;
+    private final String substModelName;
+    double[][] treeNeighbourAlphaPen;
+    boolean useBranchLengths;
+    private MPSolver solver;
+    private final Set<Integer> nodesToSkip = new HashSet<>();
+    private final Set<Integer> nodesConnectedToPreviousNode = new HashSet<>();
+    private final int[] nodeWeights;
+    private HashMap<Integer, MPVariable[]> ancestorPositionVars;
+    private MPObjective objective;
+    private final HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
+    private final HashMap<DiffKey, MPVariable> diff = new HashMap<>();
+    private final int virtualEndIdx;
 
-    public static void main(String[] args) {
+    public Mip(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
+               int nThreads, boolean useBranchLengths) {
 
+        this.pogTree = pogTree;
+        this.tree = pogTree.getTree();
+        this.extantBinarySeqs = createBinarySeqMap(aln, tree);
+        this.alnPog = new POAGraph(aln);
+        this.nPos =  aln.getWidth();
+        this.aln = aln;
+        this.nThreads = nThreads;
+        this.solverName = solverName;
+        this.substModelName = substModelName;
+        this.useBranchLengths = useBranchLengths;
+        this.nodeWeights = new int[nPos];
+        this.virtualEndIdx = nPos;
+        Arrays.fill(this.nodeWeights, 1);
+        this.identifyNodesToSkip();
+        this.treeNeighbourAlphaPen = createTreeNeighbourAlphaPen();
 
-        Tree tree = null;
-        EnumSeq.Alignment<Enumerable> aln = null;
-        try {
-            tree = Utils.loadTree("test/resources/GapSubstModel_test_1.nwk");
-            aln = Utils.loadAlignment("test/resources/GapSubstModel_test_1.aln", Enumerable.aacid);
-        } catch (ASRException | IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        GRASP.DISTANCE_BASED_MIP = true;
-        createTreeNeighbourAlphaPen(tree, aln, "JTT");
-
-
-        /*
-        HashMap<String, Object> argParser = createArgMap(args);
-        String ALIGNMENT = (String) argParser.get("ALIGNMENT");
-        String NEWICK = (String) argParser.get("NEWICK");
-        Integer MODEL_IDX = (Integer) argParser.get("MODEL_IDX");
-        String OUTPUT = (String) argParser.get("OUTPUT");
-        String PREFIX = (String) argParser.get("PREFIX");
-        int NUM_THREADS = argParser.get("THREADS") == null ? DEFAULT_THREAD_COUNT : (Integer) argParser.get("THREADS");
-
-        Tree tree = null;
-        EnumSeq.Alignment<Enumerable> aln = null;
-        try {
-            tree = Utils.loadTree(NEWICK);
-            if (MODEL_IDX == null) {
-                MODEL_IDX = Mip.DEFAULT_MODEL_IDX;
-            }
-            aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
-            Utils.checkData(aln, tree);
-        } catch (ASRException e) {
-            usage(IndelDist.ERROR.ASR.getCode(), IndelDist.ERROR.ASR.getDescription() + e.getMessage());
-        } catch (IOException e) {
-            usage(IndelDist.ERROR.IO.getCode(), IndelDist.ERROR.IO.getDescription() + e.getMessage());
-        }
-        assert tree != null;
-        assert aln != null;
-
-        if (!allColsOccupied(aln)) {
-            usage(ERROR.ALN.getCode(), "Alignment has at least one column with no sequence content. Please remove these before running indel inference.");
-        }
-
-        Loader.loadNativeLibraries();
-        POAGraph alnPog = new POAGraph(aln);
-        HashMap<Integer, Integer[]> extantBinarySeqs = createBinarySeqMap(aln, tree);
-
-        // Next we create the ancestor penalty array to mirror the tree's children array
-        double[][] treeNeighbourAlphaPen = createTreeNeighbourAlphaPen(tree);
-
-        if (GRASP.VERBOSE) {
-            System.out.println("Constructing MIP model...");
-        }
-
-        String solverName = SOLVERS[SOLVER_IDX];
-        HashMap<Integer, Integer[]> ancestorPositionVars;
-        if (solverName.equalsIgnoreCase("CPSAT")) {
-            ancestorPositionVars = runCPSolverIndelInference(tree, aln, alnPog,
-                    NUM_THREADS, extantBinarySeqs, treeNeighbourAlphaPen, null);
-        } else {
-            ancestorPositionVars = runMPSolverIndelInference(tree, alnPog, extantBinarySeqs, treeNeighbourAlphaPen, aln,
-                    NUM_THREADS, SOLVERS[SOLVER_IDX]);
-        }
-
-        outputAncestralSolutions(tree, ancestorPositionVars, OUTPUT, PREFIX);
-
-         */
     }
 
+    private void identifyNodesToSkip() {
+        int previousNode = 0;
+        for (int nodeIdx = 0; nodeIdx < nPos - 1; nodeIdx++) {
 
-    /**
-     * Run the CP-SAT solver for indel inference. There are 4 main steps:
-     * 1. Create ancestral position variables
-     * 2. Add edge constraints to ensure valid paths through the POG for each ancestor
-     * 3. Add penalty constraints to minimize indel events between tree neighbours
-     * 4. Solve the model and output the results
-     *
-     * @param tree the phylogenetic tree
-     * @param aln the sequence alignment
-     * @param alnPog the partial order graph representation of the alignment
-     * @param num_threads number of threads to use
-     * @param extantBinarySeqs map of extant sequences in binary format
-     * @param treeNeighbourAlphaPen penalty matrix for tree neighbours
-     */
-    public static HashMap<Integer, Integer[]> runCPSolverIndelInference(IdxTree tree, EnumSeq.Alignment<Enumerable> aln ,
-                                                                        POAGraph alnPog, int num_threads,
-                                                                        HashMap<Integer, Integer[]> extantBinarySeqs,
-                                                                        double[][] treeNeighbourAlphaPen,
-                                                                        Prediction parsimonyPrediction) {
 
-        CpModel model = new CpModel();
-        HashMap<Integer, Literal[]> ancestorPositionVars = createAncestralPositionVariablesCPModel(tree, model, aln.getWidth());
+            if ((getForwardEdges(nodeIdx).length == 1)
+                    && Arrays.stream(getForwardEdges(nodeIdx)).min().orElseThrow() == (nodeIdx + 1)
+                    && getBackwardEdges(nodeIdx + 1).length == 1) {
 
-        addEdgeConstraintsAncestorsCPSolver(tree, alnPog, model, ancestorPositionVars, parsimonyPrediction);
-
-        LinearExprBuilder objective = LinearExpr.newBuilder();
-        addPenaltyConstraintsCPSolver(tree, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
-                                      aln.getWidth(), model, objective);
-
-        // set hot-start initial solution if provided
-        if (parsimonyPrediction != null) {
-            for (int bpidx : tree.getAncestors()) {
-                Literal[] nodePosVar = ancestorPositionVars.get(bpidx);
-
-                // have to use the ancestor ID label to get the correct POG as getAncestor tries to convert a label to bpidx
-                POGraph ancestorPog = parsimonyPrediction.getAncestor(tree.getLabel(bpidx));
-
-                for (int pos = 0; pos < nodePosVar.length; pos++) {
-                    boolean hasContent = ancestorPog.isNode(pos);
-                    model.addHint(nodePosVar[pos], hasContent);
+                this.nodesToSkip.add(nodeIdx + 1);
+                this.nodeWeights[previousNode] += 1;
+            } else {
+                previousNode = nodeIdx + 1;
+                boolean nodeFound = false;
+                for (int forwardEdge : getForwardEdges(nodeIdx)) {
+                    if (nodeIdx + 1 == forwardEdge) {
+                        nodeFound = true;
+                        break;
+                    }
+                }
+                if (nodeFound)  {
+                    this.nodesConnectedToPreviousNode.add(nodeIdx + 1);
                 }
             }
         }
 
-        model.minimize(objective);
-
-        CpSolver solver = new CpSolver();
-        solver.getParameters().setMaxTimeInSeconds((double) GRASP.MIP_SOLVER_TIME_LIMIT_MINUTES * 60);
-        // Uncomment for logging
-        // solver.getParameters().setLogSearchProgress(true);
-
-        if (num_threads < 8) {
-            System.out.println("CP-SAT is considerably slower when using less than 8 threads. Consider increasing the number of threads or switch --indel-method to SCIP/Gurobi");
-        }
-
-        if (GRASP.VERBOSE) {
-            System.out.println("CP-SAT model build complete. Starting solver with " + num_threads +  (num_threads == 1 ? " thread..." : " threads..."));
-        }
-
-        solver.getParameters().setNumWorkers(num_threads);
-        CpSolverStatus status = solver.solve(model);
-
-        if (status == CpSolverStatus.OPTIMAL) {
-            System.out.println("Optimal solution found");
-            System.out.println("Objective value: " + solver.objectiveValue());
-            System.out.printf("Indel solution found in %d min, %d sec%n", TimeUnit.SECONDS.toMinutes((long) solver.wallTime()),
-                    (long) solver.wallTime() - TimeUnit.MINUTES.toSeconds(TimeUnit.SECONDS.toMinutes((long) solver.wallTime())));
-
-        } else if (status == CpSolverStatus.FEASIBLE) {
-
-            System.out.println("Feasible solution found");
-            System.out.println("Objective value: " + solver.objectiveValue());
-            System.out.printf("Indel solution found in %d min, %d sec%n", TimeUnit.SECONDS.toMinutes((long) solver.wallTime()),
-                    (long) solver.wallTime() - TimeUnit.MINUTES.toSeconds(TimeUnit.SECONDS.toMinutes((long) solver.wallTime())));
-        } else if (status == CpSolverStatus.INFEASIBLE) {
-            System.err.println("No solution found. A feasible solution could not be identified.");
-            return null;
-        } else if (status == CpSolverStatus.UNKNOWN) {
-            System.err.println("No solution found. A solution could not be identified with the given time limit.");
-            return null;
-        }
-
-        return extractSolutionCPSolver(ancestorPositionVars, solver);
-    }
-
-
-
-    private static HashMap<Integer, Integer[]> extractSolutionCPSolver(HashMap<Integer, Literal[]> ancestorPositionVars,
-                                                                       CpSolver solver) {
-
-        HashMap<Integer, Integer[]> ancestralIndels = new HashMap<>();
-
-        for (int ancestralIdx : ancestorPositionVars.keySet()) {
-            Literal[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
-            Integer[] ancestralSeq = new Integer[nodePosVar.length];
-            for (int pos = 0; pos < nodePosVar.length; pos++) {
-                ancestralSeq[pos] = Math.toIntExact(solver.value(nodePosVar[pos]));
-            }
-            ancestralIndels.put(ancestralIdx, ancestralSeq);
-        }
-
-        return ancestralIndels;
-
+        //System.out.println("Skipping " + nodesToSkip.toArray().length + " " + nodesConnectedToPreviousNode.toArray().length);
     }
 
     private static void outputAncestralSolutions(Tree tree,
@@ -280,430 +158,44 @@ public class Mip {
 
     }
 
-    /**
-     * Create integer position variables for ancestor sequences bounded between 0 and 1. These represent the
-     * actual sequence positions for each ancestor in the tree.
-     *
-     * @param tree the phylogenetic tree
-     * @param model the CP model
-     * @param seqLen the length of the sequences in the alignment
-     * @return a map of ancestor indices to their corresponding position variables
-     */
-    private static HashMap<Integer, Literal[]> createAncestralPositionVariablesCPModel(IdxTree tree, CpModel model,
-                                                                                       int seqLen)  {
+    public HashMap<Integer, Integer[]> runMPSolverIndelInference() {
 
-        HashMap<Integer, Literal[]> ancestorSeqVars = new HashMap<>();
-        for (int ancestorIdx : tree.getAncestors()) {
-            Literal[] seqVars = new Literal[seqLen];
-            for (int j = 0; j < seqLen; j++) {
-                seqVars[j] = model.newBoolVar("");
-            }
-
-            ancestorSeqVars.put(ancestorIdx, seqVars);
+        Loader.loadNativeLibraries(); // link to Google-OR Tools
+        this.solver = MPSolver.createSolver(solverName);
+        if (this.solver == null) {
+            GRASP.usage(6, "Could not create MIP solver with " + solverName);
         }
 
-        return ancestorSeqVars;
-    }
 
-    /**
-     * Add edge constraints to the CP model to ensure valid paths through the POG for each ancestor.
-     * At a minimum the POG must start from a virtual start node and end at a virtual end node, with
-     * all intermediate nodes fully connected.
-     *
-     * @param tree the phylogenetic tree
-     * @param alnPOG the partial order graph representation of the alignment
-     * @param model the CP model
-     * @param ancestralPositionVars map of ancestor indices to their corresponding array of position variables
-     */
-    private static void addEdgeConstraintsAncestorsCPSolver(IdxTree tree, POAGraph alnPOG, CpModel model,
-                                                            HashMap<Integer, Literal[]> ancestralPositionVars,
-                                                            Prediction parsimonyPrediction) {
+        objective = solver.objective();
 
-        int VIRTUAL_START = -1;
-        int VIRTUAL_END = alnPOG.maxsize();
-
-        HashMap<EdgeKey, Literal> allEdgeVars = new HashMap<>();
-
-        int[] ancestors = tree.getAncestors();
-        for (int ancestorIdx : ancestors) {
-
-            POGraph ancParsimonyPog = parsimonyPrediction.getAncestor(tree.getLabel(ancestorIdx));
-
-            // VIRTUAL STARTS TO REAL STARTS //
-            int[] startIndices = alnPOG.getStarts();
-            Literal[] allEdgesFromVirtualStart = new Literal[startIndices.length];
-            for (int positionTo = 0; positionTo < startIndices.length; positionTo++) {
-
-                // Variable for each edge from start node
-                Literal edge = model.newBoolVar("");
-
-//                boolean hasEdge = checkAncestralPogEdge(ancParsimonyPog, VIRTUAL_START, startIndices[positionTo]);
-//                // hot-start from parsimony prediction
-//                //model.addHint(edge, hasEdge);
-                allEdgesFromVirtualStart[positionTo] = edge;
-
-                // save unique edge/ancestor combination to a map for later use
-                EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, startIndices[positionTo], ancestorIdx);
-                allEdgeVars.put(edgeKey, edge);
-            }
-
-            // Constraint: exactly one edge must be chosen from virtual start to actual starts
-            model.addExactlyOne(allEdgesFromVirtualStart);
-
-            // FULLY CONNECTED NODES //
-            int[] endIndices = alnPOG.getEnds();
-            for (int nodeIdx = 0; nodeIdx < alnPOG.maxsize(); nodeIdx++) {
-
-                // EDGES GOING OUT //
-                int[] forwardEdges = alnPOG.getNodeIndices(nodeIdx, true);
-                // this handles the edge case where we are at an end node and need to connect to virtual end
-                int numEdgesToEnd = (alnPOG.isEndNode(nodeIdx) ? 1 : 0);
-                int totalForwardEdges = forwardEdges.length + numEdgesToEnd;
-
-                Literal[] forwardEdgesFromNode = new Literal[totalForwardEdges];
-                for (int forwardEdgeIndex = 0; forwardEdgeIndex < forwardEdges.length; forwardEdgeIndex++) {
-
-                    Literal edge = model.newBoolVar("");
-
-                    int edgeEnd = forwardEdges[forwardEdgeIndex];
-                    // boolean hasEdge = checkAncestralPogEdge(ancParsimonyPog, nodeIdx, edgeEnd);
-                    //model.addHint(edge, hasEdge);
-                    forwardEdgesFromNode[forwardEdgeIndex] = edge;
-
-                    EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
-                    allEdgeVars.put(edgeKey, edge);
-                }
-
-                // If we have a single outgoing edge to virtual end, create that variable too
-                if (numEdgesToEnd == 1) {
-                    Literal edgeToEnd = model.newBoolVar("");
-                    forwardEdgesFromNode[totalForwardEdges - 1] = edgeToEnd;
-
-                    EdgeKey edgeKey = new EdgeKey(nodeIdx, VIRTUAL_END, ancestorIdx);
-
-                    // boolean hasEdge = checkAncestralPogEdge(ancParsimonyPog, nodeIdx, VIRTUAL_END);
-                    //model.addHint(edgeToEnd, hasEdge);
-                    allEdgeVars.put(edgeKey, edgeToEnd);
-                }
-
-                // constraint: sum(edges) == positionVar
-                // i.e. We want to enforce that if an edge is present, the node must also have a character and we can
-                // only have a single outgoing edge.
-                Literal ancestralNode = ancestralPositionVars.get(ancestorIdx)[nodeIdx];
-                model.addEquality(ancestralNode, LinearExpr.sum(forwardEdgesFromNode));
-
-                // EDGES COMING IN - same as above but looking in the reverse direction//
-                int[] backwardEdges = alnPOG.getNodeIndices(nodeIdx, false);
-                int numEdgesFromStart = (alnPOG.isStartNode(nodeIdx) ? 1 : 0);
-                int totalBackwardEdges = backwardEdges.length + numEdgesFromStart;
-
-                Literal[] backwardEdgesFromNode = new Literal[totalBackwardEdges];
-                for (int positionTo = 0; positionTo < backwardEdges.length; positionTo++) {
-
-                    int edgeComingIn = backwardEdges[positionTo];
-
-                    EdgeKey edgeKey = new EdgeKey(edgeComingIn, nodeIdx, ancestorIdx);
-                    Literal edge = allEdgeVars.get(edgeKey);
-                    backwardEdgesFromNode[positionTo] = edge;
-                }
-
-                if (numEdgesFromStart == 1) {
-                    EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, nodeIdx, ancestorIdx);
-                    Literal edge = allEdgeVars.get(edgeKey);
-
-                    backwardEdgesFromNode[totalBackwardEdges - 1] = edge;
-                }
-
-                // Constraint: sum(edges) == position variable
-                model.addEquality(ancestralNode, LinearExpr.sum(backwardEdgesFromNode));
-
-            }
-
-            // REAL ENDS TO VIRTUAL ENDS - ensure that only one node connects to the virtual end //
-            Literal[] allEdgesToVirtualEnd = new Literal[endIndices.length];
-            for (int positionFrom = 0; positionFrom < endIndices.length; positionFrom++) {
-                EdgeKey edgeKey = new EdgeKey(endIndices[positionFrom], VIRTUAL_END, ancestorIdx);
-                allEdgesToVirtualEnd[positionFrom] = allEdgeVars.get(edgeKey);
-            }
-
-            model.addExactlyOne(allEdgesToVirtualEnd);
-        }
-    }
-
-    private static boolean checkAncestralPogEdge(POGraph ancestorPog, int from, int to) {
-        try {
-            return ancestorPog.getEdge(from, to) != null;
-        } catch (Exception e) { // caused if no edge exists for this ancestor solution
-            return false;
-        }
-    }
-
-    /**
-     * Add penalty constraints to the CP model to minimize indel events between tree neighbours. There are 2 main
-     * penalties to consider:
-     * 1: A gap opening penalty when a gap is introduced between two adjacent positions
-     * 2: A gap extension penalty for each additional gap position that continues a gap
-     *
-     * @param tree the phylogenetic tree
-     * @param extantBinarySeqs map of extant sequences in binary format
-     * @param treeNeighbourAlphaPen penalty matrix for tree neighbours
-     * @param ancestorPositionVars map of ancestor indices to their corresponding array of position variables
-     * @param seqLength the length of the sequences in the alignment
-     * @param model the CP model
-     * @param objective the objective function to minimize
-     */
-    private static void addPenaltyConstraintsCPSolver(IdxTree tree,
-                                                      HashMap<Integer, Integer[]> extantBinarySeqs,
-                                                      double[][] treeNeighbourAlphaPen,
-                                                      HashMap<Integer, Literal[]> ancestorPositionVars,
-                                                      int seqLength,
-                                                      CpModel model,
-                                                      LinearExprBuilder objective) {
-
-        for (int ancestralIdx : tree.getAncestors()) {
-
-            Literal[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
-
-
-            for (int childIdx : tree.getChildren(ancestralIdx)) {
-
-                Literal[] pen = new Literal[seqLength];
-                for (int i = 0; i < seqLength; i++) {
-                    pen[i] = model.newBoolVar("");//0, 1, "");
-                }
-
-                Integer[] nodeNeighbourPosVar = null;
-                Literal[] nodeNeighborPosVarAncestor = null;
-                Literal[] diffPos = null;
-
-                if (tree.isLeaf(childIdx)) {
-                    nodeNeighbourPosVar = extantBinarySeqs.get(childIdx);
-                } else {
-                    nodeNeighborPosVarAncestor = ancestorPositionVars.get(childIdx);
-
-                    diffPos = new Literal[seqLength];
-                    for (int i = 0; i < seqLength; i++) {
-                        diffPos[i] = model.newBoolVar("");// 0, 1, "");
-                    }
-                }
-
-                Literal diffVar = null;
-                Literal prevDiffVar = null;
-                for (int pos = 0; pos < seqLength; pos++) {
-
-                    if (pos > 0) {
-                        prevDiffVar = diffVar;
-                    }
-
-                    if (tree.isLeaf(childIdx)) {
-
-                        // constraint - difference variables
-                        diffVar = model.newBoolVar("");
-                        if (nodeNeighbourPosVar[pos] == 1) {
-                            // constraint: diff + nodePosVar[pos] == 1
-                            model.addEquality(LinearExpr.sum(new Literal[]{diffVar, nodePosVar[pos]}), 1);
-
-                        } else {
-                            // constraint: diffVar = nodePosVar[pos];
-                            model.addEquality(diffVar, nodePosVar[pos]);
-                        }
-                        //diff.put(diffKey, new Literal[]{diffVar});
-                        objective.add(diffVar);
-
-                        // penalty constraints
-                        if (pos == 0) {
-                            // pen[0] == diff[0]
-                            model.addEquality(diffVar, pen[pos]);
-
-                        } else {
-
-                            // constraint: pen[pos]>= diff[(node, node_neighbor_item, pos)] - diff[(node, node_neighbor_item, pos - 1)])
-                            model.addGreaterOrEqual(LinearExpr.weightedSum(
-                                            new Literal[]{
-                                                    pen[pos],
-                                                    diffVar,
-                                                    prevDiffVar},
-                                            new long[]{
-                                                    1,
-                                                    -1,
-                                                    1}),
-                                        0);
-
-                            // Constraint: pen[pos] >= node_neighbor_pos_var[pos - 1] + (1 - node_pos_var[pos - 1]) + (1 - node_neighbor_pos_var[pos]) + node_pos_var[pos] - 3
-                            // because these neighbours are children, we can just evaluate everything on right hand side
-                            // rearrange: pen[pos] + node_pos_var[pos - 1] - node_pos_var[pos] >= node_neighbor_pos_var[pos - 1] + 1 + (1 - node_neighbor_pos_var[pos]) - 3
-                            // rearrange: pen[pos] + node_pos_var[pos - 1] - node_pos_var[pos] >= node_neighbor_pos_var[pos - 1] - node_neighbor_pos_var[pos] - 1
-                            long rhs2 = nodeNeighbourPosVar[pos - 1] - nodeNeighbourPosVar[pos] - 1;
-                            model.addGreaterOrEqual(LinearExpr.weightedSum(
-                                    new Literal[]{
-                                            pen[pos],
-                                            nodePosVar[pos - 1],
-                                            nodePosVar[pos]},
-                                    new long[]{
-                                            1,
-                                            1,
-                                            -1}),
-                                    rhs2);
-
-                            // Constraint: pen[pos] >= node_neighbor_pos_var[pos] + (1 - node_pos_var[pos]) + (1 - node_neighbor_pos_var[pos - 1]) + node_pos_var[pos - 1] - 3
-                            // Rearrange: pen[pos] + node_pos_var[pos] - node_pos_var[pos - 1]  >= node_neighbor_pos_var[pos] + 1 + (1 - node_neighbor_pos_var[pos - 1]) - 3
-                            // Rearrange: pen[pos] + node_pos_var[pos] - node_pos_var[pos - 1]  >= node_neighbor_pos_var[pos] - node_neighbor_pos_var[pos - 1]) - 1
-                            long rhs3 = nodeNeighbourPosVar[pos] - nodeNeighbourPosVar[pos - 1] - 1;
-                            model.addGreaterOrEqual(LinearExpr.weightedSum(
-                                    new Literal[]{
-                                            pen[pos],
-                                            nodePosVar[pos],
-                                            nodePosVar[pos - 1]},
-                                    new long[]{
-                                            1,
-                                            1,
-                                            -1}),
-                                    rhs3);
-
-                        }
-
-                        //double penaltyVal = treeNeighbourAlphaPen[]
-
-                        //objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
-                        objective.addTerm(pen[pos], (long) treeNeighbourAlphaPen[pos][childIdx]);
-
-                    } else { // Ancestor
-
-
-                        //diff_pos[pos] <= node_pos_var[pos] + node_neighbor_pos_var[pos]
-                        model.addLessOrEqual(LinearExpr.weightedSum(
-                                new Literal[]{
-                                        diffPos[pos],
-                                        nodePosVar[pos],
-                                        nodeNeighborPosVarAncestor[pos]},
-                                new long[]{
-                                        1,
-                                        -1,
-                                        -1}),
-                                0);
-
-                        // diff_pos[pos] >= node_pos_var[pos] - node_neighbor_pos_var[pos]
-                        model.addGreaterOrEqual(LinearExpr.weightedSum(
-                                new Literal[]{
-                                        diffPos[pos],
-                                        nodePosVar[pos],
-                                        nodeNeighborPosVarAncestor[pos]},
-                                new long[]{
-                                        1,
-                                        -1,
-                                        1}),
-                                0);
-
-                        // diff_pos[pos] >= node_neighbor_pos_var[pos] - node_pos_var[pos]
-                        model.addGreaterOrEqual(LinearExpr.weightedSum(
-                                new Literal[]{
-                                        diffPos[pos],
-                                        nodeNeighborPosVarAncestor[pos],
-                                        nodePosVar[pos]},
-                                new long[]{
-                                        1,
-                                        -1,
-                                        1}),
-                                0);
-
-                        // diff_pos[pos] <= 2 - node_neighbor_pos_var[pos] - node_pos_var[pos]
-                        model.addLessOrEqual(LinearExpr.weightedSum(
-                                new Literal[]{
-                                        diffPos[pos],
-                                        nodeNeighborPosVarAncestor[pos],
-                                        nodePosVar[pos]},
-                                new long[]{
-                                        1,
-                                        1,
-                                        1}),
-                                2);
-
-                        if (pos == 0) {
-                            // constraint: pen[0] == diff[0]
-                            model.addEquality(pen[pos], diffPos[pos]);
-
-                        } else {
-                            // pen[pos] >= diff_pos[pos] - diff_pos[pos-1]
-                            model.addGreaterOrEqual(LinearExpr.weightedSum(
-                                    new Literal[]{
-                                            pen[pos],
-                                            diffPos[pos],
-                                            diffPos[pos - 1]},
-                                    new long[]{
-                                            1,
-                                            -1,
-                                            1}),
-                                    0
-                            );
-
-                            // pen[pos] >= node_neighbor_pos_var[pos-1] + (1 - node_pos_var[pos-1]) + (1 - node_neighbor_pos_var[pos]) + node_pos_var[pos] -3
-                            model.addGreaterOrEqual(LinearExpr.weightedSum(
-                                    new Literal[]{
-                                            pen[pos],
-                                            nodeNeighborPosVarAncestor[pos - 1],
-                                            nodePosVar[pos - 1],
-                                            nodeNeighborPosVarAncestor[pos],
-                                            nodePosVar[pos]},
-                                    new long[]{1, -1, 1, 1, -1}), -1);
-
-                            // pen[pos] >= node_neighbor_pos_var[pos] + (1 - node_pos_var[pos]) + (1 - node_neighbor_pos_var[pos-1]) + node_pos_var[pos-1] - 3
-                            model.addGreaterOrEqual(LinearExpr.weightedSum(
-                                    new Literal[]{
-                                            pen[pos],
-                                            nodeNeighborPosVarAncestor[pos],
-                                            nodePosVar[pos],
-                                            nodeNeighborPosVarAncestor[pos - 1],
-                                            nodePosVar[pos - 1]},
-                                    new long[]{1, -1, 1, 1, -1}), -1);
-                        }
-
-                        objective.add(diffPos[pos]);
-                        //objective.addTerm(pen[pos], DEFAULT_GAP_PENALTY);
-                        objective.addTerm(pen[pos], (long) treeNeighbourAlphaPen[pos][childIdx]);
-                    }
-                }
-            }
-        }
-    }
-
-    public static HashMap<Integer, Integer[]> runMPSolverIndelInference(IdxTree tree, POAGraph alnPog,
-                                                  HashMap<Integer, Integer[]> extantBinarySeqs,
-                                                  double[][] treeNeighbourAlphaPen, EnumSeq.Alignment<Enumerable> aln,
-                                                  int num_threads, String solverName) {
-
-        MPSolver solver = MPSolver.createSolver(solverName);
-        if (solver == null) {
-            usage(ERROR.MIP_ENGINE.getCode(), ERROR.MIP_ENGINE.getDescription() + solverName);
-        }
-        assert solver != null;
-
-        // Uncomment for logging
-        //solver.enableOutput();
-
-        HashMap<Integer, MPVariable[]> ancestorPositionVars = createAncestralPositionVariables(tree, solver, aln.getWidth());
-        addEdgeConstraintsAncestors(tree, alnPog, solver, ancestorPositionVars);
-
-        MPObjective objective = solver.objective();
-        addPenaltyConstraints(tree, extantBinarySeqs, treeNeighbourAlphaPen, ancestorPositionVars,
-                aln.getWidth(), solver, objective);
-
+        createAncestralPositionVariables();
+        createEdgeVariables();
+        addPenaltyConstraints();
         objective.setMinimization();
 
-        int actualThreadsUsed = num_threads;
+        if (GRASP.VERBOSE) {
+            solver.enableOutput();
+        }
+
+        int actualThreadsUsed = this.nThreads;
         if (solverName.equalsIgnoreCase("SCIP")) {
             // SCIP creates concurrent solvers - appears to be a bug where other workers
             // are not terminated when a solution is found.
+            System.out.println("SCIP solver detected - using single thread for solving.");
             solver.setNumThreads(1);
             actualThreadsUsed = 1;
         } else {
-            solver.setNumThreads(num_threads);
+            solver.setNumThreads(this.nThreads);
         }
 
         if (GRASP.VERBOSE) {
-            System.out.println(solverName + " model build complete. Starting solver with " + actualThreadsUsed + (actualThreadsUsed == 1 ? " thread..." : " threads..."));
+            System.out.println(solverName + "(" + solver.solverVersion().strip() + ") model build complete. Starting solver with " + actualThreadsUsed + (actualThreadsUsed == 1 ? " thread..." : " threads..."));
         }
 
         solver.setTimeLimit((long) GRASP.MIP_SOLVER_TIME_LIMIT_MINUTES * 60 * 1000); // convert to milliseconds
+
+
         MPSolver.ResultStatus resultStatus = solver.solve();
 
         if (resultStatus == MPSolver.ResultStatus.OPTIMAL) {
@@ -720,7 +212,7 @@ public class Mip {
                     TimeUnit.MILLISECONDS.toSeconds(solver.wallTime()) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(solver.wallTime())));
 
         } else if (resultStatus == MPSolver.ResultStatus.INFEASIBLE) {
-            System.err.println("A feasible solution could not be identified.");
+            System.err.println("Indel model is infeasible given the input alignment.");
             return null;
         } else if (resultStatus == MPSolver.ResultStatus.NOT_SOLVED) {
             System.err.println("No solution found or a solution could not be identified with the given time limit.");
@@ -744,7 +236,6 @@ public class Mip {
         }
 
         return ancestralIndels;
-
     }
 
     private static boolean allColsOccupied(EnumSeq.Alignment<Enumerable> aln) {
@@ -777,7 +268,7 @@ public class Mip {
             }
 
             binarySeqMap.put(tree.getIndex(seq.getName()), binSeqValues);
-         }
+        }
 
         return binarySeqMap;
     }
@@ -787,81 +278,69 @@ public class Mip {
      * distances are adjusted for each column based on the assigned rate category. Finally, the adjusted distances
      * are binned into discrete gap penalties ranging from 2 to 8 in increments of 2. If the distance based option
      * is not chosen, then the default gap penalty is assigned to all positions.
-     * @param tree the phylogenetic tree
-     * @param aln the alignment
-     * @param substModelName the substitution model name
+     *
      * @return a matrix where the rows are alignment columns and the columns are the gap opening penalties for each
      * node in the tree. The array matches the order of nodes in the IdxTree.
      */
-    public static double[][] createTreeNeighbourAlphaPen(IdxTree tree, EnumSeq.Alignment<Enumerable> aln,
-            String substModelName) {
+    private double[][] createTreeNeighbourAlphaPen() {
 
-        double[][] treeNeighbourAlphaPen = new double[aln.getWidth()][tree.getSize()];
+        double[][] treeNeighbourAlphaPen = new double[this.aln.getWidth()][this.tree.getSize()];
 
-        if (GRASP.DISTANCE_BASED_MIP) {
+        if (useBranchLengths) {
 
             double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
             if (GRASP.VERBOSE) {
                 System.out.println("Optimising indel parameters for distance-based MIP...");
             }
-            double optimal_mu = IndelDist.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
+            double optimal_mu = IndelPeeler.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
                     tree, geometric_seq_len_param, aln);
 
-            GapSubstModel gapModel;
-            switch (substModelName) {
-                case "JTT" -> gapModel = new JTTGap(optimal_mu, optimal_mu);
-                case "JC" -> gapModel = new JCGap(optimal_mu, optimal_mu);
-                default -> throw new IllegalArgumentException("Unrecognized gap substitution model: " + substModelName);
+            GapSubstModel gapModel = createGapSubstModel(optimal_mu);
+
+
+
+            double[] rates = IndelSegmentation.MEAN_RATES.get(GRASP.INDEL_RATE);
+            if (GRASP.VERBOSE) {
+                System.out.println("Computing column priors under different indel rate categories...");
+                for (int i = 0; i < rates.length; i++) {
+                    System.out.println("Rate category " + i + ": " + rates[i]);
+                }
             }
+            double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel, geometric_seq_len_param, rates, GRASP.NTHREADS);
 
             if (GRASP.VERBOSE) {
-                System.out.println("Computing column priors under different rate categories...");
+                System.out.println("Computing prefix sums for indel segment assignment...");
             }
-
-            double[] rates = IndelDist.MEAN_RATES.get(GRASP.INDEL_RATE);
-            Double[][] columnPriors = IndelDist.computeColumnPriors(gapModel, (Tree) tree, aln,
-                    rates, geometric_seq_len_param);
+            double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
 
             if (GRASP.VERBOSE) {
-                System.out.println("Computing prefix sums for segment assignment...");
+                System.out.println("Assigning optimal indel rate segments...");
             }
-            double[][] prefix_sums = IndelDist.computePrefixSums(columnPriors);
 
+            int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, IndelSegmentation.RATE_PRIORS,
+                    prefix_sums);
+
+            int[] columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
             if (GRASP.VERBOSE) {
-                System.out.println("Assigning optimal rate segments...");
+                for (int i = 0; i < columnRateCategories.length; i++) {
+                    System.out.println("Column " + i + ": indel rate category: " + columnRateCategories[i]);
+                }
             }
-
-            int[][] segments = IndelDist.assignSegments(columnPriors.length, IndelDist.RATE_PRIORS,
-                    prefix_sums, IndelDist.RHO);
-
-            int[] columnRateCategories = IndelDist.expandSegmentOrder(segments);
-
             double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
 
-            double minDist = Double.POSITIVE_INFINITY;
-            double maxDist = Double.NEGATIVE_INFINITY;
             // adjust each length by the assigned rate category
             for (int rateIdx = 0; rateIdx < rates.length; rateIdx++) {
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                     // adjust each length by the assigned rate category
                     double adjustedDist = rates[rateIdx] * tree.getDistance(bpidx);
                     rateAdjustedDists[rateIdx][bpidx] = adjustedDist;
-                    if (adjustedDist < minDist) {
-                        minDist = adjustedDist;
-                    }
-                    if (adjustedDist > maxDist) {
-                        maxDist = adjustedDist;
-                    }
                 }
             }
-
-            double binRange = (maxDist - minDist) / 2;
 
             for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                 int rateIdx = columnRateCategories[colIdx];
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                    int assignedBin = Math.min(GAP_PENALTIES.length - 1, (int) ((rateAdjustedDists[rateIdx][bpidx] + (binRange / 2) - minDist) / binRange));
-                    treeNeighbourAlphaPen[colIdx][bpidx] = GAP_PENALTIES[assignedBin];
+                    treeNeighbourAlphaPen[colIdx][bpidx] = rateAdjustedDists[rateIdx][bpidx];
                 }
             }
 
@@ -874,263 +353,331 @@ public class Mip {
         return treeNeighbourAlphaPen;
     }
 
+    private GapSubstModel createGapSubstModel(double optimal_mu) {
+        GapSubstModel gapModel;
+        switch (substModelName) {
+            case "JTT" -> gapModel = new JTTGap(optimal_mu, optimal_mu);
+            case "JC" -> gapModel = new JCGap(optimal_mu, optimal_mu);
+            case "LG" -> gapModel = new LGGap(optimal_mu, optimal_mu);
+            case "Dayhoff" -> gapModel = new DayhoffGap(optimal_mu, optimal_mu);
+            case "WAG" -> gapModel = new WAGGap(optimal_mu, optimal_mu);
+            case "Yang" -> gapModel = new YangGap(optimal_mu, optimal_mu);
+            default -> throw new IllegalArgumentException("Unrecognized gap substitution model: " + substModelName);
+        }
+        return gapModel;
+    }
+
     /**
      * Create integer position variables for ancestor sequences bounded between 0 and 1. These represent the
      * actual sequence positions for each ancestor in the tree.
-     *
-     * @param tree the phylogenetic tree
-     * @param solver the MIP solver
-     * @param seqLength the length of the sequences in the alignment
-     * @return a map of ancestor indices to their corresponding position variables
      */
-    private static HashMap<Integer, MPVariable[]> createAncestralPositionVariables(IdxTree tree, MPSolver solver, int seqLength) {
+    private void createAncestralPositionVariables() {
 
         HashMap<Integer, MPVariable[]> ancestorSeqVars = new HashMap<>();
         for (int ancestorIdx : tree.getAncestors()) {
-            MPVariable[] seqVars = new MPVariable[seqLength];
-            for (int j = 0; j < seqLength; j++) {
-                // NOTE: May want to check that create labels won't create large memory usage.
-                seqVars[j] = solver.makeBoolVar(""); //0, 1, "");
-
+            MPVariable[] seqVars = new MPVariable[nPos];
+            for (int j = 0; j < nPos; j++) {
+                if (this.nodesToSkip.contains(j)) {
+                    seqVars[j] = seqVars[j - 1];
+                } else {
+                    seqVars[j] = solver.makeBoolVar("");
+                }
             }
             ancestorSeqVars.put(ancestorIdx, seqVars);
         }
 
-        return ancestorSeqVars;
-
+        this.ancestorPositionVars = ancestorSeqVars;
     }
 
-    private static void addEdgeConstraintsAncestors(IdxTree tree, POAGraph alnPOG,
-                                                                            MPSolver solver,
-                                                                            HashMap<Integer, MPVariable[]> ancestralPositionVars
-                                                                            ) {
+    public static int[] append(int[] arr, int val) {
+        int[] out = Arrays.copyOf(arr, arr.length + 1);
+        out[arr.length] = val;
+        return out;
+    }
 
-        int VIRTUAL_START = -1;
-        int VIRTUAL_END = alnPOG.maxsize();
+    private void createEdgeVariables() {
 
-        HashMap<EdgeKey, MPVariable> allEdgeVars = new HashMap<>();
 
-        int[] ancestors = tree.getAncestors();
-        for (int ancestorIdx : ancestors) {
+        int[] startIndices = alnPog.getStarts();
+        this.nodesConnectedToPreviousNode.remove(VIRTUAL_START + 1);
+        this.nodesConnectedToPreviousNode.remove(virtualEndIdx);
+
+
+        for (int ancestorIdx : tree.getAncestors()) {
 
             // VIRTUAL STARTS TO REAL STARTS //
-            int[] startIndices = alnPOG.getStarts();
-            MPVariable[] allEdgesFromVirtualStart = new MPVariable[startIndices.length];
-            for (int positionTo = 0; positionTo < startIndices.length; positionTo++) {
-
-                // Variable for each edge from start node
-                MPVariable edge = solver.makeBoolVar("");// makeIntVar(0, 1, "");
-                allEdgesFromVirtualStart[positionTo] = edge;
-
-                // save unique edge/ancestor combination to a map for later use
-                EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, startIndices[positionTo], ancestorIdx);
-                allEdgeVars.put(edgeKey, edge);
+            for (int edgeEnd : startIndices) {
+                // Variable for each edge from virtual start to a "real" start node
+                MPVariable edge = solver.makeBoolVar("");
+                EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, edgeEnd, ancestorIdx);
+                edges.put(edgeKey, edge);
             }
 
-            // Constraint: exactly one edge must be chosen from virtual start to actual starts
-            MPConstraint virtualStartConstraint = solver.makeConstraint(1, 1);
-            for (MPVariable edgeVar : allEdgesFromVirtualStart) {
-                virtualStartConstraint.setCoefficient(edgeVar, 1);
-            }
+            for (int nodeIdx = 0; nodeIdx < alnPog.maxsize(); nodeIdx++) {
+                // first go through and find nodes where we actually need edge variables
+                if (!this.nodesToSkip.contains(nodeIdx + 1)) { // next node is not skipped
+                    if (!this.nodesConnectedToPreviousNode.contains(nodeIdx + 1)) { // current node not connected to adjacent node
+                        if (getForwardEdges(nodeIdx).length == 1) {
+                            for (int posTo : getForwardEdges(nodeIdx)) {
+                                // node has one outgoing edge, outgoing edge is implicit on this node being activated
+                                EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
+                                this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
+                            }
+                        } else {
+                            for (int posTo : getForwardEdges(nodeIdx)) {
+                                EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
+                                MPVariable edge;
+                                if (getBackwardEdges(posTo).length == 1) {
+                                    edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
+                                } else {
+                                    edge = solver.makeBoolVar("");
+                                }
+                                this.edges.put(edgeKey, edge);
+                            }
 
-            // FULLY CONNECTED NODES //
-            int[] endIndices = alnPOG.getEnds();
-            for (int nodeIdx = 0; nodeIdx < alnPOG.maxsize(); nodeIdx++) {
+                            addEdgeConstraint(ancestorIdx, nodeIdx);
+                        }
+                    } else { // connected to the adjacent node
+                        List<MPVariable> all_edges_from_pos = new ArrayList<>();
+                        List<MPVariable> all_edges_to_pos1 = new LinkedList<>();
 
-                // EDGES GOING OUT //
-                int[] forwardEdges = alnPOG.getNodeIndices(nodeIdx, true);
-                int numEdgesToEnd = (alnPOG.isEndNode(nodeIdx) ? 1 : 0);
-                int totalForwardEdges = forwardEdges.length + numEdgesToEnd;
+                        for (int posTo : getForwardEdges(nodeIdx)) {
+                            if (posTo == (nodeIdx + 1)) {
+                                continue;
+                            }
+                            MPVariable edge;
+                            if (getBackwardEdges(posTo).length == 1) {
+                                edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
+                            } else {
+                                EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
+                                edge = solver.makeBoolVar("");
+                                this.edges.put(edgeKey, edge);
+                            }
+                            all_edges_from_pos.add(edge);
+                        }
 
-                MPVariable[] forwardEdgesFromNode = new MPVariable[totalForwardEdges];
-                for (int positionTo = 0; positionTo < forwardEdges.length; positionTo++) {
+                        for (int posFrom : getBackwardEdges(nodeIdx + 1)) {
+                            if (posFrom == nodeIdx) {
+                                continue;
+                            }
+                            MPVariable edge = this.edges.get(new EdgeKey(posFrom, nodeIdx + 1, ancestorIdx));
+                            all_edges_to_pos1.add(edge);
+                        }
 
-                    MPVariable edge = solver.makeBoolVar(""); //0, 1, "");
+                        MPConstraint constraint = solver.makeConstraint(0, 0);
+                        MPVariable nodePlusOne = this.ancestorPositionVars.get(ancestorIdx)[nodeIdx + 1];
+                        constraint.setCoefficient(nodePlusOne, constraint.getCoefficient(nodePlusOne) + 1);
 
-                    int edgeEnd = forwardEdges[positionTo];
-                    forwardEdgesFromNode[positionTo] = edge;
-
-
-                    EdgeKey edgeKey = new EdgeKey(nodeIdx, edgeEnd, ancestorIdx);
-                    allEdgeVars.put(edgeKey, edge);
+                        MPVariable node = this.ancestorPositionVars.get(ancestorIdx)[nodeIdx];
+                        constraint.setCoefficient(node, constraint.getCoefficient(node) + -1);
+                        addConstraintSum(constraint, all_edges_from_pos, 1);
+                        addConstraintSum(constraint, all_edges_to_pos1, -1);
+                    }
                 }
 
-                if (numEdgesToEnd == 1) {
-                    MPVariable edgeToEnd = solver.makeBoolVar(""); //0, 1, "");
-                    forwardEdgesFromNode[totalForwardEdges - 1] = edgeToEnd;
-
-                    EdgeKey edgeKey = new EdgeKey(nodeIdx, VIRTUAL_END, ancestorIdx);
-
-                    allEdgeVars.put(edgeKey, edgeToEnd);
+                if (!this.nodesToSkip.contains(nodeIdx) && !this.nodesConnectedToPreviousNode.contains(nodeIdx)) {
+                    if (getBackwardEdges(nodeIdx).length > 1 ||
+                            getForwardEdges(Arrays.stream(getBackwardEdges(nodeIdx)).min().orElseThrow()).length == 1) {
+                        addEdgeConstraint(ancestorIdx, nodeIdx);
+                    }
                 }
-
-                // Constraint: sum(edges) - position variable == 0
-                // Which is equivalent to: sum(edges) == positionVar
-                MPConstraint forwardConstraint = solver.makeConstraint(0, 0);
-                for (MPVariable edgeVar : forwardEdgesFromNode) {
-                    forwardConstraint.setCoefficient(edgeVar, 1);
-                }
-
-                MPVariable ancestralNode = ancestralPositionVars.get(ancestorIdx)[nodeIdx];
-                forwardConstraint.setCoefficient(ancestralNode, -1);
-
-                // EDGES COMING IN //
-                int[] backwardEdges = alnPOG.getNodeIndices(nodeIdx, false);
-                int numEdgesFromStart = (alnPOG.isStartNode(nodeIdx) ? 1 : 0);
-                int totalBackwardEdges = backwardEdges.length + numEdgesFromStart;
-
-                MPVariable[] backwardEdgesFromNode = new MPVariable[totalBackwardEdges];
-                for (int positionTo = 0; positionTo < backwardEdges.length; positionTo++) {
-
-                    int edgeComingIn = backwardEdges[positionTo];
-
-                    EdgeKey edgeKey = new EdgeKey(edgeComingIn, nodeIdx, ancestorIdx);
-                    MPVariable edge = allEdgeVars.get(edgeKey);
-                    backwardEdgesFromNode[positionTo] = edge;
-                }
-
-                if (numEdgesFromStart == 1) {
-                    EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, nodeIdx, ancestorIdx);
-                    MPVariable edge = allEdgeVars.get(edgeKey);
-
-                    backwardEdgesFromNode[totalBackwardEdges - 1] = edge;
-                }
-
-                // Constraint: sum(edges) - position variable == 0
-                // Which is equivalent to: sum(edges) == positionVar
-                MPConstraint backwardConstraint = solver.makeConstraint(0, 0);
-                for (MPVariable edgeVar : backwardEdgesFromNode) {
-                    backwardConstraint.setCoefficient(edgeVar, 1);
-                }
-                backwardConstraint.setCoefficient(ancestralNode, -1);
-            }
-
-            // REAL ENDS TO VIRTUAL ENDS //
-            MPVariable[] allEdgesToVirtualEnd = new MPVariable[endIndices.length];
-            for (int positionFrom = 0; positionFrom < endIndices.length; positionFrom++) {
-                EdgeKey edgeKey = new EdgeKey(endIndices[positionFrom], VIRTUAL_END, ancestorIdx);
-                allEdgesToVirtualEnd[positionFrom] = allEdgeVars.get(edgeKey);
-            }
-
-            MPConstraint virtualEndConstraint = solver.makeConstraint(1, 1);
-            for (MPVariable edgeVar : allEdgesToVirtualEnd) {
-                virtualEndConstraint.setCoefficient(edgeVar, 1);
             }
         }
     }
 
+    private void addEdgeConstraint(int ancestorIdx, int nodeIdx) {
+        int iPrimeIndex = Arrays.stream(getBackwardEdges(nodeIdx)).max().orElseThrow();
+        MPVariable aKIPrime = null;
+        double constant = 0;
+        if (iPrimeIndex == VIRTUAL_START) {
+            constant = 1;
+        } else {
+            aKIPrime = this.ancestorPositionVars.get(ancestorIdx)[iPrimeIndex];
+        }
 
-    private static void addPenaltyConstraints(IdxTree tree,
-                                              HashMap<Integer, Integer[]> extantBinarySeqs,
-                                              double[][] treeNeighbourAlphaPen,
-                                              HashMap<Integer, MPVariable[]> ancestorPositionVars,
-                                              int seqLength,
-                                              MPSolver solver,
-                                              MPObjective objective) {
+        List<MPVariable> edgesBypassingI = new LinkedList<>();
+        for (int posTo : getForwardEdges(iPrimeIndex)) {
+            if (posTo <= nodeIdx) {
+                continue;
+            }
+            MPVariable edge;
+            if (getBackwardEdges(posTo).length == 1) {
+                edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
+            } else {
+                edge = this.edges.get(new EdgeKey(iPrimeIndex, posTo, ancestorIdx));
+            }
+            edgesBypassingI.add(edge);
+        }
 
+        List<MPVariable> edgesBypassingIPrime = new LinkedList<>();
+        for (int posFrom : getBackwardEdges(nodeIdx)) {
+            if (posFrom == iPrimeIndex) {
+                continue;
+            }
+            MPVariable edge = this.edges.get(new EdgeKey(posFrom, nodeIdx, ancestorIdx));
+            edgesBypassingIPrime.add(edge);
+        }
+
+        MPConstraint constraint = solver.makeConstraint(constant, constant);
+        // nodes can also exist as edges, need to account for this in the constraint coefficients
+        double ancExisting = constraint.getCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
+        constraint.setCoefficient(this.ancestorPositionVars.get(ancestorIdx)[nodeIdx], ancExisting + 1);
+        if (aKIPrime != null) {
+            double existing = constraint.getCoefficient(aKIPrime);
+            constraint.setCoefficient(aKIPrime, existing + -1);
+        }
+        addConstraintSum(constraint, edgesBypassingI, 1);
+        addConstraintSum(constraint, edgesBypassingIPrime, -1);
+    }
+
+    private int[] getForwardEdges(int nodeIdx) {
+
+        int[] forwardEdges;
+        if (nodeIdx == VIRTUAL_START) {
+            forwardEdges = alnPog.getStarts();
+        } else {
+            forwardEdges = alnPog.getNodeIndices(nodeIdx, true);
+        }
+
+        if (alnPog.isEndNode(nodeIdx)) {
+            forwardEdges = append(forwardEdges, virtualEndIdx);
+        }
+
+        return forwardEdges;
+
+    }
+
+    private int[] getBackwardEdges(int nodeIdx) {
+
+        int[] backwardEdges;
+        if (nodeIdx == virtualEndIdx) {
+            backwardEdges = alnPog.getEnds();
+        } else {
+            backwardEdges = alnPog.getNodeIndices(nodeIdx, false);
+        }
+
+        if (alnPog.isStartNode(nodeIdx)) {
+            backwardEdges = append(backwardEdges, VIRTUAL_START);
+        }
+
+        return backwardEdges;
+
+    }
+
+
+    private void addConstraintSum(MPConstraint constraint, List<MPVariable> vars, double coefficient) {
+        for (MPVariable var : vars) {
+            double existing = constraint.getCoefficient(var);
+            constraint.setCoefficient(var, existing + coefficient);
+        }
+    }
+
+
+    private void addPenaltyConstraints() {
 
 
         for (int ancestralIdx : tree.getAncestors()) {
 
             MPVariable[] nodePosVar = ancestorPositionVars.get(ancestralIdx);
 
-
             for (int childIdx : tree.getChildren(ancestralIdx)) {
 
-                MPVariable[] pen = new MPVariable[seqLength];
-                for (int i = 0; i < seqLength; i++) {
-                    pen[i] = solver.makeBoolVar("");//0, 1, "");
-                }
+                MPVariable[] pen = new MPVariable[nPos];
 
                 Integer[] nodeNeighbourPosVar = null;
                 MPVariable[] nodeNeighborPosVarAncestor = null;
                 MPVariable[] diffPos = null;
 
+                boolean isExtant = false;
                 if (tree.isLeaf(childIdx)) {
                     nodeNeighbourPosVar = extantBinarySeqs.get(childIdx);
+                    isExtant = true;
                 } else {
                     nodeNeighborPosVarAncestor = ancestorPositionVars.get(childIdx);
+                    MPVariable lastVar = null;
 
-                    diffPos = new MPVariable[seqLength];
-                    for (int i = 0; i < seqLength; i++) {
-                        diffPos[i] = solver.makeBoolVar("");// 0, 1, "");
+                    diffPos = new MPVariable[nPos];
+                    for (int pos = 0; pos < nPos; pos++) {
+                        if (this.nodesToSkip.contains(pos)) {
+                            diffPos[pos] = lastVar;
+                        } else {
+                            diffPos[pos] = solver.makeBoolVar("");
+                            lastVar = diffPos[pos];
+                        }
                     }
                 }
 
-                MPVariable diffVar = null;
-                MPVariable prevDiffVar = null;
-                for (int pos = 0; pos < seqLength; pos++) {
+                for (int pos = 0; pos < nPos; pos++) {
+                    if (isExtant) {
 
-                    if (pos > 0) {
-                        prevDiffVar = diffVar;
-                    }
-
-                    if (tree.isLeaf(childIdx)) {
+                        if (this.nodesToSkip.contains(pos)) {
+                            this.diff.put(new DiffKey(ancestralIdx, childIdx, pos),
+                                    this.diff.get(new DiffKey(ancestralIdx, childIdx, pos - 1)));
+                            continue;
+                        }
 
                         // constraint - difference variables
-                        diffVar = solver.makeBoolVar("");
+
                         if (nodeNeighbourPosVar[pos] == 1) {
                             // constraint: diff == 1 - nodePosVar[pos]
                             // rearrange: diff + nodePosVar[pos] == 1
+                            MPVariable diffVar = solver.makeBoolVar("");
                             MPConstraint c = solver.makeConstraint(1, 1);
                             c.setCoefficient(diffVar, 1.0);
                             c.setCoefficient(nodePosVar[pos], 1.0);
-                        } else {
-                            //diffVar = nodePosVar[pos];
-                            // diffVar - nodePosVar[pos] == 0
-                            MPConstraint c = solver.makeConstraint(0, 0);
-                            c.setCoefficient(diffVar, 1);
-                            c.setCoefficient(nodePosVar[pos], -1);
+                            this.diff.put(new DiffKey(ancestralIdx, childIdx, pos), diffVar);
 
+                        } else if (nodeNeighbourPosVar[pos] == 0) {
+                            this.diff.put(new DiffKey(ancestralIdx, childIdx, pos), nodePosVar[pos]);
                         }
-                        objective.setCoefficient(diffVar, 1.0);
 
-                        // penalty constraints
+                        // gap penalty constraints
                         if (pos == 0) {
                             // pen[0] == diff[0]
-                            // Rewrite as: pen[1] - diff[1] == 0
+                            pen[pos] = solver.makeBoolVar("");
                             MPConstraint c = solver.makeConstraint(0, 0);
                             c.setCoefficient(pen[pos], 1.0);
-                            c.setCoefficient(diffVar, -1.0);
+                            c.setCoefficient(this.diff.get(new DiffKey(ancestralIdx, childIdx, pos)), -1.0);
                         } else {
 
-                            // constraint: pen[pos]>= diff[(node, node_neighbor_item, pos)] - diff[(node, node_neighbor_item, pos - 1)])
-                            // rearrange: pen[pos] -  diff[(node, node_neighbor_item, pos)] + diff[(node, node_neighbor_item, pos - 1)]) >= 0
-                            MPConstraint c1 = solver.makeConstraint(0, Double.POSITIVE_INFINITY);
-                            c1.setCoefficient(pen[pos], 1.0);
+                            if (nodeNeighbourPosVar[pos - 1] == 1 && nodeNeighbourPosVar[pos] == 0) {
+                                pen[pos] = nodePosVar[pos];
 
-                            c1.setCoefficient(diffVar, -1.0);
+                            } else if (nodeNeighbourPosVar[pos - 1] == 0 && nodeNeighbourPosVar[pos] == 1) {
+                                pen[pos] = solver.makeBoolVar("");
+                                MPConstraint constraint = solver.makeConstraint(1,1);
+                                constraint.setCoefficient(pen[pos], 1);
+                                constraint.setCoefficient(nodePosVar[pos], 1);
 
-                            c1.setCoefficient(prevDiffVar, 1.0);
+                            } else if (nodeNeighbourPosVar[pos - 1] == 1 && nodeNeighbourPosVar[pos] == 1) {
+                                pen[pos] = solver.makeBoolVar("");
+                                MPConstraint constraint = solver.makeConstraint(0,Double.POSITIVE_INFINITY);
+                                constraint.setCoefficient(pen[pos], 1.0);
+                                constraint.setCoefficient(nodePosVar[pos - 1], -1.0);
+                                constraint.setCoefficient(nodePosVar[pos], 1.0);
 
-                            // Constraint: pen[pos] >= node_neighbor_pos_var[pos - 1] + (1 - node_pos_var[pos - 1]) + (1 - node_neighbor_pos_var[pos]) + node_pos_var[pos] - 3
-                            // because these neighbours are children, we can just evaluate everything on right hand side
-                            // rearrange: pen[pos] + node_pos_var[pos - 1] - node_pos_var[pos] >= node_neighbor_pos_var[pos - 1] + 1 + (1 - node_neighbor_pos_var[pos]) - 3
-                            // rearrange: pen[pos] + node_pos_var[pos - 1] - node_pos_var[pos] >= node_neighbor_pos_var[pos - 1] - node_neighbor_pos_var[pos] - 1
-                            double rhs2 = nodeNeighbourPosVar[pos - 1] - nodeNeighbourPosVar[pos] - 1;
-                            MPConstraint c2 = solver.makeConstraint(rhs2, Double.POSITIVE_INFINITY);
-                            c2.setCoefficient(pen[pos], 1.0);
-                            c2.setCoefficient(nodePosVar[pos - 1], 1.0);
-                            c2.setCoefficient(nodePosVar[pos], -1.0);
-
-                            // Constraint: pen[pos] >= node_neighbor_pos_var[pos] + (1 - node_pos_var[pos]) + (1 - node_neighbor_pos_var[pos - 1]) + node_pos_var[pos - 1] - 3
-                            // Rearrange: pen[pos] + node_pos_var[pos] - node_pos_var[pos - 1]  >= node_neighbor_pos_var[pos] + 1 + (1 - node_neighbor_pos_var[pos - 1]) - 3
-                            // Rearrange: pen[pos] + node_pos_var[pos] - node_pos_var[pos - 1]  >= node_neighbor_pos_var[pos] - node_neighbor_pos_var[pos - 1]) - 1
-                            double rhs3 = nodeNeighbourPosVar[pos] - nodeNeighbourPosVar[pos - 1] - 1;
-                            MPConstraint c3 = solver.makeConstraint(rhs3, Double.POSITIVE_INFINITY);
-                            c3.setCoefficient(pen[pos], 1.0);
-                            c3.setCoefficient(nodePosVar[pos], 1.0);
-                            c3.setCoefficient(nodePosVar[pos - 1], -1.0);
+                            } else if (nodeNeighbourPosVar[pos - 1] == 0 && nodeNeighbourPosVar[pos] == 0) {
+                                pen[pos] = solver.makeBoolVar("");
+                                MPConstraint constraint = solver.makeConstraint(0, Double.POSITIVE_INFINITY);
+                                constraint.setCoefficient(pen[pos], 1.0);
+                                constraint.setCoefficient(nodePosVar[pos], -1.0);
+                                constraint.setCoefficient(nodePosVar[pos - 1], 1.0);
+                            }
                         }
 
 
-                        //MPVariable objDiffVar = ((MPVariable[])diff.get(new Triplet(ancestralIdx, childIdx, pos)))[0];
-                        //objective.setCoefficient(objDiffVar, 1.0);
-                        //objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
-                        objective.setCoefficient(pen[pos], treeNeighbourAlphaPen[pos][childIdx]);
+                        objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
+                        DiffKey diffKey = new DiffKey(ancestralIdx, childIdx, pos);
+                        objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos]);
 
                     } else {
-                        //diff_pos[pos] <= node_pos_var[pos] + node_neighbor_pos_var[pos]
+
+                        if (this.nodesToSkip.contains(pos)) {
+                            continue;
+                        }
+
+                        //Absolute difference constraints
+                        // diff_pos[pos] <= node_pos_var[pos] + node_neighbor_pos_var[pos]
                         MPConstraint c1 = solver.makeConstraint(Double.NEGATIVE_INFINITY, 0);
                         c1.setCoefficient(diffPos[pos], 1.0);
                         c1.setCoefficient(nodePosVar[pos], -1.0);
@@ -1154,34 +701,76 @@ public class Mip {
                         c4.setCoefficient(nodeNeighborPosVarAncestor[pos], 1.0);
                         c4.setCoefficient(nodePosVar[pos], 1.0);
 
+                        c1.setIsLazy(true);
+                        c4.setIsLazy(true);
+
+                        pen[pos] = solver.makeBoolVar("");
                         if (pos == 0) {
                             MPConstraint c5 = solver.makeConstraint(0, 0);
                             c5.setCoefficient(pen[pos], 1.0);
                             c5.setCoefficient(diffPos[pos], -1.0);
                         } else {
-                            MPConstraint c6 = solver.makeConstraint(0, Double.POSITIVE_INFINITY);
-                            c6.setCoefficient(pen[pos], 1.0);
-                            c6.setCoefficient(diffPos[pos], -1.0);
-                            c6.setCoefficient(diffPos[pos - 1], 1.0);
+                            List<MPVariable> parentEdgesBypassingI = new LinkedList<>();
+                            List<MPVariable> childEdgesBypassingI = new LinkedList<>();
+                            // get the set of edges that leave i-1 AND BYPASS i
+                            for (int posTo : getForwardEdges(pos - 1)) {
 
-                            MPConstraint c7 = solver.makeConstraint(-1.0, Double.POSITIVE_INFINITY);
-                            c7.setCoefficient(pen[pos], 1.0);
-                            c7.setCoefficient(nodeNeighborPosVarAncestor[pos - 1], -1.0);
-                            c7.setCoefficient(nodePosVar[pos - 1], 1.0);
-                            c7.setCoefficient(nodeNeighborPosVarAncestor[pos], 1.0);
-                            c7.setCoefficient(nodePosVar[pos], -1.0);
+                                if (posTo > pos) {
+                                    MPVariable parentEdge;
+                                    MPVariable childEdge;
+                                    if (getBackwardEdges(posTo).length == 1) {
+                                        parentEdge = nodePosVar[posTo];
+                                        childEdge = nodeNeighborPosVarAncestor[posTo];
+                                    } else {
+                                        parentEdge = this.edges.get(new EdgeKey(pos - 1, posTo, ancestralIdx));
+                                        childEdge = this.edges.get(new EdgeKey(pos - 1, posTo, childIdx));
+                                    }
+                                    parentEdgesBypassingI.add(parentEdge);
+                                    childEdgesBypassingI.add(childEdge);
+                                }
+                            }
 
-                            MPConstraint c8 = solver.makeConstraint(-1.0, Double.POSITIVE_INFINITY);
-                            c8.setCoefficient(pen[pos], 1.0);
-                            c8.setCoefficient(nodeNeighborPosVarAncestor[pos], -1.0);
-                            c8.setCoefficient(nodePosVar[pos], 1.0);
-                            c8.setCoefficient(nodeNeighborPosVarAncestor[pos - 1], 1.0);
-                            c8.setCoefficient(nodePosVar[pos - 1], -1.0);
+                            // get the set of edges that enter i and bypass i-1
+                            List<MPVariable> parentEdgesBypassingIMinus1 = new LinkedList<>();
+                            List<MPVariable> childEdgesBypassingIMinus1 = new LinkedList<>();
+
+                            for (int posFrom : getBackwardEdges(pos)) {
+
+                                if (posFrom < pos - 1) {
+
+                                    MPVariable parentEdge;
+                                    MPVariable childEdge;
+                                    if (getBackwardEdges(pos).length == 1) {
+                                        parentEdge = nodePosVar[pos];
+                                        childEdge = nodeNeighborPosVarAncestor[pos];
+                                    } else {
+                                        parentEdge = this.edges.get(new EdgeKey(posFrom, pos, ancestralIdx));
+                                        childEdge = this.edges.get(new EdgeKey(posFrom, pos, childIdx));
+                                    }
+
+                                    parentEdgesBypassingIMinus1.add(parentEdge);
+                                    childEdgesBypassingIMinus1.add(childEdge);
+                                }
+                            }
+
+                            MPConstraint parentConstraint = solver.makeConstraint(-1, Double.POSITIVE_INFINITY);
+                            parentConstraint.setCoefficient(pen[pos], 1.0);
+                            parentConstraint.setCoefficient(diffPos[pos], -1.0);
+                            addConstraintSum(parentConstraint, parentEdgesBypassingI, -1);
+                            addConstraintSum(parentConstraint, parentEdgesBypassingIMinus1, -1);
+
+                            MPConstraint childConstraint = solver.makeConstraint(-1, Double.POSITIVE_INFINITY);
+                            childConstraint.setCoefficient(pen[pos], 1.0);
+                            childConstraint.setCoefficient(diffPos[pos], -1.0);
+                            addConstraintSum(childConstraint, childEdgesBypassingI, -1);
+                            addConstraintSum(childConstraint, childEdgesBypassingIMinus1, -1);
+
                         }
 
-                        objective.setCoefficient(diffPos[pos], 1.0);
-                        //objective.setCoefficient(pen[pos], DEFAULT_GAP_PENALTY);
-                        objective.setCoefficient(pen[pos], treeNeighbourAlphaPen[pos][childIdx]);
+                        double existingPen = objective.getCoefficient(pen[pos]);
+                        objective.setCoefficient(pen[pos], existingPen + treeNeighbourAlphaPen[pos][childIdx]);
+                        double existingDiff = objective.getCoefficient(diffPos[pos]);
+                        objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
                     }
                 }
             }
@@ -1192,153 +781,7 @@ public class Mip {
      * Create a unique key for an edge in the POG associated with a specific ancestor.
      * Allows this to be used as a key in hash maps.
      */
-    public record EdgeKey(int from, int to, int ancestorIdx) {}
+    record EdgeKey(int from, int to, int ancestorIdx) {}
+    record DiffKey(int ancestorIdx, int childIdx, int pos) {}
 
-    /**
-     * Error codes for the program
-     */
-    public enum ERROR {
-        SUCCESS(0, null),
-        ALN(1, "Must specify alignment (--aln <Clustal or FASTA file>)"),
-        NWK( 2, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>)"),
-        UNKNOWN(3, "Unknown option or missing required argument: "),
-        IO(4, "Failed to read or write files: "),
-        SUB_MODEL(5, "Could not find model with ID "),
-        MIP_ENGINE(6, "Could not create MIP solver with "),
-        INVALID_SOLVER(7, " is not a valid solver name for option --solver");
-
-        private final int code;
-        private final String description;
-
-        ERROR(int code, String description) {
-            this.code = code;
-            this.description = description;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public int getCode() {
-            return code;
-        }
-    }
-
-    public static void usage(int error_code, String msg) {
-        PrintStream out = System.out;
-        if (error_code != 0)
-            out = System.err;
-
-        out.println("""
-                Usage: asr.Mip\s
-                \t[-a | --aln <filename>]
-                \t[-n | --nwk <filename>]
-                \t{-s | --substitution-model <JTT(default)}
-                \t{-t | --threads <number>}
-                \t{-pre | --prefix <stub>}
-                \t{-o | --output-folder <foldername>} (default is current working folder, or input folder if available)
-                \t{-so | --solver <SCIP (default), Gurobi, CPSAT>}
-                \t-h (or --help) will print out this screen
-                """
-        );
-
-        if (msg != null) {
-            out.println("\n" + msg + "(Error code " + error_code + ")");
-        }
-        System.exit(error_code);
-    }
-
-    public static void usage() {
-        usage(ERROR.SUCCESS.getCode(), ERROR.SUCCESS.getDescription());
-    }
-
-    public static HashMap<String, Object> createArgMap(String[] args) {
-
-        HashMap<String, Object> argMap = new HashMap<>();
-
-        parseArgs(args, argMap);
-
-        checkArgsValid(argMap);
-
-        return argMap;
-    }
-
-    private static void parseArgs(String[] args, HashMap<String, Object> argMap) {
-        // Read in all the arguments
-        for (int a = 0; a < args.length; a++) {
-            if (args[a].startsWith("-")) {
-                String arg = args[a].substring(1);
-                if (((arg.equalsIgnoreCase("-aln")) || (arg.equalsIgnoreCase("a"))) && args.length > a + 1) {
-                    argMap.put("ALIGNMENT", args[++a]);
-                } else if ((arg.equalsIgnoreCase("-output-folder") || arg.equalsIgnoreCase("o")) && args.length > a + 1) {
-                    argMap.put("OUTPUT", args[++a]);
-                } else if (((arg.equalsIgnoreCase("-nwk")) || (arg.equalsIgnoreCase("n"))) && args.length > a + 1) {
-                    argMap.put("NEWICK", args[++a]);
-                } else if ((arg.equalsIgnoreCase("-prefix") || arg.equalsIgnoreCase("pre")) && args.length > a + 1) {
-                    argMap.put("PREFIX", args[++a]);
-                } else if ((arg.equalsIgnoreCase("-solver") || arg.equalsIgnoreCase("so")) && args.length > a + 1) {
-                    boolean foundSolver = false;
-                    for (int i = 0; i < SOLVERS.length; i++) {
-                        if (args[a + 1].equalsIgnoreCase(SOLVERS[i])) {
-                            SOLVER_IDX = i;
-                            foundSolver = true;
-                        }
-                    }
-                    if (!foundSolver) {
-                        usage(ERROR.INVALID_SOLVER.getCode(), args[a + 1] + ERROR.INVALID_SOLVER.getDescription());
-                    }
-                } else if ((arg.equalsIgnoreCase("-threads") || arg.equalsIgnoreCase("t")) && args.length > a + 1) {
-                    try {
-                        argMap.put("THREADS", Integer.parseInt(args[++a]));
-                    } catch (NumberFormatException e) {
-                        System.err.println("Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
-                    }
-                } else if ((arg.equalsIgnoreCase("-substitution-model") || arg.equalsIgnoreCase("s")) && args.length > a + 1) {
-                    boolean model_found = false;
-                    for (int i = 0; i < MODELS.length; i++) {
-                        if (args[a + 1].equalsIgnoreCase(MODELS[i])) {
-                            model_found = true;
-                            argMap.put("MODEL_IDX", i);
-                        }
-                    }
-
-                    if (!model_found) {
-                        usage(ERROR.SUB_MODEL.getCode(), ERROR.SUB_MODEL.getDescription() + args[a + 1]);
-                    }
-                } else if ((arg.equalsIgnoreCase("-input-folder") || arg.equalsIgnoreCase("i")) && args.length > a + 1) {
-                    argMap.put("INPUT", args[++a]);
-                } else {
-                        usage(ERROR.UNKNOWN.getCode(), ERROR.UNKNOWN.getDescription() + "\" + args[a] + \"");
-                    }
-            }
-        }
-    }
-
-    private static void checkArgsValid(HashMap<String, Object> argMap) {
-
-        String ALIGNMENT = (String) argMap.get("ALIGNMENT");
-        String INPUT = (String) argMap.get("INPUT");
-        String OUTPUT = (String) argMap.get("OUTPUT");
-        String PREFIX = (String) argMap.get("PREFIX");
-
-        if (!argMap.containsKey("ALIGNMENT")) {
-            usage(ERROR.ALN.getCode(), ERROR.ALN.getDescription());
-        } else if (!argMap.containsKey("NEWICK")) {
-            usage(ERROR.NWK.getCode(), ERROR.NWK.getDescription());
-        } else if (OUTPUT == null) {
-            OUTPUT = INPUT == null ? "." : INPUT;
-        }
-
-        if (PREFIX == null) { // default prefix is the (prefix of) alignment filename
-            int idx2 = ALIGNMENT == null ? 0 : ALIGNMENT.lastIndexOf(".");
-            if (idx2 == -1)
-                idx2 = ALIGNMENT.length();
-            int idx1 = ALIGNMENT == null ? 0 : ALIGNMENT.lastIndexOf("/") + 1;
-            PREFIX = ALIGNMENT == null ? "" : ALIGNMENT.substring(idx1, idx2);
-        }
-
-        argMap.put("OUTPUT", OUTPUT);
-        argMap.put("PREFIX", PREFIX);
-
-    }
 }

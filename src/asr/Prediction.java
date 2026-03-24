@@ -1,7 +1,12 @@
 package asr;
 
+import bn.BNode;
+import bn.ctmc.GapSubstModel;
 import bn.ctmc.SubstModel;
+import bn.ctmc.SubstNode;
 import bn.ctmc.matrix.JC;
+import bn.ctmc.matrix.JCGap;
+import bn.ctmc.matrix.JTTGap;
 import bn.prob.EnumDistrib;
 import com.google.ortools.Loader;
 import dat.EnumSeq;
@@ -1652,30 +1657,36 @@ public class Prediction {
         return new Prediction(pogTree, ancestors);
     }
 
+
+    public static void indelPred(POGTree pogTree, SubstModel model, double geometricSeqLenParam) {
+
+
+        IndelPeeler[] inf = new IndelPeeler[pogTree.getPositions()];
+
+        for (int pos = 0; pos < inf.length; pos++) {
+            inf[pos] = new IndelPeeler(pogTree, model, pos, geometricSeqLenParam);
+        }
+
+
+
+    }
+
     public static Prediction PredictByMIP(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln,
-                                          String solver, double[][] treeNeighbourAlphaPen) {
+                                          String solver, String substModelName, int nThreads, boolean useDistances) {
 
         Map<Object, POGraph> ancestors = new HashMap<>(); // prepare where predictions will go
         int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
         IdxTree tree = pogTree.getTree();  // indexed tree (quick access to branch points, no editing)
 
-        Loader.loadNativeLibraries(); // link to Google-OR Tools
-        POAGraph alnPog = new POAGraph(aln);
-        HashMap<Integer, Integer[]> extantBinarySeqs = Mip.createBinarySeqMap(aln, tree);
+
+        Mip mipSolver = new Mip(pogTree, aln, solver, substModelName, nThreads, useDistances);
 
         if (GRASP.VERBOSE) {
             System.out.println("Constructing MIP indel model using " + solver + "...");
         }
 
-        HashMap<Integer, Integer[]> ancestorPositionVars; //bpidx to array of position indices
-        if (solver.equalsIgnoreCase("CPSAT")) {
-            Prediction parsimonyIndels = PredictByParsimony(pogTree); // use parsimony to seed CPSAT
-            ancestorPositionVars = Mip.runCPSolverIndelInference(pogTree.getTree(), aln, alnPog,
-                    GRASP.NTHREADS, extantBinarySeqs, treeNeighbourAlphaPen, parsimonyIndels);
-        } else {
-            ancestorPositionVars = Mip.runMPSolverIndelInference(pogTree.getTree(), alnPog, extantBinarySeqs,
-                    treeNeighbourAlphaPen, aln, GRASP.NTHREADS, solver);
-        }
+        //bpidx to array of position indices
+        HashMap<Integer, Integer[]> ancestorPositionVars =  mipSolver.runMPSolverIndelInference();
 
         if (ancestorPositionVars == null) {
             System.out.println("Defaulting to bi-directional edge parsimony for indel inference");
@@ -1725,23 +1736,23 @@ public class Prediction {
             }
         }
 
-        if (GRASP.VERBOSE) {
-            double propOutDist = POGraph.calcProportionOutOfDistributionAncestors(ancestors, alnPog) * 100;
-            int numIndelEvents = POGraph.calcNumberIndelEvents(pogTree, ancestors);
-            int numPhylogeneticViolations = POGraph.countNumberOfPhylogeneticallyIncorrectEvents(pogTree, ancestors, aln);
-            double meanGapLength = POGraph.getMeanGapLength(ancestors);
-            double averageAncestorLength = POGraph.getAverageSeqLength(ancestors);
-            double gapProportion = POGraph.getGapProportion(ancestors);
-
-
-            System.out.println("Proportion of out-of-distribution positions in ancestral sequences: " +
-                    String.format("%.2f", propOutDist) + "%");
-            System.out.println("Number of inferred indel events across the tree: " + numIndelEvents);
-            System.out.println("Number of phylogenetic violations (Dollo's Law) in inferred indel events: " + numPhylogeneticViolations);
-            System.out.println("Mean gap length in ancestral sequences: " + String.format("%.2f", meanGapLength) + " positions");
-            System.out.println("Average ancestral sequence length: " + String.format("%.2f", averageAncestorLength) + " positions");
-            System.out.println("Overall gap percentage in ancestral sequences: " + String.format("%.2f", gapProportion * 100) + "%");
-        }
+//        if (GRASP.VERBOSE) {
+//            //double propOutDist = POGraph.calcProportionOutOfDistributionAncestors(ancestors, alnPog) * 100;
+//            int numIndelEvents = POGraph.calcNumberIndelEvents(pogTree, ancestors);
+//            int numPhylogeneticViolations = POGraph.countNumberOfPhylogeneticallyIncorrectEvents(pogTree, ancestors, aln);
+//            double meanGapLength = POGraph.getMeanGapLength(ancestors);
+//            double averageAncestorLength = POGraph.getAverageSeqLength(ancestors);
+//            double gapProportion = POGraph.getGapProportion(ancestors);
+//
+//
+////            System.out.println("Proportion of out-of-distribution positions in ancestral sequences: " +
+////                    String.format("%.2f", propOutDist) + "%");
+//            System.out.println("Number of inferred indel events across the tree: " + numIndelEvents);
+//            System.out.println("Number of phylogenetic violations (Dollo's Law) in inferred indel events: " + numPhylogeneticViolations);
+//            System.out.println("Mean gap length in ancestral sequences: " + String.format("%.2f", meanGapLength) + " positions");
+//            System.out.println("Average ancestral sequence length: " + String.format("%.2f", averageAncestorLength) + " positions");
+//            System.out.println("Overall gap percentage in ancestral sequences: " + String.format("%.2f", gapProportion * 100) + "%");
+//        }
 
         return new Prediction(pogTree, ancestors);
     }

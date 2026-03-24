@@ -1,5 +1,6 @@
 package smile.math.special;
 
+import asr.GRASP;
 import smile.math.Function;
 
 public class Minimise {
@@ -50,16 +51,18 @@ public class Minimise {
         double fx = func.apply(x);
         int new_i = i + 1;
         double m = 0.5 * (a + b);
+        if (GRASP.VERBOSE) {
+            System.out.println("Iteration: " + new_i + " Current interval: [" + a + ", " + b + "] Current best: " + m);
+        }
         if (b - a <= EPS) {
             System.out.println("Number of iterations: " + (i + 1));
-            System.out.println("Solution: " + m);
+            System.out.println("Optimal mu/lambda value: " + m);
             return m;
         } else if (i > MAX) {
             System.out.println("Exhausted iterations before convergence");
-            System.out.println("Non-optimal solution: " + m);
+            System.out.println("Approximate mu/lambda value: " + m);
             return m;
         }
-
 
         double r = (x - w) * (fx - fv);
         double tq = (x - v) * (fx - fw);

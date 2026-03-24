@@ -35,12 +35,13 @@ public class JTTGap extends GapSubstModel {
             {0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000}};
 
 
-    public JTTGap(double[] F, double[][] S, Enumerable alphabet, double mu, double lambda) throws IllegalArgumentException {
-        super(F, S, alphabet, mu, lambda);
-    }
 
     public JTTGap(double mu, double lambda) {
         super(F, Q, new Enumerable(S), mu, lambda);
+    }
+
+    public JTTGap(double[] empiricalF, double mu, double lambda) {
+        super(empiricalF, Q, new Enumerable(S), mu, lambda);
     }
 
     @Override
