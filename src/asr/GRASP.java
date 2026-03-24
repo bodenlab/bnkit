@@ -18,7 +18,7 @@ import java.io.IOException;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import asr.IndelDist.RATE_CATEGORY;
+import asr.IndelSegmentation.RATE_CATEGORY;
 
 /**
  * Command line version of GRASP.

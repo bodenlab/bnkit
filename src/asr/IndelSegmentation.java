@@ -4,7 +4,7 @@ package asr;
 import stats.Zipf;
 import java.util.*;
 
-public class IndelDist {
+public class IndelSegmentation {
 
     private static final int SEG_START = 0;
     private static final int SEG_END = 1;

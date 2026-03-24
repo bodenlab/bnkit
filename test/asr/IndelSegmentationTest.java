@@ -14,7 +14,7 @@ import static asr.ThreadedPeeler.logProbColGivenRate;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class IndelDistTest {
+public class IndelSegmentationTest {
 
 
     @Test
@@ -22,12 +22,12 @@ public class IndelDistTest {
         int numCols = 1;
         double[] priors = {0.9, 0.1};  // two rates, rate 0 favored
         double[][] ll = {{2.0, -1.0}};  // one column,
-        double[][] prefix = IndelDist.computePrefixSums(ll);
+        double[][] prefix = IndelSegmentation.computePrefixSums(ll);
 
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
-        int[][] segs = IndelDist.assignSegments(numCols, priors, prefix);
+        int[][] segs = IndelSegmentation.assignSegments(numCols, priors, prefix);
 
         assertEquals(1, segs.length);
         assertArrayEquals(new int[]{0,0,0}, segs[0]);  // start=0 end=0 rate=0
@@ -41,12 +41,12 @@ public class IndelDistTest {
                 {-5.0, 5.0},   // col 1
                 {-5.0, 5.0}    // col 2
         };
-        double[][] prefix = IndelDist.computePrefixSums(ll);
+        double[][] prefix = IndelSegmentation.computePrefixSums(ll);
 
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
-        int[][] segs = IndelDist.assignSegments(2, priors, prefix);
+        int[][] segs = IndelSegmentation.assignSegments(2, priors, prefix);
 
         // One long segment is optimal: length = 2
         assertEquals(1, segs.length);
@@ -63,12 +63,12 @@ public class IndelDistTest {
                 {0.0, 4.0}   // col2 strongly prefers rate1
         };
 
-        double[][] prefix = IndelDist.computePrefixSums(ll);
+        double[][] prefix = IndelSegmentation.computePrefixSums(ll);
 
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
-        int[][] segs = IndelDist.assignSegments(2, priors, prefix);
+        int[][] segs = IndelSegmentation.assignSegments(2, priors, prefix);
 
         assertEquals(2, segs.length);
 
@@ -89,12 +89,12 @@ public class IndelDistTest {
                 {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, {2.0}, // max segment length 50
                 {2.0}, {2.0}
         };
-        double[][] prefix = IndelDist.computePrefixSums(ll);
+        double[][] prefix = IndelSegmentation.computePrefixSums(ll);
 
         double expected_segment_length = 50.0;
         double rho = 1 / expected_segment_length;
 
-        int[][] segs = IndelDist.assignSegments(52, priors, prefix);
+        int[][] segs = IndelSegmentation.assignSegments(52, priors, prefix);
 
         // Entire segment should be chosen
         assertEquals(2, segs.length);
@@ -112,13 +112,13 @@ public class IndelDistTest {
                 {3.0, 0.0},
                 {0.0, 5.0}
         };
-        double[][] prefix = IndelDist.computePrefixSums(ll);
+        double[][] prefix = IndelSegmentation.computePrefixSums(ll);
 
 
         double expected_segment_length = 20.0;
         double rho = 1 / expected_segment_length;
 
-        int[][] segs = IndelDist.assignSegments(3, priors, prefix);
+        int[][] segs = IndelSegmentation.assignSegments(3, priors, prefix);
 
         assertEquals(2, segs.length);
         assertArrayEquals(new int[]{0, 1, 0}, segs[0]);  // cols 0–1 rate0

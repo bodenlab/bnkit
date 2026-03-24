@@ -299,7 +299,7 @@ public class Mip {
 
 
 
-            double[] rates = IndelDist.MEAN_RATES.get(GRASP.INDEL_RATE);
+            double[] rates = IndelSegmentation.MEAN_RATES.get(GRASP.INDEL_RATE);
             if (GRASP.VERBOSE) {
                 System.out.println("Computing column priors under different indel rate categories...");
                 for (int i = 0; i < rates.length; i++) {
@@ -311,16 +311,16 @@ public class Mip {
             if (GRASP.VERBOSE) {
                 System.out.println("Computing prefix sums for indel segment assignment...");
             }
-            double[][] prefix_sums = IndelDist.computePrefixSums(columnPriors);
+            double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
 
             if (GRASP.VERBOSE) {
                 System.out.println("Assigning optimal indel rate segments...");
             }
 
-            int[][] segments = IndelDist.assignSegments(columnPriors.length, IndelDist.RATE_PRIORS,
+            int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, IndelSegmentation.RATE_PRIORS,
                     prefix_sums);
 
-            int[] columnRateCategories = IndelDist.expandSegmentOrder(segments);
+            int[] columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
             if (GRASP.VERBOSE) {
                 for (int i = 0; i < columnRateCategories.length; i++) {
                     System.out.println("Column " + i + ": indel rate category: " + columnRateCategories[i]);
