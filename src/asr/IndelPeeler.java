@@ -3,8 +3,7 @@ package asr;
 import bn.ctmc.GapSubstModel;
 import bn.ctmc.SubstModel;
 import bn.ctmc.SubstNode;
-import bn.ctmc.matrix.JC;
-import bn.ctmc.matrix.JTT;
+import bn.ctmc.matrix.*;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.phylo.BranchPoint;
@@ -482,8 +481,24 @@ public class IndelPeeler {
             F = JC.F(JC.S.length);
             IRM = JC.Q(1, JC.S.length);
             alpha = new Enumerable(JC.S);
+        } else if (substModelName.equals("Yang")) {
+            F = Yang.F;
+            IRM = Yang.Q;
+            alpha = new Enumerable(Yang.S);
+        } else if (substModelName.equals("LG")) {
+            F = LG.F;
+            IRM = LG.Q;
+            alpha = new Enumerable(LG.S);
+        } else if (substModelName.equals("WAG")) {
+            F = WAG.F;
+            IRM = WAG.Q;
+            alpha = new Enumerable(WAG.S);
+        } else if (substModelName.equals("Dayhoff")) {
+            F = Dayhoff.F;
+            IRM = Dayhoff.Q;
+            alpha = new Enumerable(Dayhoff.S);
         } else {
-            throw new IllegalArgumentException(substModelName + " not implemented yet");
+            throw new IllegalArgumentException(substModelName + " gap model not implemented yet");
         }
 
 

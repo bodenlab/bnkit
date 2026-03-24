@@ -1,8 +1,7 @@
 package asr;
 
 import bn.ctmc.GapSubstModel;
-import bn.ctmc.matrix.JCGap;
-import bn.ctmc.matrix.JTTGap;
+import bn.ctmc.matrix.*;
 import com.google.ortools.Loader;
 import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
@@ -175,14 +174,15 @@ public class Mip {
         addPenaltyConstraints();
         objective.setMinimization();
 
-        // Uncomment for logging
-        solver.enableOutput();
+        if (GRASP.VERBOSE) {
+            solver.enableOutput();
+        }
 
         int actualThreadsUsed = this.nThreads;
         if (solverName.equalsIgnoreCase("SCIP")) {
             // SCIP creates concurrent solvers - appears to be a bug where other workers
             // are not terminated when a solution is found.
-            System.out.println("SCIP solver detected - setting number of threads to 1 for optimisation.");
+            System.out.println("SCIP solver detected - using single thread for solving.");
             solver.setNumThreads(1);
             actualThreadsUsed = 1;
         } else {
@@ -212,7 +212,7 @@ public class Mip {
                     TimeUnit.MILLISECONDS.toSeconds(solver.wallTime()) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(solver.wallTime())));
 
         } else if (resultStatus == MPSolver.ResultStatus.INFEASIBLE) {
-            System.err.println("A feasible solution could not be identified.");
+            System.err.println("Indel model is infeasible given the input alignment.");
             return null;
         } else if (resultStatus == MPSolver.ResultStatus.NOT_SOLVED) {
             System.err.println("No solution found or a solution could not be identified with the given time limit.");
@@ -236,7 +236,6 @@ public class Mip {
         }
 
         return ancestralIndels;
-
     }
 
     private static boolean allColsOccupied(EnumSeq.Alignment<Enumerable> aln) {
@@ -296,60 +295,51 @@ public class Mip {
             double optimal_mu = IndelPeeler.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
                     tree, geometric_seq_len_param, aln);
 
-            GapSubstModel gapModel;
-            switch (substModelName) {
-                case "JTT" -> gapModel = new JTTGap(optimal_mu, optimal_mu);
-                case "JC" -> gapModel = new JCGap(optimal_mu, optimal_mu);
-                default -> throw new IllegalArgumentException("Unrecognized gap substitution model: " + substModelName);
-            }
+            GapSubstModel gapModel = createGapSubstModel(optimal_mu);
 
-            if (GRASP.VERBOSE) {
-                System.out.println("Computing column priors under different rate categories...");
-            }
+
 
             double[] rates = IndelDist.MEAN_RATES.get(GRASP.INDEL_RATE);
+            if (GRASP.VERBOSE) {
+                System.out.println("Computing column priors under different indel rate categories...");
+                for (int i = 0; i < rates.length; i++) {
+                    System.out.println("Rate category " + i + ": " + rates[i]);
+                }
+            }
             double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel, geometric_seq_len_param, rates, GRASP.NTHREADS);
 
             if (GRASP.VERBOSE) {
-                System.out.println("Computing prefix sums for segment assignment...");
+                System.out.println("Computing prefix sums for indel segment assignment...");
             }
             double[][] prefix_sums = IndelDist.computePrefixSums(columnPriors);
 
             if (GRASP.VERBOSE) {
-                System.out.println("Assigning optimal rate segments...");
+                System.out.println("Assigning optimal indel rate segments...");
             }
 
             int[][] segments = IndelDist.assignSegments(columnPriors.length, IndelDist.RATE_PRIORS,
                     prefix_sums);
 
             int[] columnRateCategories = IndelDist.expandSegmentOrder(segments);
-
+            if (GRASP.VERBOSE) {
+                for (int i = 0; i < columnRateCategories.length; i++) {
+                    System.out.println("Column " + i + ": indel rate category: " + columnRateCategories[i]);
+                }
+            }
             double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
 
-//            double minDist = Double.POSITIVE_INFINITY;
-//            double maxDist = Double.NEGATIVE_INFINITY;
             // adjust each length by the assigned rate category
             for (int rateIdx = 0; rateIdx < rates.length; rateIdx++) {
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                     // adjust each length by the assigned rate category
                     double adjustedDist = rates[rateIdx] * tree.getDistance(bpidx);
                     rateAdjustedDists[rateIdx][bpidx] = adjustedDist;
-//                    if (adjustedDist < minDist) {
-//                        minDist = adjustedDist;
-//                    }
-//                    if (adjustedDist > maxDist) {
-//                        maxDist = adjustedDist;
-//                    }
                 }
             }
 
-//            double binRange = (maxDist - minDist) / 2;
-//
             for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                 int rateIdx = columnRateCategories[colIdx];
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-//                    int assignedBin = Math.min(GAP_PENALTIES.length - 1, (int) ((rateAdjustedDists[rateIdx][bpidx] + (binRange / 2) - minDist) / binRange));
-//                    treeNeighbourAlphaPen[colIdx][bpidx] = GAP_PENALTIES[assignedBin];
                     treeNeighbourAlphaPen[colIdx][bpidx] = rateAdjustedDists[rateIdx][bpidx];
                 }
             }
@@ -361,6 +351,20 @@ public class Mip {
         }
 
         return treeNeighbourAlphaPen;
+    }
+
+    private GapSubstModel createGapSubstModel(double optimal_mu) {
+        GapSubstModel gapModel;
+        switch (substModelName) {
+            case "JTT" -> gapModel = new JTTGap(optimal_mu, optimal_mu);
+            case "JC" -> gapModel = new JCGap(optimal_mu, optimal_mu);
+            case "LG" -> gapModel = new LGGap(optimal_mu, optimal_mu);
+            case "Dayhoff" -> gapModel = new DayhoffGap(optimal_mu, optimal_mu);
+            case "WAG" -> gapModel = new WAGGap(optimal_mu, optimal_mu);
+            case "Yang" -> gapModel = new YangGap(optimal_mu, optimal_mu);
+            default -> throw new IllegalArgumentException("Unrecognized gap substitution model: " + substModelName);
+        }
+        return gapModel;
     }
 
     /**

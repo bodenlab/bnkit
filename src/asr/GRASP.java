@@ -28,7 +28,7 @@ import asr.IndelDist.RATE_CATEGORY;
  */
 public class GRASP {
 
-    public static String VERSION = "30-Jan-2026";
+    public static String VERSION = "24-Mar-2026";
 
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
