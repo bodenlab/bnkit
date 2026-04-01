@@ -161,7 +161,14 @@ public class Mip {
     public HashMap<Integer, Integer[]> runMPSolverIndelInference() {
 
         Loader.loadNativeLibraries(); // link to Google-OR Tools
-        this.solver = MPSolver.createSolver(solverName);
+
+        if (solverName.equalsIgnoreCase("SCIP")) {
+            this.solver = new MPSolver("SCIP", MPSolver.OptimizationProblemType.SCIP_MIXED_INTEGER_PROGRAMMING);
+        } else if (solverName.equalsIgnoreCase("Gurobi")) {
+            this.solver = MPSolver.createSolver(solverName);
+        }
+
+
         if (this.solver == null) {
             GRASP.usage(6, "Could not create MIP solver with " + solverName);
         }
@@ -185,8 +192,8 @@ public class Mip {
             System.out.println("SCIP solver detected - using single thread for solving.");
             solver.setNumThreads(1);
             actualThreadsUsed = 1;
-        } else {
-            solver.setNumThreads(this.nThreads);
+        } else if (solverName.equalsIgnoreCase("Gurobi")) {
+            solver.setSolverSpecificParametersAsString("Presolve=-1, FeasibilityTol=1e-06, IntFeasTol=1e-05, OptimalityTol=1e-06, Method=1, DegenMoves=0, Threads=" + this.nThreads);
         }
 
         if (GRASP.VERBOSE) {
