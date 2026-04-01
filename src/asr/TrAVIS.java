@@ -69,11 +69,10 @@ public class TrAVIS {
                 "      --extants <number>                       Number of extant leaves (default: 5)\n" +
                 "  -s, --substitution-model <model>             Substitution model: JTT (default), Dayhoff, LG, WAG, JC, Yang\n" +
                 "  -rf, --rates-file <file>                     Tabulated file with site-specific rates (IQ-TREE format)\n" +
-                "      --dist-distrib <type:params>             Branch distance (t) distribution: Gamma, ZeroInflatedGamma, MixtureGamma\n" +
-                "      --dgamma <shape> <scale> [<depth>]       Legacy format of Gamma distribution for branch distances (by shape, scale, optional tree depth)\n" +
+                "      --dist-distrib <type:params>             Branch distance (t) distribution: Gamma:<SHAPE>,<SCALE> ZeroInflatedGamma:<PI>,<SHAPE>,<SCALE> MixtureGamma:<SHAPE1>,SCALE1>,<WEIGHT1>,<SHAPE2>,SCALE2>,<WEIGHT2>\n" +
                 "      --leaf2root-distrib <type:params>        Distribution for leaf-to-root distances: Gaussian, GDF\n" +
                 "      --subst-rate-distrib <type:params>       Substitution rate (r) distribution: Gamma, ZeroInflatedGamma, MixtureGamma\n" +
-                "  *   --indel-prior <LOWGAP|MEDGAP|HIGHGAP>    Pre-set priors for indel rates (Pfam-based)\n" +
+                "  *   --indel-prior <LOWGAP|MEDGAP|HIGHGAP>    Pre-set priors for indel rates (PFAM-based)\n" +
                 "      --indel-rate-distrib <type:params>       Indel rate (rho) distribution: Gamma, ZeroInflatedGamma, MixtureGamma\n" +
                 "      --insertion-rate-distrib <type:params>   Insertion rate distribution (overrides indel-rate)\n" +
                 "      --deletion-rate-distrib <type:params>    Deletion rate distribution (overrides indel-rate)\n" +
@@ -149,11 +148,11 @@ public class TrAVIS {
                 ANCSEQ = args[a];
             } else if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
-                if (arg.equalsIgnoreCase("n0") && args.length > a + 1) {
+                if (arg.equalsIgnoreCase("n0") || arg.equalsIgnoreCase("-ancestor") && args.length > a + 1) {
                     ANCSEQ = args[++a];
                 } else if (arg.equalsIgnoreCase("nwk") && args.length > a + 1) {
                     OUTPUTTREE = args[++a];
-                } else if (arg.equalsIgnoreCase("out") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("o") || arg.equalsIgnoreCase("-output-folder") && args.length > a + 1) {
                     OUTPUT = args[++a];
                 } else if (arg.equalsIgnoreCase("-seed") && args.length > a + 1) {
                     SEED = Integer.parseInt(args[++a]);
@@ -223,7 +222,7 @@ public class TrAVIS {
                     SUBST_RATE_INFLUENCE_INDELS = true;
                 } else if (arg.equalsIgnoreCase("-delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
-                } else if (arg.equalsIgnoreCase("-tree-distrib") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("-dist-distrib") && args.length > a + 1) {
                     String params = args[a+1];
                     int colonPos = params.indexOf(':');
                     String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
@@ -250,6 +249,11 @@ public class TrAVIS {
                 }
             }
         }
+
+        if (OUTPUT == null) {
+            usage(25, "Output file or folder must be specified");
+        }
+
         if (SRATESFILE != null) {
             try {
                 TSVFile ratesfile = new TSVFile(SRATESFILE, true);
@@ -354,6 +358,7 @@ public class TrAVIS {
         } else {
             tree = Tree.generateTreeFromMixture(tree,3,SEED,100);
         }
+
         if (ancseq != null && OUTPUT != null) { // we've got an ancestor to track down the tree
             TrackTree.Params params = new TrackTree.Params(tree, ancseq, EVOL_MODEL);
             if (INDEL_LENGTH_MODEL != null)
@@ -374,10 +379,11 @@ public class TrAVIS {
 
             params.SUBST_RATE_INFLUENCES_INDELS = SUBST_RATE_INFLUENCE_INDELS;
             params.PROPORTION_DELETION = DELETIONPROP;
+            params.setSeed(SEED);
             //params.MAX_DE_LENGTH;
             //params.MAX_IN_LENGTH;
 
-            TrackTree tracker = new TrackTree(params);
+            TrackTree tracker = new TrackTree(params, SEED);
 
             EnumSeq[] seqs = tracker.getSequences();
             switch (FORMAT_IDX) {

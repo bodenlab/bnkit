@@ -927,7 +927,7 @@ public class GRASP {
                         }
                         break;
 
-                    case 11: // SIMUL: simulate a complete reconstruction with the same pseudo-biological proerties as the present reconstruction
+                    case 11: // SIMUL: simulate a complete reconstruction with the same pseudo-biological properties as the present reconstruction
                         if (!BYPASS) {
                             if (MODE == Inference.JOINT) {
                                 RateModel ddistrib = IdxTree.getGammaMixture(tree, 3, SEED);
