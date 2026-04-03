@@ -64,7 +64,7 @@ public class GRASP {
                 "\t{-t | --threads <number>}\n" +
                 "\t{-j | --joint (default)}\n" +
                 "\t{-m | --marginal <branchpoint-id>}\n" +
-                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML SCIP Gurobi CPSAT)\n" +
+                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML SCIP Gurobi)\n" +
                 "\t{--reuse-tree Re-use the reconstructed tree for TrAVIS}\n" +
                 "\t{* --indel-prior <LOWGAP|MEDGAP|HIGHGAP>}\n" +
                 "\t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>}\n" +
