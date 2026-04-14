@@ -522,7 +522,10 @@ public class GRASP {
                 if (indelpred.getTree().getIndex(MARG_NODE) < 0)
                     usage(2, MARG_NODE + " is not a valid ancestor number");
                 indelpred.getMarginal(MARG_NODE, MODEL, RATES);
+            } else if (MODE == null) { // --onlyindel selected
+                indelpred.saveIndelSolutionAsFasta(OUTPUT, PREFIX);
             }
+
             POGraph.SUPPORTED_PATH_DEFAULT = SPATH_IDX;
             Map<Object, POGraph> pogs = indelpred.getAncestors(MODE);
             ancestors = new POGraph[pogs.size()];

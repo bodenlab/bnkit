@@ -190,6 +190,7 @@ public class Mip {
             // SCIP creates concurrent solvers - appears to be a bug where other workers
             // are not terminated when a solution is found.
             System.out.println("SCIP solver detected - using single thread for solving.");
+            solver.setSolverSpecificParametersAsString("lp/initalgorithm = d");
             solver.setNumThreads(1);
             actualThreadsUsed = 1;
         } else if (solverName.equalsIgnoreCase("Gurobi")) {
