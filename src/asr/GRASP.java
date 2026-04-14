@@ -40,11 +40,12 @@ public class GRASP {
     public static boolean RECODE_NULL = true;
     public static int MIP_SOLVER_TIME_LIMIT_MINUTES = 720; // 12 hours
     public static boolean REMOVE_INDEL_ORPHANS = true;
+    public static boolean ONLYINDEL = false;
     public enum Inference {
         JOINT,
         MARGINAL
     }
-    public static RATE_CATEGORY INDEL_RATE = RATE_CATEGORY.LOW;
+    public static RATE_CATEGORY INDEL_RATE = RATE_CATEGORY.HIGH;
 
     public static void usage() {
         usage(0, null);
@@ -225,6 +226,7 @@ public class GRASP {
                     }
                 } else if (arg.equalsIgnoreCase("-onlyindel")) {
                     MODE = null;
+                    ONLYINDEL = true;
                 } else if ((arg.equalsIgnoreCase("-substitution-model") || arg.equalsIgnoreCase("s")) && args.length > a + 1) {
                     boolean found_model = false;
                     for (int i = 0; i < MODELS.length; i++) {
@@ -338,9 +340,8 @@ public class GRASP {
 
                     switch (args[++a].toUpperCase()) {
                         case "LOWGAP" -> {INDEL_RATE = RATE_CATEGORY.LOW;}
-                        case "MEDGAP" -> {INDEL_RATE = RATE_CATEGORY.MEDIUM;}
                         case "HIGHGAP" -> {INDEL_RATE = RATE_CATEGORY.HIGH;}
-                        default -> usage(25, args[a] + " is not a valid indel prior (choose from LOWGAP, MEDGAP, HIGHGAP)");
+                        default -> usage(25, args[a] + " is not a valid indel prior (choose from LOWGAP (UniRef30), HIGHGAP (PFAM))");
                     }
 
                 } else if (arg.equalsIgnoreCase("-verbose")) {
@@ -522,7 +523,7 @@ public class GRASP {
                 if (indelpred.getTree().getIndex(MARG_NODE) < 0)
                     usage(2, MARG_NODE + " is not a valid ancestor number");
                 indelpred.getMarginal(MARG_NODE, MODEL, RATES);
-            } else if (MODE == null) { // --onlyindel selected
+            } else if (ONLYINDEL) {
                 indelpred.saveIndelSolutionAsFasta(OUTPUT, PREFIX);
             }
 
