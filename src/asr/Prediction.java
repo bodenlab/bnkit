@@ -80,6 +80,50 @@ public class Prediction {
         this.distribs = new EnumDistrib[phylotree.getSize()][];
     }
 
+    public void saveIndelSolutionAsFasta(String output, String prefix) {
+
+        //String fastaFilePath = prefix + "_ancestral_indel.fasta";
+        File file = new File(output, prefix + "_ancestral_indel.fa");
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+
+            for (int ancestralIdx : phylotree.getAncestors()) {
+                POGraph ancestralPOG = ancarr[ancestralIdx];
+
+                // Write FASTA header
+                writer.write(">N" + phylotree.getLabel(ancestralIdx));
+                writer.newLine();
+
+                StringBuilder sequenceLine = new StringBuilder();
+                for (int pos = 0; pos < ancestralPOG.maxsize(); pos++) {
+
+                    if (ancestralPOG.isNode(pos)) {
+                        sequenceLine.append("X");
+                    } else {
+                        sequenceLine.append("-");
+                    }
+
+                    // Optional: Add line breaks every 80 characters (standard FASTA format)
+                    if ((pos + 1) % 80 == 0 && pos < ancestralPOG.maxsize() - 1) {
+                        writer.write(sequenceLine.toString());
+                        writer.newLine();
+                        sequenceLine = new StringBuilder();
+                    }
+                }
+
+                // Write any remaining sequence
+                if (!sequenceLine.isEmpty()) {
+                    writer.write(sequenceLine.toString());
+                    writer.newLine();
+                }
+            }
+
+
+        } catch (IOException e) {
+            System.err.println("Error writing ancestral sequences to file: " + e.getMessage());
+        }
+    }
+
     /**
      * Convert instance from JSON.
      * @param json specification of prediction on JSON format
