@@ -19,6 +19,7 @@ import dat.pog.POGTree;
 
 public class Mip {
 
+    private static final double MAX_PENALTY = 10.0;
     public static double MIN_MU_LAMBDA_VALUE = 0;
     public static double MAX_MU_LAMBDA_VALUE = 0.5;
     private static final int GAP = 0;
@@ -161,12 +162,13 @@ public class Mip {
     public HashMap<Integer, Integer[]> runMPSolverIndelInference() {
 
         Loader.loadNativeLibraries(); // link to Google-OR Tools
+        this.solver = MPSolver.createSolver(solverName);
 
-        if (solverName.equalsIgnoreCase("SCIP")) {
-            this.solver = new MPSolver("SCIP", MPSolver.OptimizationProblemType.SCIP_MIXED_INTEGER_PROGRAMMING);
-        } else if (solverName.equalsIgnoreCase("Gurobi")) {
-            this.solver = MPSolver.createSolver(solverName);
-        }
+//        if (solverName.equalsIgnoreCase("SCIP")) {
+//            this.solver = new MPSolver("SCIP", MPSolver.OptimizationProblemType.SCIP_MIXED_INTEGER_PROGRAMMING);
+//        } else if (solverName.equalsIgnoreCase("Gurobi")) {
+//            this.solver = MPSolver.createSolver(solverName);
+//        }
 
 
         if (this.solver == null) {
@@ -348,7 +350,10 @@ public class Mip {
             for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                 int rateIdx = columnRateCategories[colIdx];
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                    treeNeighbourAlphaPen[colIdx][bpidx] = rateAdjustedDists[rateIdx][bpidx];
+
+                    // shorter distances get higher penalties
+                    double penalty = Math.min(1 / rateAdjustedDists[rateIdx][bpidx], MAX_PENALTY);
+                    treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                 }
             }
 
