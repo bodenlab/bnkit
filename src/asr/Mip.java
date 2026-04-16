@@ -339,6 +339,7 @@ public class Mip {
             double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
 
             // adjust each length by the assigned rate category
+
             for (int rateIdx = 0; rateIdx < rates.length; rateIdx++) {
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                     // adjust each length by the assigned rate category
@@ -347,13 +348,23 @@ public class Mip {
                 }
             }
 
+            double max = Double.NEGATIVE_INFINITY;
             for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                 int rateIdx = columnRateCategories[colIdx];
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
 
                     // shorter distances get higher penalties
                     double penalty = Math.min(1 / rateAdjustedDists[rateIdx][bpidx], MAX_PENALTY);
+                    if (penalty > max) {
+                        max = penalty;
+                    }
                     treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
+                }
+            }
+
+            for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+                    treeNeighbourAlphaPen[colIdx][bpidx] /= max;
                 }
             }
 
