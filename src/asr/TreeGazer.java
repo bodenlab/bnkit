@@ -37,9 +37,7 @@ public class TreeGazer {
             out.println(msg + " (Error " + error + ")");
         out.println("""
                 Usage: asr.TreeGazer\s
-                \t[-nwk <tree-file> -in {<label>{:<parser>}@}<input-file> -out <output-file>]
-                \t{-model <uniform(default)>}
-                \t{-gamma <value (default 1.0)>}
+                \t[-nwk <tree-file> -in {<label>@}<input-file> -out <output-file>]
                 \t{-params <JSON-file>}
                 \t{-latent <#states>}
                 \t{-internal}
@@ -57,21 +55,19 @@ public class TreeGazer {
         out.println("""
                 where\s
                 \ttree-file is a phylogenetic tree on Newick format
-                \tinput-file is a table with sequence or ancestor names in the first column, and corresponding values
+                \tinput-file is a TSV file with sequence or ancestor names in the first column, with corresponding values in the other columns (empty or None or null implies not assigned)
                 \t(empty or None or null implies not assigned) on TSV format
-                \tlabel flags that a header is used in the input-file and identifies the column with values to be modelled;
-                \tif no label is given, headers are assumed absent and values from the second column will be modelled
-                \tparser identifies a parser to use on the column with values (e.g. BRENDA).
-                \toutput-file will contain:
-                \t- inferred branch point states on specified format (TSV by default, TREE is a labelled tree on Newick format, ITOL is a dataset to decorate trees in iTOL.embl.de), or
-                \tgamma-value is parameter to the uniform model (n-state generalisation of Jukes-Cantor)
+                \tlabel label flags that a header is used in the input-file and identifies the column with values to be modelled; if no label is given, values from the second column will be modelled
+                \toutput-file is the prefix of the file, the type of file is changed by -format:
+                \t\t -format TSV by default containing both inferred and known nodes
+                \t\t -format TREE is a labelled tree on Newick format
+                \t\t -format ITOL is a dataset to decorate trees in iTOL.embl.de
                 \tlambda is the multiplier for the upper confidence bound of predicted values (used only when latent mode with real values is applied)
-                \tJSON-file contains a JSON string specifying the distribution for latent nodes (if latent mode is used)
-                \tlatent indicates that the tree consists of latent values only (latent mode), with specified values as extensions to the leaves.
-                \t- #states is the number of latent states to learn (should not exceed 25, labelled A-Z).
+                \tlatent indicates the number of latent states to use.
+                \t\t - The number of latent states to learn should not exceed 25 as latent states are labelled A-Z.
                 \tinternal indicates that internal nodes are also extended with user-specified or learned distributions (default leaves-only).
-                \tlearn excludes inference and instead prompts EM learning of parameters, using input data as training data.
-                \tuntied implies that the variance learned is NOT the same across the latent states (only applicable when EM-learning GDTs; default is on).
+                \tlearn learn excludes inference and instead prompts EM learning of parameters, using input data as training data.
+                \tuntied implies that the variance learned is NOT the same across the latent states (only applicable when EM-learning GDTs; default is tied variance).
                 \tcmax and cmin specify the maximum and minimum values for the colour scale of iTOL output (only applicable when latent mode with real values is applied; default is to use the max and min of the input values).
                 \thelp prints out commandline arguments (this screen).
                 \tverbose completes the requested steps while printing out messages about the process.
@@ -79,11 +75,9 @@ public class TreeGazer {
         out.println("""
                 Notes:
                 \tEvolutionary models of substitution are currently limited to uniform, which is an adaptation of Jukes-Cantor for arbitrary number of states.
-                \t- gamma-value is used by this model
                 \tIf specified values are real, a conditional Gaussian mixture distribution conditioned on latent state is learned.
                 \tIf specified values are discrete, a multinomial distribution conditioned on latent state is learned.
-                \tInference is either joint (default) or marginal (marginal allows a branch-point to be nominated;\s
-                \tif one is not given all uninstantiated nodes are inferred)
+                \tInference is either joint (default) or marginal (marginal allows a branch-point to be nominated; if one is not given all uninstantiated nodes are inferred)
                 """);
         System.exit(error);
     }
