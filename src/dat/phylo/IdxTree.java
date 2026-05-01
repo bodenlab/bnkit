@@ -1136,6 +1136,8 @@ public class IdxTree implements Iterable<Integer> {
             // Step 2: identify what branches b1 v b2 that should be swapped in j1,
             // so that ...
             Set<Integer> shared = new HashSet<>(); // branches shared between j1 and j2
+            // TODO: Sometimes there are no unique branches for j1, this causes a null-pointer exception at step 4,
+            //  because favb1 is not assigned. just skip the iteration if that happens, maybe can be handled more elegantly?
             Set<Integer> unique = new HashSet<>(); // branches unique to j1
             for (int b = 1; b < dmat[nomj1].length; b ++) {
                 if (dmat[nomj1][b] != null) {
@@ -1145,6 +1147,11 @@ public class IdxTree implements Iterable<Integer> {
                         unique.add(b);
                 }
             }
+
+            if (unique.isEmpty() || shared.isEmpty()) { // no branches to swap, so skip this iteration
+                continue;
+            }
+
             // Step 3: make a choice,
             Integer favb1 = null, favb2 = null;
             // two possibilities...
