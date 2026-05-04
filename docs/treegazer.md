@@ -1,10 +1,15 @@
 # TreeGazer
 
-
 ### Table of Contents
 
-- [Using TreeGazer](#using-treegazer)
-- [Notes](#example-1)
+- [Model background](#model-background)
+- [Command line reference](#command-line-reference)
+- [Examples](#examples)
+- [Latent mode - learning](#latent-mode---learning)
+- [Latent mode - Marginal inference](#latent-mode---marginal-inference)
+- [Latent mode - joint inference](#latent-mode---joint-inference)
+- [Direct mode - joint inference](#direct-mode---joint-inference)
+- [Direct mode - marginal inference](#direct-mode---marginal-inference)
 
 ### Command line reference
 
@@ -167,138 +172,114 @@ most cases, especially if the data is sparse. This can be disabled by using the 
 Now that we have `kari_demo.params` we can perform actual inference. 
 
 `java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -latent 3 
--in demo.tsv -seed 42 -internal -learn -verbose`
+-in demo.tsv -seed 42 -internal -verbose -marg -out kari_demo_marg`
 
+By default, TreeGazer will output the results in a TSV file with both known and inferred values.
 
-
-
-
-
-Then we have a tab-separated value file (TSV file) with annotations 
-`annotations.txt` extracted from various sources; each column has a header (e.g. `SUPERKINGDOM`) that we reference below.
-
-We infer the joint labeling (`-joint`) of external and internal (`-internal`) nodes most likely to explain the labels in the matching annotation file.
-
-`AnnotAceR -nwk ancestors.nwk -in SUPERKINGDOM@annotations.txt -joint -internal -out tst_Taxonomic_lineage_SUPERKINGDOM.txt -format ITOL`
-
-Here are 10 lines from `annotations.txt`:
 ```
-Entry	PHYLUM	SUPERKINGDOM	BRENDA_TS_DATA
-A5ILB0	Thermotogae	Bacteria	None
-P08144	Arthropoda	Eukaryota	57.7_count=1
-P29957	Proteobacteria	Bacteria	44.1_count=1
-H2N0D4	Chordata	Eukaryota	55_count=1
-T1WDH2	Ciliophora	Eukaryota	40_count=1;50_count=2
-T1WE96	Ciliophora	Eukaryota	40_count=1;50_count=2
-H9B4I9	Firmicutes	Bacteria	62.3_count=2
-A0A060DAC6	None	None	34_count=1;55_count=3
-Q47R94	Actinobacteria	Bacteria	74_count=1
+Entry	mean_retained_activity (Mean)	mean_retained_activity (SD)	mean_retained_activity (UCB)
+N0	0.4159883877711853	0.3399206669380877	2.1155917224616236
+N1	0.17249387866666666		
+N2	0.6965149831920605	1.6692858637489851	9.042944301936986
+N3	1.252269881963146	2.83445639799529	15.424551871939595
+N4	1.7435295250035734	3.579176033836374	19.639409694185446
+N5	2.403442216905911	4.237785076700372	23.592367600407773
+A0A0A7GET6	3.6236493368774387	4.9655733305662855	28.451515989708867
+N6	3.605903787080107	4.956870443119277	28.39025600267649
+N7	3.868271518731236	5.0899309538387705	29.31792628792509
 ```
 
-The result is here saved as an iTOL dataset file (`-format ITOL`), which we drop in the iTOL webtool once the tree file has been uploaded.
+For nodes that had known values, the mean, standard deviation and upper confidence bound (UCB) are not 
+calculated and so will be left blank. For uninstantiated nodes, the mean, standard 
+deviation and UCB are calculated by sampling from the Gaussian mixture distribution at that node. The UCB is 
+calculated as the mean plus the lambda multiplier of the standard deviation. By default, lambda is 
+set to 5.0, but this can be changed using the `-lambda` flag.
+
+To visualise the results in iTOL add `-format ITOL` and the output file will be in the correct
+format to be dropped into the iTOL website. Squares represent the training data and circles represent the 
+inferred values, with the size of circles representing the confidence of the prediction. 
+The colour scale is determined by the maximum and minimum values in the input data, but
+this can be changed by using the `-cmax` and `-cmin` flags. Manually setting the colour 
+scale can be useful when you want your visualisations to be comparable across different datasets.
+
+![kari_vis.png](images%2Fkari_vis.png) 
+
+#### Latent mode - joint inference
+
+The joint labelling of latent states that explains the data can also be inferred. 
+This is done by using the `-joint` flag instead of `-marg`.
+
+`java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -latent 3 
+-in demo.tsv -seed 42 -internal -verbose -joint -out kari_demo_joint`
+
+The file `kari_demo_joint.tsv` will then contain the most likely latent state for each
+node in the tree, which is the same as the most likely Gaussian distribution for that node. 
+
+```
+Entry   mean_retained_activity
+N0      mean_retained_activity_3
+N2      mean_retained_activity_3
+N3      mean_retained_activity_3
+N4      mean_retained_activity_3
+N5      mean_retained_activity_3
+A0A0A7GET6      mean_retained_activity_3
+N6      mean_retained_activity_3
+N7      mean_retained_activity_3
+A0A2A5QQ65      mean_retained_activity_3
+```
+
+#### Direct mode - joint inference
+
+Unlike with latent mode, when performing direct inference only a single step is required
+to infer the most likely labelling of the tree. This is because there are no latent
+states and so the observed values are directly mapped onto the tree structure. We have 
+a tab-separated value file (TSV file) with discrete annotations specifying the taxonomic 
+superkingdom of a subset of nodes in the tree. 
+
+```
+Entry	PHYLUM	SUPERKINGDOM	
+A5ILB0	Thermotogae	Bacteria	
+P08144	Arthropoda	Eukaryota	
+P29957	Proteobacteria	Bacteria
+H2N0D4	Chordata	Eukaryota	
+T1WDH2	Ciliophora	Eukaryota	
+T1WE96	Ciliophora	Eukaryota	
+H9B4I9	Firmicutes	Bacteria	
+A0A060DAC6	None	None	
+Q47R94	Actinobacteria	Bacteria
+```
+
+We can infer the joint labeling (`-joint`) of external and internal nodes most likely to explain the labels
+in the matching annotation file.
+
+`java -jar treegazer.jar -out kari_demo -nwk kari.nwk -in superkingdom@demo.tsv -seed 42 -internal -verbose  -out kari_taxa_joint -joint`
+
+The result is here saved as an iTOL dataset file (`-format ITOL`), which we drop in the iTOL webtool once the
+tree file has been uploaded.
 
 ![SUPERKINGDOM.png](images%2FSUPERKINGDOM.png)
 
-#### Example 2
+#### Direct mode - marginal inference
 
-This example learns distributions for continuous, experimental values, as observed for various ancestral 
-reconstructions across a tree (yes, you can mix extants and ancestors). It then infers continuous values
-for uninstantiated nodes in the tree, including other ancestors and all extants, conditioned on those 
-that are known.
+Marginal inference can also be performed in direct mode, but only for discrete data. 
+This is done by using the `-marg` flag instead of `-joint`. 
 
-First, learning the distribution shared by all nodes (external and internal, as turned "on" by the option 
-`-internal`). The model uses three latent states (`-latent 3`) for which it invents three discrete values: 
-`NADPH_kcat_1`, `NADPH_kcat_2`, ... These are not shown by default in marginal inference, as the method 
-instead opts to sample the continuous distribution many times to arrive at a mean value. 
 
-`asr.TreeGazer -nwk kari_ancestors.nwk -in NADPH_kcat@experiments.txt -latent 3 -learn -internal -params params_NADPH_kcat.json -out trn_NADPH_kcat.txt -format ITOL -seed 1 -tied`
+`java -jar treegazer.jar -out kari_demo -nwk kari.nwk -in superkingdom@demo.tsv -seed 42 -internal -verbose  -out kari_taxa_marg -marg`
 
-Experimental values are available for a group of ancestors in `experiments.txt` (TSV file; note that 
-ancestor names are numbers as generated by GRASP, not including the 'N' prefix). Note also that when no 
-value is available you just leave that cell blank or use a value like `null`, `None`:
-```
-Ancestor	NADPH_kcat	NADH_kcat	NADPH_km	NADH_km	NADPH_kcat_km	NADH_kcat_km	NADPH_Vmax	NADH_Vmax	NADH_Tm
-615	0.102	0.04	0.106	0.251	0.965	0.158	1.02E-04	3.95E-05	75.0
-459	0.244	0.213	0.06	0.131	4.081	1.627	1.22E-04	1.06E-04
-608	0.854	0.582	0.563	0.854	1.518	0.681	8.54E-04	5.82E-04	100.0
-95	0.474	0.456	0.177	0.217	2.686	2.119	4.74E-04	4.56E-04	90.0
-29	0.028	0.04	0.112	0.074	0.245	0.538	2.75E-04	3.99E-05
-227	0.138	0.083	0.2277	0.1702	0.607	0.546	1.38E-04	9.29E-05	95.0
-79									85.0%
-```
-
-Training was done with tied variances as this dataset is extremely sparse (only five values known). 
-The latent-to-continuous value distribution shared between nodes is saved after training as:
-```
-{"Condition":[["NADPH_kcat_1"],["NADPH_kcat_2"],["NADPH_kcat_3"]],
-"Pr":[[0.8539999487484222,0.007448424553531107],
-[0.29523664088109924,0.007448424553531107],
-[0.07218627893409603,0.007448424553531107]],
-"Variable":{"Domain":{"Predef":"Real"},"Name":"0_Real"},"Nodetype":"GDT","TieVariance":2,"Index":[0,1,2]}
-```
-
-The training data was saved as an iTOL dataset above and can be dropped into the iTOL webtool 
-and shows up like this. 
-
-![NADPH_kcat_trn.png](images%2FNADPH_kcat_trn.png)
-
-Now, let's run the inference. 
-
-`asr.TreeGazer -nwk kari_ancestors.nwk -in NADPH_kcat@experiments.txt -latent 3 -marg -internal -params params_NADPH_kcat.json -out tst_NADPH_kcat.txt -format ITOL -seed 1 -tied`
-
-Sampling from Gaussian mixture at each uninstantiated node gives:
-
-![NADPH_kcat_tst.png](images%2FNADPH_kcat_tst.png)
-
-Change `-format TSV` gives a file with this "head".
+The output file will then contain the probability of each node being in each state. Note that you cannot make an iTOL 
+visualisation of marginal inference results in direct mode, as the from a direct marginal inference
+is the multinomial distribution of the observed states.
 
 ```
-Ancestor	NADPH_kcat
-N0	0.754645807596001
-N1	0.6482432683741166
-N2	0.6378986978798374
-N3	0.5932161625795987
-N4	0.5734614385345007
-N5	0.5261001211533353
-tr|A0A0A7GET6|A0A0A7GET6_GEOAI	0.4469566331089113
-N6	0.4536806953981594
-N7	0.44623041036501315
+Entry	Eukaryota	Bacteria
+N0	0.5	0.5
+N2	0.9693484697521487	0.030651530247851267
+N3	0.9180669129002216	0.0819330870997784
+N4	0.8715425890702533	0.12845741092974677
+N5	0.7956810969656312	0.20431890303436887
+A0A0A7GET6	0.6574044328303008	0.3425955671696993
+N6	0.6593567657556293	0.3406432342443707
+N7	0.631639943967058	0.368360056032942
+A0A2A5QQ65	0.5573169561287165	0.4426830438712836
 ```
-
-#### Example 3
-
-`asr.TreeGazer -nwk ancestors.nwk -in BRENDA_TS_DATA:BRENDA@annotations.txt -learn -tied -latent 3 -internal -params params_BRENDA_TS_DATA.json -out tst_BRENDA_TS_DATA.txt -format ITOL -seed 2`
-
-learns a single mixture of Gaussians for the continuous property values in the column `BRENDA_TS_DATA` extracted by the parser `BRENDA`. The mixture is saved in a file `params_BRENDA_TS_DATA.json`; 
-the training data is re-saved for visualisation in iTOL as `tst_BRENDA_TS_DATA.txt`. Notice that the `-tied` variance option was used ensuring that the
-variance for each component is the same value, pooled from all the data. This is recommended if the data is sparse.
-
-The input tree file is on the Newick format with labelled extand and ancestor nodes (N0, ...), the other 
-input file `annotations.txt` is a TAB-separated value file (TSV), which is partially shown in Example 1 above.
-
-The Gaussian mixture file looks like this:
-```
-{"Condition":[["BRENDA_TS_DATA_1"],["BRENDA_TS_DATA_2"],["BRENDA_TS_DATA_3"]],
-"Pr":[[89.33343935081669,51.919856563088985],
-[60.4077134808605,51.919856563088985],
-[35.758600529629916,51.919856563088985]],
-"Variable":{"Domain":{"Predef":"Real"},"Name":"0_Real"},"Nodetype":"GDT","TieVariance":2,"Index":[0,1,2]}                    
-```
-
-The iTOL file follows the dataset format, so can be dropped into the iTOL webtool after the tree has been uploaded.
-
-![TS_BRENDA_trn.png](images/TS_BRENDA_trn.png)
-
-The inference for all other nodes can be done with the following command, making reference to the Gaussian mixture
-generated above:
-
-`asr.TreeGazer -nwk ancestors.nwk -in BRENDA_TS_DATA:BRENDA@annotations.txt -marg -tied -latent 3 -internal -params params_BRENDA_TS_DATA.json -out trn_BRENDA_TS_DATA.txt -format ITOL -seed 2`
-
-The inference generates another file, in this case again on the iTOL format, enabling it to be used as a second dataset
-for visualisation. If you'd like it to be presented as a TSV file, use `-format TSV`.
-
-This is the iTOL visual (added ontop of the previous with training data):
-
-![TS_BRENDA_tst.png](images/TS_BRENDA_tst.png)
-
-

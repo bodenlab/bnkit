@@ -91,8 +91,7 @@ public class TreeGazer {
     private static final int VALUE = 1;
     private static final int MEAN = 1;
     private static final int SD = 2;
-    private static final int IWD_VAL = 3;
-    private static final int UCB_VAL = 4;
+    private static final int UCB_VAL = 3;
     private static final int DEFAULT_VALUES_IDX = 1;
     private static final int DEFAULT_ENTRIES_IDX = 0;
     private static final String[] FORMATS = new String[] {"TSV", "TREE", "STDOUT", "ITOL"};
@@ -602,15 +601,19 @@ public class TreeGazer {
         for (int bpidx : tree) {
             if (!ENTRIES_SET.contains(tree.getLabel(bpidx))) {
                 Object state = inf.getDecoration(bpidx); // retrieve the already inferred state for the specified node
-                save[bpcnt][NODE] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx); // if ancestor attach N-prefix
-                save[bpcnt][VALUE] = state;
-                if (FORMAT_IDX == STDOUT)
-                    System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + state);
+                saveInstantiatedNode(tree, FORMAT_IDX, save, bpcnt, bpidx, state);
                 bpcnt += 1;
             }
         }
         TSVFile tempTsv = new TSVFile(new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valcol)}, save);
         saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, null, null, CMAX, CMIN);
+    }
+
+    private static void saveInstantiatedNode(Tree tree, int FORMAT_IDX, Object[][] save, int bpcnt, int bpidx, Object state) {
+        save[bpcnt][NODE] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx); // if ancestor attach N-prefix
+        save[bpcnt][VALUE] = state;
+        if (FORMAT_IDX == STDOUT)
+            System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + state);
     }
 
     /**
@@ -798,7 +801,7 @@ public class TreeGazer {
     private static String[] buildTsvHeader(PhyloBN pbn, BNode exampleNode, TSVFile tsv, int valCol) {
         String[] headers;
         if (pbn.getMasterCPT() == null && pbn.getMasterGDT() != null) { // Gaussian, so real value
-            headers = new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valCol)+" (Mean)", tsv.getHeader(valCol)+" (SD)", tsv.getHeader(valCol)+" (IWD)", tsv.getHeader(valCol)+" (UCB)"};
+            headers = new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valCol)+" (Mean)", tsv.getHeader(valCol)+" (SD)", tsv.getHeader(valCol)+" (UCB)"};
 
         } else if (pbn.getMasterCPT() != null && pbn.getMasterGDT() == null) { // Discrete
 
@@ -828,6 +831,32 @@ public class TreeGazer {
         } catch (ClassCastException e) { // Mixture of Gaussians, probably
             try {
 
+//                Old IWD calculation, removed for now as unclear if useful, also costly to compute
+//                double instance_dub = (Double) instance;
+//                MaxLhoodMarginal<EnumDistrib> instan_inf = new MaxLhoodMarginal<>(bpidx, pbn);
+//                ti.setInstance(bpidx, null); // remove evidence, treat as uninstantiated
+//
+//                // perform marginal inference
+//                instan_inf.decorate(ti);
+//                // retrieve the distribution at the node previously nominated
+//                Distrib instan_anydistrib = instan_inf.getDecoration(bpidx);
+//
+//                ti.setInstance(bpidx, instance); // replace the value in the tree
+//
+//                // cast under assumption using a Gaussian mixture
+//                MixtureDistrib mixtureDistrib = (MixtureDistrib) instan_anydistrib;
+//
+//                double[] samples = new double[NSAMPLES];
+//                for (int i = 0; i < NSAMPLES; i++) {
+//                    samples[i] = (Double) instan_anydistrib.sample();
+//                }
+//
+//                GaussianDistrib gd = GaussianDistrib.estimate(samples);
+//
+//                double abs_error = Math.abs(instance_dub - gd.getMean());
+//                double iwd = mixtureDistrib.cdf(gd.getMean() + abs_error) - mixtureDistrib.cdf(gd.getMean() - abs_error);
+//                save[bpcnt][IWD_VAL] = iwd;
+
                 double[] samples = new double[NSAMPLES];
                 for (int i = 0; i < NSAMPLES; i++) {
                     samples[i] = (Double) anydistrib.sample();
@@ -852,41 +881,11 @@ public class TreeGazer {
         }
     }
 
-    private static void processInstantiatedNode(PhyloBN pbn, TreeInstance ti, int FORMAT_IDX, Tree tree,
-                                                Object[][] save, int bpidx, int bpcnt, int NSAMPLES) {
-
+    private static void processInstantiatedNode(PhyloBN pbn, int FORMAT_IDX, Tree tree,
+                                                Object[][] save, int bpidx, int bpcnt) {
 
         Object instance = pbn.getExtNode(bpidx).getInstance();
-
-        double instance_dub = (Double) instance;
-        MaxLhoodMarginal<EnumDistrib> instan_inf = new MaxLhoodMarginal<>(bpidx, pbn);
-        ti.setInstance(bpidx, null); // remove evidence, treat as uninstantiated
-
-        // perform marginal inference
-        instan_inf.decorate(ti);
-        // retrieve the distribution at the node previously nominated
-        Distrib instan_anydistrib = instan_inf.getDecoration(bpidx);
-
-        ti.setInstance(bpidx, instance); // replace the value in the tree
-
-        // cast under assumption using a Gaussian mixture
-        MixtureDistrib mixtureDistrib = (MixtureDistrib) instan_anydistrib;
-
-        double[] samples = new double[NSAMPLES];
-        for (int i = 0; i < NSAMPLES; i++) {
-            samples[i] = (Double) instan_anydistrib.sample();
-        }
-
-        GaussianDistrib gd = GaussianDistrib.estimate(samples);
-
-        double abs_error = Math.abs(instance_dub - gd.getMean());
-        double iwd = mixtureDistrib.cdf(gd.getMean() + abs_error) - mixtureDistrib.cdf(gd.getMean() - abs_error);
-        save[bpcnt][IWD_VAL] = iwd;
-        save[bpcnt][NODE] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
-        save[bpcnt][MEAN] = instance; // here this is not actually the mean, but the instantiated value
-
-        if (FORMAT_IDX == STDOUT)
-            System.out.println(bpidx + "\t" + (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx) + "\t" + instance);
+        saveInstantiatedNode(tree, FORMAT_IDX, save, bpcnt, bpidx, instance);
     }
 
     private static void performLatentMarginalInference(Tree tree, Object MARG_LABEL,
@@ -919,7 +918,7 @@ public class TreeGazer {
                         bpcnt, NSAMPLES, LAMBDA);
             } else {
                 // anydistrib == null; this happens when a node is instantiated, so retrieve the value accordingly
-                processInstantiatedNode(pbn, ti, FORMAT_IDX, tree, save, bpidx, bpcnt, NSAMPLES);
+                processInstantiatedNode(pbn, FORMAT_IDX, tree, save, bpidx, bpcnt);
             }
 
             bpcnt += 1;
