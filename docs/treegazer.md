@@ -1,20 +1,16 @@
 # TreeGazer
 
-TreeGazer is a tool to annotate ancestors and extant nodes in a phylogenetic tree by 
-reference to a subset of nodes with known properties. These properties are represented by either 
-discrete or continuous variables. In the latter case, it also uses latent discrete variables 
-to mix (Gaussian) distributions of the observable continuous variables. (The parameters for these
-mixtures are shared between all nodes in the tree; the states at the nodes are governed by an
-evolutionary model.) The use of latent variables is optional for discrete observables.
-TreeGazer forms part of the GRASP-suite (Foley et al., 2022).
 
-### Using TreeGazer
+### Table of Contents
+
+- [Using TreeGazer](#using-treegazer)
+- [Notes](#example-1)
+
+### Command line reference
 
 `Usage: asr.TreeGazer`
 
      [-nwk <tree-file> -in {<label>@}<input-file> -out <output-file>]
-        {-model <uniform(default)>}
-        {-gamma <value (default 1.0)>}
         {-params <JSON-file>}
         {-latent <#states>}
         {-internal}
@@ -57,11 +53,7 @@ TreeGazer forms part of the GRASP-suite (Foley et al., 2022).
             help prints out commandline arguments (this screen).
 
             verbose completes the requested steps while printing out messages about the process.
-        
 
-
-### Notes:
- 
 Evolutionary models of substitution are currently limited to uniform, which is an adaptation of Jukes-Cantor for arbitrary number of states.
 
 If specified values are real, a conditional Gaussian mixture distribution conditioned on latent state is learned.
@@ -71,12 +63,118 @@ If specified values are discrete, a multinomial distribution conditioned on late
 Inference is either joint (default) or marginal (marginal allows a branch-point to be nominated;
 if one is not given all uninstantiated nodes are inferred)
 
+### Model background
+
+TreeGazer is a tool to annotate ancestors (internal) and extant (leaf) nodes in a phylogenetic tree by
+reference to a subset of nodes with known properties. These properties are represented by either
+discrete or continuous variables.
+
+In the case of continuous variables, TreeGazer uses latent discrete variables
+to mix Gaussian distributions of the observable continuous variables (Figure 1). The parameters for these
+mixtures are learnt via expectation maximisation (EM) and are shared between all nodes in the tree; the 
+states at the nodes are governed by an evolutionary model. The use of latent variables is optional
+for discrete observables. TreeGazer can also perform direct inference whereby observed variables are mapped directly onto the
+tree structure without any internal latent variables.
+
+![TreeGazer_description.png](images%2FTreeGazer_description.png) Figure 1: A visualisation of the 
+TreeGazer model structure when performing latent inference. Discrete latent nodes (circles) mimic the 
+structure of the phylogenetic tree, while continuous, real nodes (squares) are fixed with known values 
+for a given property (for example, a kinetic parameter). Users can specify any number of latent states,
+with each latent state mapping to a Gaussian distribution for which parameters are learned from the data.
+
+The table below summarises the main analyses TreeGazer can perform and the possible data types that can 
+be used. the following sections will detail how to perform each type of analysis.  
+
+| Mode        | Outcome                                           | Input Data Type   |
+|-------------|---------------------------------------------------|-------------------|
+| Direct      | Joint reconstruction                              | Discrete only     |
+| Direct      | Marginal reconstruction                           | Discrete only     |
+| Latent      | Learning                                          | Discrete and real |
+| Latent      | Marginal reconstruction (learning required first) | Discrete and real |
+| Latent      | Joint reconstruction (learning required first)    | Discrete and real |
+
+
 ### Examples
 
-#### Example 1
+#### Latent mode - learning
 
-Here we use a tree `ancestors.nwk` with extant nodes labelled by their accession IDs and internal, ancestor nodes labelled 
-as per GRASP (N0, N1, etc in a depth first manner). Then we have a tab-separated value file (TSV file) with annotations 
+Before performing any type of latent inference, the distribution shared by all nodes must be first be learnt. Below is
+an example of how the input TSV file should be formatted. Extant nodes are labelled by their accession IDs and 
+internal, ancestor nodes are labelled as per GRASP (N0, N1, etc in a depth first manner). The node names must 
+be in the first column. Note also that when no value is available you just leave that cell blank or use a value 
+like `null`, `None`:
+
+```
+Entry	mean_retained_activity	std_retained_activity	Isobutanol_%
+A0A2M7A7S6	0.3990116080000001	0.19623674311255804	8
+N1	0.17249387866666666	0.038831346745923825	8
+N227	0.4221575046666666	0.001622404	8
+N28	0.8627858626666667	0.031306071743960474	8
+N29	0.5615638736666667	0.008130065	8
+N459	0.39025134166666664	0.013820733111537073	8
+N608	0.10784281966666666	0.005627829	8
+N615	0.6278029940000001	0.025805765715013116	8
+N78	12.469763536666667	1.1619048626436186	8
+N79	2.6974158083333335	0.051390714599450736	8
+N82	2.074187615	0.2004342392387551	8
+N95	0.3724682653333333	0.022329334151059477	8
+A0A0K9HJH1	0.5610371706666667	0.029527957919090055	8
+D3PT81	0.319143403	0.043889298	8
+A0A1V4QSD8	1.3732522796666666	0.039652550084277975	8
+```
+
+Below is an example command to perform learning: 
+
+`java -jar treegazer.jar -nwk kari.nwk -params kari_demo.params -latent 3 
+-in demo.tsv -seed 42 -internal -learn -verbose`
+
+The model uses three latent states (`-latent 3`) for which it invents three discrete values:
+`mean_retained_activity_1`, `mean_retained_activity_2` and `mean_retained_activity_3`. Here we use a tree `kari.nwk`
+which should contain the same labels as the TSV file. Because we are interested in learning the shared 
+distribution for both internal and external notes, we use the `-internal` flag. If `-internal`isn't specified
+but there are internal node annotations in the TSV file, these will be ignored.
+
+By default, TreeGazer will assume that the second column of the TSV input contains the values to learn. However, you
+can specify a specific column using the column name before the input file like so: 
+
+`java -jar treegazer.jar -nwk kari.nwk -params kari_demo.params -latent 3 
+-in mean_retained_activity@demo.tsv -seed 42 -internal -learn -verbose`
+
+If in `-verbose` mode, TreeGazer will also print the parameters of the evolutionary model that describe the latent
+variables. "R" specifes the instantaneous rate matrix for the 3 state model and "F" specifies the stationary 
+frequencies of each latent state. TreeGazer assumes a uniform model, where all latent states are equally likely and 
+the probabilities of transitioning between these states are also equally likely. 
+```
+"R" : [-0.66,  0.33,  0.33]
+      [ 0.33, -0.66,  0.33]
+      [ 0.33,  0.33, -0.66]
+          
+"F" : [ 0.33,  0.33,  0.33]
+```
+
+After the EM algorithm converges the parameters are saved into the file indicated by `-params`. 
+```
+{"Condition":[["mean_retained_activity_1"],["mean_retained_activity_2"],["mean_retained_activity_3"]],
+"Pr":[[12.469763536666667,0.11150665525484037],[2.049876146158595,0.11150665525484037],[0.4366513910438917,0.11150665525484037]],
+"Variable":{"Domain":{"Predef":"Real"},"Name":"0_Real"},"Nodetype":"GDT","TieVariance":2,"Index":[0,1,2]}
+```
+The contents of "Pr" are the mean and variance respectively of each of the latent states. Note that the variance values 
+are the same across all latent states, pooled from all the data. Tied variance used by default and is recommended in
+most cases, especially if the data is sparse. This can be disabled by using the `-untied` flag. 
+
+#### Latent mode - Marginal inference
+
+Now that we have `kari_demo.params` we can perform actual inference. 
+
+`java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -latent 3 
+-in demo.tsv -seed 42 -internal -learn -verbose`
+
+
+
+
+
+
+Then we have a tab-separated value file (TSV file) with annotations 
 `annotations.txt` extracted from various sources; each column has a header (e.g. `SUPERKINGDOM`) that we reference below.
 
 We infer the joint labeling (`-joint`) of external and internal (`-internal`) nodes most likely to explain the labels in the matching annotation file.
@@ -202,3 +300,5 @@ for visualisation. If you'd like it to be presented as a TSV file, use `-format 
 This is the iTOL visual (added ontop of the previous with training data):
 
 ![TS_BRENDA_tst.png](images/TS_BRENDA_tst.png)
+
+

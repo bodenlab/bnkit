@@ -323,7 +323,7 @@ public class TreeGazer {
             if (TSVFile.isDoubleOrInt(ENTRY_VALUES)) { // the value column of data is all Double (real), hence must use latent states for nodes in tree
                 ENTRY_VALUES = TSVFile.getDouble(ENTRY_VALUES);
                 if (VERBOSE) {
-                    System.out.println("Detected real values in data--using Gaussian mixture with " + NSTATES + " components");
+                    System.out.println("Detected real values in data - using Gaussian mixture with " + NSTATES + " components");
                 }
             } else { // the column has discrete values (not real)
                 discreteVals = checkDiscreteDataValidForLatentModel(ENTRY_VALUES, NSTATES, VERBOSE);
@@ -421,17 +421,22 @@ public class TreeGazer {
             } else {
                 if (!tree.isLeaf(bpidx)) {
                     ancestorFound = true;
+                    if (leavesOnly) {
+                        continue;
+                    }
                 }
+
                 entryStrings[i] = tree.getLabel(bpidx).toString(); //
                 entrySet.add(tree.getLabel(bpidx));
             }
         }
 
         if ((ancestorFound && leavesOnly) && (mode == MODEL_MODE.LATENT)) {
-            usage(17, "Internal nodes with annotations were identified in " + input + ". Use -internal to avoid failure of learning/inference.");
-        } else if (missingNode) {
-            usage(18, "Input TSV contains node labels that are not present in the tree.");
+            System.err.println("Internal nodes with annotations were identified in " + input + " but were ignored because -internal was not specified.");
         }
+//        } else if (missingNode) {
+//            usage(18, "Input TSV contains node labels that are not present in the tree.");
+//        }
     }
 
     private static Object[] createLatentStateLabels(Integer numStates, String label) {
@@ -457,13 +462,12 @@ public class TreeGazer {
         String[] discreteVals = new String[observed.size()];
         try {
             observed.toArray(discreteVals);
-
         } catch (ArrayStoreException e) {
             usage(15, "Discrete values cannot contain integers");
         }
 
         if (VERBOSE) {
-            System.out.println("Detected " + discreteVals.length + " discrete values in data--using multi-nomial distributions conditioned on " + NSTATES + " states");
+            System.out.println("Detected " + discreteVals.length + " discrete values in data - using multi-nomial distributions conditioned on " + NSTATES + " states");
         }
 
         return discreteVals;
