@@ -29,7 +29,8 @@ import asr.IndelSegmentation.RATE_CATEGORY;
 public class GRASP {
 
     public static String VERSION = "24-Mar-2026";
-
+    public static boolean RANDOM_RATES = false;
+    public static boolean SIMPLE_RATES = false;
     public static boolean VERBOSE  = false;
     public static boolean TIME     = false;
     public static int     NTHREADS = 4;
@@ -214,6 +215,10 @@ public class GRASP {
                     SEED = Integer.parseInt(args[++a]);
                 } else if (arg.equalsIgnoreCase("-joint") || arg.equalsIgnoreCase("j")) {
                     MODE = Inference.JOINT;
+                } else if (arg.equalsIgnoreCase("-random-rates")) {
+                    RANDOM_RATES = true;
+                } else if (arg.equalsIgnoreCase("-simple-rates")) {
+                    SIMPLE_RATES = true;
                 } else if ((arg.equalsIgnoreCase("-marginal") || arg.equalsIgnoreCase("m")) && args.length > a + 1) {
                     MODE = Inference.MARGINAL;
                     String ancid = args[++a];
