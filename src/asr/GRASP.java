@@ -1064,9 +1064,9 @@ public class GRASP {
                                 while (tracker == null) {
                                     TrAVIS.TrackTree.Params params = null;
                                     if (REUSE_TREE)
-                                        params = new TrAVIS.TrackTree.Params(tree, EnumSeq.parseProtein(n0.toString()), MODEL);
+                                        params = new TrAVIS.TrackTree.Params(tree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED);
                                     else
-                                        params = new TrAVIS.TrackTree.Params(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL);
+                                        params = new TrAVIS.TrackTree.Params(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED);
                                     if (RATES != null && COPY_SUBST_RATES) {
                                         // recover rates for N0, appropriately indexed
                                         int[] n0idxs = indelpred.getConsensus(0);

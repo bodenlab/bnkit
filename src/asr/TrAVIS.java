@@ -360,22 +360,32 @@ public class TrAVIS {
         }
 
         if (ancseq != null && OUTPUT != null) { // we've got an ancestor to track down the tree
-            TrackTree.Params params = new TrackTree.Params(tree, ancseq, EVOL_MODEL);
-            if (INDEL_LENGTH_MODEL != null)
+            TrackTree.Params params = new TrackTree.Params(tree, ancseq, EVOL_MODEL, SEED);
+            if (INDEL_LENGTH_MODEL != null) {
                 params.setIndelModel(INDEL_LENGTH_MODEL);
-            if (INSERTION_LENGTH_MODEL != null)
+            } else {
+                params.setIndelModel(IndelModel.create("Zipf", "1.7,100"));
+            }
+            if (INSERTION_LENGTH_MODEL != null) {
                 params.setInsertmodel(INSERTION_LENGTH_MODEL);
-            if (DELETION_LENGTH_MODEL != null)
+            } else {
+                params.setInsertmodel(IndelModel.create("Zipf", "1.7,100"));
+            }
+            if (DELETION_LENGTH_MODEL != null) {
                 params.setDeletemodel(DELETION_LENGTH_MODEL);
-            // still need to set rate models
+            } else {
+                params.setDeletemodel(IndelModel.create("Zipf", "1.7,100"));
+            }
+            // still need to set substitution rate models
             if (SUBST_RATE_MODEL == null && GAMMA_ALPHA != null)
                 params.setSubstRateModel(GAMMA_ALPHA);
             else if (SUBST_RATE_MODEL != null)
                 params.setSubstRateModel(SUBST_RATE_MODEL);
-            else
-                usage(7, "Substitution rate model could not be created");
+//            else
+//                usage(7, "Substitution rate model could not be created");
             if (INDEL_RATE_MODEL != null)
                 params.setIndelRateModel(INDEL_RATE_MODEL);
+
 
             params.SUBST_RATE_INFLUENCES_INDELS = SUBST_RATE_INFLUENCE_INDELS;
             params.PROPORTION_DELETION = DELETIONPROP;
@@ -442,8 +452,22 @@ public class TrAVIS {
                         poaGraph.saveToDOT(OUTPUT+"/travis.dot");
                         poaGraph.saveToMatrix(OUTPUT+"/travis.m");
                         Newick.save(tree, OUTPUT+"/travis.nwk", Newick.MODE_DEFAULT);
+
+                        if (tracker.INDELRATES) {
+                            double[] indelRates = tracker.getIndelRates();
+                            Object[][] data = new Object[indelRates.length + 1][2];
+                            for (int i = 0; i <= indelRates.length; i++) {
+                                if (i == 0) // header
+                                    data[0] = new Object[]{"Site", "Rate"};
+                                else
+                                    data[i] = new Object[]{i, indelRates[i - 1]};
+                            }
+                            TSVFile ratesfile = new TSVFile(data, true);
+                            ratesfile.save(OUTPUT + "/indel_rates_travis.tsv");
+                        }
+
                         if (GAMMA_ALPHA != null) {
-                            double[] rates = tracker.getRates();
+                            double[] rates = tracker.getSubstRates();
                             Object[][] data = new Object[rates.length + 1][2];
                             for (int i = 0; i <= rates.length; i++) {
                                 if (i == 0) // header
@@ -459,8 +483,25 @@ public class TrAVIS {
                     }
                     break;
                 case 6: // RATES
+                    if (tracker.INDELRATES) {
+                        double[] indelRates = tracker.getIndelRates();
+                        Object[][] data = new Object[indelRates.length + 1][2];
+                        for (int i = 0; i <= indelRates.length; i++) {
+                            if (i == 0) // header
+                                data[0] = new Object[]{"Site", "Rate"};
+                            else
+                                data[i] = new Object[]{i, indelRates[i - 1]};
+                        }
+                        try {
+                            TSVFile ratesfile = new TSVFile(data, true);
+                            ratesfile.save(OUTPUT + "_indel_rates.tsv");
+                        } catch (IOException e) {
+                            usage(6, "Indel rates file could not be saved");
+                        }
+                    }
+
                     if (GAMMA_ALPHA != null) {
-                        double[] rates = tracker.getRates();
+                        double[] rates = tracker.getSubstRates();
                         Object[][] data = new Object[rates.length + 1][2];
                         for (int i = 0; i <= rates.length; i++) {
                             if (i == 0) // header
@@ -474,9 +515,10 @@ public class TrAVIS {
                         } catch (IOException e) {
                             usage(6, "RATES file could not be saved");
                         }
-                    } else {
-                        usage(8, "RATES are not used hence cannot be saved");
                     }
+//                    else {
+//                        usage(8, "RATES are not used hence cannot be saved");
+//                    }
             }
         }
     }
@@ -730,10 +772,11 @@ public class TrAVIS {
             public double PROPORTION_DELETION = 0.5;   // the proportion of deletion events (as opposed to insertion) amongst all indels
             public Random rand = new Random(System.currentTimeMillis());
 
-            public Params(IdxTree tree, EnumSeq ancseq, SubstModel substmodel) {
+            public Params(IdxTree tree, EnumSeq ancseq, SubstModel substmodel, long SEED) {
                 this.tree = tree;
                 this.ancseq = ancseq;
                 this.substmodel = substmodel;
+                setSeed(SEED);
             }
 
             public static Params seed(Params params, long SEED) {
@@ -824,8 +867,11 @@ public class TrAVIS {
         private int[][] alignedidxs = null;         // alignment extracted from sequences and POAG, but in the form of indices from original seq idx to alignment idx
         // private int[] order = null; // topological order of nodes in POAG; when set alignment can be extracted
         private double[] alignedrates = null;
-        private double[][] rates = null; // rates in tree, reference to branchpoint specific index
+        private double[] alignedIndelRates = null;
+        private double[][] substRates; // rates in tree, reference to branchpoint specific index
+        private double[][] colIndelRates;
         public boolean USERATES;
+        public boolean INDELRATES;
 
         /**
          * @param params
@@ -844,13 +890,15 @@ public class TrAVIS {
 
             List<Double> rList = new ArrayList<>();
             USERATES = (params.substratemodel != null); // check if we will generate position specific rates using the model; if not, use a constant rate
-            if (USERATES)
-                params.substratemodel.setSeed(SEED);
+            INDELRATES = (params.indelratemodel != null);
+//            if (USERATES)
+//                params.substratemodel.setSeed(SEED);
             myType = ancseq.getType();
             IdxTree tree = params.tree;
             int[][] deletions  = new int[tree.getSize()][];
             int[][] insertions = new int[tree.getSize()][];
-            rates = new double[tree.getSize()][];
+            substRates = new double[tree.getSize()][];
+            colIndelRates = new double[tree.getSize()][];
             EnumSeq[] bpseqs = new EnumSeq[tree.getSize()];
             int length_sum = 0;
             int indel_cnt = 0;
@@ -859,9 +907,12 @@ public class TrAVIS {
             for (int idx : tree) {
                 if (idx == 0) {
                     bpseqs[0] = ancseq;
-                    rates[0] = new double[ancseq.length()];
-                    for (int i = 0; i < ancseq.length(); i++)
-                        rates[0][i] = params.ancrates != null ? params.ancrates[i] : (USERATES ? params.substratemodel.sample() : 1);
+                    substRates[0] = new double[ancseq.length()];
+                    colIndelRates[0] = new double[ancseq.length()];
+                    for (int i = 0; i < ancseq.length(); i++) {
+                        substRates[0][i] = params.ancrates != null ? params.ancrates[i] : (USERATES ? params.substratemodel.sample() : 1);
+                        colIndelRates[0][i] = INDELRATES ? params.indelratemodel.sample() : 1;
+                    }
                 } else { // branchpoint has parents, all of which have been instantiated (iterator order ensures this, starting with branchpoint idx 0)
                     int paridx = tree.getParent(idx);           // idx of parent
                     Object[] parseq = bpseqs[paridx].get();     // sequence of parent
@@ -869,14 +920,19 @@ public class TrAVIS {
                     //double t = tree.getDistance(1);
                     insertions[idx] = new int[parseq.length+1]; // insertions at this branchpoint relative to parent indices; note that insertions can happen before or after a sequence
                     deletions[idx] = new int[parseq.length];    // deletions at this branchpoint relative to parent indices
-                    rates[idx] = new double[parseq.length];     // rates at this branchpoint relative to parent indices; note that insertion rate for before and after is shared
+                    substRates[idx] = new double[parseq.length];     // rates at this branchpoint relative to parent indices; note that insertion rate for before and after is shared
+                    colIndelRates[idx] = new double[parseq.length];
+
                     // determine what indels are introduced; note: we don't yet know how many indices are required for child so we use lists before moving to array
                     List<Object> child = new ArrayList<>();     // collect character states for the resulting positions, accommodating insertions and deletions
                     List<Object> tail  = new ArrayList<>();     // collect character states for the tail of the child; intended for tailing insertions
                     List<Double> childrates = new ArrayList<>();// collect character rates for the resulting positions, accommodating insertions and deletions
                     List<Double> tailrates = new ArrayList<>(); // collect character rates for the tail of the child; intended for tailing insertions
-                    double rho = params.indelratemodel.sample();// node specific rate of insertions and deletions
-                    rList.add(rho);                             // save it so the whole series can be recorded
+                    List<Double> childColIndelRates = new ArrayList<>(); // collect indel rates for the resulting positions
+                    List<Double> childColIndelTailRates = new ArrayList<>(); // collect indel rates for the tail of the child
+
+                    //double rho = params.indelratemodel.sample();// node specific rate of insertions and deletions
+                    //rList.add(rho);                             // save it so the whole series can be recorded
                     // ----
                     // Next, loop through each site of the parent sequence
                     // ----
@@ -890,11 +946,15 @@ public class TrAVIS {
                         // 3. insertion/s in the child
                         double toss = params.rand.nextDouble();
                         // indel rate (rho) is separate from site-specific substitution rate, and is node-specific
-                        double p = Math.exp(-(rho*t * (params.SUBST_RATE_INFLUENCES_INDELS ? rates[paridx][i]:1)));
+                        //double p = Math.exp(-(rho*t * (params.SUBST_RATE_INFLUENCES_INDELS ? substRates[paridx][i]:1)));
+
+                        // the indel rate is specific to the position in the parent sequence, i.e. the propensity for an indel event at this position
+                        double p = Math.exp(-(colIndelRates[paridx][i] * t));
+
                         // p = (1-p)/2 + p; // FIX halve-it see how things change....
                         // make decision of what happens in child for the current site i
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution (r is evolutionary rate and t is branch distance)
-                            EnumDistrib d = params.substmodel.getDistrib(parseq[i], rates[paridx][i]*t); // probability of child states GIVEN parent state
+                            EnumDistrib d = params.substmodel.getDistrib(parseq[i], substRates[paridx][i]*t); // probability of child states GIVEN parent state
                             Object nchar = null;
                             double tossagain = params.rand.nextDouble();
                             double sump = 0;
@@ -907,7 +967,8 @@ public class TrAVIS {
                             }
                             if (nchar != null) {
                                 child.add(nchar);
-                                childrates.add(rates[paridx][i]); // stays the same
+                                childrates.add(substRates[paridx][i]); // stays the same
+                                childColIndelRates.add(colIndelRates[paridx][i]); // same for col indel rate
                             } else
                                 throw new RuntimeException("Sampling invalid distribution");
                             i += 1; // done with site, continue to next...
@@ -942,10 +1003,14 @@ public class TrAVIS {
                                             tail.add(nchar);
                                         else
                                             child.add(nchar);
-                                        if (i == 0 && insertions[idx][parseq.length] > 0)
+
+                                        if (i == 0 && insertions[idx][parseq.length] > 0) {
                                             tailrates.add(USERATES ? params.substratemodel.sample() : 1);
-                                        else
+                                            childColIndelTailRates.add(INDELRATES ? params.indelratemodel.sample() : 1);
+                                        } else {
                                             childrates.add(USERATES ? params.substratemodel.sample() : 1); // new position means new rate
+                                            childColIndelRates.add(INDELRATES ? params.indelratemodel.sample() : 1);
+                                        }
                                     } else
                                         throw new RuntimeException("Sampling invalid distribution");
                                 }
@@ -964,7 +1029,8 @@ public class TrAVIS {
                                 }
                                 if (nchar != null) {
                                     child.add(nchar);
-                                    childrates.add(rates[paridx][i]); // stays the same
+                                    childrates.add(substRates[paridx][i]); // stays the same
+                                    childColIndelRates.add(colIndelRates[paridx][i]);
                                 } else
                                     throw new RuntimeException("Sampling invalid distribution");
                                 i += 1;
@@ -973,13 +1039,16 @@ public class TrAVIS {
                     }
                     // set character states
                     Object[] chseq = new Object[child.size() + tail.size()];
-                    rates[idx] = new double[childrates.size() + tailrates.size()];
+                    substRates[idx] = new double[childrates.size() + tailrates.size()];
+                    colIndelRates[idx] = new double[childColIndelRates.size() + childColIndelTailRates.size()];
                     for (int j = 0; j < chseq.length; j ++) {
-                        if (j >= child.size())
-                            rates[idx][j] = tailrates.get(j - child.size());
-                        else
-                            rates[idx][j] = childrates.get(j);
-                        if (j >= child.size())
+                        if (j >= child.size()) {
+                            substRates[idx][j] = tailrates.get(j - child.size());
+                            colIndelRates[idx][j] = childColIndelTailRates.get(j - child.size());
+                        } else {
+                            substRates[idx][j] = childrates.get(j);
+                            colIndelRates[idx][j] = childColIndelRates.get(j);
+                        } if (j >= child.size())
                             chseq[j] = tail.get(j - child.size());
                         else
                             chseq[j] = child.get(j);
@@ -995,15 +1064,15 @@ public class TrAVIS {
             ti_seqs = new TreeInstance(tree, bpseqs);
 
             if (VERBOSE) {
-                System.out.println(rList);
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter((OUTPUT!=null? OUTPUT:"") + "_result_rlist.txt"))) {
-                    for (Double r : rList) {
-                        writer.write(r.toString());
-                        writer.newLine();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                //System.out.println(rList);
+//                try (BufferedWriter writer = new BufferedWriter(new FileWriter((OUTPUT!=null? OUTPUT:"") + "_result_rlist.txt"))) {
+//                    for (Double r : rList) {
+//                        writer.write(r.toString());
+//                        writer.newLine();
+//                    }
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
                 String outputFile = (OUTPUT!=null? OUTPUT:"")  +"_travis_report.txt";
 
                 try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
@@ -1143,6 +1212,8 @@ public class TrAVIS {
             }
             if (USERATES)
                 alignedrates = new double[order.length];
+            if (INDELRATES)
+                alignedIndelRates = new double[order.length];
             for (int idx : params.tree) {
                 alignedseqs[idx] = new EnumSeq.Gappy(myType);
                 Object[] seq = new Object[order.length];
@@ -1153,7 +1224,10 @@ public class TrAVIS {
                     seq[pos] = orig.get(j);
                     alignedidxs[idx][j] = pos;
                     if (USERATES)
-                        alignedrates[pos] = rates[idx][j];
+                        alignedrates[pos] = substRates[idx][j];
+                    if (INDELRATES) {
+                        alignedIndelRates[pos] = colIndelRates[idx][j];
+                    }
                 }
                 alignedseqs[idx].set(seq);
                 alignedseqs[idx].setName(params.tree.getBranchPoint(idx).getLabel().toString());
@@ -1196,13 +1270,24 @@ public class TrAVIS {
         }
 
 
-        public double[] getRates() {
+        public double[] getSubstRates() {
             if (!USERATES)
                 return null;
             if (alignedrates != null)
                 return alignedrates;
             getAlignment();
             return alignedrates;
+        }
+
+        public double[] getIndelRates() {
+            if (!INDELRATES) {
+                return null;
+            }
+            if (alignedIndelRates != null) {
+                return alignedIndelRates;
+            }
+            getAlignment();
+            return alignedIndelRates;
         }
 
 

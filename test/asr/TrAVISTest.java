@@ -61,7 +61,7 @@ class TrAVISTest {
                     //             TrackTree tracker = new TrackTree(tree, ancseq, MODEL, SEED, RATESGAMMA==null?-1:RATESGAMMA);
                     IdxTree tree = Tree.Random(N, SEED, GAMMA_SHAPE, 1.0 / GAMMA_SCALE, 2, 2).getIdxTree();
                     tree.adjustDistances(D); // scale distances
-                    TrAVIS.TrackTree.Params params = new TrAVIS.TrackTree.Params(tree, ancseq, model);
+                    TrAVIS.TrackTree.Params params = new TrAVIS.TrackTree.Params(tree, ancseq, model, SEED);
                     TrAVIS.TrackTree t = new TrAVIS.TrackTree(params, SEED);
                     int key = getKey(i, j, SEED);
                     trackMap.put(key, t);
