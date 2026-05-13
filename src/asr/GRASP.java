@@ -763,6 +763,10 @@ public class GRASP {
                             //
                             int[] ins_total = new int[0];
                             int[] del_total = new int[0];
+
+                            int[] columnDeletionEvents = new int[ancseqs_gappy[0].length];
+                            int[] columnInsertionEvents = new int[ancseqs_gappy[0].length];
+
                             // Go through the tree, and look at each ancestor sequence, recording predicted indel events
                             for (int idx : mytree) { // go through the original, user-provided tree
                                 int parent = mytree.getParent(idx);
@@ -786,11 +790,47 @@ public class GRASP {
                                     double event_prop = (double) (nInsertions + nDeletions) / ancseqs_nogap[(Integer) mytree.getLabel(parent)].length;
                                     double indelrate = -Math.log(1.0 - event_prop) / dist;
                                     indelrates.put(idx, indelrate);
+
+                                    int[] localColInsertionEvents = TrAVIS.markColumnInsertionEvents(pseq, cseq);
+                                    int[] localColDeletionEvents = TrAVIS.markColumnDeletionEvents(pseq, cseq);
+                                    for (int j = 0; j < columnDeletionEvents.length; j++) {
+                                        columnInsertionEvents[j] += localColInsertionEvents[j];
+                                        columnDeletionEvents[j] += localColDeletionEvents[j];
+                                    }
+
                                     // Accumulate insertion/deletion lengths
                                     ins_total = TrAVIS.mergeCounts(ins_total, insertions);
                                     del_total = TrAVIS.mergeCounts(del_total, deletions);
                                 }
                             }
+
+                            List<Double> rateSampleCollection = new ArrayList<>();
+                            for (int idx : mytree) { // go through the original, user-provided tree
+                                int parent = mytree.getParent(idx);
+                                if (parent != -1) {  // Non-root node, so there is a branch with distance to catch...
+                                    double dist = mytree.getDistance(idx);
+                                    for (int j = 0; j < columnInsertionEvents.length; j++) {
+                                        int numIndelEvents = columnDeletionEvents[j] + columnInsertionEvents[j];
+
+                                        int numSeqs = mytree.getSize() - 1;
+                                        double eventProp = (double) numIndelEvents / numSeqs;
+                                        double colIndelRate = -Math.log(1.0 - eventProp) / dist;
+                                        rateSampleCollection.add(colIndelRate);
+                                    }
+                                }
+                            }
+
+                            double[] colRateArray = new double[rateSampleCollection.size()];
+                            for (int jj = 0; jj < rateSampleCollection.size(); jj++)
+                                colRateArray[jj] = rateSampleCollection.get(jj);
+
+                            RateModel indelColRateDist = RateModel.bestfit(colRateArray, SEED);
+                            if (indelColRateDist != null)
+                                System.out.println("--indel-col-rate-distrib " + indelColRateDist.getTrAVIS() + " \\");
+
+                            System.out.println(colRateArray.length + " samples in the column rate array");
+
+
                             //
                             List<Double> collect = new ArrayList<>();
                             for (Map.Entry<Integer, Double> entry : indelrates.entrySet()) {
@@ -804,6 +844,9 @@ public class GRASP {
                             double[] rarray = new double[collect.size()];
                             for (int jj = 0; jj < rarray.length; jj++)
                                 rarray[jj] = collect.get(jj);
+
+                            System.out.println(rarray.length + " samples in the seq rate array");
+
                             // fit a zero-inflated or standard gamma distribution to all collected rates (from the reconstruction); seems to work OK but sometime less well than the mixture below
                             RateModel indelrateDist = RateModel.bestfit(rarray, SEED);
                             // Two options:
@@ -821,6 +864,8 @@ public class GRASP {
                             // ZeroInflatedGammaMix indelrateDist = ZeroInflatedGammaMix.fit(rarray, 2);
                             if (indelrateDist != null)
                                 System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS() + " \\");
+
+
                             // now, turn to indel lengths...
                             int[] indel_total = TrAVIS.mergeCounts(ins_total, del_total);
                             int[] ins_data = TrAVIS.unfoldCounts(ins_total);
