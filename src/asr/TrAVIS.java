@@ -6,6 +6,7 @@ import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
+import dat.SeqDomain;
 import dat.file.AlnWriter;
 import dat.file.FastaWriter;
 import dat.file.Newick;
@@ -49,6 +50,7 @@ import static bn.prob.GammaDistrib.getAlpha;
  *
  * @author Mikael Boden
  * @author Chongting Zhao
+ * @author Sebastian Porras
  */
 public class TrAVIS {
     public static void usage() {
@@ -79,7 +81,6 @@ public class TrAVIS {
                 "      --indel-length-distrib <type:params>     Indel length distribution: ZeroTruncatedPoisson, Poisson, Zipf, Lavalette\n" +
                 "      --insertion-length-distrib <type:params> Insertion length distribution (overrides indel-length)\n" +
                 "      --deletion-length-distrib <type:params>  Deletion length distribution (overrides indel-length)\n" +
-                "      --ratesconflate                          Modulate indel rate (rho) by site-specific substitution rate (r): p=e^(rho*r*t)\n" +
                 "      --delprop <fraction>                     Proportion of deletions among indels (0-1, default: 0.5)\n" +
                 "      --gap                                    Include gap character in output (default for CLUSTAL)\n" +
                 "      --format <type>                          Output format: FASTA (default), CLUSTAL, DOT, TREE, RATES, DIR\n" +
@@ -107,41 +108,100 @@ public class TrAVIS {
 
     public static Boolean VERBOSE = false;
     public static String OUTPUT = null;
+    private static final int DISTRIB_NAME = 0;
+    private static final int DISTRIB_PARAMS = 1;
+    private static double TREE_GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
+    private static double TREE_GAMMA_SCALE = 0.2;
+    private static final int DESCENDANTS_MAX = 2, DESCENDANTS_MIN = 2; // Max and min of tree branching
+    private static double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
+    private static final int EVOL_MODEL_IDX = 0; // default model is that above indexed
+    private static final String[] EVOL_MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
+    private static String ANCSEQ = null; // ancestor sequence as a text string, provided
+    private static String INPUT_TREE = null;
+    private static Double GAMMA_ALPHA = null;
+    private static Double SCALEDIST = null;
+    private static String SRATESFILE = null;
+    private static  double[] SRATES = null;
+    private static long SEED = System.currentTimeMillis();
+    private static int EXTANTS_N = 5;
+    private static SubstModel EVOL_MODEL = null;
+    private static IndelModel INDEL_LENGTH_MODEL = null;
+    private static IndelModel INSERTION_LENGTH_MODEL = null;
+    private static IndelModel DELETION_LENGTH_MODEL = null;
+    private static RateModel SUBST_RATE_MODEL = null;
+    private static RateModel INDEL_RATE_MODEL = null;
+    private static RateModel INSERTION_RATE_MODEL = null;
+    private static RateModel DELETION_RATE_MODEL = null;
+    private static RateModel TREE_DISTANCE_MODEL = null;
+    private static Distrib LEAF2ROOT_DISTANCE_MODEL = null;
+    private static boolean GAPPY = false;
+    private static final String[] FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "DIR", "RATES"};
+    private static int FORMAT_IDX = 0;
+    private static final int FASTA = 0;
+    private static final int DOT = 3;
+    private static final int CLUSTAL = 2;
+    private static final int ALL = 5;
+    private static final int RATES = 6;
+
 
     public static void main(String[] args) {
-        String ANCSEQ = null; // ancestor sequence as a text string, provided
-        String OUTPUTTREE = null;
-        Double GAMMA_ALPHA = null;
-        Double SCALEDIST = null;
-        boolean LOADTREE = false;
-        String SRATESFILE = null;
-        double[] SRATES = null;
-        long SEED = System.currentTimeMillis();
-        int EXTANTS_N = 5;
-        double TREE_GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
-        double TREE_GAMMA_SCALE = 0.2;
-        int DESCENDANTS_MAX = 2, DESCENDANTS_MIN = 2; // Max and min of tree branching
-        double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
 
-        String[] EVOL_MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
-        int EVOL_MODEL_IDX = 0; // default model is that above indexed
-        SubstModel EVOL_MODEL = null;
-        IndelModel INDEL_LENGTH_MODEL = null;
-        IndelModel INSERTION_LENGTH_MODEL = null;
-        IndelModel DELETION_LENGTH_MODEL = null;
-        RateModel SUBST_RATE_MODEL = null;
-        RateModel INDEL_RATE_MODEL = null;
-        RateModel INSERTION_RATE_MODEL = null;
-        RateModel DELETION_RATE_MODEL = null;
-        boolean SUBST_RATE_INFLUENCE_INDELS = false;
-        RateModel TREE_DISTANCE_MODEL = null;
-        Distrib LEAF2ROOT_DISTANCE_MODEL = null;
-        // Alphabet is decided by EVOL_MODEL_IDX
-        Enumerable[] ALPHAS = new Enumerable[]{Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
-        // Indel approaches:
-        boolean GAPPY = false;
-        String[] FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "DIR", "RATES"};
-        int FORMAT_IDX = 0;
+        parseArgs(args);
+        checkArgsValid();
+
+        EnumSeq rootSeq = createRootSeq();
+        IdxTree tree = setupTree();
+
+        TrackTree.Params params = setupParams(tree, rootSeq);
+
+        TrackTree tracker = new TrackTree(params, SEED);
+
+        EnumSeq[] seqs = tracker.getSequences();
+
+        saveOutput(seqs, tracker, tree);
+
+    }
+
+    private static String[] parseDistribParamString(String params) {
+
+        int colonPos = params.indexOf(':');
+
+        String distName = colonPos >= 0 ? params.substring(0, colonPos) : params;
+        String parsedParams = colonPos >= 0 ? params.substring(colonPos + 1) : "";
+
+        return new String[]{distName, parsedParams};
+    }
+
+    private static double[] parseSubstitutionRateFile(String filename) {
+        double[] rates = null;
+        try {
+            TSVFile ratesfile = new TSVFile(filename, true);
+            int rates_col = ratesfile.getColumnIndex("Rate");
+            int index_col = ratesfile.getColumnIndex("Site");
+            if (rates_col == -1)  // not there
+                rates_col = 0;
+            Object[] rateobjs = ratesfile.getColData(rates_col);
+            Object[] idxobjs = null;
+            if (index_col != -1)
+                idxobjs = ratesfile.getColData(index_col);
+            rates = new double[rateobjs.length];
+            for (int i = 0; i < rates.length; i++) {
+                try {
+                    int index = index_col == -1 ? i : (Integer) idxobjs[i] - 1; // starts with 1, so subtract "1" to use as position index
+                    rates[index] = (Double) rateobjs[i];
+                } catch (NumberFormatException e0) {
+                    usage(23, "Rates file has invalid number format:" + rateobjs[i]);
+                }
+            }
+        } catch (IOException e) {
+            usage(24, "Rates file could not be opened or read: " + filename);
+        }
+
+        return rates;
+
+    }
+
+    private static void parseArgs(String[] args) {
 
         for (int a = 0; a < args.length; a++) {
             if (!args[a].startsWith("-") && ANCSEQ == null) { // ancestor sequence
@@ -151,7 +211,7 @@ public class TrAVIS {
                 if (arg.equalsIgnoreCase("n0") || arg.equalsIgnoreCase("-ancestor") && args.length > a + 1) {
                     ANCSEQ = args[++a];
                 } else if (arg.equalsIgnoreCase("nwk") && args.length > a + 1) {
-                    OUTPUTTREE = args[++a];
+                    INPUT_TREE = args[++a];
                 } else if (arg.equalsIgnoreCase("o") || arg.equalsIgnoreCase("-output-folder") && args.length > a + 1) {
                     OUTPUT = args[++a];
                 } else if (arg.equalsIgnoreCase("-seed") && args.length > a + 1) {
@@ -177,63 +237,34 @@ public class TrAVIS {
                 } else if ((arg.equalsIgnoreCase("rf") && args.length > a + 1)) {
                     SRATESFILE = args[++a];
                 } else if (arg.equalsIgnoreCase("-subst-rate-distrib") && args.length > a + 1) {
-                    String params = args[a+1];
-                    int colonPos = params.indexOf(':');
-                    String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
-                    String part2 = colonPos >= 0 ? params.substring(colonPos + 1) : "";
-                    SUBST_RATE_MODEL = RateModel.create(part1, part2);
+                    String[] params = parseDistribParamString(args[a+1]);
+                    SUBST_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-indel-rate-distrib") && args.length > a + 1) {
-                    String params = args[a+1];
-                    int colonPos = params.indexOf(':');
-                    String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
-                    String part2 = colonPos >= 0 ? params.substring(colonPos + 1) : "";
-                    INDEL_RATE_MODEL = RateModel.create(part1, part2);
+                    String[] params = parseDistribParamString(args[a+1]);
+                    INDEL_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-insertion-rate-distrib") && args.length > a + 1) {
-                    String params = args[a+1];
-                    int colonPos = params.indexOf(':');
-                    String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
-                    String part2 = colonPos >= 0 ? params.substring(colonPos + 1) : "";
-                    INSERTION_RATE_MODEL = RateModel.create(part1, part2);
+                    String[] params = parseDistribParamString(args[a+1]);
+                    INSERTION_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-deletion-rate-distrib") && args.length > a + 1) {
-                    String params = args[a+1];
-                    int colonPos = params.indexOf(':');
-                    String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
-                    String part2 = colonPos >= 0 ? params.substring(colonPos + 1) : "";
-                    DELETION_RATE_MODEL = RateModel.create(part1, part2);
+                    String[] params = parseDistribParamString(args[a+1]);
+                    DELETION_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-indel-length-distrib") && args.length > a + 1) {
-                    String params = args[a+1];
-                    int colonPos = params.indexOf(':');
-                    String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
-                    String part2 = colonPos >= 0 ? params.substring(colonPos + 1) : "";
-                    INDEL_LENGTH_MODEL = IndelModel.create(part1, part2);
+                    String[] params = parseDistribParamString(args[a+1]);
+                    INDEL_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-insertion-length-distrib") && args.length > a + 1) {
-                    String params = args[a+1];
-                    int colonPos = params.indexOf(':');
-                    String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
-                    String part2 = colonPos >= 0 ? params.substring(colonPos + 1) : "";
-                    INSERTION_LENGTH_MODEL = IndelModel.create(part1, part2);
+                    String[] params = parseDistribParamString(args[a+1]);
+                    INSERTION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-deletion-length-distrib") && args.length > a + 1) {
-                    String params = args[a+1];
-                    int colonPos = params.indexOf(':');
-                    String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
-                    String part2 = colonPos >= 0 ? params.substring(colonPos + 1) : "";
-                    DELETION_LENGTH_MODEL = IndelModel.create(part1, part2);
-                } else if (arg.equalsIgnoreCase("-ratesconflate")) {
-                    SUBST_RATE_INFLUENCE_INDELS = true;
+                    String[] params = parseDistribParamString(args[a+1]);
+                    DELETION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("-dist-distrib") && args.length > a + 1) {
-                    String params = args[a+1];
-                    int colonPos = params.indexOf(':');
-                    String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
-                    String part2 = colonPos >= 0 ? params.substring(colonPos + 1) : "";
-                    TREE_DISTANCE_MODEL = RateModel.create(part1, part2);
+                    String[] params = parseDistribParamString(args[a+1]);
+                    TREE_DISTANCE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-leaf2root-distrib") && args.length > a + 1) {
-                    String params = args[a+1];
-                    int colonPos = params.indexOf(':');
-                    String part1 = colonPos >= 0 ? params.substring(0, colonPos) : params;
-                    String part2 = colonPos >= 0 ? params.substring(colonPos + 1) : "";
-                    LEAF2ROOT_DISTANCE_MODEL = Distrib.create(part1, part2);
+                    String[] params = parseDistribParamString(args[a+1]);
+                    LEAF2ROOT_DISTANCE_MODEL = Distrib.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-format") && args.length > a + 1) {
                     boolean found_format = false;
                     for (int i = 0; i < FORMATS.length; i++) {
@@ -244,66 +275,26 @@ public class TrAVIS {
                     }
                     if (!found_format)
                         usage(1, args[a + 1] + " is not a valid format name");
-                } else if (arg.equalsIgnoreCase("-help") && arg.equalsIgnoreCase("h")) {
+                } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
                     usage();
                 }
             }
         }
+
+    }
+
+    private static void checkArgsValid() {
 
         if (OUTPUT == null) {
             usage(25, "Output file or folder must be specified");
         }
 
         if (SRATESFILE != null) {
-            try {
-                TSVFile ratesfile = new TSVFile(SRATESFILE, true);
-                int rates_col = ratesfile.getColumnIndex("Rate");
-                int index_col = ratesfile.getColumnIndex("Site");
-                if (rates_col == -1)  // not there
-                    rates_col = 0;
-                Object[] rateobjs = ratesfile.getColData(rates_col);
-                Object[] idxobjs = null;
-                if (index_col != -1)
-                    idxobjs = ratesfile.getColData(index_col);
-                SRATES = new double[rateobjs.length];
-                for (int i = 0; i < SRATES.length; i++) {
-                    try {
-                        int index = index_col == -1 ? i : (Integer) idxobjs[i] - 1; // starts with 1, so subtract "1" to use as position index
-                        SRATES[index] = (Double) rateobjs[i];
-                    } catch (NumberFormatException e0) {
-                        usage(23, "Rates file has invalid number format:" + rateobjs[i]);
-                    }
-                }
-            } catch (IOException e) {
-                usage(24, "Rates file could not be opened or read: " + SRATESFILE);
-            }
+            SRATES = parseSubstitutionRateFile(SRATESFILE);
         }
 
         if (SRATES != null) { // position-specific rates available
             GAMMA_ALPHA = getAlpha(SRATES);
-        }
-        Random rand = new Random(SEED);
-
-        if (ANCSEQ == null ) { // check standard input for sequence?
-            BufferedReader br = null;
-            try {
-                br = new BufferedReader(new InputStreamReader(System.in));
-                String input = br.readLine();
-                while (input != null) {
-                    ANCSEQ += input.trim();
-                    input = br.readLine();
-                }
-            } catch (IOException e) {
-                System.err.println("Error in standard input");
-            } finally {
-                if (br != null) {
-                    try {
-                        br.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
         }
 
         EVOL_MODEL = SubstModel.createModel(EVOL_MODELS[EVOL_MODEL_IDX]);
@@ -311,31 +302,20 @@ public class TrAVIS {
             usage(1, "Model " + EVOL_MODELS[EVOL_MODEL_IDX] + " could not be created");
         }
 
-        EnumSeq ancseq = null;
-        if (ANCSEQ != null) {
-            if (EVOL_MODEL.getDomain().equals(Enumerable.aacid)) {
-                ancseq = EnumSeq.parseProtein(ANCSEQ);
-            } else if (EVOL_MODEL.getDomain().equals(Enumerable.nacid)) {
-                ancseq = EnumSeq.parseDNA(ANCSEQ);
-            } else if (EVOL_MODEL.getDomain().equals(Enumerable.nacidRNA)) {
-                ancseq = EnumSeq.parseRNA(ANCSEQ);
-            } else {
-                usage(5, "Model \"" + EVOL_MODELS[EVOL_MODEL_IDX] + "\" alphabet is not valid");
-            }
-            if (ancseq == null)
-                usage(4, "Invalid ancestor sequence \"" + ANCSEQ + "\" for model " + EVOL_MODELS[EVOL_MODEL_IDX]);
-            ancseq.setName("N0");
-        }
-
         if (FORMATS[FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
             GAPPY = true;
 
-        /* Load or create a tree */
+    }
+
+    private static IdxTree setupTree() {
+
         IdxTree tree = null;
-        if (LOADTREE && OUTPUTTREE != null) {
+
+        if (INPUT_TREE != null) {
             try {
-                tree = Newick.load(OUTPUTTREE);
+                tree = Newick.load(INPUT_TREE);
             } catch (IOException e) {
+                usage(26, "Input tree file " + INPUT_TREE + " is invalid.");
             }
         }
         if (tree == null) {
@@ -348,9 +328,9 @@ public class TrAVIS {
             }
             if (SCALEDIST != null)
                 tree.adjustDistances(SCALEDIST);
-            if (OUTPUTTREE != null) {
+            if (INPUT_TREE != null) {
                 try {
-                    Newick.save(tree, OUTPUTTREE, Newick.MODE_DEFAULT);
+                    Newick.save(tree, INPUT_TREE + "_travis.nwk", Newick.MODE_DEFAULT);
                 } catch (IOException e) {
                     usage(2, "Tree file could not be saved");
                 }
@@ -359,127 +339,126 @@ public class TrAVIS {
             tree = Tree.generateTreeFromMixture(tree,3,SEED,100);
         }
 
-        if (ancseq != null && OUTPUT != null) { // we've got an ancestor to track down the tree
-            TrackTree.Params params = new TrackTree.Params(tree, ancseq, EVOL_MODEL, SEED);
-            if (INDEL_LENGTH_MODEL != null) {
-                params.setIndelModel(INDEL_LENGTH_MODEL);
+        return tree;
+    }
+
+    private static EnumSeq createRootSeq() {
+
+        EnumSeq ancseq = null;
+
+        if (ANCSEQ != null) {
+            if (EVOL_MODEL.getDomain().equals(Enumerable.aacid)) {
+                ancseq = EnumSeq.parseProtein(ANCSEQ);
+            } else if (EVOL_MODEL.getDomain().equals(Enumerable.nacid)) {
+                ancseq = EnumSeq.parseDNA(ANCSEQ);
+            } else if (EVOL_MODEL.getDomain().equals(Enumerable.nacidRNA)) {
+                ancseq = EnumSeq.parseRNA(ANCSEQ);
             } else {
-                params.setIndelModel(IndelModel.create("Zipf", "1.7,100"));
+                usage(5, "Model \"" + EVOL_MODELS[EVOL_MODEL_IDX] + "\" alphabet is not valid");
             }
-            if (INSERTION_LENGTH_MODEL != null) {
-                params.setInsertmodel(INSERTION_LENGTH_MODEL);
-            }
+        }
 
-            if (DELETION_LENGTH_MODEL != null) {
-                params.setDeletemodel(DELETION_LENGTH_MODEL);
-            }
-            // still need to set substitution rate models
-            if (SUBST_RATE_MODEL == null && GAMMA_ALPHA != null)
-                params.setSubstRateModel(GAMMA_ALPHA);
-            else if (SUBST_RATE_MODEL != null)
-                params.setSubstRateModel(SUBST_RATE_MODEL);
-//            else
-//                usage(7, "Substitution rate model could not be created");
-            if (INDEL_RATE_MODEL != null)
-                params.setIndelRateModel(INDEL_RATE_MODEL);
+        if (ancseq == null)
+            usage(4, "Invalid ancestor sequence \"" + ANCSEQ + "\" for model " + EVOL_MODELS[EVOL_MODEL_IDX]);
+        else {
+            ancseq.setName("N0");
+        }
 
+        return ancseq;
+    }
 
-            params.SUBST_RATE_INFLUENCES_INDELS = SUBST_RATE_INFLUENCE_INDELS;
-            params.PROPORTION_DELETION = DELETIONPROP;
-            params.setSeed(SEED);
-            //params.MAX_DE_LENGTH;
-            //params.MAX_IN_LENGTH;
+    private static TrackTree.Params setupParams(IdxTree tree, EnumSeq rootSeq) {
 
-            TrackTree tracker = new TrackTree(params, SEED);
+        // we've got an ancestor to track down the tree
+        TrackTree.Params params = new TrackTree.Params(tree, rootSeq, EVOL_MODEL, SEED);
 
-            EnumSeq[] seqs = tracker.getSequences();
-            switch (FORMAT_IDX) {
-                case 0: // FASTA
-                    try {
-                        FastaWriter fw = new FastaWriter(OUTPUT);
-                        if (!GAPPY) {
-                            fw.save(seqs);
-                        } else { // gappy
-                            EnumSeq[] aln = tracker.getAlignment();
-                            fw.save(aln);
-                        }
-                        fw.close();
-                    } catch (IOException e) {
-                        usage(6, "FASTA file could not be saved");
+        if (INDEL_LENGTH_MODEL == null) {
+            params.setIndelModel(IndelModel.create("Zipf", "1.7,100"));
+        }
+        params.setIndelModel(INDEL_LENGTH_MODEL);
+
+        if (INSERTION_LENGTH_MODEL != null) {
+            params.setInsertmodel(INSERTION_LENGTH_MODEL);
+        }
+        if (DELETION_LENGTH_MODEL != null) {
+            params.setDeletemodel(DELETION_LENGTH_MODEL);
+        }
+
+        if (INDEL_RATE_MODEL != null)
+            params.setIndelRateModel(INDEL_RATE_MODEL);
+
+        // still need to set substitution rate models
+        if (SUBST_RATE_MODEL == null && GAMMA_ALPHA != null)
+            params.setSubstRateModel(GAMMA_ALPHA);
+        else if (SUBST_RATE_MODEL != null)
+            params.setSubstRateModel(SUBST_RATE_MODEL);
+
+        params.PROPORTION_DELETION = DELETIONPROP;
+
+        params.setSeed(SEED);
+
+        return params;
+    }
+
+    private static void saveOutput(EnumSeq[] seqs, TrackTree tracker, IdxTree tree) {
+
+        switch (FORMAT_IDX) {
+            case FASTA: // FASTA
+                try {
+                    FastaWriter fw = new FastaWriter(OUTPUT);
+                    if (!GAPPY) {
+                        fw.save(seqs);
+                    } else { // gappy
+                        EnumSeq[] aln = tracker.getAlignment();
+                        fw.save(aln);
                     }
-                    break;
-                case 3: // DOT
-                    POAGraph poag = tracker.getPOAG();
-                    try {
-                        poag.saveToDOT(OUTPUT);
-                    } catch (IOException e) {
-                        usage(6, "DOT file could not be saved");
+                    fw.close();
+                } catch (IOException e) {
+                    usage(6, "FASTA file could not be saved");
+                }
+                break;
+            case DOT: // DOT
+                POAGraph poag = tracker.getPOAG();
+                try {
+                    poag.saveToDOT(OUTPUT);
+                } catch (IOException e) {
+                    usage(6, "DOT file could not be saved");
+                }
+                break;
+            case CLUSTAL: // CLUSTAL
+                EnumSeq[] aln = tracker.getAlignment();
+                try {
+                    AlnWriter aw = new AlnWriter(OUTPUT);
+                    aw.save(aln);
+                    aw.close();
+                } catch (IOException e) {
+                    usage(6, "CLUSTAL file could not be saved");
+                }
+                break;
+            case ALL: // ALL in a DIRECTORY
+                POAGraph poaGraph = tracker.getPOAG();
+                EnumSeq[] aseqs = tracker.getAlignment();
+                try {
+                    File file = new File(OUTPUT);
+                    if (file.mkdirs()) { // true if the directory was created, false otherwise
+                    } else {
+                        // System.err.println("Directory " + OUTPUT + " already exists");
+                        // throw new ASRException("Directory " + directory + " already exists");
                     }
-                    break;
-                case 2: // CLUSTAL
-                    EnumSeq[] aln = tracker.getAlignment();
-                    try {
-                        AlnWriter aw = new AlnWriter(OUTPUT);
-                        aw.save(aln);
-                        aw.close();
-                    } catch (IOException e) {
-                        usage(6, "CLUSTAL file could not be saved");
+                    FastaWriter fw = new FastaWriter(OUTPUT+"/travis.fa");
+                    if (!GAPPY) {
+                        fw.save(seqs);
+                    } else { // gappy
+                        fw.save(aseqs);
                     }
-                    break;
-                case 5: // ALL in a DIRECTORY
-                    POAGraph poaGraph = tracker.getPOAG();
-                    EnumSeq[] aseqs = tracker.getAlignment();
-                    try {
-                        File file = new File(OUTPUT);
-                        if (file.mkdirs()) { // true if the directory was created, false otherwise
-                        } else {
-                            // System.err.println("Directory " + OUTPUT + " already exists");
-                            // throw new ASRException("Directory " + directory + " already exists");
-                        }
-                        FastaWriter fw = new FastaWriter(OUTPUT+"/travis.fa");
-                        if (!GAPPY) {
-                            fw.save(seqs);
-                        } else { // gappy
-                            fw.save(aseqs);
-                        }
-                        fw.close();
-                        AlnWriter aw = new AlnWriter(OUTPUT+"/travis.aln");
-                        aw.save(aseqs);
-                        aw.close();
-                        poaGraph.saveToDOT(OUTPUT+"/travis.dot");
-                        poaGraph.saveToMatrix(OUTPUT+"/travis.m");
-                        Newick.save(tree, OUTPUT+"/travis.nwk", Newick.MODE_DEFAULT);
+                    fw.close();
+                    AlnWriter aw = new AlnWriter(OUTPUT+"/travis.aln");
+                    aw.save(aseqs);
+                    aw.close();
+                    poaGraph.saveToDOT(OUTPUT+"/travis.dot");
+                    poaGraph.saveToMatrix(OUTPUT+"/travis.m");
+                    Newick.save(tree, OUTPUT+"/travis.nwk", Newick.MODE_DEFAULT);
 
-                        if (tracker.INDELRATES) {
-                            double[] indelRates = tracker.getIndelRates();
-                            Object[][] data = new Object[indelRates.length + 1][2];
-                            for (int i = 0; i <= indelRates.length; i++) {
-                                if (i == 0) // header
-                                    data[0] = new Object[]{"Site", "Rate"};
-                                else
-                                    data[i] = new Object[]{i, indelRates[i - 1]};
-                            }
-                            TSVFile ratesfile = new TSVFile(data, true);
-                            ratesfile.save(OUTPUT + "/indel_rates_travis.tsv");
-                        }
-
-                        if (GAMMA_ALPHA != null) {
-                            double[] rates = tracker.getSubstRates();
-                            Object[][] data = new Object[rates.length + 1][2];
-                            for (int i = 0; i <= rates.length; i++) {
-                                if (i == 0) // header
-                                    data[0] = new Object[]{"Site", "Rate"};
-                                else
-                                    data[i] = new Object[]{i, rates[i - 1]};
-                            }
-                            TSVFile ratesfile = new TSVFile(data, true);
-                            ratesfile.save(OUTPUT + "/travis.tsv");
-                        }
-                    } catch (IOException e) {
-                        usage(7, "Something went wrong saving files in directory");
-                    }
-                    break;
-                case 6: // RATES
                     if (tracker.INDELRATES) {
                         double[] indelRates = tracker.getIndelRates();
                         Object[][] data = new Object[indelRates.length + 1][2];
@@ -489,12 +468,8 @@ public class TrAVIS {
                             else
                                 data[i] = new Object[]{i, indelRates[i - 1]};
                         }
-                        try {
-                            TSVFile ratesfile = new TSVFile(data, true);
-                            ratesfile.save(OUTPUT + "_indel_rates.tsv");
-                        } catch (IOException e) {
-                            usage(6, "Indel rates file could not be saved");
-                        }
+                        TSVFile ratesfile = new TSVFile(data, true);
+                        ratesfile.save(OUTPUT + "/indel_rates_travis.tsv");
                     }
 
                     if (GAMMA_ALPHA != null) {
@@ -506,19 +481,50 @@ public class TrAVIS {
                             else
                                 data[i] = new Object[]{i, rates[i - 1]};
                         }
-                        try {
-                            TSVFile ratesfile = new TSVFile(data, true);
-                            ratesfile.save(OUTPUT);
-                        } catch (IOException e) {
-                            usage(6, "RATES file could not be saved");
-                        }
+                        TSVFile ratesfile = new TSVFile(data, true);
+                        ratesfile.save(OUTPUT + "/travis.tsv");
                     }
-//                    else {
-//                        usage(8, "RATES are not used hence cannot be saved");
-//                    }
-            }
+                } catch (IOException e) {
+                    usage(7, "Something went wrong saving files in directory");
+                }
+                break;
+            case RATES: // RATES
+                if (tracker.INDELRATES) {
+                    double[] indelRates = tracker.getIndelRates();
+                    Object[][] data = new Object[indelRates.length + 1][2];
+                    for (int i = 0; i <= indelRates.length; i++) {
+                        if (i == 0) // header
+                            data[0] = new Object[]{"Site", "Rate"};
+                        else
+                            data[i] = new Object[]{i, indelRates[i - 1]};
+                    }
+                    try {
+                        TSVFile ratesfile = new TSVFile(data, true);
+                        ratesfile.save(OUTPUT + "_indel_rates.tsv");
+                    } catch (IOException e) {
+                        usage(6, "Indel rates file could not be saved");
+                    }
+                }
+
+                if (GAMMA_ALPHA != null) {
+                    double[] rates = tracker.getSubstRates();
+                    Object[][] data = new Object[rates.length + 1][2];
+                    for (int i = 0; i <= rates.length; i++) {
+                        if (i == 0) // header
+                            data[0] = new Object[]{"Site", "Rate"};
+                        else
+                            data[i] = new Object[]{i, rates[i - 1]};
+                    }
+                    try {
+                        TSVFile ratesfile = new TSVFile(data, true);
+                        ratesfile.save(OUTPUT);
+                    } catch (IOException e) {
+                        usage(6, "RATES file could not be saved");
+                    }
+                }
         }
     }
+
 
     /**
      * Calculates the counts of insertions between two sequences.
@@ -570,49 +576,6 @@ public class TrAVIS {
                 ret[i] = 0;
         }
         return ret;
-    }
-
-    static int[] markColumnInsertionEvents(Object[] parent, Object[] child) {
-        if (parent.length != child.length)
-            return null;
-        int[] insertionCounts = new int[parent.length]; //
-        boolean insertionInChild = false;
-        for (int i = 0; i < parent.length; i++) {
-            if (parent[i] == null && child[i] == null)
-                continue;
-            if (parent[i] == null && child[i] != null) {
-                insertionInChild = true;
-                insertionCounts[i] = 1;
-            } else {
-                if (insertionInChild) {
-                    insertionInChild = false;
-                }
-            }
-        }
-
-        return insertionCounts;
-    }
-
-    static int[] markColumnDeletionEvents(Object[] parent, Object[] child) {
-        if (parent.length != child.length)
-            return null;
-
-        int[] deletionCounts = new int[parent.length];
-        boolean deletionInChild = false;
-        for (int i = 0; i < parent.length; i++) {
-            if (parent[i] == null && child[i] == null) // both parent and child are gaps, so nothing changes
-                continue;
-            if (child[i] == null && parent[i] != null) { // parent has content, but child has gap so start/continue deletion
-                deletionInChild = true; // start/continue current deletion
-                deletionCounts[i] = 1;
-            } else { // parent is gap, child has content, or both have content; either way, we're ending deletion (if current)
-                if (deletionInChild) {
-                    deletionInChild = false;
-                }
-            }
-        }
-
-        return deletionCounts;
     }
 
     /**
@@ -740,49 +703,6 @@ public class TrAVIS {
 
 
     /**
-     * Calculate the relative indel rate (r) for each node in a tree.
-     *
-     * @param Events    indel, match mismatch
-     * @param branchLength Branch lengths from parent to child.
-     * @return indel rates for a node.
-     */
-    public static Double calculateRForNodes(int[] Events, double seqlength, double branchLength) {
-
-
-        double rs = 0;
-        int indels = Events[0];
-        int matches = Events[1];    // MB: why do we need the number of matches?
-        int mismatches = Events[2]; // MB: why do we need the number of mismatches?
-
-        // Total alignment events (B)
-        double B = matches + mismatches + indels;
-        // Calculate r using the formula
-        if (B > 0 && branchLength > 0) {
-            rs = -Math.log(1 - (double) indels / seqlength) / branchLength;
-        }
-
-        //if (rs ==0) {
-            //rs =1e-4;
-            //};
-
-        return rs;
-    }
-
-    /** Method to parse a string like "[1,2,3]" into a double array
-     * @deprecated ?
-     * @param input
-     * @return
-     */
-    private static double[] parseArray(String input) {
-        // Remove brackets and split by comma
-        String cleaned = input.replaceAll("[\\[\\]]", "");
-        String[] parts = cleaned.split(",");
-
-        // Convert string parts to double values
-        return Arrays.stream(parts).mapToDouble(Double::parseDouble).toArray();
-    }
-
-    /**
      * Class to track ancestor sequence to extants via intermediate ancestors.
      * Matches/substitutions are determined by a probability p=exp^-rt where rt is the rate times the evolutionary distance from the ancestor to the descendant.
      * If not a match/substitution, insertions and deletions are equally probable, i.e. (1-p)/2 each.
@@ -806,11 +726,9 @@ public class TrAVIS {
             public IndelModel insertmodel = null;   // distribution from which insertion lengths are sampled
             public IndelModel deletemodel = null;   // distribution from which deletion lengths are sampled
 
-            // if true, the site-specific evolutionary rate has an impact on the number of indels at a site (mean of rates is 1 across all sites)
-            public boolean SUBST_RATE_INFLUENCES_INDELS = false;
 
             public double PROPORTION_DELETION = 0.5;   // the proportion of deletion events (as opposed to insertion) amongst all indels
-            public Random rand = new Random(System.currentTimeMillis());
+            public Random rand = null;
 
             public Params(IdxTree tree, EnumSeq ancseq, SubstModel substmodel, long SEED) {
                 this.tree = tree;
@@ -926,9 +844,9 @@ public class TrAVIS {
          */
         public TrackTree(TrackTree.Params params, long SEED) {
             this.params = params;
+            this.params.setSeed(SEED);
             EnumSeq ancseq = params.ancseq;
 
-            List<Double> rList = new ArrayList<>();
             USERATES = (params.substratemodel != null); // check if we will generate position specific rates using the model; if not, use a constant rate
             INDELRATES = (params.indelratemodel != null);
 //            if (USERATES)
@@ -957,7 +875,6 @@ public class TrAVIS {
                     int paridx = tree.getParent(idx);           // idx of parent
                     Object[] parseq = bpseqs[paridx].get();     // sequence of parent
                     double t = tree.getDistance(idx);           // distance from parent to child
-                    //double t = tree.getDistance(1);
                     insertions[idx] = new int[parseq.length+1]; // insertions at this branchpoint relative to parent indices; note that insertions can happen before or after a sequence
                     deletions[idx] = new int[parseq.length];    // deletions at this branchpoint relative to parent indices
                     substRates[idx] = new double[parseq.length];     // rates at this branchpoint relative to parent indices; note that insertion rate for before and after is shared
