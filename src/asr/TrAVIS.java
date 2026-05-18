@@ -74,14 +74,13 @@ public class TrAVIS {
                 "      --dist-distrib <type:params>             Branch distance (t) distribution: Gamma:<SHAPE>,<SCALE> ZeroInflatedGamma:<PI>,<SHAPE>,<SCALE> MixtureGamma:<SHAPE1>,SCALE1>,<WEIGHT1>,<SHAPE2>,SCALE2>,<WEIGHT2>\n" +
                 "      --leaf2root-distrib <type:params>        Distribution for leaf-to-root distances: Gaussian, GDF\n" +
                 "      --subst-rate-distrib <type:params>       Substitution rate (r) distribution: Gamma, ZeroInflatedGamma, MixtureGamma\n" +
-                "  *   --indel-prior <LOWGAP|MEDGAP|HIGHGAP>    Pre-set priors for indel rates (PFAM-based)\n" +
                 "      --indel-rate-distrib <type:params>       Indel rate (rho) distribution: Gamma, ZeroInflatedGamma, MixtureGamma\n" +
-                "      --insertion-rate-distrib <type:params>   Insertion rate distribution (overrides indel-rate)\n" +
-                "      --deletion-rate-distrib <type:params>    Deletion rate distribution (overrides indel-rate)\n" +
                 "      --indel-length-distrib <type:params>     Indel length distribution: ZeroTruncatedPoisson, Poisson, Zipf, Lavalette\n" +
                 "      --insertion-length-distrib <type:params> Insertion length distribution (overrides indel-length)\n" +
                 "      --deletion-length-distrib <type:params>  Deletion length distribution (overrides indel-length)\n" +
                 "      --delprop <fraction>                     Proportion of deletions among indels (0-1, default: 0.5)\n" +
+                "      --copy-tree                              Use the tree from -nwk to perform the simulation\n" +
+                "      --extants-only                           Create a separate FASTA file with simulated extants only\n" +
                 "      --gap                                    Include gap character in output (default for CLUSTAL)\n" +
                 "      --format <type>                          Output format: FASTA (default), CLUSTAL, DOT, TREE, RATES, DIR\n" +
                 "      --seed <number>                          Random seed\n" +
@@ -93,7 +92,6 @@ public class TrAVIS {
                 "  - Site specific rates are set from the Gamma distribution, either by specified parameters or as estimated from rates file.\n" +
                 "  - If a phylogenetic tree file is given, the simulated tree is generated from a distribution estimated from it.\n" +
                 "  - If no tree file is given, a random tree is generated using the specified distribution.\n" +
-                "  - Indel priors (LOWGAP, MEDGAP, HIGHGAP) are based on Pfam alignments.\n" +
                 "  - Distribution parameters:\n" +
                 "      Gamma: <shape,scale>\n" +
                 "      ZeroInflatedGamma: <pi,shape,scale>\n" +
@@ -142,7 +140,8 @@ public class TrAVIS {
     private static final int CLUSTAL = 2;
     private static final int ALL = 5;
     private static final int RATES = 6;
-
+    private static boolean COPY_TREE = false;
+    private static boolean EXTANTS_ONLY = false;
 
     public static void main(String[] args) {
 
@@ -263,8 +262,12 @@ public class TrAVIS {
                     String[] params = parseDistribParamString(args[a+1]);
                     TREE_DISTANCE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-leaf2root-distrib") && args.length > a + 1) {
-                    String[] params = parseDistribParamString(args[a+1]);
+                    String[] params = parseDistribParamString(args[a + 1]);
                     LEAF2ROOT_DISTANCE_MODEL = Distrib.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                } else if (arg.equalsIgnoreCase("-copy-tree") && args.length > a + 1) {
+                    COPY_TREE = true;
+                } else if (arg.equalsIgnoreCase("-extants-only") && args.length > a + 1) {
+                    EXTANTS_ONLY = true;
                 } else if (arg.equalsIgnoreCase("-format") && args.length > a + 1) {
                     boolean found_format = false;
                     for (int i = 0; i < FORMATS.length; i++) {
@@ -314,6 +317,11 @@ public class TrAVIS {
         if (INPUT_TREE != null) {
             try {
                 tree = Newick.load(INPUT_TREE);
+
+                if (COPY_TREE) {
+                    return tree;
+                }
+
             } catch (IOException e) {
                 usage(26, "Input tree file " + INPUT_TREE + " is invalid.");
             }
@@ -413,6 +421,21 @@ public class TrAVIS {
                         fw.save(aln);
                     }
                     fw.close();
+
+                    if (EXTANTS_ONLY) {
+                        EnumSeq[] aln = tracker.getAlignment();
+                        EnumSeq[] extants = new EnumSeq[tree.getNLeaves()];
+                        int count = 0;
+                        for (EnumSeq e : aln) {
+                            if (e.getName().startsWith("A")) {
+                                extants[count] = e;
+                                count++;
+                            }
+                        }
+                        FastaWriter fwExtants = new FastaWriter("extants_" + OUTPUT);
+                        fwExtants.save(extants);
+                        fwExtants.close();
+                    }
                 } catch (IOException e) {
                     usage(6, "FASTA file could not be saved");
                 }
@@ -458,6 +481,19 @@ public class TrAVIS {
                     poaGraph.saveToDOT(OUTPUT+"/travis.dot");
                     poaGraph.saveToMatrix(OUTPUT+"/travis.m");
                     Newick.save(tree, OUTPUT+"/travis.nwk", Newick.MODE_DEFAULT);
+
+                    EnumSeq[] alnTracker = tracker.getAlignment();
+                    EnumSeq[] extants = new EnumSeq[tree.getNLeaves()];
+                    int count = 0;
+                    for (EnumSeq e : alnTracker) {
+                        if (e.getName().startsWith("A")) {
+                            extants[count] = e;
+                            count++;
+                        }
+                    }
+                    FastaWriter fwExtants = new FastaWriter(OUTPUT + "/extants_travis.fa");
+                    fwExtants.save(extants);
+                    fwExtants.close();
 
                     if (tracker.INDELRATES) {
                         double[] indelRates = tracker.getIndelRates();
@@ -721,7 +757,7 @@ public class TrAVIS {
             public double[] ancrates = null;        // rates for ancestor to override randomly set rates for the corresponding position
 
             public RateModel substratemodel = null; // distribution which specifies site-specific rates that modulates substitution at each site/position
-            public RateModel indelratemodel = null; // distribution which specifies node-specific rates that modulates indel events in a sequence (NOT site specific)
+            public RateModel indelratemodel = null; // distribution which specifies site-specific rates that modulates indel events at each site/position
 
             public IndelModel insertmodel = null;   // distribution from which insertion lengths are sampled
             public IndelModel deletemodel = null;   // distribution from which deletion lengths are sampled
