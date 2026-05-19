@@ -161,6 +161,50 @@ public class TrAVIS {
 
     }
 
+    static int[] markColumnInsertionEvents(Object[] parent, Object[] child) {
+        if (parent.length != child.length)
+            return null;
+        int[] insertionCounts = new int[parent.length]; //
+        boolean insertionInChild = false;
+        for (int i = 0; i < parent.length; i++) {
+            if (parent[i] == null && child[i] == null)
+                continue;
+            if (parent[i] == null && child[i] != null) {
+                insertionInChild = true;
+                insertionCounts[i] = 1;
+            } else {
+                if (insertionInChild) {
+                    insertionInChild = false;
+                }
+            }
+        }
+
+        return insertionCounts;
+    }
+
+    static int[] markColumnDeletionEvents(Object[] parent, Object[] child) {
+        if (parent.length != child.length)
+            return null;
+
+        int[] deletionCounts = new int[parent.length];
+        boolean deletionInChild = false;
+        for (int i = 0; i < parent.length; i++) {
+            if (parent[i] == null && child[i] == null) // both parent and child are gaps, so nothing changes
+                continue;
+            if (child[i] == null && parent[i] != null) { // parent has content, but child has gap so start/continue deletion
+                deletionInChild = true; // start/continue current deletion
+                deletionCounts[i] = 1;
+            } else { // parent is gap, child has content, or both have content; either way, we're ending deletion (if current)
+                if (deletionInChild) {
+                    deletionInChild = false;
+                }
+            }
+        }
+
+        return deletionCounts;
+    }
+
+
     private static String[] parseDistribParamString(String params) {
 
         int colonPos = params.indexOf(':');

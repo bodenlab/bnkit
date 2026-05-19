@@ -764,6 +764,10 @@ public class GRASP {
                             int[] ins_total = new int[0];
                             int[] del_total = new int[0];
 
+                            int[] columnDeletionEvents = new int[ancseqs_gappy[0].length];
+                            int[] columnInsertionEvents = new int[ancseqs_gappy[0].length];
+
+                            List<Double> rateSampleCollection = new ArrayList<>();
                             // Go through the tree, and look at each ancestor sequence, recording predicted indel events
                             for (int idx : mytree) { // go through the original, user-provided tree
                                 int parent = mytree.getParent(idx);
@@ -788,11 +792,46 @@ public class GRASP {
                                     double indelrate = -Math.log(1.0 - event_prop) / dist;
                                     indelrates.put(idx, indelrate);
 
+                                    int[] localColInsertionEvents = TrAVIS.markColumnInsertionEvents(pseq, cseq);
+                                    int[] localColDeletionEvents = TrAVIS.markColumnDeletionEvents(pseq, cseq);
+                                    for (int j = 0; j < columnDeletionEvents.length; j++) {
+                                        columnInsertionEvents[j] += localColInsertionEvents[j];
+                                        columnDeletionEvents[j] += localColDeletionEvents[j];
+                                    }
+
                                     // Accumulate insertion/deletion lengths
                                     ins_total = TrAVIS.mergeCounts(ins_total, insertions);
                                     del_total = TrAVIS.mergeCounts(del_total, deletions);
                                 }
                             }
+
+                            int numBranches = 2 * mytree.getNLeaves() - 2;
+                            for (int j = 0; j < columnInsertionEvents.length; j++) {
+                                int numIndelEvents = columnDeletionEvents[j] + columnInsertionEvents[j];
+                                double eventProp = (double) numIndelEvents / (double) numBranches;
+                                double occupancy = 1 - ((double) aln.getOccupancy(j) / aln.getHeight());
+                                for (int idx : mytree) { // go through the original, user-provided tree
+                                    int parent = mytree.getParent(idx);
+                                    if (parent != -1) {  // Non-root node, so there is a branch with distance to catch...
+
+                                        double dist = mytree.getDistance(idx);
+
+                                        double colIndelRate = -Math.log((1.0 - occupancy) / dist);
+
+                                        rateSampleCollection.add(colIndelRate);
+                                    }
+                                }
+                            }
+
+                            double[] colRateArray = new double[rateSampleCollection.size()];
+                            for (int jj = 0; jj < rateSampleCollection.size(); jj++)
+                                colRateArray[jj] = rateSampleCollection.get(jj);
+
+                            RateModel indelColRateDist = RateModel.bestfit(colRateArray, SEED);
+//                            if (indelColRateDist != null)
+//                                System.out.println("--indel-col-rate-distrib " + indelColRateDist.getTrAVIS() + " \\");
+
+                            //System.out.println(colRateArray.length + " samples in the column rate array");
 
                             //
                             List<Double> collect = new ArrayList<>();
@@ -808,7 +847,7 @@ public class GRASP {
                             for (int jj = 0; jj < rarray.length; jj++)
                                 rarray[jj] = collect.get(jj);
 
-                            System.out.println(rarray.length + " samples in the seq rate array");
+                            //System.out.println(rarray.length + " samples in the seq rate array");
 
                             // fit a zero-inflated or standard gamma distribution to all collected rates (from the reconstruction); seems to work OK but sometime less well than the mixture below
                             RateModel indelrateDist = RateModel.bestfit(rarray, SEED);
@@ -825,8 +864,12 @@ public class GRASP {
                                 indelrateDist = RateModel.bestfit(rarray, SEED);
                             // fit a 3-component mixture distribution to all collected rates (from the reconstruction)
                             // ZeroInflatedGammaMix indelrateDist = ZeroInflatedGammaMix.fit(rarray, 2);
+
+                            for (int x = 0; x < 10; x++) {
+                                System.out.println(indelColRateDist.sample());
+                            }
                             if (indelrateDist != null)
-                                System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS() + " \\");
+                                System.out.println("--indel-rate-distrib " + indelColRateDist.getTrAVIS() + " \\"); // indelrateDist.getTrAVIS() + " \\");
 
 
                             // now, turn to indel lengths...
@@ -867,12 +910,12 @@ public class GRASP {
                                 Zipf                    1, 2, 5, 15
                                 Lavalette               1, 2, 5, 15
                                 ZeroTruncatedPoisson    0.01, 0.1, 1, 2                     */
-                            if (VERBOSE)
-                                System.out.print("Parent\tChild\tDist \t#Insert\t#Delete\t#Indel\tLength\tRate\tP(orig)\t");
+//                            if (VERBOSE)
+//                                System.out.print("Parent\tChild\tDist \t#Insert\t#Delete\t#Indel\tLength\tRate\tP(orig)\t");
                             int NSIMUL = 10; // number of simulations
-                            for (int k = 0; k < NSIMUL; k ++)
-                                if (VERBOSE)
-                                    System.out.printf("%s\t%5s\t%s\t%s\t", "rate/"+(k+1), "p/"+(k+1), "#ind/"+(k+1), "len/"+(k+1));
+//                            for (int k = 0; k < NSIMUL; k ++)
+//                                if (VERBOSE)
+//                                    System.out.printf("%s\t%5s\t%s\t%s\t", "rate/"+(k+1), "p/"+(k+1), "#ind/"+(k+1), "len/"+(k+1));
                             int[] totIndels = new int[NSIMUL + 1];
                             int[] totLengths = new int[NSIMUL + 1];
                             for (int idx : mytree) { // go through the original, user-provided tree
@@ -899,8 +942,8 @@ public class GRASP {
                                     double p_before = Math.exp(-indelrate * dist);
                                     int[] indels = TrAVIS.mergeCounts(insertions, deletions);
                                     int lengths_total = Arrays.stream(TrAVIS.unfoldCounts(indels)).sum();
-                                    if (VERBOSE)
-                                        System.out.printf("%5d\t%5d\t%5.3f\t%5d\t%5d\t%5d\t%5d\t%+5.3f\t%+5.3f\t", parent, idx, dist, nInsertions, nDeletions, nInsertions + nDeletions, lengths_total, indelrate, p_before);
+//                                    if (VERBOSE)
+//                                        System.out.printf("%5d\t%5d\t%5.3f\t%5d\t%5d\t%5d\t%5d\t%+5.3f\t%+5.3f\t", parent, idx, dist, nInsertions, nDeletions, nInsertions + nDeletions, lengths_total, indelrate, p_before);
                                     totIndels[0] += (nInsertions + nDeletions);
                                     totLengths[0] += lengths_total;
                                     for (int k = 0; k < NSIMUL; k ++) {
@@ -916,19 +959,19 @@ public class GRASP {
                                         }
                                         totIndels[k + 1] += nIndel;
                                         totLengths[k + 1] += lenIndel;
-                                        if (VERBOSE)
-                                            System.out.printf("%5.3f\t%5.3f\t%5d\t%5d\t", sample, p, nIndel, lenIndel);
+//                                        if (VERBOSE)
+//                                            System.out.printf("%5.3f\t%5.3f\t%5d\t%5d\t", sample, p, nIndel, lenIndel);
                                     }
                                 }
-                                if (VERBOSE)
-                                    System.out.println();
+//                                if (VERBOSE)
+//                                    System.out.println();
                             }
-                            if (VERBOSE)
-                                System.out.printf("     \t     \t     \t     \t      \t%5d\t%5d\t      \t      \t", totIndels[0], totLengths[0]);
+//                            if (VERBOSE)
+//                                System.out.printf("     \t     \t     \t     \t      \t%5d\t%5d\t      \t      \t", totIndels[0], totLengths[0]);
                             double mean_indel = 0, mean_length = 0;
                             for (int k = 0; k < NSIMUL; k ++) {
-                                if (VERBOSE)
-                                    System.out.printf("     \t     \t%5d\t%5d\t", totIndels[k + 1], totLengths[k + 1]);
+//                                if (VERBOSE)
+//                                    System.out.printf("     \t     \t%5d\t%5d\t", totIndels[k + 1], totLengths[k + 1]);
                                 mean_indel += totIndels[k + 1] / NSIMUL;
                                 mean_length += totLengths[k + 1] / NSIMUL;
                             }
@@ -939,8 +982,8 @@ public class GRASP {
                             }
                             sd_indel = Math.sqrt(sd_indel);
                             sd_length = Math.sqrt(sd_length);
-                            if (VERBOSE)
-                                System.out.printf("\t\t\t%5.3f\t%5.3f\t(%5.3f)\t%5.3f\t%5.3f\t(%5.3f)\n", mean_indel, Math.abs(mean_indel - (double)totIndels[0]), sd_indel, mean_length, Math.abs(mean_length - (double)totLengths[0]), sd_length);
+//                            if (VERBOSE)
+//                                System.out.printf("\t\t\t%5.3f\t%5.3f\t(%5.3f)\t%5.3f\t%5.3f\t(%5.3f)\n", mean_indel, Math.abs(mean_indel - (double)totIndels[0]), sd_indel, mean_length, Math.abs(mean_length - (double)totLengths[0]), sd_length);
                         }
                         break;
 
