@@ -1027,8 +1027,12 @@ public class IdxTree implements Iterable<Integer> {
     public double getMeanDistance() {
         double d = 0;
         try {
-            for (int i = 0; i < bpoints.length; i ++)
-                d += bpoints[i].getDistance();
+            for (int i = 0; i < bpoints.length; i ++) {
+                BranchPoint bp = bpoints[i];
+                if (bp.getParent() == null)
+                    continue; // skip the root
+                d += bp.getDistance();
+            }
         } catch (TreeRuntimeException e) {
             throw new TreeRuntimeException("One or more branchpoints do not have distances assigned");
         }
