@@ -8,6 +8,7 @@ import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.*;
 import dat.phylo.IdxTree;
+import dat.phylo.PhyloBN;
 import dat.phylo.Tree;
 import dat.pog.IdxGraph;
 import dat.pog.POAGraph;
@@ -767,7 +768,7 @@ public class GRASP {
                             int[] columnDeletionEvents = new int[ancseqs_gappy[0].length];
                             int[] columnInsertionEvents = new int[ancseqs_gappy[0].length];
 
-                            List<Double> rateSampleCollection = new ArrayList<>();
+
                             // Go through the tree, and look at each ancestor sequence, recording predicted indel events
                             for (int idx : mytree) { // go through the original, user-provided tree
                                 int parent = mytree.getParent(idx);
@@ -792,12 +793,12 @@ public class GRASP {
                                     double indelrate = -Math.log(1.0 - event_prop) / dist;
                                     indelrates.put(idx, indelrate);
 
-                                    int[] localColInsertionEvents = TrAVIS.markColumnInsertionEvents(pseq, cseq);
-                                    int[] localColDeletionEvents = TrAVIS.markColumnDeletionEvents(pseq, cseq);
-                                    for (int j = 0; j < columnDeletionEvents.length; j++) {
-                                        columnInsertionEvents[j] += localColInsertionEvents[j];
-                                        columnDeletionEvents[j] += localColDeletionEvents[j];
-                                    }
+//                                    int[] localColInsertionEvents = TrAVIS.markColumnInsertionEvents(pseq, cseq);
+//                                    int[] localColDeletionEvents = TrAVIS.markColumnDeletionEvents(pseq, cseq);
+//                                    for (int j = 0; j < columnDeletionEvents.length; j++) {
+//                                        columnInsertionEvents[j] += localColInsertionEvents[j];
+//                                        columnDeletionEvents[j] += localColDeletionEvents[j];
+//                                    }
 
                                     // Accumulate insertion/deletion lengths
                                     ins_total = TrAVIS.mergeCounts(ins_total, insertions);
@@ -805,21 +806,68 @@ public class GRASP {
                                 }
                             }
 
-                            int numBranches = 2 * mytree.getNLeaves() - 2;
+                            int numSamples = 10; // this will be per column number of samples
+                            // assume geometric with stopping prob p, therefore mean=1/p
+                            int averageNodesToTraverse = 20; // hyperparameter
+                            double stoppingProb = (double) 1 /averageNodesToTraverse;
+                            int[] ancestorIndices = tree.getAncestors(); // will sample from internal nodes
+                            List<Double> rateSampleCollection = new ArrayList<>();
                             for (int j = 0; j < columnInsertionEvents.length; j++) {
-                                int numIndelEvents = columnDeletionEvents[j] + columnInsertionEvents[j];
-                                double eventProp = (double) numIndelEvents / (double) numBranches;
-                                double occupancy = 1 - ((double) aln.getOccupancy(j) / aln.getHeight());
-                                for (int idx : mytree) { // go through the original, user-provided tree
-                                    int parent = mytree.getParent(idx);
-                                    if (parent != -1) {  // Non-root node, so there is a branch with distance to catch...
 
-                                        double dist = mytree.getDistance(idx);
+                                int nodesVisited = 0;
+                                while (nodesVisited < numSamples) {
 
-                                        double colIndelRate = -Math.log((1.0 - occupancy) / dist);
+                                    int ancestorIndex = ancestorIndices[random.nextInt(ancestorIndices.length)];
+                                    Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(ancestorIndex)];
 
-                                        rateSampleCollection.add(colIndelRate);
+                                    int nodesTraversed = 0;
+                                    boolean keepTraversing = true;
+                                    int indelEvents = 0;
+                                    double distanceTraversed = 0.0;
+                                    while (keepTraversing) {
+
+                                        double p = random.nextDouble();
+
+                                        int childIndex = tree.getChildren(ancestorIndex)[random.nextInt(2)];
+                                        boolean childIsLeaf = tree.isLeaf(childIndex);
+                                        distanceTraversed += tree.getDistance(childIndex);
+                                        nodesTraversed++;
+
+
+
+                                        if ((p < stoppingProb) || childIsLeaf) {
+                                            keepTraversing = false;
+
+                                            Object[] cseq;
+                                            if (mytree.isLeaf(childIndex)) {
+                                                EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(childIndex)));
+                                                cseq = seq.get();
+                                            } else {
+                                                cseq = ancseqs_gappy[(Integer) mytree.getLabel(childIndex)];
+                                            }
+
+                                            // record indel events
+                                            if (pseq[j] == null && cseq[j] != null) {
+                                                indelEvents++;
+                                            } else if (pseq[j] != null && cseq[j] == null) {
+                                                indelEvents++;
+                                            }
+
+                                            continue;
+                                        }
+
+                                        ancestorIndex = childIndex;
                                     }
+
+                                    if (nodesTraversed == 1) {
+                                        break;
+                                    }
+                                    double indelRate = -Math.log(1.0 - ((double) indelEvents / nodesTraversed)) / distanceTraversed;
+                                    nodesVisited++;
+                                    if (indelRate == -Double.NEGATIVE_INFINITY || Double.isNaN(indelRate)) {
+                                        continue;
+                                    }
+                                    rateSampleCollection.add(indelRate);
                                 }
                             }
 
@@ -865,9 +913,6 @@ public class GRASP {
                             // fit a 3-component mixture distribution to all collected rates (from the reconstruction)
                             // ZeroInflatedGammaMix indelrateDist = ZeroInflatedGammaMix.fit(rarray, 2);
 
-                            for (int x = 0; x < 10; x++) {
-                                System.out.println(indelColRateDist.sample());
-                            }
                             if (indelrateDist != null)
                                 System.out.println("--indel-rate-distrib " + indelColRateDist.getTrAVIS() + " \\"); // indelrateDist.getTrAVIS() + " \\");
 
