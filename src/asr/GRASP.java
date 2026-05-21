@@ -736,11 +736,11 @@ public class GRASP {
                             double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
                             double gap_open_prop = (double) aln.getGapStartCount() / (double) (aln.getWidth() * aln.getHeight());
                             double gap_length = aln.getMeanGapLength();
-                            if (VERBOSE) {
-                                System.out.println("Gap proportion= " + gap_prop);
-                                System.out.println("Gap opening proportion= " + gap_open_prop);
-                                System.out.println("Mean gap length= " + gap_length);
-                            }
+//                            if (VERBOSE) {
+//                                System.out.println("Gap proportion= " + gap_prop);
+//                                System.out.println("Gap opening proportion= " + gap_open_prop);
+//                                System.out.println("Mean gap length= " + gap_length);
+//                            }
                             StringBuilder n0 = new StringBuilder();
                             for (int j = 0; j < ancseqs_nogap[0].length; j++)
                                 n0.append(ancseqs_nogap[0][j]);
@@ -806,9 +806,9 @@ public class GRASP {
                                 }
                             }
 
-                            int numSamples = 10; // this will be per column number of samples
+                            int numSamples = 50; // this will be per column number of samples
                             // assume geometric with stopping prob p, therefore mean=1/p
-                            int averageNodesToTraverse = 20; // hyperparameter
+                            int averageNodesToTraverse = 50; // hyperparameter
                             double stoppingProb = (double) 1 /averageNodesToTraverse;
                             int[] ancestorIndices = tree.getAncestors(); // will sample from internal nodes
                             List<Double> rateSampleCollection = new ArrayList<>();
@@ -817,52 +817,58 @@ public class GRASP {
                                 int nodesVisited = 0;
                                 while (nodesVisited < numSamples) {
 
-                                    int ancestorIndex = ancestorIndices[random.nextInt(ancestorIndices.length)];
-                                    Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(ancestorIndex)];
+//                                    int ancestorIndex = ancestorIndices[random.nextInt(ancestorIndices.length)];
+//                                    Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(ancestorIndex)];
 
                                     int nodesTraversed = 0;
                                     boolean keepTraversing = true;
                                     int indelEvents = 0;
                                     double distanceTraversed = 0.0;
+                                    double lastDist = 0.0;
+                                    int ancestorIndex = ancestorIndices[random.nextInt(ancestorIndices.length)];
+                                    Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(ancestorIndex)];
                                     while (keepTraversing) {
-
                                         double p = random.nextDouble();
+
 
                                         int childIndex = tree.getChildren(ancestorIndex)[random.nextInt(2)];
                                         boolean childIsLeaf = tree.isLeaf(childIndex);
                                         distanceTraversed += tree.getDistance(childIndex);
+                                        lastDist = tree.getDistance(childIndex);
                                         nodesTraversed++;
 
+                                        Object[] cseq;
+                                        if (mytree.isLeaf(childIndex)) {
+                                            EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(childIndex)));
+                                            cseq = seq.get();
+                                        } else {
+                                            cseq = ancseqs_gappy[(Integer) mytree.getLabel(childIndex)];
+                                        }
 
-
-                                        if ((p < stoppingProb) || childIsLeaf) {
+                                        // record indel events
+                                        if (pseq[j] == null && cseq[j] != null) {
+                                            indelEvents++;
                                             keepTraversing = false;
+                                        } else if (pseq[j] != null && cseq[j] == null) {
+                                            indelEvents++;
+                                            keepTraversing = false;
+                                        }
 
-                                            Object[] cseq;
-                                            if (mytree.isLeaf(childIndex)) {
-                                                EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(childIndex)));
-                                                cseq = seq.get();
-                                            } else {
-                                                cseq = ancseqs_gappy[(Integer) mytree.getLabel(childIndex)];
-                                            }
-
-                                            // record indel events
-                                            if (pseq[j] == null && cseq[j] != null) {
-                                                indelEvents++;
-                                            } else if (pseq[j] != null && cseq[j] == null) {
-                                                indelEvents++;
-                                            }
-
+                                        if (p < stoppingProb) {
+                                            keepTraversing = false;
                                             continue;
                                         }
+
+                                        if (childIsLeaf) {
+                                            keepTraversing = false;
+                                            continue;
+                                        }
+
 
                                         ancestorIndex = childIndex;
                                     }
 
-                                    if (nodesTraversed == 1) {
-                                        break;
-                                    }
-                                    double indelRate = -Math.log(1.0 - ((double) indelEvents / nodesTraversed)) / distanceTraversed;
+                                    double indelRate = -Math.log(1.0 - ((double) indelEvents / (nodesTraversed + 1))) / lastDist;
                                     nodesVisited++;
                                     if (indelRate == -Double.NEGATIVE_INFINITY || Double.isNaN(indelRate)) {
                                         continue;
