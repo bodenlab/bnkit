@@ -50,6 +50,19 @@ public interface RateModel {
                     return new GammaDistrib.Mixture(gammas, priors);
                 }
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
+            case "MixtureZIG":
+                if ((params_arr.length % 3) == 1) { // divisible by 3 plus zero inflated prob
+
+                    GammaDistrib[] gammas = new GammaDistrib[params_arr.length / 3];
+                    double[] priors = new double[params_arr.length / 3];
+                    for (int i = 1; i < params_arr.length; i += 3) { // three params for each gamma distrib
+                        gammas[i/3] = new GammaDistrib(params_arr[i], 1 / params_arr[i + 1]);
+                        priors[i/3] = params_arr[i + 2];
+                    }
+
+                    return new ZeroInflatedGamma.Mixture(params_arr[0], gammas, priors, 42);
+                }
+                throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             default:
                 throw new RuntimeException("Invalid distribution " + distrib_name);
         }
