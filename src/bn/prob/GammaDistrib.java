@@ -292,6 +292,10 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         x_mean /= n;
         log_x_mean /= n;
         double a = 0.5 / (Math.log(x_mean) - log_x_mean); // good starting point (see Minka 2002)
+        if (a == Double.NEGATIVE_INFINITY || a == Double.POSITIVE_INFINITY || Double.isNaN(a)) {
+            a = 0.5; // fallback starting point
+        }
+
         double a_inv = 1.0 / a;
         for (int r = 0; r < 10; r ++) { // max 10 iterations, should converge in ~4
             double numerator = log_x_mean - Math.log(x_mean) + Math.log(a) - digamma(a);
@@ -661,7 +665,7 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         }
     }
 
-    public static void main0(String[] args) {
+    public static void main(String[] args) {
         double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5, 0.001, 1.2, 2.3, 3.1, 5.9, 1.5, 1.4, 2.3, 1.9, 3.5, 2.3, 2.1, 2.9, 0.5, 0.4, 0.3, 0.9, 0.15, 0.01, 0.22, 0.23, 0.123};
         double alpha = GammaDistrib.getAlpha(X);
         double beta = GammaDistrib.getBeta(X, alpha);
@@ -779,7 +783,7 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * Example that finds a mixture of Gammas using EM
      * @param args
      */
-    public static void main(String[] args) {
+    public static void main0(String[] args) {
         double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5, 0.001, 1.2, 2.3, 3.1, 5.9, 1.5, 1.4, 2.3, 1.9, 3.5, 2.3, 2.1, 2.9, 0.5, 0.4, 0.3, 0.9, 0.15, 0.01, 0.22, 0.23, 0.123};
         GammaDistrib.Mixture mixture = GammaDistrib.Mixture.fitMLE(X, 2, 321);
         GammaDistrib gamma = GammaDistrib.fitMLE(X, 321);

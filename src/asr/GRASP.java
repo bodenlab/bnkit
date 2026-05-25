@@ -725,12 +725,7 @@ public class GRASP {
 
                             // the user-provided tree for which ancestor sequences have been determined
                             IdxTree mytree = indelpred.getTree();
-                            RateModel ddistrib = IdxTree.getGammaMixture(mytree, 3, SEED);
-                            System.out.println("--dist-distrib " + ddistrib.getTrAVIS() + " \\");
-                            GaussianDistrib l2rdistrib = mytree.getLeaf2RootDistrib();
-                            IdxTree newrtree = Tree.Random(mytree.getNLeaves(), ddistrib, 2, 2, SEED);
-                            newrtree.fitDistances(100, l2rdistrib, SEED + 202);
-                            System.out.println("--leaf2root-distrib " + l2rdistrib.getTrAVIS() + " \\");
+                            TrAVIS.learnTreeParams(mytree, 3, SEED);
 
                             // calculate some v basic stats from the alignment itself
                             double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
@@ -760,14 +755,10 @@ public class GRASP {
                             Map<Integer, Double> dists = new HashMap<>();
                             // collect reconstructed/observed indel rates (based on the proportion of sequence they occupy and
                             // the distance from ancestor) on each branch so that a distribution can be estimated
-                            Map<Integer, Double> indelrates = new HashMap<>();
+                            //Map<Integer, Double> indelrates = new HashMap<>();
                             //
                             int[] ins_total = new int[0];
                             int[] del_total = new int[0];
-
-                            int[] columnDeletionEvents = new int[ancseqs_gappy[0].length];
-                            int[] columnInsertionEvents = new int[ancseqs_gappy[0].length];
-
 
                             // Go through the tree, and look at each ancestor sequence, recording predicted indel events
                             for (int idx : mytree) { // go through the original, user-provided tree
@@ -789,9 +780,9 @@ public class GRASP {
                                     int nInsertions = Arrays.stream(insertions).sum();
                                     int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
                                     int nDeletions = Arrays.stream(deletions).sum();
-                                    double event_prop = (double) (nInsertions + nDeletions) / ancseqs_nogap[(Integer) mytree.getLabel(parent)].length;
-                                    double indelrate = -Math.log(1.0 - event_prop) / dist;
-                                    indelrates.put(idx, indelrate);
+                                    //double event_prop = (double) (nInsertions + nDeletions) / ancseqs_nogap[(Integer) mytree.getLabel(parent)].length;
+                                    //double indelrate = -Math.log(1.0 - event_prop) / dist;
+                                    //indelrates.put(idx, indelrate);
 
                                     // Accumulate insertion/deletion lengths
                                     ins_total = TrAVIS.mergeCounts(ins_total, insertions);
@@ -800,10 +791,11 @@ public class GRASP {
                             }
 
                             List<Double> rateSampleCollection = new ArrayList<>();
+                            enum LineageState {HAS_CONTENT, DELETED, NEVER_HAD_CONTENT }
                             for (int alnPos = 0; alnPos < aln.getWidth(); alnPos++) {
 
                                 Iterator<Integer> dfs = tree.getDepthFirstIterator();
-                                enum LineageState {HAS_CONTENT, DELETED, NEVER_HAD_CONTENT }
+
                                 Map<Integer, LineageState> lineageState = new HashMap<>();
                                 Map<Integer, Integer> numNodesTraversedSinceIndel = new HashMap<>();
                                 Map<Integer, Double> distTraversedSinceIndel = new HashMap<>();
@@ -843,7 +835,7 @@ public class GRASP {
                                     LineageState parentState = lineageState.get(parentIdx);
                                     // two possible scenarios:
                                     // 1) child has content: if the parent was deleted or never had content, this is an insertion.
-                                    // TODO - deletion in parent followed by insertion is technically a violation, potentially should stop indels below this node
+                                    // TODO - deletion in parent followed by insertion is technically a violation, potentially should stop recording indels below this node
                                     // 2) Child does NOT have content; if parent had content we've identified a deletion.
                                     boolean indelEventOccured = ((parentState == LineageState.DELETED || parentState == LineageState.NEVER_HAD_CONTENT) && currentNodeHasContent) ||
                                             (parentState == LineageState.HAS_CONTENT && !currentNodeHasContent);
@@ -851,8 +843,9 @@ public class GRASP {
                                     if (indelEventOccured) {
                                         int localNodesTraversed = numNodesTraversedSinceIndel.get(bpidx);
                                         double localDistTraversed = distTraversedSinceIndel.get(bpidx);
-                                        // there is 1 indel event after traverse a certain number of nodes
+                                        // there is 1 indel event after we traverse a certain number of nodes
                                         double indelRate = -Math.log(1.0 - ((double) 1 / localNodesTraversed)) / localDistTraversed;
+
                                         rateSampleCollection.add(indelRate);
                                         // Except for the last node, we had no indel events, which we mark as a non-event.
                                         for (int x = 0; x < localNodesTraversed - 1; x++) {
@@ -864,7 +857,7 @@ public class GRASP {
                                         distTraversedSinceIndel.put(bpidx, 0.0);
                                     }
 
-                                    // book-keeping so we can identify indel events.
+                                    // bookkeeping so we can identify indel events.
                                     LineageState currentState;
                                     if (currentNodeHasContent) {
                                         currentState = LineageState.HAS_CONTENT;
@@ -881,96 +874,11 @@ public class GRASP {
                             }
 
 
-
-//                            int numSamples = 10; // this will be per column number of samples
-//                            // assume geometric with stopping prob p, therefore mean=1/p
-//                            int averageNodesToTraverse = 20; // hyperparameter
-//                            double stoppingProb = (double) 1 /averageNodesToTraverse;
-//                            int[] ancestorIndices = tree.getAncestors(); // will sample from internal nodes
-//                            for (int j = 0; j < columnInsertionEvents.length; j++) {
-//
-//                                int nodesVisited = 0;
-//                                while (nodesVisited < numSamples) {
-//
-//                                    int ancestorIndex = ancestorIndices[random.nextInt(ancestorIndices.length)];
-//                                    Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(ancestorIndex)];
-//
-//                                    int nodesTraversed = 0;
-//                                    boolean keepTraversing = true;
-//                                    int indelEvents = 0;
-//                                    double distanceTraversed = 0.0;
-//                                    while (keepTraversing) {
-//
-//                                        double p = random.nextDouble();
-//
-//                                        int childIndex = tree.getChildren(ancestorIndex)[random.nextInt(2)];
-//                                        boolean childIsLeaf = tree.isLeaf(childIndex);
-//                                        distanceTraversed += tree.getDistance(childIndex);
-//                                        nodesTraversed++;
-//
-//                                        if ((p < stoppingProb) || childIsLeaf) {
-//                                            keepTraversing = false;
-//
-//                                            Object[] cseq;
-//                                            if (mytree.isLeaf(childIndex)) {
-//                                                EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(childIndex)));
-//                                                cseq = seq.get();
-//                                            } else {
-//                                                cseq = ancseqs_gappy[(Integer) mytree.getLabel(childIndex)];
-//                                            }
-//
-//                                            // record indel events
-//                                            if (pseq[j] == null && cseq[j] != null) {
-//                                                indelEvents++;
-//                                            } else if (pseq[j] != null && cseq[j] == null) {
-//                                                indelEvents++;
-//                                            }
-//
-//                                            continue;
-//                                        }
-//
-//                                        ancestorIndex = childIndex;
-//                                    }
-//
-//                                    if (nodesTraversed == 1) {
-//                                        break;
-//                                    }
-//                                    double indelRate = -Math.log(1.0 - ((double) indelEvents / nodesTraversed)) / distanceTraversed;
-//                                    nodesVisited++;
-//                                    if (indelRate == -Double.NEGATIVE_INFINITY || Double.isNaN(indelRate)) {
-//                                        continue;
-//                                    }
-//                                    rateSampleCollection.add(indelRate);
-//                                }
-//                            }
-
                             double[] colRateArray = new double[rateSampleCollection.size()];
                             for (int jj = 0; jj < rateSampleCollection.size(); jj++)
                                 colRateArray[jj] = rateSampleCollection.get(jj);
 
-//                            RateModel indelColRateDist = RateModel.bestfit(colRateArray, SEED);
-//                            if (indelColRateDist != null)
-//                                System.out.println("--indel-col-rate-distrib " + indelColRateDist.getTrAVIS() + " \\");
-
-                            //System.out.println(colRateArray.length + " samples in the column rate array");
-
-                            //
-//                            List<Double> collect = new ArrayList<>();
-//                            for (Map.Entry<Integer, Double> entry : indelrates.entrySet()) {
-//                                double d = dists.get(entry.getKey());
-//                                int nfractions = (int) Math.floor(d * 50); // could do 100, or 10... to adjust distance resolution (greater n means higher res)
-//                                double rate = entry.getValue();
-//                                for (int jj = 0; jj < nfractions; jj++) {
-//                                    collect.add(rate);
-//                                }
-//                            }
-//                            double[] rarray = new double[collect.size()];
-//                            for (int jj = 0; jj < rarray.length; jj++)
-//                                rarray[jj] = collect.get(jj);
-//
-//                            //System.out.println(rarray.length + " samples in the seq rate array");
-//
-//                            // fit a zero-inflated or standard gamma distribution to all collected rates (from the reconstruction); seems to work OK but sometime less well than the mixture below
+                            // fit a zero-inflated or standard gamma distribution to all collected rates (from the reconstruction); seems to work OK but sometime less well than the mixture below
                             RateModel indelrateDist = null;
                             // Two options:
                             if (INDEL_RATE_DISTRIB != null) {
@@ -978,17 +886,16 @@ public class GRASP {
                                 try {
                                     indelrateDist = RateModel.bestfit(INDEL_RATE_DISTRIB, colRateArray, SEED);
                                 } catch (RuntimeException e) {
-                                    throw new RuntimeException("Invalid indel rate distribution " + indelrateDist.getTrAVIS());
+                                    throw new RuntimeException("Invalid indel rate distribution " + indelrateDist.getTrAVIS() + " \\");
                                 }
-                            } else
+                            } else {
                                 // (2) we need to try all and pick the one with greatest log-likelihood
                                 indelrateDist = RateModel.bestfit(colRateArray, SEED);
-                            // fit a 3-component mixture distribution to all collected rates (from the reconstruction)
-                            // ZeroInflatedGammaMix indelrateDist = ZeroInflatedGammaMix.fit(rarray, 2);
+                            }
 
-                            if (indelrateDist != null)
-                                System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS() + " \\"); // indelrateDist.getTrAVIS() + " \\");
-
+                            if (indelrateDist != null) {
+                                System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS());
+                            }
 
                             // now, turn to indel lengths...
                             int[] indel_total = TrAVIS.mergeCounts(ins_total, del_total);

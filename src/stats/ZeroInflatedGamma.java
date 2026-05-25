@@ -45,6 +45,18 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
         this.rand = new Random(seed);
     }
 
+    public ZeroInflatedGamma(double pi, GammaDistrib gammaDist, long seed) {
+        if (pi < 0 || pi > 1) {
+            throw new IllegalArgumentException("Invalid zero-inflation probability p: " + pi);
+        }
+
+        this.gamma = gammaDist;
+        this.pi = pi;
+        this.shape = gammaDist.getShape();
+        this.scale = gammaDist.getScale();
+        this.rand = new Random(seed);
+    }
+
     /**
      * Constructor for Zero-Inflated Gamma distribution.
      *
@@ -130,15 +142,21 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             return new ZeroInflatedGamma(1.0, 1.0, 1.0, seed);
         }
 
-        double mean = Arrays.stream(nonZeroData).average().orElse(0.0);
-        double variance = Arrays.stream(nonZeroData)
-                .map(x -> Math.pow(x - mean, 2))
-                .sum() / nonZeroData.length;
+        double alpha = GammaDistrib.getAlpha(nonZeroData);
+        double beta = GammaDistrib.getBeta(nonZeroData, alpha);
+        GammaDistrib gammaDist = new GammaDistrib(alpha, beta, seed);
 
-        double shape = mean * mean / variance;
-        double scale = variance / mean;
+        return new ZeroInflatedGamma(p, gammaDist, seed);
 
-        return new ZeroInflatedGamma(p, shape, scale, seed);
+//        double mean = Arrays.stream(nonZeroData).average().orElse(0.0);
+//        double variance = Arrays.stream(nonZeroData)
+//                .map(x -> Math.pow(x - mean, 2))
+//                .sum() / nonZeroData.length;
+//
+//        double shape = mean * mean / variance;
+//        double scale = variance / mean;
+//
+//        return new ZeroInflatedGamma(p, shape, scale, seed);
     }
 
     /**
