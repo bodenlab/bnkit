@@ -8,7 +8,6 @@ import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.*;
 import dat.phylo.IdxTree;
-import dat.phylo.PhyloBN;
 import dat.phylo.Tree;
 import dat.pog.IdxGraph;
 import dat.pog.POAGraph;
@@ -744,7 +743,7 @@ public class GRASP {
                             System.out.println("--substitution-model " + MODEL.getName() + " \\");
                             RateModel subst_rate_distrib = null;
                             if (RATES != null) { // position-specific rates available
-                                double rates_alpha = GammaDistrib.getAlpha(RATES);
+                                double rates_alpha = GammaDistrib.calcAlpha(RATES);
                                 subst_rate_distrib = new GammaDistrib(rates_alpha, rates_alpha);
                                 System.out.println("--subst-rate-distrib " + subst_rate_distrib.getTrAVIS() + " \\");
                             }
@@ -1028,7 +1027,7 @@ public class GRASP {
                                     System.out.println("N0= " + n0.toString());
                                 Double rates_alpha = 0.01;
                                 if (RATES != null) { // position-specific rates available
-                                    rates_alpha = GammaDistrib.getAlpha(RATES);
+                                    rates_alpha = GammaDistrib.calcAlpha(RATES);
                                     if (VERBOSE)
                                         System.out.println("Position-specific rates Gamma shape= " + rates_alpha + " scale= " + 1.0/rates_alpha);
                                 }

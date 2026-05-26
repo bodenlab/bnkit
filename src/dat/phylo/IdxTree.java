@@ -9,12 +9,8 @@ import dat.file.Newick;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
-import smile.stat.distribution.ExponentialFamilyMixture;
-import smile.stat.distribution.GammaDistribution;
-import smile.stat.distribution.Mixture;
 import stats.RateModel;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
@@ -1210,8 +1206,8 @@ public class IdxTree implements Iterable<Integer> {
      */
     public double[] getGammaParams() {
         double[] dists_arr = getValidDistances();
-        double alpha1 = GammaDistrib.getAlpha(dists_arr);
-        double beta1 = GammaDistrib.getBeta(dists_arr, alpha1);
+        double alpha1 = GammaDistrib.calcAlpha(dists_arr);
+        double beta1 = GammaDistrib.calcScale(dists_arr, alpha1);
         return new double[] {alpha1, beta1};
     }
 

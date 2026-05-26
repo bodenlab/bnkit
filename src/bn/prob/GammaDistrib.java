@@ -223,10 +223,6 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         return k;
     }
 
-    public double getBeta() {
-        return lambda;
-    }
-
     public void setBeta(double beta) {
         lambda = beta;
     }
@@ -240,11 +236,11 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * Based on Thomas Minka "Estimating a Gamma distribution" 2002.
      * http://research.microsoft.com/en-us/um/people/minka/papers/minka-gamma.pdf
      * @param X data
-     * @return the log likelihood of the data; log p(X|alpha, beta)
+     * @return the log likelihood of the data; log p(X|alpha, scale)
      */
     public double getLogLikelihood(double[] X) {
-        double a = getAlpha();  // aka shape
-        double b = getBeta();   // aka rate
+        double a = getShape();  // aka shape
+        double b = getScale();   // aka scale
         int n = X.length;
         double x_mean = 0;
         double log_x_mean = 0;
@@ -277,7 +273,7 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * @param X data
      * @return alpha parameter (same as lambda here)
      */
-    public static double getAlpha(double[] X) {
+    public static double calcAlpha(double[] X) {
         double delta = 1;
         int n = X.length;
         double x_mean = 0;
@@ -304,7 +300,8 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
             double next_a = 1.0 / next_inv;
             delta = Math.abs(next_a - a);
             a = next_a;
-            if (delta < .01) {
+            a_inv = next_inv;
+            if (delta < .001) {
                 //System.out.println("Converged after " + (r + 1) + " rounds");
                 break;
             }
@@ -313,12 +310,12 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
     }
     
     /**
-     * Get beta that maximises likelihood as computed for a specified alpha.
+     * Get scale that maximises likelihood as computed for a specified alpha.
      * @param X data
      * @param alpha
-     * @return beta
+     * @return scale
      */
-    public static double getBeta(double[] X, double alpha) {
+    public static double calcScale(double[] X, double alpha) {
         int n = X.length;
         double x_mean = 0;
         for (double xi : X) {
@@ -350,9 +347,9 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * @return a GammaDistrib object with the estimated parameters
      */
     public static GammaDistrib fitMLE(double[] X, long seed) {
-        double alpha = getAlpha(X);
-        double beta = getBeta(X, alpha);
-        return new GammaDistrib(alpha, beta, seed);
+        double alpha = calcAlpha(X);
+        double scale = calcScale(X, alpha);
+        return new GammaDistrib(alpha, 1/scale, seed);
     }
 
     /**
@@ -667,20 +664,41 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
 
     public static void main(String[] args) {
         double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5, 0.001, 1.2, 2.3, 3.1, 5.9, 1.5, 1.4, 2.3, 1.9, 3.5, 2.3, 2.1, 2.9, 0.5, 0.4, 0.3, 0.9, 0.15, 0.01, 0.22, 0.23, 0.123};
-        double alpha = GammaDistrib.getAlpha(X);
-        double beta = GammaDistrib.getBeta(X, alpha);
+        double alpha = GammaDistrib.calcAlpha(X);
+        double scale = GammaDistrib.calcScale(X, alpha);
         //double beta = 1 / alpha; // force mean to be 1
-        System.out.println("Setting Gamma distrib with alpha = " + alpha + " beta = " + beta);
-        GammaDistrib gd = new GammaDistrib(alpha, 1/beta);
+        System.out.println("Setting Gamma distrib with alpha = " + alpha + " scale = " + scale);
+        GammaDistrib gd = new GammaDistrib(alpha, 1/scale, 42);
         double mean = 0.0;
         System.out.println("Sample");
-        int N = 2000;
+        int N = 500;
+        double[] sampledRates = new double[N];
         for (int i = 0; i < N; i ++) {
             double y = gd.sample();
+            sampledRates[i] = y;
             mean += y;
             //System.out.println(i + "\t" + y);
         }
-        System.out.println("Mean\t" + mean / N);
+
+        double approxAlpha = GammaDistrib.calcAlpha(sampledRates);
+        double approxScale = GammaDistrib.calcScale(sampledRates, approxAlpha);
+
+        double mommean = Arrays.stream(sampledRates).average().orElse(0.0);
+        double monvariance = Arrays.stream(sampledRates)
+                .map(x -> Math.pow(x - mommean, 2))
+                .sum() / sampledRates.length;
+
+        double mom_shape = (mommean * mommean) / monvariance;
+        double mom_scale = monvariance / mommean;
+
+
+        System.out.println("MOM Alpha " + mom_shape);
+        System.out.println("MOM Scale " + mom_scale);
+
+        System.out.println("Approximated Alpha " + approxAlpha);
+        System.out.println("Approximated Scale " + approxScale);
+        System.out.println("Approximated mean "  + alpha * approxScale);
+        System.out.println("Sample Mean\t" + mean / N);
     }
 
     /**

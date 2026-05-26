@@ -7,7 +7,6 @@ import java.util.Random;
 
 import bn.Distrib;
 import bn.prob.GammaDistrib;
-import smile.stat.distribution.GammaDistribution;
 
 /**
  * A zero-inflated gamma distribution is a mixture of:
@@ -123,7 +122,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
     }
 
     /**
-     * Estimates the parameters (p, k, θ) from data using MLE / MOM.
+     * Estimates the parameters (p, k, θ) from data using MLE .
      *
      * @param data sample data
      * @param seed random seed
@@ -142,21 +141,10 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             return new ZeroInflatedGamma(1.0, 1.0, 1.0, seed);
         }
 
-        double alpha = GammaDistrib.getAlpha(nonZeroData);
-        double beta = GammaDistrib.getBeta(nonZeroData, alpha);
-        GammaDistrib gammaDist = new GammaDistrib(alpha, beta, seed);
+        double alpha = GammaDistrib.calcAlpha(nonZeroData);
+        double scale = GammaDistrib.calcScale(nonZeroData, alpha);
 
-        return new ZeroInflatedGamma(p, gammaDist, seed);
-
-//        double mean = Arrays.stream(nonZeroData).average().orElse(0.0);
-//        double variance = Arrays.stream(nonZeroData)
-//                .map(x -> Math.pow(x - mean, 2))
-//                .sum() / nonZeroData.length;
-//
-//        double shape = mean * mean / variance;
-//        double scale = variance / mean;
-//
-//        return new ZeroInflatedGamma(p, shape, scale, seed);
+        return new ZeroInflatedGamma(p, alpha, scale, seed);
     }
 
     /**

@@ -7,7 +7,6 @@ import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
-import dat.SeqDomain;
 import dat.file.*;
 import dat.phylo.BranchPoint;
 import dat.phylo.IdxTree;
@@ -19,7 +18,7 @@ import stats.*;
 import java.io.*;
 import java.util.*;
 
-import static bn.prob.GammaDistrib.getAlpha;
+import static bn.prob.GammaDistrib.calcAlpha;
 
 /**
  * Track Ancestor Via Indels and Substitutions.
@@ -219,6 +218,7 @@ public class TrAVIS {
         }
 
         System.out.println("--ancestor " + n0 + " \\");
+        System.out.println("--length " + n0.length() + " \\ (Use for random seq instead of --ancestor)");
     }
 
 
@@ -407,15 +407,13 @@ public class TrAVIS {
     private static void parseArgs(String[] args) {
 
         for (int a = 0; a < args.length; a++) {
-            if (!args[a].startsWith("-") && ANCSEQ == null) { // ancestor sequence
-                ANCSEQ = args[a];
-            } else if (args[a].startsWith("-")) {
+            if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
                 if (arg.equalsIgnoreCase("n0") || arg.equalsIgnoreCase("-ancestor") && args.length > a + 1) {
                     ANCSEQ = args[++a];
                 } else if ((arg.equalsIgnoreCase("-aln") || arg.equalsIgnoreCase("a")) && args.length > a + 1) {
                         ALIGNMENT = args[++ a];
-                } else if (arg.equalsIgnoreCase("-nwk") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("-nwk")  || arg.equalsIgnoreCase("n") && args.length > a + 1) {
                     INPUT_TREE = args[++a];
                 } else if (arg.equalsIgnoreCase("o") || arg.equalsIgnoreCase("-output-folder") && args.length > a + 1) {
                     OUTPUT = args[++a];
@@ -507,7 +505,7 @@ public class TrAVIS {
         }
 
         if (SRATES != null) { // position-specific rates available
-            GAMMA_ALPHA = getAlpha(SRATES);
+            GAMMA_ALPHA = calcAlpha(SRATES);
         }
 
         EVOL_MODEL = SubstModel.createModel(EVOL_MODELS[EVOL_MODEL_IDX]);
@@ -581,14 +579,16 @@ public class TrAVIS {
             Enumerable domain = EVOL_MODEL.getDomain();
             Random rand = new Random(SEED);
 
-            Object nchar = null;
-            double tossagain = rand.nextDouble();
-            double sump = 0;
+
+
             String[] ancSeq = new String[ANCSEQ_LENGTH];
             for (int i = 0; i < ANCSEQ_LENGTH; i++) {
+                Object nchar = null;
+                double sump = 0;
+                double tossAgain = rand.nextDouble();
                 for (Object c : domain.getValues()) {
                     sump += EVOL_MODEL.getProb(c);
-                    if (sump >= tossagain) {
+                    if (sump >= tossAgain) {
                         nchar = c;
                         break;
                     }

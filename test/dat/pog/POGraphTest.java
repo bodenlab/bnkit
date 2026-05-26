@@ -482,7 +482,7 @@ class POGraphTest {
 
         int[][] n0Adj = new int[][] {
                 {0,1,0},
-                {0,0,0},
+                {1,0,0},
                 {0,0,0},
         };
         int[][] n1Adj = new int[][] {
