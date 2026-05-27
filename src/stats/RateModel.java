@@ -79,7 +79,7 @@ public interface RateModel {
                 ZeroInflatedGamma.Mixture.fitMLE(rate_data, 2, seed),
                 ZeroInflatedGamma.Mixture.fitMLE(rate_data, 3, seed),
         };
-        double best_ll = Double.MIN_VALUE;
+        double best_ll = Double.NEGATIVE_INFINITY;
         int best_idx = 0;
         for (int i = 0; i < models.length; i++) {
             RateModel model = models[i];

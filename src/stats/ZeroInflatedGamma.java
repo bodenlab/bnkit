@@ -259,7 +259,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             for (int i = 0; i < distribs.length; i++) {
                 prob += priors[i] * distribs[i].p(x);
             }
-            return prob;
+            return (1 - zeromass) * prob;
         }
 
         @Override
@@ -413,9 +413,9 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                     priors[k] = sumResp / n;
                 }
             }
-            for (int k = 0; k < components; k++) {
-                priors[k] -= zeromass / components;
-            }
+//            for (int k = 0; k < components; k++) {
+//                priors[k] -= zeromass / components;
+//            }
             return new Mixture(zeromass, distribs, priors, seed);
         }
 

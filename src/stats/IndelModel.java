@@ -98,8 +98,7 @@ public interface IndelModel {
                 ZeroTruncatedPoisson.fitMLE(indel_data, seed),
                 Poisson.fitMLE(indel_data, seed),
         };
-        double best_ll = Double.MIN_VALUE;
-        IndelModel best_model = null;
+        double best_ll = Double.NEGATIVE_INFINITY;
         int best_idx = 0;
         for (int i = 0; i < models.length; i++) {
             IndelModel model = models[i];
