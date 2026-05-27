@@ -259,7 +259,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             for (int i = 0; i < distribs.length; i++) {
                 prob += priors[i] * distribs[i].p(x);
             }
-            return (1 - zeromass) * prob;
+            return (1.0 - zeromass) * prob;
         }
 
         @Override
@@ -367,7 +367,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             }
 
             int n = nonZeroData.length;
-            double[][] resp = new double[n][components];
+
             // Initialize priors and components
             Arrays.fill(priors, 1.0 / components);
             for (int k = 0; k < components; k++) {
@@ -379,6 +379,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             }
 
             // EM algorithm
+            double[][] resp = new double[n][components];
             int maxIter = 100;
             for (int iter = 0; iter < maxIter; iter++) {
                 // E-step: compute responsibilities
@@ -386,6 +387,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                     double sum = 0;
                     for (int k = 0; k < components; k++) {
                         resp[i][k] = priors[k] * distribs[k].p(nonZeroData[i]);
+
                         sum += resp[i][k];
                     }
                     for (int k = 0; k < components; k++) {
@@ -411,6 +413,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                         sumResp += resp[i][k];
                     }
                     priors[k] = sumResp / n;
+
                 }
             }
 //            for (int k = 0; k < components; k++) {

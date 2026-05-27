@@ -130,6 +130,20 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         return get(x);
     }
 
+    /**
+     *
+     * @param x input to the PDF
+     * @return the log probability density at x
+     */
+    public double logP(double x) {
+        if (x <= 0) return Double.NEGATIVE_INFINITY;
+        double shape = getShape();
+        double scale = getScale();
+        return (shape - 1.0) * Math.log(x) - lgamma(shape) - shape * Math.log(scale) - x / scale;
+
+
+    }
+
     @Override
     public double cdf(double x) {
         throw new RuntimeException("GammaDistrib cdf() not implemented");
@@ -176,6 +190,8 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         return (alpha - 1) * Math.log(s) - beta * s;
         // constant terms dropped (not needed for MAP)
     }
+
+
 
 
     /*
@@ -669,6 +685,9 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         //double beta = 1 / alpha; // force mean to be 1
         System.out.println("Setting Gamma distrib with alpha = " + alpha + " scale = " + scale);
         GammaDistrib gd = new GammaDistrib(alpha, 1/scale, 42);
+
+        System.out.println(gd.p(0.5) + "\t" + Math.exp(gd.logP(0.5)));
+
         double mean = 0.0;
         System.out.println("Sample");
         int N = 500;
