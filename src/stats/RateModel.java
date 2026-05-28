@@ -8,7 +8,7 @@ import bn.prob.GammaDistrib;
  */
 public interface RateModel {
 
-    public static double[] parseParams(String str) throws RuntimeException {
+     static double[] parseParams(String str) throws RuntimeException {
         try {
             String[] parts = str.split(",");
             double[] result = new double[parts.length];
@@ -21,7 +21,7 @@ public interface RateModel {
         }
     }
 
-    public static RateModel create(String distrib_name, String params) {
+     static RateModel create(String distrib_name, String params) {
         double[] params_arr = parseParams(params);
         switch (distrib_name) {
             case "ZIG":
@@ -70,7 +70,7 @@ public interface RateModel {
 
     /**
      * Find the distribution with maximum data likelihood
-     * @param rate_data
+     * @param rate_data dataset
      * @return the best model
      */
     static RateModel bestfit(double[] rate_data, long seed) {
@@ -83,12 +83,21 @@ public interface RateModel {
         int best_idx = 0;
         for (int i = 0; i < models.length; i++) {
             RateModel model = models[i];
+            if (!model.isValidForIndels()) {
+                System.out.println("Model parameters " + model.getTrAVIS() + " are not valid for indel data");
+                continue; // skip invalid models
+            }
             double ll = model.getLogLikelihood(rate_data);
             if (ll > best_ll) {
                 best_ll = ll;
                 best_idx = i;
             }
         }
+
+        if (best_ll == Double.NEGATIVE_INFINITY) {
+            throw new RuntimeException("No valid model found for the given data");
+        }
+
         return models[best_idx];
     }
 
@@ -138,6 +147,14 @@ public interface RateModel {
      * @return the sampled value
      */
     Double sample();
+
+
+    /**
+     * Indicates whether this distribution is valid for modeling indel lengths.
+     * @return true if valid for indels, false otherwise
+     */
+    boolean isValidForIndels();
+
 
     /**
      * Computes the probability mass function (PMF) for a given value

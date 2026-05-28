@@ -13,7 +13,7 @@ import bn.prob.GammaDistrib;
  * a point mass at zero (for excess zeros), and
  * a gamma distribution (for the positive continuous part).
  *
- * @author Chongting Zhao, Mikael Boden
+ * @author Chongting Zhao, Mikael Boden, Sebastian Porras
  */
 public class ZeroInflatedGamma implements RateModel, Distrib {
     private GammaDistrib gamma;
@@ -40,20 +40,17 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
         this.gamma = new GammaDistrib(shape, 1.0/scale, seed);
         this.pi = pi;
         this.shape = shape;
-        this.scale = scale; // here...
+        this.scale = scale;
         this.rand = new Random(seed);
     }
 
-    public ZeroInflatedGamma(double pi, GammaDistrib gammaDist, long seed) {
-        if (pi < 0 || pi > 1) {
-            throw new IllegalArgumentException("Invalid zero-inflation probability p: " + pi);
-        }
-
-        this.gamma = gammaDist;
-        this.pi = pi;
-        this.shape = gammaDist.getShape();
-        this.scale = gammaDist.getScale();
-        this.rand = new Random(seed);
+    /**
+     * Check if the distribution is valid for modeling indel rates
+     * (i.e., has positive shape and scale parameters).
+     * @return true if valid for indels, false otherwise
+     */
+    public boolean isValidForIndels() {
+        return this.shape > 0.0 && this.scale > 0.0;
     }
 
     /**
@@ -108,6 +105,16 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             return pi;
         } else {
             return (1 - pi) * gamma.get(x);
+        }
+    }
+
+    public double logP(double x) {
+        if (x < 0) {
+            return 0.0;
+        } else if (x == 0) {
+            return Math.log(pi);
+        } else {
+            return Math.log(1.0 - pi) + gamma.logP(x);
         }
     }
 
@@ -205,7 +212,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             if (x == 0.0) {
                 logL += Math.log(pi);
             } else if (x > 0.0) {
-                logL += Math.log(1.0 - pi) + Math.log(gamma.get(x));
+                logL += logP(x);
             } // ignore negative values (not supported by the model)
         }
         return logL;
@@ -245,6 +252,15 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             }
         }
 
+        public boolean isValidForIndels() {
+            for (GammaDistrib dist : distribs) {
+                if (!dist.isValidForIndels()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         /**
          * Probability mass function for the mixture.
          *
@@ -264,9 +280,14 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
 
         @Override
         public double cdf(double x) {
+
+            if (x < 0) {
+                return 0.0;
+            }
+
             double result = x >= 0 ? zeromass : 0.0;
             for (int i = 0; i < distribs.length; i++) {
-                result += priors[i] * distribs[i].cdf(x);
+                result += (1 - zeromass) * priors[i] * distribs[i].cdf(x);
             }
             return result;
         }
@@ -350,76 +371,101 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
          * @return a fitted Mixture model
          */
         public static Mixture fitMLE(double[] data, int components, long seed) {
-            if (data.length == 0) {
-                throw new IllegalArgumentException("Data cannot be empty.");
-            }
-            GammaDistrib[] distribs = new GammaDistrib[components];
-            double[] priors = new double[components];
-            int zeroCount = (int) Arrays.stream(data).filter(x -> x == 0.0).count();
-            double zeromass = (double) zeroCount / data.length;
-            double[] nonZeroData = Arrays.stream(data).filter(x -> x > 0).toArray();
-            if (nonZeroData.length == 0) {
-                for (int i = 0; i < components; i++) {
-                    distribs[i] = new GammaDistrib(1.0, 1.0, seed + i);
-                    priors[i] = 0.0;
+
+            try {
+
+                if (data.length == 0) {
+                    throw new IllegalArgumentException("Data cannot be empty.");
                 }
-                return new Mixture(1.0, distribs, priors, seed);
-            }
-
-            int n = nonZeroData.length;
-
-            // Initialize priors and components
-            Arrays.fill(priors, 1.0 / components);
-            for (int k = 0; k < components; k++) {
-                // Randomly assign data to clusters for initial fit
-                int start = k * n / components;
-                int end = (k + 1) * n / components;
-                double[] subset = Arrays.copyOfRange(nonZeroData, start, end);
-                distribs[k] = GammaDistrib.fitMLE(subset, seed + k);
-            }
-
-            // EM algorithm
-            double[][] resp = new double[n][components];
-            int maxIter = 100;
-            for (int iter = 0; iter < maxIter; iter++) {
-                // E-step: compute responsibilities
-                for (int i = 0; i < n; i++) {
-                    double sum = 0;
-                    for (int k = 0; k < components; k++) {
-                        resp[i][k] = priors[k] * distribs[k].p(nonZeroData[i]);
-
-                        sum += resp[i][k];
+                GammaDistrib[] distribs = new GammaDistrib[components];
+                double[] priors = new double[components];
+                int zeroCount = (int) Arrays.stream(data).filter(x -> x == 0.0).count();
+                double zeromass = (double) zeroCount / data.length;
+                double[] nonZeroData = Arrays.stream(data).filter(x -> x > 0).toArray();
+                if (nonZeroData.length == 0) {
+                    for (int i = 0; i < components; i++) {
+                        distribs[i] = new GammaDistrib(1.0, 1.0, seed + i);
+                        priors[i] = 0.0;
                     }
-                    for (int k = 0; k < components; k++) {
-                        resp[i][k] /= sum;
-                    }
+                    return new Mixture(1.0, distribs, priors, seed);
                 }
 
-                // M-step: update priors and fit each component
+                int n = nonZeroData.length;
+
+                // Initialize priors and components
+                Arrays.fill(priors, 1.0 / components);
                 for (int k = 0; k < components; k++) {
-                    // Weighted data for component k
-                    List<Double> weightedData = new ArrayList<>();
+                    // Randomly assign data to clusters for initial fit
+                    int start = k * n / components;
+                    int end = (k + 1) * n / components;
+                    double[] subset = Arrays.copyOfRange(nonZeroData, start, end);
+                    distribs[k] = GammaDistrib.fitMLE(subset, seed + k);
+                }
+
+                // EM algorithm
+                double[][] resp = new double[n][components];
+                double[][] logResp = new double[n][components];
+                int maxIter = 500; // Increased max iterations for better convergence
+                double prevLogLikelihood = Double.NEGATIVE_INFINITY;
+                for (int iter = 0; iter < maxIter; iter++) {
+                    // E-step: compute responsibilities
+                    double logLikelihood = 0.0;
                     for (int i = 0; i < n; i++) {
-                        for (int r = 0; r < (int) (resp[i][k] * 100); r++) {
-                            weightedData.add(nonZeroData[i]);
+
+                        // apply log sum exp trick for numerical stability
+                        double maxLog = Double.NEGATIVE_INFINITY;
+                        for (int k = 0; k < components; k++) {
+                            logResp[i][k] = Math.log(priors[k]) + distribs[k].logP(nonZeroData[i]);
+                            if (logResp[i][k] > maxLog) {
+                                maxLog = logResp[i][k];
+                            }
+                        }
+
+                        double sumExp = 0.0;
+                        for (int k = 0; k < components; k++) {
+                            sumExp += Math.exp(logResp[i][k] - maxLog);
+                        }
+                        double logNorm = maxLog + Math.log(sumExp);
+                        logLikelihood += logNorm;
+                        for (int k = 0; k < components; k++) {
+                            resp[i][k] = Math.exp(logResp[i][k] - logNorm);
                         }
                     }
-                    if (weightedData.size() > 0) {
-                        distribs[k] = GammaDistrib.fitMLE(weightedData, seed + k);
-                    }
-                    // Update priors
-                    double sumResp = 0;
-                    for (int i = 0; i < n; i++) {
-                        sumResp += resp[i][k];
-                    }
-                    priors[k] = sumResp / n;
 
+                    // M-step: update priors and fit each component
+                    for (int k = 0; k < components; k++) {
+                        // Weighted data for component k
+                        List<Double> weightedData = new ArrayList<>();
+                        int scale = 1000; // don't reduce scale below 1000, poor convergence otherwise
+                        for (int i = 0; i < n; i++) {
+                            for (int r = 0; r < (int) (resp[i][k] * scale); r++) {
+                                weightedData.add(nonZeroData[i]);
+                            }
+                        }
+                        if (!weightedData.isEmpty()) {
+                            distribs[k] = GammaDistrib.fitMLE(weightedData, seed + k);
+                        }
+                        // Update priors
+                        double sumResp = 0;
+                        for (int i = 0; i < n; i++) {
+                            sumResp += resp[i][k];
+                        }
+                        priors[k] = sumResp / n;
+                    }
+
+                    if (Math.abs(logLikelihood - prevLogLikelihood) < 1e-4) {
+                        //System.out.println("Convergence reached at iteration " + iter);
+                        break;
+                    }
+                    prevLogLikelihood = logLikelihood;
                 }
+
+                return new Mixture(zeromass, distribs, priors, seed);
+
+            } catch (StackOverflowError e) {
+                System.out.println("EM failed to converge for " + components + " components, trying " + (components - 1) + " components");
+                return Mixture.fitMLE(data, components - 1, seed);
             }
-//            for (int k = 0; k < components; k++) {
-//                priors[k] -= zeromass / components;
-//            }
-            return new Mixture(zeromass, distribs, priors, seed);
         }
 
         public String getTrAVIS() {

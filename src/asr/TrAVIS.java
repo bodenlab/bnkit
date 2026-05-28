@@ -129,8 +129,6 @@ public class TrAVIS {
     private static IndelModel DELETION_LENGTH_MODEL = null;
     private static RateModel SUBST_RATE_MODEL = null;
     private static RateModel INDEL_RATE_MODEL = null;
-    private static RateModel INSERTION_RATE_MODEL = null;
-    private static RateModel DELETION_RATE_MODEL = null;
     private static RateModel TREE_DISTANCE_MODEL = null;
     private static Distrib LEAF2ROOT_DISTANCE_MODEL = null;
     private static Integer ANCSEQ_LENGTH = null;
@@ -155,20 +153,22 @@ public class TrAVIS {
         checkArgsValid();
 
         if (LEARN) {
-
             EnumSeq.Alignment aln = null;
-            IdxTree tree = null;
+            Tree tree = null;
             try {
                 aln = Utils.loadAlignment(ALIGNMENT, EVOL_MODEL.getDomain());
                 tree = Newick.load(INPUT_TREE);
+                Utils.checkData(aln, tree, true);
+
             } catch (IOException | ASRException e) {
                 usage(10, e.getMessage());
             }
 
             learnTreeParams(tree, 3, SEED);
 
+            assert aln != null;
             Map<String, Integer> idToAlnIndex = aln.getMap();
-            printRootSeq(aln, idToAlnIndex);
+            printRootSeq(aln, idToAlnIndex, tree);
 
             accumulateIndelLengths(tree, aln, idToAlnIndex);
 
@@ -179,7 +179,7 @@ public class TrAVIS {
             }
 
         } else {
-
+            // Actually perform simulation
             EnumSeq rootSeq = createRootSeq();
             IdxTree tree = setupTree();
 
@@ -194,7 +194,18 @@ public class TrAVIS {
     }
 
 
-
+    /**
+     * To simulate phylogenetic trees we learn two distributions which sufficiently capture a description of the tree
+     * which allows us to generate similar trees. The first is the distribution of branch distances, which we learn as
+     * a gamma mixture distribution. The second is the distribution of leaf-to-root distances, which we
+     * learn as a Gaussian distribution. The branch distance distribution is used to generate trees with similar branch
+     * lengths, and the leaf-to-root distribution is used to shuffle the tree to have a similar distribution of
+     * leaf-to-root distances as the original tree.
+     *
+     * @param tree The tree to learn from
+     * @param nComponents The number of components to use in the gamma mixture distribution for branch lengths.
+     * @param seed Random seed for reproducibility.
+     */
     public static void learnTreeParams(IdxTree tree, int nComponents, long seed) {
 
         RateModel ddistrib = IdxTree.getGammaMixture(tree, nComponents, seed);
@@ -206,10 +217,10 @@ public class TrAVIS {
 
     }
 
-    private static void printRootSeq(EnumSeq.Alignment aln, Map<String, Integer> idToAlnIndex) {
+    private static void printRootSeq(EnumSeq.Alignment aln, Map<String, Integer> idToAlnIndex, Tree tree) {
 
         StringBuilder n0 = new StringBuilder();
-        Object[] n0Gapped = aln.getEnumSeq(idToAlnIndex.get("N0")).get();
+        Object[] n0Gapped = aln.getEnumSeq(idToAlnIndex.get(tree.getRoot().getLabel())).get();
 
         for (Object o : n0Gapped) {
             if (o != null) {
@@ -244,12 +255,12 @@ public class TrAVIS {
             if (parent != -1) {  // Non-root node, so there is a branch with distance to catch...
 
                 // Retrieve parent/child reconstructed sequences at a node in the user-provided tree
-                Object[] pseq = aln.getEnumSeq(idToAlnIndex.get("N" + tree.getLabel(parent))).get();
+                Object[] pseq = aln.getEnumSeq(idToAlnIndex.get(tree.getBranchPoint(parent).getLabel().toString())).get();
                 Object[] cseq;
                 if (tree.isLeaf(idx)) {
-                    cseq = aln.getEnumSeq(idToAlnIndex.get(tree.getLabel(idx))).get();
+                    cseq = aln.getEnumSeq(idToAlnIndex.get(tree.getBranchPoint(idx).getLabel().toString())).get();
                 } else {
-                    cseq = aln.getEnumSeq(idToAlnIndex.get("N" + tree.getLabel(parent))).get();
+                    cseq = aln.getEnumSeq(idToAlnIndex.get(tree.getBranchPoint(idx).getLabel().toString())).get();
                 }
                 // Calculate indel rate for the reconstructed sequences in the user-provided tree
                 int[] insertions = getInsertionCounts(pseq, cseq);
@@ -330,11 +341,7 @@ public class TrAVIS {
                 int bpidx = dfs.next();
                 // grab the current node sequence
                 Object[] currentSeq;
-                if (tree.isLeaf(bpidx)) {
-                    currentSeq = aln.getEnumSeq(idToAlnIndex.get(tree.getLabel(bpidx))).get();
-                } else {
-                    currentSeq = aln.getEnumSeq(idToAlnIndex.get("N" + tree.getLabel(bpidx))).get();
-                }
+                currentSeq = aln.getEnumSeq(idToAlnIndex.get(tree.getBranchPoint(bpidx).getLabel().toString())).get();
 
                 boolean currentNodeHasContent = currentSeq[alnPos] != null;
                 if (bpidx == 0) {
@@ -447,12 +454,6 @@ public class TrAVIS {
                 } else if (arg.equalsIgnoreCase("-indel-rate-distrib") && args.length > a + 1) {
                     String[] params = parseDistribParamString(args[a+1]);
                     INDEL_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
-                } else if (arg.equalsIgnoreCase("-insertion-rate-distrib") && args.length > a + 1) {
-                    String[] params = parseDistribParamString(args[a+1]);
-                    INSERTION_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
-                } else if (arg.equalsIgnoreCase("-deletion-rate-distrib") && args.length > a + 1) {
-                    String[] params = parseDistribParamString(args[a+1]);
-                    DELETION_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
                 } else if (arg.equalsIgnoreCase("-indel-length-distrib") && args.length > a + 1) {
                     String[] params = parseDistribParamString(args[a+1]);
                     INDEL_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
@@ -522,6 +523,7 @@ public class TrAVIS {
 
         IdxTree tree = null;
 
+        // load in a user provided tree
         if (INPUT_TREE != null) {
             try {
                 tree = Newick.load(INPUT_TREE);
@@ -534,34 +536,45 @@ public class TrAVIS {
                 usage(26, "Input tree file " + INPUT_TREE + " is invalid.");
             }
         }
+
+
         if (tree == null) {
+            // no tree provided but parameters given
             if (TREE_DISTANCE_MODEL != null)
                 tree = IdxTree.generateTreeFromDistrib(TREE_DISTANCE_MODEL, LEAF2ROOT_DISTANCE_MODEL, EXTANTS_N, SEED, 100);
             else {
+                // otherwise create a completely random tree
                 tree = Tree.Random(EXTANTS_N, SEED, TREE_GAMMA_SHAPE, 1.0 / TREE_GAMMA_SCALE, DESCENDANTS_MAX, DESCENDANTS_MIN);
                 if (LEAF2ROOT_DISTANCE_MODEL != null)
                     tree = IdxTree.shuffleWithLeaf2RootDistrib(tree, LEAF2ROOT_DISTANCE_MODEL, SEED, 100);
             }
             if (SCALEDIST != null)
                 tree.adjustDistances(SCALEDIST);
-            if (INPUT_TREE != null) {
-                try {
-                    Newick.save(tree, INPUT_TREE + "_travis.nwk", Newick.MODE_DEFAULT);
-                } catch (IOException e) {
-                    usage(2, "Tree file could not be saved");
-                }
-            }
         } else {
             tree = Tree.generateTreeFromMixture(tree,3,SEED,100);
+        }
+
+        // a tree should exist now
+        try {
+            Newick.save(tree, OUTPUT + "/travis.nwk", Newick.MODE_DEFAULT);
+        } catch (IOException e) {
+            usage(2, "Tree file could not be saved");
         }
 
         return tree;
     }
 
+    /**
+     * Create the root sequence for the simulation, either by parsing a user-provided sequence or by
+     * generating a random sequence according to the model's equilibrium distribution.
+     *
+     * @return The root sequence as an EnumSeq object.
+     */
     private static EnumSeq createRootSeq() {
 
         EnumSeq ancseq = null;
 
+        // sequence provided, try parse it according to the model
         if (ANCSEQ != null) {
             if (EVOL_MODEL.getDomain().equals(Enumerable.aacid)) {
                 ancseq = EnumSeq.parseProtein(ANCSEQ);
@@ -574,13 +587,13 @@ public class TrAVIS {
             }
         }
 
+        // user needs to provide a sequence length otherwise
         if (ANCSEQ == null && ANCSEQ_LENGTH != null) {
 
             Enumerable domain = EVOL_MODEL.getDomain();
             Random rand = new Random(SEED);
 
-
-
+            // sample from the model's equilibrium distribution to create a random sequence of the specified length
             String[] ancSeq = new String[ANCSEQ_LENGTH];
             for (int i = 0; i < ANCSEQ_LENGTH; i++) {
                 Object nchar = null;
@@ -615,13 +628,21 @@ public class TrAVIS {
         return ancseq;
     }
 
+    /**
+     * Build the Params object to be used for the TrackTree simulation, which includes all the necessary information
+     * about the tree, root sequence, and evolutionary models.
+     *
+     * @param tree The phylogenetic tree to simulate along.
+     * @param rootSeq The root sequence from which to start the simulation.
+     * @return A TrackTree.Params object containing all the parameters for the simulation.
+     */
     private static TrackTree.Params setupParams(IdxTree tree, EnumSeq rootSeq) {
 
         // we've got an ancestor to track down the tree
         TrackTree.Params params = new TrackTree.Params(tree, rootSeq, EVOL_MODEL, SEED);
 
         if (INDEL_LENGTH_MODEL == null) {
-            params.setIndelModel(IndelModel.create("Zipf", "1.7,100"));
+            params.setIndelModel(IndelModel.create("Zipf", "1.7,50"));
         }
         params.setIndelModel(INDEL_LENGTH_MODEL);
 
@@ -1178,13 +1199,10 @@ public class TrAVIS {
                         // 2. deletion/s in the child, and
                         // 3. insertion/s in the child
                         double toss = params.rand.nextDouble();
-                        // indel rate (rho) is separate from site-specific substitution rate, and is node-specific
-                        //double p = Math.exp(-(rho*t * (params.SUBST_RATE_INFLUENCES_INDELS ? substRates[paridx][i]:1)));
 
                         // the indel rate is specific to the position in the parent sequence, i.e. the propensity for an indel event at this position
                         double p = Math.exp(-(colIndelRates[paridx][i] * t));
 
-                        // p = (1-p)/2 + p; // FIX halve-it see how things change....
                         // make decision of what happens in child for the current site i
                         if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution (r is evolutionary rate and t is branch distance)
                             EnumDistrib d = params.substmodel.getDistrib(parseq[i], substRates[paridx][i]*t); // probability of child states GIVEN parent state
@@ -1281,7 +1299,9 @@ public class TrAVIS {
                         } else {
                             substRates[idx][j] = childrates.get(j);
                             colIndelRates[idx][j] = childColIndelRates.get(j);
-                        } if (j >= child.size())
+                        }
+
+                        if (j >= child.size())
                             chseq[j] = tail.get(j - child.size());
                         else
                             chseq[j] = child.get(j);
@@ -1306,7 +1326,7 @@ public class TrAVIS {
 //                } catch (IOException e) {
 //                    e.printStackTrace();
 //                }
-                String outputFile = (OUTPUT!=null? OUTPUT:"")  +"_travis_report.txt";
+                String outputFile = (OUTPUT != null ? OUTPUT : "")  +"_travis_report.txt";
 
                 try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
 

@@ -8,6 +8,7 @@ import smile.stat.distribution.GammaDistribution;
 import smile.stat.distribution.Mixture.Component;
 import stats.RateModel;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.*;
 
@@ -25,6 +26,7 @@ import java.util.*;
 
 public class GammaDistrib implements Distrib, Serializable, RateModel {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public static final double GAMMA = 0.577215664901532860606512090082;
@@ -51,6 +53,10 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         this.k = k;
         this.lambda = lambda;
         this.rand = new Random(seed);
+    }
+
+    public boolean isValidForIndels() {
+        return k > 0.0 && lambda > 0.0;
     }
 
     /**
@@ -140,8 +146,6 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         double shape = getShape();
         double scale = getScale();
         return (shape - 1.0) * Math.log(x) - lgamma(shape) - shape * Math.log(scale) - x / scale;
-
-
     }
 
     @Override
@@ -190,9 +194,6 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         return (alpha - 1) * Math.log(s) - beta * s;
         // constant terms dropped (not needed for MAP)
     }
-
-
-
 
     /*
      * used for parameter learning
@@ -437,6 +438,7 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * @since 2.0
      */
     public static double digamma(double x) {
+
         if (x > 0 && x <= S_LIMIT) {
             // use method 5 from Bernardo AS103
             // accurate to O(x)
@@ -485,10 +487,12 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
     public static class Mixture implements RateModel {
         public GammaDistrib[] distribs;
         public double[] priors;
+
         public Mixture(GammaDistrib[] distribs, double[] priors) {
             this.distribs = distribs;
             this.priors = priors;
         }
+
         public String toString() {
             StringBuilder sb = new StringBuilder();
             sb.append("GammaMixture[");
@@ -496,6 +500,13 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
                 sb.append(String.format("%s,%.3f;", distribs[i].getTrAVIS(), priors[i]));
             sb.append("]");
             return sb.toString();
+        }
+
+        public boolean isValidForIndels() {
+            for (int i = 0; i < distribs.length; i++)
+                if (!distribs[i].isValidForIndels())
+                    return false;
+            return true;
         }
 
         /**
@@ -568,9 +579,6 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
             for (int i = 0; i < components; i++) {
                 System.arraycopy(data, i*subset.length, subset, 0, subset.length);
                 gamma[i] = GammaDistribution.fit(subset);
-                for (int j = 0; j < subset.length; j++) {
-                    // System.out.print(subset[j] + " ");
-                }
                 comps[i] = new Component(1.0/components, gamma[i]);
             }
             try {
@@ -690,7 +698,7 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
 
         double mean = 0.0;
         System.out.println("Sample");
-        int N = 500;
+        int N = 2000;
         double[] sampledRates = new double[N];
         for (int i = 0; i < N; i ++) {
             double y = gd.sample();

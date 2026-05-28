@@ -6,8 +6,8 @@ import java.util.Random;
 
 public class Lavalette implements IndelModel {
 
-    private double a;  // Exponent parameter of the Lavalette distribution
-    private int maxK;  // Maximum rank value (N in the formula)
+    private final double a;  // Exponent parameter of the Lavalette distribution
+    private final int maxK;  // Maximum rank value (N in the formula)
     private Random rand;
 
     public Lavalette(double a, long seed, int maxK) {
@@ -212,6 +212,10 @@ public class Lavalette implements IndelModel {
         double logPrior = GammaDistrib.logPrior(s, alpha, beta);
 
         return logLikelihood + logPrior;
+    }
+
+    public boolean isValidForIndels() {
+        return a > 0.0 && maxK > 0;
     }
 
     /**

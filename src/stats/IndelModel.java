@@ -1,13 +1,18 @@
 package stats;
 
-import bn.prob.GammaDistrib;
-
 public interface IndelModel {
     /**
      * Samples a value from the distribution
      * @return the sampled value
      */
     int sample();
+
+
+        /**
+        * Checks if the distribution is valid for modeling indel lengths (e.g. non-negative integers)
+        * @return true if valid, false otherwise
+        */
+    boolean isValidForIndels();
 
     /**
      * Computes the probability mass function (PMF) for a given value
@@ -29,17 +34,17 @@ public interface IndelModel {
      */
     String getTrAVIS();
 
-    public void setSeed(long seed);
+    void setSeed(long seed);
 
     /**
      * Calculate the log likelihood of the data given the model/distribution
      * @param data dataset
      * @return the log-likelihood of the data given the model
      */
-    public double getLogLikelihood(int[] data);
+    double getLogLikelihood(int[] data);
 
 
-    public static double[] parseParams(String str) throws RuntimeException {
+    static double[] parseParams(String str) throws RuntimeException {
         try {
             String[] parts = str.split(",");
             double[] result = new double[parts.length];
@@ -102,12 +107,21 @@ public interface IndelModel {
         int best_idx = 0;
         for (int i = 0; i < models.length; i++) {
             IndelModel model = models[i];
+            if (!model.isValidForIndels()) {
+                System.out.println("Model parameters " + model.getTrAVIS() + " are not valid for indel data");
+                continue; // skip invalid models
+            }
             double ll = model.getLogLikelihood(indel_data);
             if (ll > best_ll) {
                 best_ll = ll;
                 best_idx = i;
             }
         }
+
+        if (best_ll == Double.NEGATIVE_INFINITY) {
+            throw new RuntimeException("No valid model found for the given indel data");
+        }
+
         return models[best_idx];
     }
 

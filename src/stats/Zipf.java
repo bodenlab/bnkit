@@ -24,6 +24,10 @@ public class Zipf implements IndelModel {
         this.rand = new Random(seed);
     }
 
+    public boolean isValidForIndels() {
+        return s > 0.0 || maxK > 0;
+    }
+
     /**
      * Defines a Zipf distribution
      *
