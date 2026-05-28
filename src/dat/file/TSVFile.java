@@ -962,6 +962,35 @@ public class TSVFile {
         return empiricalFreqs;
     }
 
+    public static double[] loadSubstitutionRatesFile(String filename) throws IOException, NumberFormatException {
+
+        double[] rates;
+        try {
+            TSVFile ratesfile = new TSVFile(filename, true);
+            int rates_col = ratesfile.getColumnIndex("Rate");
+            int index_col = ratesfile.getColumnIndex("Site");
+            if (rates_col == -1)  // not there
+                rates_col = 0;
+            Object[] rateobjs = ratesfile.getColData(rates_col);
+            Object[] idxobjs = null;
+            if (index_col != -1)
+                idxobjs = ratesfile.getColData(index_col);
+            rates = new double[rateobjs.length];
+            for (int i = 0; i < rates.length; i++) {
+                try {
+                    int index = index_col == -1 ? i : (Integer) idxobjs[i] - 1; // starts with 1, so subtract "1" to use as position index
+                    rates[index] = (Double) rateobjs[i];
+                } catch (NumberFormatException e0) {
+                    throw new NumberFormatException("Rates file has invalid number format:" + rateobjs[i]);
+                }
+            }
+        } catch (IOException e) {
+            throw new IOException("Rates file could not be opened or read: " + filename);
+        }
+
+        return rates;
+    }
+
     private static HashMap<String, Integer> getOrderedAlphabetMap(String modelName) {
 
         HashMap<String, Integer> characterToIndex = new HashMap<>();
@@ -979,6 +1008,8 @@ public class TSVFile {
         }
         return characterToIndex;
     }
+
+
 
     public static void main(String[] args) {
         Object[] items = new String[] {"WT25", "ASR55", "ASR01", "ASR05", "ASR07"};
