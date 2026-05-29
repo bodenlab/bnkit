@@ -676,6 +676,7 @@ public class Prediction {
         if (bpidx == -1) {
             throw new ASRRuntimeException("Invalid ancestor ID: " + ancID);
         }
+
         int[] idxs = getConsensus(bpidx);
         if (idxs == null)
             throw new ASRRuntimeException("Failed to find optimal path for ancestor ID: " + ancID);
@@ -722,6 +723,9 @@ public class Prediction {
      */
     public int[] getConsensus(int bpidx) {
         POGraph pog = this.ancarr[bpidx];
+        if (bpidx == 154) {
+            System.out.println();
+        }
         if (pog == null)
             throw new ASRRuntimeException("Ancestor has not been inferred: index is " + bpidx);
         // collect info to make decisions...
