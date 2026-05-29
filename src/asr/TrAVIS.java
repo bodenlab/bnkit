@@ -144,7 +144,7 @@ public class TrAVIS {
     private static boolean EXTANTS_ONLY = false;
     private static boolean LEARN = false;
     private static String ALIGNMENT;
-    enum LineageState {HAS_CONTENT, DELETED, NEVER_HAD_CONTENT }
+    public enum LineageState {HAS_CONTENT, DELETED, NEVER_HAD_CONTENT }
 
     public static void main(String[] args) {
 
@@ -217,7 +217,7 @@ public class TrAVIS {
 
     }
 
-    private static void printRootSeq(EnumSeq.Alignment aln, Map<String, Integer> idToAlnIndex, Tree tree) {
+    public static void printRootSeq(EnumSeq.Alignment<Enumerable> aln, Map<String, Integer> idToAlnIndex, Tree tree) {
 
         StringBuilder n0 = new StringBuilder();
         Object[] n0Gapped = aln.getEnumSeq(idToAlnIndex.get(tree.getRoot().getLabel())).get();
@@ -233,7 +233,7 @@ public class TrAVIS {
     }
 
 
-    private static String[] parseDistribParamString(String params) {
+    public static String[] parseDistribParamString(String params) {
 
         int colonPos = params.indexOf(':');
 
@@ -243,7 +243,7 @@ public class TrAVIS {
         return new String[]{distName, parsedParams};
     }
 
-    private static void accumulateIndelLengths(IdxTree tree, EnumSeq.Alignment aln, Map<String, Integer> idToAlnIndex) {
+    public static void accumulateIndelLengths(IdxTree tree, EnumSeq.Alignment<Enumerable> aln, Map<String, Integer> idToAlnIndex) {
 
 
         int[] ins_total = new int[0];
@@ -293,7 +293,6 @@ public class TrAVIS {
         int nindel = ninsertions + ndeletions;
         double delprop = (double) ndeletions / (double) nindel;
         System.out.printf("--delprop %.2f \\\n", delprop);
-
     }
 
     private static double[] parseSubstitutionRateFile(String filename) {
@@ -325,7 +324,7 @@ public class TrAVIS {
 
     }
 
-    private static double[] calculateColumnIndelRates(IdxTree tree, EnumSeq.Alignment aln,
+    public static double[] calculateColumnIndelRates(IdxTree tree, EnumSeq.Alignment aln,
                                                           Map<String, Integer> idToAlnIndex) {
 
         List<Double> rateSampleCollection = new ArrayList<>();
@@ -368,10 +367,10 @@ public class TrAVIS {
                 // 1) child has content: if the parent was deleted or never had content, this is an insertion.
                 // TODO - deletion in parent followed by insertion is technically a violation, potentially should stop recording indels below this node
                 // 2) Child does NOT have content; if parent had content we've identified a deletion.
-                boolean indelEventOccured = ((parentState == LineageState.DELETED || parentState == LineageState.NEVER_HAD_CONTENT) && currentNodeHasContent) ||
+                boolean indelEventOccurred = ((parentState == LineageState.DELETED || parentState == LineageState.NEVER_HAD_CONTENT) && currentNodeHasContent) ||
                         (parentState == LineageState.HAS_CONTENT && !currentNodeHasContent);
 
-                if (indelEventOccured) {
+                if (indelEventOccurred) {
                     int localNodesTraversed = numNodesTraversedSinceIndel.get(bpidx);
                     double localDistTraversed = distTraversedSinceIndel.get(bpidx);
                     // there is 1 indel event after we traverse a certain number of nodes
@@ -502,7 +501,14 @@ public class TrAVIS {
         }
 
         if (SRATESFILE != null) {
-            SRATES = parseSubstitutionRateFile(SRATESFILE);
+            try {
+                SRATES = TSVFile.loadSubstitutionRatesFile(SRATESFILE);
+            } catch (IOException e) {
+                usage(24, e.getMessage());
+            } catch (NumberFormatException e) {
+                usage(23, e.getMessage());
+            }
+
         }
 
         if (SRATES != null) { // position-specific rates available

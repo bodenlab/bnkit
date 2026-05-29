@@ -1,5 +1,6 @@
 package asr;
 
+import bn.Distrib;
 import bn.ctmc.SubstModel;
 import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
@@ -218,11 +219,73 @@ public class GRASP {
     private static final int SCIP = 6;
     private static final int GUROBI = 7;
 
+    // TRAVIS PARAMS
+    private static boolean RUN_TRAVIS = false;
+    private static int EXTANTS_N = 5;
+    private static final int DISTRIB_NAME = 0;
+    private static final int DISTRIB_PARAMS = 1;
+    private static double TREE_GAMMA_SHAPE = 1.1; // setting to 1.0 will introduce values very close to zero
+    private static double TREE_GAMMA_SCALE = 0.2;
+    private static final int DESCENDANTS_MAX = 2, DESCENDANTS_MIN = 2; // Max and min of tree branching
+    private static double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
+    private static Double SCALEDIST = null;
+    private static boolean LEARN = false;
+    private static final String[] TRAVIS_FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "DIR", "RATES"};
+    private static int TRAVIS_FORMAT_IDX = 0;
+    private static boolean EXTANTS_ONLY = false;
+    private static boolean COPY_TREE = false;
+    private static IndelModel INDEL_LENGTH_MODEL = null;
+    private static IndelModel INSERTION_LENGTH_MODEL = null;
+    private static IndelModel DELETION_LENGTH_MODEL = null;
+    private static RateModel SUBST_RATE_MODEL = null;
+    private static RateModel INDEL_RATE_MODEL = null;
+    private static RateModel TREE_DISTANCE_MODEL = null;
+    private static Distrib LEAF2ROOT_DISTANCE_MODEL = null;
+    private static Integer ANCSEQ_LENGTH = null;
+    private static String ANCSEQ = null; // ancestor sequence as a text string, provided
+
     public static void main(String[] args) {
 
         SEED = new Random().nextInt();
-        parseGRASPArgs(args);
+        RUN_TRAVIS = runTravis(args);
+
+        if (RUN_TRAVIS) {
+            parseTravisArgs(args);
+        } else {
+            parseGRASPArgs(args);
+        }
+
         checkArgsValid();
+
+        EnumSeq.Alignment<Enumerable> aln = null;
+        Tree tree = null;
+
+        if (RUN_TRAVIS && LEARN) {
+            try {
+                aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
+                tree = Utils.loadTree(NEWICK);
+                Utils.checkData(aln, tree, true);
+
+            } catch (ASRException e) {
+                usage(22, "Invalid input for ASR: " + e.getMessage());
+            } catch (IOException e) {
+                usage(2, "Failed to read or write files: " + e.getMessage());
+            }
+
+            assert aln != null;
+            assert tree != null;
+            TrAVIS.learnTreeParams(tree, 3, SEED);
+            Map<String, Integer> idToAlnIndex = aln.getMap();
+            TrAVIS.printRootSeq(aln, idToAlnIndex, tree);
+            TrAVIS.accumulateIndelLengths(tree, aln, idToAlnIndex);
+            double[] rateSampleCollection = TrAVIS.calculateColumnIndelRates(tree, aln, idToAlnIndex);
+            RateModel indelrateDist = RateModel.bestfit(rateSampleCollection, SEED);
+            if (indelrateDist != null) {
+                System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS());
+            }
+
+            System.exit(0);
+        }
 
         Object[][] ancseqs_gappy = null;
         Object[][] ancseqs_nogap = null;
@@ -230,8 +293,7 @@ public class GRASP {
         POGraph[] ancestors = null;
         Prediction indelpred = (INPUT != null) ? setupIndelPrediction() : null;
 
-        EnumSeq.Alignment<Enumerable> aln = null;
-        Tree tree = null;
+
         long START_TIME = System.currentTimeMillis();
         if (indelpred == null) {
             try {
@@ -277,6 +339,108 @@ public class GRASP {
         if (VERBOSE || TIME) {
             System.out.printf("Done in %d min, %d sec%n", TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME),
                     TimeUnit.MILLISECONDS.toSeconds(ELAPSED_TIME) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(ELAPSED_TIME)));
+        }
+    }
+
+    private static boolean runTravis(String[] args) {
+
+        boolean runTravis = false;
+        for (String s : args) {
+            if (s.startsWith("-")) {
+                String arg = s.substring(1);
+                if ((arg.equalsIgnoreCase("-travis"))) {
+                    runTravis = true;
+                    break;
+                }
+            }
+        }
+
+        return runTravis;
+    }
+
+    private static void parseTravisArgs(String[] args) {
+        for (int a = 0; a < args.length; a++) {
+            if (args[a].startsWith("-")) {
+                String arg = args[a].substring(1);
+                if (arg.equalsIgnoreCase("n0") || arg.equalsIgnoreCase("-ancestor") && args.length > a + 1) {
+                    ANCSEQ = args[++a];
+                } else if ((arg.equalsIgnoreCase("-aln") || arg.equalsIgnoreCase("a")) && args.length > a + 1) {
+                    ALIGNMENT = args[++ a];
+                } else if (arg.equalsIgnoreCase("-nwk")  || arg.equalsIgnoreCase("n") && args.length > a + 1) {
+                    NEWICK = args[++a];
+                } else if (arg.equalsIgnoreCase("o") || arg.equalsIgnoreCase("-output-folder") && args.length > a + 1) {
+                    OUTPUT = args[++a];
+                } else if (arg.equalsIgnoreCase("-seed") && args.length > a + 1) {
+                    SEED = Integer.parseInt(args[++a]);
+                } else if (arg.equalsIgnoreCase("-extants") && args.length > a + 1) {
+                    EXTANTS_N = Integer.parseInt(args[++a]);
+                } else if (arg.equalsIgnoreCase("-dgamma") && args.length > a + 2) {
+                    TREE_GAMMA_SHAPE = Double.parseDouble(args[a+1]);
+                    TREE_GAMMA_SCALE = Double.parseDouble(args[a+2]);
+                    if (args.length > a + 3 && !args[a + 3].startsWith("-")) {
+                        SCALEDIST = Double.parseDouble(args[a+3]); // brdist_scale
+                    }
+                } else if (arg.equalsIgnoreCase("-gap")) {
+                    GAPPY = true;
+                } else if (arg.equalsIgnoreCase("-learn")) {
+                    LEARN = true;
+                } else if (arg.equalsIgnoreCase("-verbose")) {
+                    VERBOSE = true;
+                } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
+                    usage();
+                } else if ((arg.equalsIgnoreCase("s") || arg.equalsIgnoreCase("-substitution-model")) && args.length > a + 1) {
+                    boolean found_model = false;
+                    for (int i = 0; i < MODELS.length; i++) {
+                        if (args[a + 1].equalsIgnoreCase(MODELS[i])) {
+                            MODEL_IDX = i;
+                            found_model = true;
+                        }
+                    }
+                    if (!found_model)
+                        usage(1, args[a + 1] + " is not a valid model name for option --substitution-model");
+
+                } else if ((arg.equalsIgnoreCase("-rates-file") || arg.equalsIgnoreCase("rf")) && args.length > a + 1) {
+                    RATESFILE = args[++a];
+                } else if (arg.equalsIgnoreCase("-indel-rate-distrib") && args.length > a + 1) {
+                    String[] params = TrAVIS.parseDistribParamString(args[a+1]);
+                    INDEL_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                } else if (arg.equalsIgnoreCase("-indel-length-distrib") && args.length > a + 1) {
+                    String[] params = TrAVIS.parseDistribParamString(args[a+1]);
+                    INDEL_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                } else if (arg.equalsIgnoreCase("-insertion-length-distrib") && args.length > a + 1) {
+                    String[] params = TrAVIS.parseDistribParamString(args[a+1]);
+                    INSERTION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                } else if (arg.equalsIgnoreCase("-deletion-length-distrib") && args.length > a + 1) {
+                    String[] params = TrAVIS.parseDistribParamString(args[a+1]);
+                    DELETION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                } else if (arg.equalsIgnoreCase("-delprop") && args.length > a + 1) {
+                    DELETIONPROP = Double.parseDouble(args[++a]);
+                } else if (arg.equalsIgnoreCase("-length") || arg.equalsIgnoreCase("l") && args.length > a + 1) {
+                    ANCSEQ_LENGTH = Integer.parseInt(args[++a]);
+                } else if (arg.equalsIgnoreCase("-dist-distrib") && args.length > a + 1) {
+                    String[] params = TrAVIS.parseDistribParamString(args[a+1]);
+                    TREE_DISTANCE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                } else if (arg.equalsIgnoreCase("-leaf2root-distrib") && args.length > a + 1) {
+                    String[] params = TrAVIS.parseDistribParamString(args[a + 1]);
+                    LEAF2ROOT_DISTANCE_MODEL = Distrib.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                } else if (arg.equalsIgnoreCase("-copy-tree") && args.length > a + 1) {
+                    COPY_TREE = true;
+                } else if (arg.equalsIgnoreCase("-extants-only") && args.length > a + 1) {
+                    EXTANTS_ONLY = true;
+                } else if (arg.equalsIgnoreCase("-format") && args.length > a + 1) {
+                    boolean found_format = false;
+                    for (int i = 0; i < TRAVIS_FORMATS.length; i++) {
+                        if (args[a + 1].equalsIgnoreCase(TRAVIS_FORMATS[i])) {
+                            TRAVIS_FORMAT_IDX = i;
+                            found_format = true;
+                        }
+                    }
+                    if (!found_format)
+                        TrAVIS.usage(1, args[a + 1] + " is not a valid format name");
+                } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
+                    TrAVIS.usage();
+                }
+            }
         }
     }
 
@@ -460,17 +624,9 @@ public class GRASP {
     }
 
     private static void checkArgsValid() {
-        if (ALIGNMENT == null && INPUT == null)
-            usage(3, "Must specify alignment (--aln <Clustal or FASTA file>) or previously saved folder (--input-folder <folder>");
-        else if (NEWICK == null && INPUT == null)
-            usage(4, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>");
 
         if (OUTPUT == null)
             OUTPUT = INPUT == null ? "." : INPUT;
-
-        if (PREFIX == null) {
-            setFilePrefix();
-        }
 
         if (RATESFILE != null) {
             parseRatesFile();
@@ -483,7 +639,19 @@ public class GRASP {
         setupSubstModel();
         setOutputFormats();
 
+        if (PREFIX == null) {
+            setFilePrefix();
+        }
 
+        if (TRAVIS_FORMATS[TRAVIS_FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
+            GAPPY = true;
+
+        if (!RUN_TRAVIS) {
+            if (ALIGNMENT == null && INPUT == null)
+                usage(3, "Must specify alignment (--aln <Clustal or FASTA file>) or previously saved folder (--input-folder <folder>");
+            else if (NEWICK == null && INPUT == null)
+                usage(4, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>");
+        }
     }
 
     private static void setFilePrefix() {
@@ -513,13 +681,29 @@ public class GRASP {
             }
 
         } catch (ClassCastException e) {
-            usage(29, e.getMessage());
+            if (RUN_TRAVIS) {
+                TrAVIS.usage(29, e.getMessage());
+            } else {
+                usage(29, e.getMessage());
+            }
         } catch (NumberFormatException e) {
-            usage(28, e.getMessage());
+            if (RUN_TRAVIS) {
+                TrAVIS.usage(28, e.getMessage());
+            } else {
+                usage(28, e.getMessage());
+            }
         } catch (IOException e) {
-            usage(30, "Empirical frequencies file could not be opened or read: " + EMPIRICAL_FREQS_FILE);
+            if (RUN_TRAVIS) {
+                TrAVIS.usage(30, "Empirical frequencies file could not be opened or read: " + EMPIRICAL_FREQS_FILE);
+            } else {
+                usage(30, "Empirical frequencies file could not be opened or read: " + EMPIRICAL_FREQS_FILE);
+            }
         } catch (RuntimeException e) {
-            usage(27, e.getMessage());
+            if (RUN_TRAVIS) {
+                TrAVIS.usage(27, e.getMessage());
+            } else {
+                usage(27, e.getMessage());
+            }
         }
     }
 
