@@ -3,8 +3,6 @@ package asr;
 import bn.Distrib;
 import bn.ctmc.SubstModel;
 import bn.prob.EnumDistrib;
-import bn.prob.GammaDistrib;
-import bn.prob.GaussianDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.*;
@@ -163,8 +161,6 @@ public class GRASP {
     private static String PREFIX = null;
     private static String RATESFILE = null;
     private static double[] RATES = null;
-    private static boolean REUSE_TREE = false;
-    private static boolean COPY_SUBST_RATES = false;
     private static String EMPIRICAL_FREQS_FILE = null;
     private static double[] EMPIRICAL_FREQS = null;
     private static final String[] MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
@@ -172,21 +168,18 @@ public class GRASP {
     private static SubstModel MODEL = null;
     // Alphabet is decided by MODEL_IDX
     private static final Enumerable[] ALPHAS = new Enumerable[]{Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
+
     // Indel approaches:
     private static final String[] INDELS = new String[]{"BEP", "BEML", "SICP", "SICML", "PSP", "PSML", "SCIP", "Gurobi"};
     private static int INDEL_IDX = 0; // default indel approach is that above indexed 0
-    private static String INDEL_RATE_DISTRIB = null;
-    private static String INDEL_LENGTH_DISTRIB = null;
     private static final String[] SPATH = new String[]{"DIJKSTRA", "ASTAR"};
     private static boolean GAPPY = true;
+
     // output formats
     private static boolean SAVE_AS = false;
     private static boolean INCLUDE_EXTANTS = false;
-    private static final String[] FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "MATLAB", "LATEX", "POAG", "TrAVIS", "SIMUL"};
-    // select these, default for "joint reconstruction"
-    private static boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
-    // select to compute consensus path for these output formats
-    private static final boolean[] CONSENSUS = new boolean[]{true, false, true, false, false, false, false, false, false, false, true, true};
+    private static final String[] FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "POAG"};
+
     // default inference mode
     private static Inference MODE = Inference.JOINT;
     // ancestor to reconstruct if inference mode is "marginal"
@@ -196,6 +189,10 @@ public class GRASP {
     private static boolean NEED_CONSENSUS = false;
 
     // OUTPUT FORMATS
+    private static final boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
+    // select to compute consensus path for these output formats
+    private static final boolean[] CONSENSUS = new boolean[]{true, false, true, false, false, false, false, false};
+
     private static final int FASTA = 0;
     private static final int DISTRIB = 1;
     private static final int CLUSTAL = 2;
@@ -203,11 +200,7 @@ public class GRASP {
     private static final int POGS = 4;
     private static final int DOT = 5;
     private static final int TREES = 6;
-    private static final int MATLAB = 7;
-    private static final int LATEX = 8;
-    private static final int POAG = 9;
-    private static final int TRAVIS = 10;
-    private static final int SIMUL = 11;
+    private static final int POAG = 7;
 
     // INDEL INFERENCE METHODS
     private static final int BEP = 0;
@@ -243,6 +236,8 @@ public class GRASP {
     private static Distrib LEAF2ROOT_DISTANCE_MODEL = null;
     private static Integer ANCSEQ_LENGTH = null;
     private static String ANCSEQ = null; // ancestor sequence as a text string, provided
+    private static boolean PERFORM_TRAVIS_SIMUL = false;
+    private static boolean TRAVIS_LEARN_NO_RECON = false;
 
     public static void main(String[] args) {
 
@@ -260,42 +255,13 @@ public class GRASP {
         EnumSeq.Alignment<Enumerable> aln = null;
         Tree tree = null;
 
-        if (RUN_TRAVIS && LEARN) {
-            try {
-                aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
-                tree = Utils.loadTree(NEWICK);
-                Utils.checkData(aln, tree, true);
-
-            } catch (ASRException e) {
-                usage(22, "Invalid input for ASR: " + e.getMessage());
-            } catch (IOException e) {
-                usage(2, "Failed to read or write files: " + e.getMessage());
-            }
-
-            assert aln != null;
-            assert tree != null;
-            TrAVIS.learnTreeParams(tree, 3, SEED);
-            Map<String, Integer> idToAlnIndex = aln.getMap();
-            TrAVIS.printRootSeq(aln, idToAlnIndex, tree);
-            TrAVIS.accumulateIndelLengths(tree, aln, idToAlnIndex);
-            double[] rateSampleCollection = TrAVIS.calculateColumnIndelRates(tree, aln, idToAlnIndex);
-            RateModel indelrateDist = RateModel.bestfit(rateSampleCollection, SEED);
-            if (indelrateDist != null) {
-                System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS());
-            }
-
-            System.exit(0);
-        }
-
         Object[][] ancseqs_gappy = null;
         Object[][] ancseqs_nogap = null;
         String[] ancnames = null;
         POGraph[] ancestors = null;
         Prediction indelpred = (INPUT != null) ? setupIndelPrediction() : null;
 
-
-        long START_TIME = System.currentTimeMillis();
-        if (indelpred == null) {
+        if (indelpred == null && !PERFORM_TRAVIS_SIMUL) {
             try {
                 aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
                 tree = Utils.loadTree(NEWICK);
@@ -307,13 +273,16 @@ public class GRASP {
             }
         }
 
+        long START_TIME = System.currentTimeMillis();
 
-        if (!BYPASS && indelpred == null) {
+        // INDEL INFERENCE
+        if (!BYPASS && indelpred == null && !PERFORM_TRAVIS_SIMUL) {
             POGTree pogtree = new POGTree(aln, tree);
             indelpred = performIndelInference(pogtree, aln);
         }
 
-        if (!BYPASS) {
+        // COLUMN INFERENCE
+        if (!BYPASS && !PERFORM_TRAVIS_SIMUL) {
             if (indelpred == null)
                 usage(3, INDELS[INDEL_IDX] + " is not implemented");
 
@@ -328,12 +297,74 @@ public class GRASP {
                 ancseqs_nogap = new Object[pogs.size()][];
                 extractAncestralSequences(ancseqs_gappy, ancseqs_nogap, pogs, indelpred, ancnames);
             }
-            File file = new File(OUTPUT);
-            file.mkdirs();// true if the directory was created, false otherwise
-
         }
 
-        saveGraspOutput(ancnames, ancseqs_nogap, ancseqs_gappy, indelpred, tree, aln, ancestors);
+        if (RUN_TRAVIS) {
+            if (LEARN) {
+                if (TRAVIS_LEARN_NO_RECON) {
+                    try {
+                        aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
+                        tree = Utils.loadTree(NEWICK);
+                        Utils.checkData(aln, tree, true);
+
+                    } catch (ASRException e) {
+                        usage(22, "Invalid input for ASR: " + e.getMessage());
+                    } catch (IOException e) {
+                        usage(2, "Failed to read or write files: " + e.getMessage());
+                    }
+
+                    assert aln != null;
+                    assert tree != null;
+                    TrAVIS.learnTreeParams(tree, 3, SEED);
+                    TrAVIS.printRootSeq(aln, tree, null);
+                    TrAVIS.learnIndelLengthDistributions(tree, aln, SEED, null);
+                    TrAVIS.learnIndelRateDistribution(tree, aln, null, SEED);
+                } else {
+                    IdxTree mytree = indelpred.getTree();
+                    TrAVIS.learnTreeParams(mytree, 3, SEED);
+                    TrAVIS.printRootSeq(aln, mytree, ancseqs_nogap);
+                    System.out.println("--substitution-model " + MODEL.getName() + " \\");
+                    TrAVIS.learnIndelRateDistribution(tree, aln, ancseqs_gappy, SEED);
+                    TrAVIS.learnIndelLengthDistributions(tree, aln, SEED, ancseqs_gappy);
+                }
+            }
+
+            if (PERFORM_TRAVIS_SIMUL) {
+                // actually run the simulation
+                EnumSeq rootSeq = TrAVIS.createRootSeq(ANCSEQ, MODEL, ANCSEQ_LENGTH, SEED);
+                IdxTree simTree = TrAVIS.setupTree(
+                        NEWICK,
+                        COPY_TREE,
+                        TREE_DISTANCE_MODEL,
+                        LEAF2ROOT_DISTANCE_MODEL,
+                        EXTANTS_N,
+                        SEED,
+                        TREE_GAMMA_SHAPE,
+                        TREE_GAMMA_SCALE,
+                        DESCENDANTS_MIN,
+                        DESCENDANTS_MAX,
+                        SCALEDIST,
+                        OUTPUT);
+
+                TrAVIS.TrackTree.Params params = TrAVIS.setupParams(
+                        simTree,
+                        rootSeq,
+                        INDEL_LENGTH_MODEL,
+                        INSERTION_LENGTH_MODEL,
+                        DELETION_LENGTH_MODEL,
+                        INDEL_RATE_MODEL,
+                        SUBST_RATE_MODEL,
+                        MODEL,
+                        DELETIONPROP,
+                        SEED);
+
+                TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(params, SEED);
+                EnumSeq[] seqs = tracker.getSequences();
+                TrAVIS.saveOutput(seqs, tracker, tree, TRAVIS_FORMAT_IDX, GAPPY, EXTANTS_ONLY, OUTPUT);
+            }
+        } else {
+            saveGraspOutput(ancnames, ancseqs_nogap, ancseqs_gappy, indelpred, tree, aln, ancestors);
+        }
 
         long ELAPSED_TIME = (System.currentTimeMillis() - START_TIME);
         if (VERBOSE || TIME) {
@@ -362,24 +393,34 @@ public class GRASP {
         for (int a = 0; a < args.length; a++) {
             if (args[a].startsWith("-")) {
                 String arg = args[a].substring(1);
+
+                if (arg.equalsIgnoreCase("-travis")) {
+                    continue;
+                }
+
                 if (arg.equalsIgnoreCase("n0") || arg.equalsIgnoreCase("-ancestor") && args.length > a + 1) {
                     ANCSEQ = args[++a];
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if ((arg.equalsIgnoreCase("-aln") || arg.equalsIgnoreCase("a")) && args.length > a + 1) {
                     ALIGNMENT = args[++ a];
                 } else if (arg.equalsIgnoreCase("-nwk")  || arg.equalsIgnoreCase("n") && args.length > a + 1) {
                     NEWICK = args[++a];
+                } else if (arg.equalsIgnoreCase("-no-recon-learn")) {
+                    TRAVIS_LEARN_NO_RECON = true; // bypasses reconstruction and just produces TrAVIS parameters based on input tree and alignment
                 } else if (arg.equalsIgnoreCase("o") || arg.equalsIgnoreCase("-output-folder") && args.length > a + 1) {
                     OUTPUT = args[++a];
                 } else if (arg.equalsIgnoreCase("-seed") && args.length > a + 1) {
                     SEED = Integer.parseInt(args[++a]);
                 } else if (arg.equalsIgnoreCase("-extants") && args.length > a + 1) {
                     EXTANTS_N = Integer.parseInt(args[++a]);
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-dgamma") && args.length > a + 2) {
                     TREE_GAMMA_SHAPE = Double.parseDouble(args[a+1]);
                     TREE_GAMMA_SCALE = Double.parseDouble(args[a+2]);
                     if (args.length > a + 3 && !args[a + 3].startsWith("-")) {
                         SCALEDIST = Double.parseDouble(args[a+3]); // brdist_scale
                     }
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-gap")) {
                     GAPPY = true;
                 } else if (arg.equalsIgnoreCase("-learn")) {
@@ -404,30 +445,38 @@ public class GRASP {
                 } else if (arg.equalsIgnoreCase("-indel-rate-distrib") && args.length > a + 1) {
                     String[] params = TrAVIS.parseDistribParamString(args[a+1]);
                     INDEL_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-indel-length-distrib") && args.length > a + 1) {
                     String[] params = TrAVIS.parseDistribParamString(args[a+1]);
                     INDEL_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-insertion-length-distrib") && args.length > a + 1) {
                     String[] params = TrAVIS.parseDistribParamString(args[a+1]);
                     INSERTION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-deletion-length-distrib") && args.length > a + 1) {
                     String[] params = TrAVIS.parseDistribParamString(args[a+1]);
                     DELETION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-length") || arg.equalsIgnoreCase("l") && args.length > a + 1) {
                     ANCSEQ_LENGTH = Integer.parseInt(args[++a]);
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-dist-distrib") && args.length > a + 1) {
                     String[] params = TrAVIS.parseDistribParamString(args[a+1]);
                     TREE_DISTANCE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-leaf2root-distrib") && args.length > a + 1) {
                     String[] params = TrAVIS.parseDistribParamString(args[a + 1]);
                     LEAF2ROOT_DISTANCE_MODEL = Distrib.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-copy-tree") && args.length > a + 1) {
                     COPY_TREE = true;
                 } else if (arg.equalsIgnoreCase("-extants-only") && args.length > a + 1) {
                     EXTANTS_ONLY = true;
-                } else if (arg.equalsIgnoreCase("-format") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("-sa") || arg.equalsIgnoreCase("-save-as") && args.length > a + 1) {
                     boolean found_format = false;
                     for (int i = 0; i < TRAVIS_FORMATS.length; i++) {
                         if (args[a + 1].equalsIgnoreCase(TRAVIS_FORMATS[i])) {
@@ -439,6 +488,8 @@ public class GRASP {
                         TrAVIS.usage(1, args[a + 1] + " is not a valid format name");
                 } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
                     TrAVIS.usage();
+                } else {
+                    TrAVIS.usage(5, "Unknown option or missing required argument: \"" + args[a] + "\"");
                 }
             }
         }
@@ -566,18 +617,8 @@ public class GRASP {
                     RECODE_NULL = false;
                 } else if (arg.equalsIgnoreCase("-include-extants")) {
                     INCLUDE_EXTANTS = true;
-                } else if (arg.equalsIgnoreCase("-indel-rate-distrib") && args.length > a + 1) {
-                    //  --indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>
-                    INDEL_RATE_DISTRIB = args[++a];
-                } else if (arg.equalsIgnoreCase("-indel-length-distrib") && args.length > a + 1) {
-                    //  --indel-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>
-                    INDEL_LENGTH_DISTRIB = args[++a];
-                } else if (arg.equalsIgnoreCase("-reuse-tree")) {
-                    REUSE_TREE = true;
                 } else if ((arg.equalsIgnoreCase("-empirical-freqs") || arg.equalsIgnoreCase("ef")) && args.length > a + 1) {
                     EMPIRICAL_FREQS_FILE = args[++a];
-                } else if (arg.equalsIgnoreCase("-copy-rates")) {
-                    COPY_SUBST_RATES = true;
                 } else if ((arg.equalsIgnoreCase("-threads") || arg.equalsIgnoreCase("t")) && args.length > a + 1) {
                     try {
                         NTHREADS = Integer.parseInt(args[++a]);
@@ -651,6 +692,24 @@ public class GRASP {
                 usage(3, "Must specify alignment (--aln <Clustal or FASTA file>) or previously saved folder (--input-folder <folder>");
             else if (NEWICK == null && INPUT == null)
                 usage(4, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>");
+        } else {
+            if (LEARN && (ALIGNMENT == null || NEWICK == null)) {
+                TrAVIS.usage(2, "Must specify alignment (--aln) and tree (--nwk) to learn parameters");
+            } else if (!LEARN) {
+                if (INDEL_RATE_MODEL == null) {
+                    TrAVIS.usage(3, "Must specify indel rate distribution to run simulation (--indel-rate-distrib)");
+                }
+
+                if (ANCSEQ == null && ANCSEQ_LENGTH == null) {
+                    TrAVIS.usage(4, "Must specify ancestor sequence or ancestor sequence length to run simulation (--ancestor or --length)");
+                }
+
+                if (NEWICK == null && TREE_DISTANCE_MODEL == null && LEAF2ROOT_DISTANCE_MODEL == null) {
+                    TrAVIS.usage(5, "Must specify tree (--nwk) or tree distance distribution (--dist-distrib or --leaf2root-distrib) to run simulation");
+                } else if ((TREE_DISTANCE_MODEL != null && LEAF2ROOT_DISTANCE_MODEL == null) || (TREE_DISTANCE_MODEL == null && LEAF2ROOT_DISTANCE_MODEL != null)) {
+                    TrAVIS.usage(5, "Must specify --leaf2root-distrib or --dist-distrib to run simulation if --nwk is not specified");
+                }
+            }
         }
     }
 
@@ -733,6 +792,10 @@ public class GRASP {
                 NEED_CONSENSUS = true;
                 break;
             }
+        }
+
+        if (RUN_TRAVIS) {
+            NEED_CONSENSUS = true;
         }
     }
 
@@ -818,9 +881,6 @@ public class GRASP {
                     break;
                 }
                 ancnames[(Integer) entry.getKey()] = "N" + entry.getKey().toString();
-                if (("N" + entry.getKey()).equals("N78")) {
-                    System.out.println();
-                }
                 ancseqs_gappy[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, true);
                 ancseqs_nogap[(Integer) entry.getKey()] = indelpred.getSequence(entry.getKey(), MODE, false);
                 ii++;
@@ -837,6 +897,9 @@ public class GRASP {
     private static void saveGraspOutput(String[] ancnames, Object[][] ancseqs_nogap,  Object[][] ancseqs_gappy,
                                         Prediction indelpred, IdxTree tree, EnumSeq.Alignment<Enumerable> aln,
                                         POGraph[] ancestors) {
+        File file = new File(OUTPUT);
+        file.mkdirs();// true if the directory was created, false otherwise
+
         try {
             for (int i = 0; i < SAVE_AS_IDX.length; i++) {
                 if (!SAVE_AS_IDX[i])
@@ -873,516 +936,10 @@ public class GRASP {
                     case TREES:
                         saveGraspOutputAsTree(indelpred, tree, true);
                         break;
-/*
-                    case MATLAB: // MATLAB
-                        Map<Object, IdxGraph> saveme = new HashMap<>();
-                        saveme.put("Extants", new POAGraph(aln));
-                        for (Object name : aln.getNames())
-                            saveme.put(name, pogtree.getExtant(name));
-                        for (int idx = 0; idx < ancestors.length; idx++)
-                            saveme.put("N" + idx, ancestors[idx]);
-                        IdxGraph.saveToMatrix(OUTPUT, saveme);
-                        break;
-                    case LATEX: // LATEX
-                        Map<Object, IdxGraph> saveme3 = new HashMap<>();
-                        saveme3.put("*", new POAGraph(aln));
-                        for (Object name : aln.getNames())
-                            saveme3.put(name, pogtree.getExtant(name));
-                        for (int idx = 0; idx < ancestors.length; idx++)
-                            saveme3.put("N" + idx, ancestors[idx]);
-                        IdxGraph.saveToLaTeX(OUTPUT, saveme3);
-                        break;
- */
+
                     case POAG:
                         if (BYPASS) {
                             saveGraspOutputAsPOAG(tree, aln);
-                        }
-                        break;
-                    case TRAVIS: // TrAVIS: figure out params to run TrAVIS, produce report
-                        if (!BYPASS) {
-                            Random random = new Random(SEED);
-
-                            // the user-provided tree for which ancestor sequences have been determined
-                            IdxTree mytree = indelpred.getTree();
-                            TrAVIS.learnTreeParams(mytree, 3, SEED);
-
-                            // calculate some v basic stats from the alignment itself
-                            double gap_prop = (double) aln.getGapCount() / (double) (aln.getWidth() * aln.getHeight());
-                            double gap_open_prop = (double) aln.getGapStartCount() / (double) (aln.getWidth() * aln.getHeight());
-                            double gap_length = aln.getMeanGapLength();
-                            if (VERBOSE) {
-                                System.out.println("Gap proportion= " + gap_prop);
-                                System.out.println("Gap opening proportion= " + gap_open_prop);
-                                System.out.println("Mean gap length= " + gap_length);
-                            }
-                            StringBuilder n0 = new StringBuilder();
-                            for (int j = 0; j < ancseqs_nogap[0].length; j++)
-                                n0.append(ancseqs_nogap[0][j]);
-                            System.out.println("--ancestor " + n0.toString() + " \\");
-
-                            System.out.println("--substitution-model " + MODEL.getName() + " \\");
-                            RateModel subst_rate_distrib = null;
-                            if (RATES != null) { // position-specific rates available
-                                double rates_alpha = GammaDistrib.calcAlpha(RATES);
-                                subst_rate_distrib = new GammaDistrib(rates_alpha, rates_alpha);
-                                System.out.println("--subst-rate-distrib " + subst_rate_distrib.getTrAVIS() + " \\");
-                            }
-                            // GammaDistrib.Mixture mixture = Tree.getGammaMixture4Distances(mytree, 3);
-                            // retrieve sequence names to alignment index map (extants only of course)
-                            Map<String, Integer> extmap = aln.getMap();
-                            // collect evolutionary distances for each branch so that a distribution can be estimated
-                            Map<Integer, Double> dists = new HashMap<>();
-                            // collect reconstructed/observed indel rates (based on the proportion of sequence they occupy and
-                            // the distance from ancestor) on each branch so that a distribution can be estimated
-                            //Map<Integer, Double> indelrates = new HashMap<>();
-                            //
-                            int[] ins_total = new int[0];
-                            int[] del_total = new int[0];
-
-                            // Go through the tree, and look at each ancestor sequence, recording predicted indel events
-                            for (int idx : mytree) { // go through the original, user-provided tree
-                                int parent = mytree.getParent(idx);
-                                if (parent != -1) {  // Non-root node, so there is a branch with distance to catch...
-                                    double dist = mytree.getDistance(idx);
-                                    dists.put(idx, dist); // collect evolutionary distance on the node (to its parent)
-                                    // Retrieve parent/child reconstructed sequences at a node in the user-provided tree
-                                    Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(parent)];
-                                    Object[] cseq;
-                                    if (mytree.isLeaf(idx)) {
-                                        EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(idx)));
-                                        cseq = seq.get();
-                                    } else {
-                                        cseq = ancseqs_gappy[(Integer) mytree.getLabel(idx)];
-                                    }
-                                    // Calculate indel rate for the reconstructed sequences in the user-provided tree
-                                    int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
-                                    int nInsertions = Arrays.stream(insertions).sum();
-                                    int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
-                                    int nDeletions = Arrays.stream(deletions).sum();
-                                    //double event_prop = (double) (nInsertions + nDeletions) / ancseqs_nogap[(Integer) mytree.getLabel(parent)].length;
-                                    //double indelrate = -Math.log(1.0 - event_prop) / dist;
-                                    //indelrates.put(idx, indelrate);
-
-                                    // Accumulate insertion/deletion lengths
-                                    ins_total = TrAVIS.mergeCounts(ins_total, insertions);
-                                    del_total = TrAVIS.mergeCounts(del_total, deletions);
-                                }
-                            }
-
-                            List<Double> rateSampleCollection = new ArrayList<>();
-                            enum LineageState {HAS_CONTENT, DELETED, NEVER_HAD_CONTENT}
-                            for (int alnPos = 0; alnPos < aln.getWidth(); alnPos++) {
-
-                                Iterator<Integer> dfs = tree.getDepthFirstIterator();
-
-                                Map<Integer, LineageState> lineageState = new HashMap<>();
-                                Map<Integer, Integer> numNodesTraversedSinceIndel = new HashMap<>();
-                                Map<Integer, Double> distTraversedSinceIndel = new HashMap<>();
-
-                                while (dfs.hasNext()) {
-                                    int bpidx = dfs.next();
-
-                                    // grab the current node sequence
-                                    Object[] currentSeq;
-                                    if (mytree.isLeaf(bpidx)) {
-                                        EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(bpidx)));
-                                        currentSeq = seq.get();
-                                    } else {
-                                        currentSeq = ancseqs_gappy[(Integer) mytree.getLabel(bpidx)];
-                                    }
-
-                                    boolean currentNodeHasContent = currentSeq[alnPos] != null;
-                                    if (bpidx == 0) {
-                                        // special conditions for the root
-                                        lineageState.put(bpidx, currentNodeHasContent ? LineageState.HAS_CONTENT : LineageState.NEVER_HAD_CONTENT);
-                                        numNodesTraversedSinceIndel.put(bpidx, 1); // start the count
-                                        distTraversedSinceIndel.put(bpidx, 0.0);
-                                        continue;
-                                    }
-
-                                    int parentIdx = mytree.getParent(bpidx);
-
-                                    // need to track how many nodes since indel relative to the parent
-                                    int nodesParentTraversed = numNodesTraversedSinceIndel.get(parentIdx);
-                                    numNodesTraversedSinceIndel.put(bpidx, nodesParentTraversed + 1);
-
-                                    // same idea for distance traversed
-                                    double distTraversedParent = distTraversedSinceIndel.get(parentIdx);
-                                    distTraversedSinceIndel.put(bpidx, distTraversedParent + tree.getDistance(bpidx));
-
-                                    // now check the state of our parent
-                                    LineageState parentState = lineageState.get(parentIdx);
-                                    // two possible scenarios:
-                                    // 1) child has content: if the parent was deleted or never had content, this is an insertion.
-                                    // TODO - deletion in parent followed by insertion is technically a violation, potentially should stop recording indels below this node
-                                    // 2) Child does NOT have content; if parent had content we've identified a deletion.
-                                    boolean indelEventOccured = ((parentState == LineageState.DELETED || parentState == LineageState.NEVER_HAD_CONTENT) && currentNodeHasContent) ||
-                                            (parentState == LineageState.HAS_CONTENT && !currentNodeHasContent);
-
-                                    if (indelEventOccured) {
-                                        int localNodesTraversed = numNodesTraversedSinceIndel.get(bpidx);
-                                        double localDistTraversed = distTraversedSinceIndel.get(bpidx);
-                                        // there is 1 indel event after we traverse a certain number of nodes
-                                        double indelRate = -Math.log(1.0 - ((double) 1 / localNodesTraversed)) / localDistTraversed;
-
-                                        rateSampleCollection.add(indelRate);
-                                        // Except for the last node, we had no indel events, which we mark as a non-event.
-                                        for (int x = 0; x < localNodesTraversed - 1; x++) {
-                                            rateSampleCollection.add(0.0);
-                                        }
-
-                                        // reset all the counts
-                                        numNodesTraversedSinceIndel.put(bpidx, 1);
-                                        distTraversedSinceIndel.put(bpidx, 0.0);
-                                    }
-
-                                    // bookkeeping so we can identify indel events.
-                                    LineageState currentState;
-                                    if (currentNodeHasContent) {
-                                        currentState = LineageState.HAS_CONTENT;
-                                    } else if (parentState == LineageState.HAS_CONTENT) {
-                                        currentState = LineageState.DELETED;
-                                    } else if (parentState == LineageState.DELETED) {
-                                        currentState = LineageState.DELETED;
-                                    } else {
-                                        currentState = LineageState.NEVER_HAD_CONTENT;
-                                    }
-
-                                    lineageState.put(bpidx, currentState);
-                                }
-                            }
-
-
-                            double[] colRateArray = new double[rateSampleCollection.size()];
-                            for (int jj = 0; jj < rateSampleCollection.size(); jj++)
-                                colRateArray[jj] = rateSampleCollection.get(jj);
-
-                            // fit a zero-inflated or standard gamma distribution to all collected rates (from the reconstruction); seems to work OK but sometime less well than the mixture below
-                            RateModel indelrateDist = null;
-                            // Two options:
-                            if (INDEL_RATE_DISTRIB != null) {
-                                // (1) an indel rate distribution has been nominated so we will use it
-                                try {
-                                    indelrateDist = RateModel.bestfit(INDEL_RATE_DISTRIB, colRateArray, SEED);
-                                } catch (RuntimeException e) {
-                                    throw new RuntimeException("Invalid indel rate distribution " + indelrateDist.getTrAVIS() + " \\");
-                                }
-                            } else {
-                                // (2) we need to try all and pick the one with greatest log-likelihood
-                                indelrateDist = RateModel.bestfit(colRateArray, SEED);
-                            }
-
-                            if (indelrateDist != null) {
-                                System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS());
-                            }
-
-                            // now, turn to indel lengths...
-                            int[] indel_total = TrAVIS.mergeCounts(ins_total, del_total);
-                            int[] ins_data = TrAVIS.unfoldCounts(ins_total);
-                            int[] del_data = TrAVIS.unfoldCounts(del_total);
-                            int[] indel_data = TrAVIS.unfoldCounts(indel_total);
-
-                            // Now we can fit the indel distribution to the lengths of insertions and deletions
-                            IndelModel indel_length_distrib = null;
-                            IndelModel insertion_length_distrib = null;
-                            IndelModel deletion_length_distrib = null;
-                            // Two options:
-                            if (INDEL_LENGTH_DISTRIB != null) {
-                                // (1) an indel distribution has been nominated so we will use it
-                                try {
-                                    indel_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, indel_data, SEED);
-                                    insertion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, ins_data, SEED);
-                                    deletion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, del_data, SEED);
-                                } catch (RuntimeException e) {
-                                    throw new RuntimeException("Invalid indel length distribution " + indel_length_distrib.getTrAVIS());
-                                }
-                            } else {
-                                // (2) we need to try all and pick the one with greatest log-likelihood
-                                indel_length_distrib = IndelModel.bestfit(indel_data, SEED);
-                                insertion_length_distrib = IndelModel.bestfit(ins_data, SEED);
-                                deletion_length_distrib = IndelModel.bestfit(del_data, SEED);
-                            }
-                            System.out.println("--indel-length-distrib " + indel_length_distrib.getTrAVIS() + " \\");
-                            System.out.println("--insertion-length-distrib " + insertion_length_distrib.getTrAVIS() + " \\");
-                            System.out.println("--deletion-length-distrib " + deletion_length_distrib.getTrAVIS() + " \\");
-                            int ninsertions = Arrays.stream(ins_total).sum();
-                            int ndeletions = Arrays.stream(del_total).sum();
-                            int nindel = ninsertions + ndeletions;
-                            double delprop = (double) ndeletions / (double) nindel;
-                            System.out.printf("--delprop %.2f \\\n", delprop);
-                            /* Previously the following distributions (with params) were used to determine data likelihood
-                                Zipf                    1, 2, 5, 15
-                                Lavalette               1, 2, 5, 15
-                                ZeroTruncatedPoisson    0.01, 0.1, 1, 2                     */
-//                            if (VERBOSE)
-//                                System.out.print("Parent\tChild\tDist \t#Insert\t#Delete\t#Indel\tLength\tRate\tP(orig)\t");
-                            int NSIMUL = 10; // number of simulations
-//                            for (int k = 0; k < NSIMUL; k ++)
-//                                if (VERBOSE)
-//                                    System.out.printf("%s\t%5s\t%s\t%s\t", "rate/"+(k+1), "p/"+(k+1), "#ind/"+(k+1), "len/"+(k+1));
-                            int[] totIndels = new int[NSIMUL + 1];
-                            int[] totLengths = new int[NSIMUL + 1];
-                            for (int idx : mytree) { // go through the original, user-provided tree
-                                int parent = mytree.getParent(idx);
-                                if (parent != -1) {  // Non-root node, so there is a branch with distance to catch...
-                                    double dist = mytree.getDistance(idx);
-                                    // Retrieve parent/child reconstructed sequences at a node in the user-provided tree
-                                    Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(parent)];
-                                    Object[] cseq;
-                                    if (mytree.isLeaf(idx)) {
-                                        EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(idx)));
-                                        cseq = seq.get();
-                                    } else {
-                                        cseq = ancseqs_gappy[(Integer) mytree.getLabel(idx)];
-                                    }
-                                    // Calculate indel rate for the reconstructed sequences in the user-provided tree
-                                    int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
-                                    int nInsertions = Arrays.stream(insertions).sum();
-                                    int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
-                                    int nDeletions = Arrays.stream(deletions).sum();
-                                    int seqlength = ancseqs_nogap[(Integer) mytree.getLabel(parent)].length;
-                                    double event_prop = (double) (nInsertions + nDeletions) / seqlength;
-                                    double indelrate = -Math.log(1.0 - event_prop) / dist;
-                                    double p_before = Math.exp(-indelrate * dist);
-                                    int[] indels = TrAVIS.mergeCounts(insertions, deletions);
-                                    int lengths_total = Arrays.stream(TrAVIS.unfoldCounts(indels)).sum();
-//                                    if (VERBOSE)
-//                                        System.out.printf("%5d\t%5d\t%5.3f\t%5d\t%5d\t%5d\t%5d\t%+5.3f\t%+5.3f\t", parent, idx, dist, nInsertions, nDeletions, nInsertions + nDeletions, lengths_total, indelrate, p_before);
-                                    totIndels[0] += (nInsertions + nDeletions);
-                                    totLengths[0] += lengths_total;
-                                    for (int k = 0; k < NSIMUL; k++) {
-                                        double sample = indelrateDist.sample();
-                                        double p = Math.exp(-(sample * dist));
-                                        int nIndel = 0;
-                                        int lenIndel = 0;
-                                        for (int pos = 0; pos < seqlength; pos++) {
-                                            if (random.nextDouble() >= p) {
-                                                nIndel += 1;
-                                                lenIndel += indel_length_distrib.sample();
-                                            }
-                                        }
-                                        totIndels[k + 1] += nIndel;
-                                        totLengths[k + 1] += lenIndel;
-//                                        if (VERBOSE)
-//                                            System.out.printf("%5.3f\t%5.3f\t%5d\t%5d\t", sample, p, nIndel, lenIndel);
-                                    }
-                                }
-//                                if (VERBOSE)
-//                                    System.out.println();
-                            }
-//                            if (VERBOSE)
-//                                System.out.printf("     \t     \t     \t     \t      \t%5d\t%5d\t      \t      \t", totIndels[0], totLengths[0]);
-                            double mean_indel = 0, mean_length = 0;
-                            for (int k = 0; k < NSIMUL; k++) {
-//                                if (VERBOSE)
-//                                    System.out.printf("     \t     \t%5d\t%5d\t", totIndels[k + 1], totLengths[k + 1]);
-                                mean_indel += totIndels[k + 1] / NSIMUL;
-                                mean_length += totLengths[k + 1] / NSIMUL;
-                            }
-                            double sd_indel = 0, sd_length = 0;
-                            for (int k = 0; k < NSIMUL; k++) {
-                                sd_indel += Math.pow(totIndels[k + 1] - mean_indel, 2) / NSIMUL;
-                                sd_length += Math.pow(totLengths[k + 1] - mean_length, 2) / NSIMUL;
-                            }
-                            sd_indel = Math.sqrt(sd_indel);
-                            sd_length = Math.sqrt(sd_length);
-//                            if (VERBOSE)
-//                                System.out.printf("\t\t\t%5.3f\t%5.3f\t(%5.3f)\t%5.3f\t%5.3f\t(%5.3f)\n", mean_indel, Math.abs(mean_indel - (double)totIndels[0]), sd_indel, mean_length, Math.abs(mean_length - (double)totLengths[0]), sd_length);
-                        }
-                        break;
-
-                    case SIMUL: // SIMUL: simulate a complete reconstruction with the same pseudo-biological properties as the present reconstruction
-                        if (!BYPASS) {
-                            if (MODE == Inference.JOINT) {
-                                RateModel ddistrib = IdxTree.getGammaMixture(tree, 3, SEED);
-                                GaussianDistrib l2rdistrib = tree.getLeaf2RootDistrib();
-                                IdxTree newrtree = Tree.Random(tree.getNLeaves(), ddistrib, 2, 2, SEED);
-                                newrtree.fitDistances(100, l2rdistrib, SEED + 202);
-//                                IdxTree newrtree = IdxTree.generateTreeFromMixture(tree, 3, SEED, 100);
-                                IdxTree mytree = indelpred.getTree();
-                                StringBuilder n0 = new StringBuilder();
-                                for (int j = 0; j < ancseqs_nogap[0].length; j++)
-                                    n0.append(ancseqs_nogap[0][j]);
-                                if (VERBOSE)
-                                    System.out.println("N0= " + n0.toString());
-                                Double rates_alpha = 0.01;
-                                if (RATES != null) { // position-specific rates available
-                                    rates_alpha = GammaDistrib.calcAlpha(RATES);
-                                    if (VERBOSE)
-                                        System.out.println("Position-specific rates Gamma shape= " + rates_alpha + " scale= " + 1.0 / rates_alpha);
-                                }
-                                // retrieve sequence names to alignment index map (extants only of course)
-                                Map<String, Integer> extmap = aln.getMap();
-                                // collect evolutionary distances for each branch so that a distribution can be estimated
-                                Map<Integer, Double> dists = new HashMap<>();
-                                // collect reconstructed/observed indel rates (based on the proportion of sequence they occupy and
-                                // the distance from ancestor) on each branch so that a distribution can be estimated
-                                Map<Integer, Double> indelrates = new HashMap<>();
-                                // collect indel lengths as well, distinguishing between insertions and deletions
-                                int[] ins_total = new int[0];
-                                int[] del_total = new int[0];
-
-                                Object[] labels = mytree.getLabels();
-                                int[][] skips = indelpred.getDiffSkipovers();
-
-                                // Go through the tree, and look at each ancestor sequence, recording predicted indel events
-                                for (int idx : mytree) { // go through the original, user-provided tree
-                                    int parent = mytree.getParent(idx);
-                                    if (parent != -1) {  // Non-root node, so there is a branch with distance to catch...
-                                        double dist = mytree.getDistance(idx);
-                                        dists.put(idx, dist); // collect evolutionary distance on the node (to its parent)
-                                        // Retrieve parent/child reconstructed sequences at a node in the user-provided tree
-                                        Object[] pseq = ancseqs_gappy[(Integer) mytree.getLabel(parent)];
-                                        Object[] cseq;
-                                        if (mytree.isLeaf(idx)) {
-                                            EnumSeq.Gappy seq = aln.getEnumSeq(extmap.get(mytree.getLabel(idx)));
-                                            cseq = seq.get();
-                                        } else {
-                                            cseq = ancseqs_gappy[(Integer) mytree.getLabel(idx)];
-                                        }
-                                        // Calculate indel rate for the reconstructed sequences in the user-provided tree
-                                        int[] insertions = TrAVIS.getInsertionCounts(pseq, cseq);
-                                        int nInsertions = Arrays.stream(insertions).sum();
-                                        int[] deletions = TrAVIS.getDeletionCounts(pseq, cseq);
-                                        int nDeletions = Arrays.stream(deletions).sum();
-                                        double event_prop = (double) (nInsertions + nDeletions) / ancseqs_nogap[(Integer) mytree.getLabel(parent)].length;
-                                        double indelrate = -Math.log(1.0 - event_prop) / dist;
-                                        indelrates.put(idx, indelrate);
-                                        // Accumulate insertion/deletion lengths
-                                        ins_total = TrAVIS.mergeCounts(ins_total, insertions);
-                                        del_total = TrAVIS.mergeCounts(del_total, deletions);
-                                    }
-                                }
-                                //
-                                List<Double> collect = new ArrayList<>();
-                                for (Map.Entry<Integer, Double> entry : indelrates.entrySet()) {
-                                    double d = dists.get(entry.getKey());
-                                    int nfractions = (int) Math.floor(d * 50); // could do 100, or 10...
-                                    double rate = entry.getValue();
-                                    for (int jj = 0; jj < nfractions; jj++) {
-                                        collect.add(rate);
-                                    }
-                                }
-                                double[] rarray = new double[collect.size()];
-                                for (int jj = 0; jj < rarray.length; jj++)
-                                    rarray[jj] = collect.get(jj);
-                                // fit a gamma distribution to all collected rates (from the reconstruction); seems to work OK but less well than the mixture below
-                                // fit a zero-inflated or standard gamma distribution to all collected rates (from the reconstruction); seems to work OK but sometime less well than the mixture below
-                                RateModel indelrateDist = RateModel.bestfit(rarray, SEED);
-                                // Two options:
-                                if (INDEL_RATE_DISTRIB != null) {
-                                    // (1) an indel rate distribution has been nominated so we will use it
-                                    try {
-                                        indelrateDist = RateModel.bestfit(INDEL_RATE_DISTRIB, rarray, SEED);
-                                    } catch (RuntimeException e) {
-                                        throw new RuntimeException("Invalid indel length distribution " + indelrateDist.getTrAVIS());
-                                    }
-                                } else
-                                    // (2) we need to try all and pick the one with greatest log-likelihood
-                                    indelrateDist = RateModel.bestfit(rarray, SEED);
-                                if (VERBOSE && indelrateDist != null)
-                                    System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS() + " \\");
-
-                                // now, turn to indel lengths...
-                                int[] indel_total = TrAVIS.mergeCounts(ins_total, del_total);
-                                int[] ins_data = TrAVIS.unfoldCounts(ins_total);
-                                int[] del_data = TrAVIS.unfoldCounts(del_total);
-                                int[] indel_data = TrAVIS.unfoldCounts(indel_total);
-                                if (VERBOSE)
-                                    System.out.println("Input tree has number indels = " + indel_data.length + " sum of lengths = " + Arrays.stream(indel_data).sum());
-                                // Now we can fit the indel distribution to the lengths of insertions and deletions
-                                IndelModel indel_length_distrib = null;
-                                IndelModel insertion_length_distrib = null;
-                                IndelModel deletion_length_distrib = null;
-                                // Two options:
-                                if (INDEL_LENGTH_DISTRIB != null) {
-                                    // (1) an indel distribution has been nominated so we will use it
-                                    try {
-                                        indel_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, indel_data, SEED);
-                                        insertion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, ins_data, SEED);
-                                        deletion_length_distrib = IndelModel.bestfit(INDEL_LENGTH_DISTRIB, del_data, SEED);
-                                    } catch (RuntimeException e) {
-                                        throw new RuntimeException("Invalid indel length distribution " + indel_length_distrib.getTrAVIS());
-                                    }
-                                } else {
-                                    // (2) we need to try all and pick the one with greatest log-likelihood
-                                    indel_length_distrib = IndelModel.bestfit(indel_data, SEED);
-                                    insertion_length_distrib = IndelModel.bestfit(ins_data, SEED);
-                                    deletion_length_distrib = IndelModel.bestfit(del_data, SEED);
-                                }
-                                if (VERBOSE)
-                                    System.out.println("--indel-length-distrib " + indel_length_distrib.getTrAVIS() + " \\");
-
-                                int ninsertions = Arrays.stream(ins_total).sum();
-                                int ndeletions = Arrays.stream(del_total).sum();
-                                int nindel = ninsertions + ndeletions;
-                                double delprop = (double) ndeletions / (double) nindel;
-
-                                TrAVIS.TrackTree tracker = null;
-                                EnumSeq[] seqs = null;
-                                EnumSeq[] seqs_ex = null;
-                                while (tracker == null) {
-                                    TrAVIS.TrackTree.Params params = null;
-                                    if (REUSE_TREE)
-                                        params = new TrAVIS.TrackTree.Params(tree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED);
-                                    else
-                                        params = new TrAVIS.TrackTree.Params(newrtree, EnumSeq.parseProtein(n0.toString()), MODEL, SEED);
-                                    if (RATES != null && COPY_SUBST_RATES) {
-                                        // recover rates for N0, appropriately indexed
-                                        int[] n0idxs = indelpred.getConsensus(0);
-                                        double[] rates = new double[n0idxs.length];
-                                        for (int k = 0; k < n0idxs.length; k++)
-                                            rates[k] = RATES[n0idxs[k]];
-                                        params.setSubstRates(rates);
-                                    } else if (RATES != null && !COPY_SUBST_RATES) {
-                                        params.setSubstRateModel(rates_alpha);
-                                    }
-                                    params.setIndelRateModel(indelrateDist);
-                                    params.setInsertmodel(insertion_length_distrib);
-                                    params.setDeletemodel(deletion_length_distrib);
-                                    params.PROPORTION_DELETION = delprop;
-                                    params.setSeed(SEED);
-
-                                    tracker = new TrAVIS.TrackTree(params, SEED);
-                                    seqs = tracker.getSequences();
-                                    seqs_ex = tracker.getLeafSequences();
-                                    for (EnumSeq seq : seqs) {
-                                        if (seq.length() < 1) {
-                                            tracker = null;
-                                            SEED += 1;
-                                            break;
-                                        }
-                                    }
-                                    int[][] indels = tracker.getIndels();
-                                    int[] ins_sim = indels[0];
-                                    int[] del_sim = indels[1];
-                                    int[] merged = TrAVIS.mergeCounts(ins_sim, del_sim);
-                                    int[] flattened = TrAVIS.unfoldCounts(merged);
-                                    if (VERBOSE)
-                                        System.out.println("Simul tree has number indels = " + flattened.length + " sum of lengths = " + Arrays.stream(flattened).sum());
-                                }
-
-                                EnumSeq[] aseqs = tracker.getAlignment();
-                                EnumSeq[] aseqs_ex = tracker.getLeafAlignments();
-                                try {
-                                    File file = new File(OUTPUT);
-                                    if (!file.exists()) {
-                                        file.mkdirs();
-                                    }
-                                    FastaWriter fw = new FastaWriter(OUTPUT + "/" + PREFIX + "_full.fa");
-                                    fw.save(GAPPY ? aseqs : seqs);
-                                    fw.close();
-                                    FastaWriter fw1 = new FastaWriter(OUTPUT + "/" + PREFIX + ".fa");
-                                    fw1.save(GAPPY ? aseqs_ex : seqs_ex);
-                                    fw1.close();
-                                    Newick.save(newrtree, OUTPUT + "/" + PREFIX + ".nwk", Newick.MODE_DEFAULT);
-
-                                } catch (IOException e) {
-                                    usage(7, "Something went wrong saving files in directory");
-                                }
-
-                            } else if (MODE == Inference.MARGINAL)
-                                usage(23, "TrAVIS reports must be based on joint reconstructions");
                         }
                         break;
                 }
