@@ -979,7 +979,7 @@ public class TSVFile {
             for (int i = 0; i < rates.length; i++) {
                 try {
                     int index = index_col == -1 ? i : (Integer) idxobjs[i] - 1; // starts with 1, so subtract "1" to use as position index
-                    rates[index] = (Double) rateobjs[i];
+                    rates[index] = (double) Double.parseDouble(rateobjs[i].toString());
                 } catch (NumberFormatException e0) {
                     throw new NumberFormatException("Rates file has invalid number format:" + rateobjs[i]);
                 }

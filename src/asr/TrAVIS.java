@@ -203,6 +203,7 @@ public class TrAVIS {
                                                 SUBST_RATE_MODEL,
                                                 EVOL_MODEL,
                                                 DELETIONPROP,
+                                                null,
                                                 SEED);
 
             TrackTree tracker = new TrackTree(params, SEED);
@@ -700,6 +701,7 @@ public class TrAVIS {
                                                RateModel substRateModel,
                                                SubstModel model,
                                                double deletionProportion,
+                                               double[] substRates,
                                                long seed) {
 
         // we've got an ancestor to track down the tree
@@ -711,6 +713,9 @@ public class TrAVIS {
             params.setIndelModel(indelLengthModel);
         }
 
+        if (substRates != null) {
+            params.setSubstRates(substRates);
+        }
 
         if (insertionLengthModel != null) {
             params.setInsertmodel(insertionLengthModel);

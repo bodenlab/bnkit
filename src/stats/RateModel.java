@@ -28,7 +28,7 @@ public interface RateModel {
             case "zeroinflatedgamma":
             case "zig":
                 if (params_arr.length == 3)
-                    return new ZeroInflatedGamma(params_arr[0], params_arr[1], params_arr[2]);
+                    return new ZeroInflatedGamma(params_arr[0], params_arr[1], params_arr[2], seed);
                 else if (params_arr.length == 2)
                     return new ZeroInflatedGamma(1.0, params_arr[0], params_arr[1], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);

@@ -425,8 +425,12 @@ public class GRASP {
                 } else if ((arg.equalsIgnoreCase("-rates-file") || arg.equalsIgnoreCase("rf")) && args.length > a + 1) {
                     RATESFILE = args[++a];
                 } else if (arg.equalsIgnoreCase("-indel-rate-distrib") && args.length > a + 1) {
-                    String[] params = TrAVIS.parseDistribParamString(args[a+1]);
+                    String[] params = TrAVIS.parseDistribParamString(args[a + 1]);
                     INDEL_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS], SEED);
+                    PERFORM_TRAVIS_SIMUL = true;
+                } else if (arg.equalsIgnoreCase("-subst-rate-distrib")) {
+                    String[] params = TrAVIS.parseDistribParamString(args[a+1]);
+                    SUBST_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS], SEED);
                     PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-indel-length-distrib") && args.length > a + 1) {
                     String[] params = TrAVIS.parseDistribParamString(args[a+1]);
@@ -1109,6 +1113,7 @@ public class GRASP {
                     SUBST_RATE_MODEL,
                     MODEL,
                     DELETIONPROP,
+                    RATES,
                     SEED);
 
             TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(params, SEED);
