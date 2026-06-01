@@ -29,26 +29,6 @@ import asr.IndelSegmentation.RATE_CATEGORY;
 public class GRASP {
 
     public static String VERSION = "28-MAY-2026";
-    public static boolean RANDOM_RATES = false;
-    public static boolean SIMPLE_RATES = false;
-    public static boolean VERBOSE = false;
-    public static boolean TIME = false;
-    public static int NTHREADS = 4;
-    public static boolean NIBBLE = true;
-    public static boolean INDEL_CONSERVATIVE = true;
-    public static boolean DISTANCE_BASED_MIP = false;
-    // Mode for BEP
-    public static boolean RECODE_NULL = true;
-    public static int MIP_SOLVER_TIME_LIMIT_MINUTES = 720; // 12 hours
-    public static boolean REMOVE_INDEL_ORPHANS = true;
-    public static boolean ONLYINDEL = false;
-
-    public enum Inference {
-        JOINT,
-        MARGINAL
-    }
-
-    public static RATE_CATEGORY INDEL_RATE = RATE_CATEGORY.HIGH;
 
     public static void usage() {
         usage(0, null);
@@ -58,42 +38,57 @@ public class GRASP {
         PrintStream out = System.out;
         if (error != 0)
             out = System.err;
-        out.println("Usage: asr.GRASP \n" +
-                "\t[-a | --aln <filename>]\n" +
-                "\t[-n | --nwk <filename>]\n" +
-                "\t{-o | --output-folder <foldername>} (default is current working folder, or input folder if available)\n" +
-                "\t{-i | --input-folder <foldername>}\n" +
-                "\t{-pre | --prefix <stub>}\n" +
-                "\t{-rf | --rates-file <filename>}\n" +
-                "\t{-ef | --empirical-freqs <filename>}\n" +
-                "\t{-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}\n" +
-                "\t{-t | --threads <number>}\n" +
-                "\t{-j | --joint (default)}\n" +
-                "\t{-m | --marginal <branchpoint-id>}\n" +
-                "\t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML SCIP Gurobi)\n" +
-                "\t{--reuse-tree Re-use the reconstructed tree for TrAVIS}\n" +
-                "\t{* --indel-prior <LOWGAP|MEDGAP|HIGHGAP>}\n" +
-                "\t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>}\n" +
-                "\t{--copy-rates Copy substitution rates from reconstructed ancestor\n" +
-                "\t{--conflate-rates Modulate indel rate (rho) by site-specific substitution rate (r): p=e^(rho*r*t)\n" +
-                "\t{--indel-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>}\n" +
-                "\t{--supported-path <methodname>} (select one from DIJKSTRA(default) ASTAR)\n" +
-                "\t{--nogap}\n" +
-                "\t{--seed <seed>}\n" +
-                "\t{--nonibble}\n" +
-                "\t{--exclude-noedge}\n" +
-                "\t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES TrAVIS SIMUL)\n" +
-                "\t{--save-all} (saves reconstruction with ALL formats)\n" +
-                "\t{--save-tree} (bypasses inference and re-saves the tree with ancestor nodes labelled as per GRASP's\n\tdepth-first labelling scheme starting with N0)\n" +
-                "\t{--save-poag { <branchpoint-id> } (bypasses inference and saves the input alignment as a POAG\n\t(partial order alignment graph of extant sequences under specified ancestor [default N0])\n" +
-                "\t{--time}{--verbose}{--help}\n");
-        out.println("Inference is a two-stage process:\n" +
-                "\t(1) A history of indel events is inferred by either maximum likelihood or maximum parsimony and \n\tmapped onto the tree to determine what positions contain actual sequence content\n" +
-                "\t(2) For each ancestral position, the most probable character is assigned to each phylogenetic branch \n\tpoint when performing a joint reconstruction. Alternatively, for each \n\tposition at a nominated branch point, the probability distribution over all possible \n\tcharacters is inferred when performing a marginal reconstruction.\n" +
-                "\tFinally, edges are drawn to represent all inferred combinations of indels to form an ancestor POG \n\twith nodes that can form a valid sequence with inferred content; a preferred path\n\tthrough the POG is then inferred, nominating a single, best supported sequence.\n");
-        out.println("Mode of character inference:\n" +
-                "\t-j (or --joint) activates joint reconstruction (default), \n\t-m (or --marginal) activates marginal reconstruction (requires a branch-point to be nominated)\n" +
-                "\t--onlyindel disengages the stage of character state inference\n");
+        out.println("""
+                Usage: asr.GRASP\s
+                \t[-a | --aln <filename>]
+                \t[-n | --nwk <filename>]
+                \t{-o | --output-folder <foldername>} (default is current working folder, or input folder if available)
+                \t{-i | --input-folder <foldername>}
+                \t{-pre | --prefix <stub>}
+                \t{-rf | --rates-file <filename>}
+                \t{-ef | --empirical-freqs <filename>}
+                \t{-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}
+                \t{-t | --threads <number>}
+                \t{-j | --joint (default)}
+                \t{-m | --marginal <branchpoint-id>}
+                \t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML SCIP Gurobi)
+                \t{--reuse-tree Re-use the reconstructed tree for TrAVIS}
+                \t{* --indel-prior <LOWGAP|MEDGAP|HIGHGAP>}
+                \t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>}
+                \t{--copy-rates Copy substitution rates from reconstructed ancestor
+                \t{--conflate-rates Modulate indel rate (rho) by site-specific substitution rate (r): p=e^(rho*r*t)
+                \t{--indel-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>}
+                \t{--supported-path <methodname>} (select one from DIJKSTRA(default) ASTAR)
+                \t{--nogap}
+                \t{--seed <seed>}
+                \t{--nonibble}
+                \t{--exclude-noedge}
+                \t{--save-as <list-of-formats>} (select multiple from FASTA CLUSTAL TREE DISTRIB ASR DOT TREES)
+                \t{--save-all} (saves reconstruction with ALL formats)
+                \t{--save-tree} (bypasses inference and re-saves the tree with ancestor nodes labelled as per GRASP's
+                \tdepth-first labelling scheme starting with N0)
+                \t{--save-poag { <branchpoint-id> } (bypasses inference and saves the input alignment as a POAG
+                \t(partial order alignment graph of extant sequences under specified ancestor [default N0])
+                \t{--time}{--verbose}{--help}
+                """);
+        out.println("""
+                Inference is a two-stage process:
+                \t(1) A history of indel events is inferred by either maximum likelihood or maximum parsimony and\s
+                \tmapped onto the tree to determine what positions contain actual sequence content
+                \t(2) For each ancestral position, the most probable character is assigned to each phylogenetic branch\s
+                \tpoint when performing a joint reconstruction. Alternatively, for each\s
+                \tposition at a nominated branch point, the probability distribution over all possible\s
+                \tcharacters is inferred when performing a marginal reconstruction.
+                \tFinally, edges are drawn to represent all inferred combinations of indels to form an ancestor POG\s
+                \twith nodes that can form a valid sequence with inferred content; a preferred path
+                \tthrough the POG is then inferred, nominating a single, best supported sequence.
+                """);
+        out.println("""
+                Mode of character inference:
+                \t-j (or --joint) activates joint reconstruction (default),\s
+                \t-m (or --marginal) activates marginal reconstruction (requires a branch-point to be nominated)
+                \t--onlyindel disengages the stage of character state inference
+                """);
         out.println("Required arguments:\n" +
                 "\t-a (or --aln) must specify the name of a multiple-sequence alignment file on FASTA or CLUSTAL format\n" +
                 "\t-n (or --nwk) must specify the name of a phylogenetic-tree file in Newick format\n");
@@ -117,33 +112,40 @@ public class GRASP {
                 "\t--solver-time-limit the maximum time the MIP solver can run for in minutes before defaulting to BEP indel inference\n" +
                 "\t--verbose prints out information about steps undertaken, and --time the time it took to finish\n" +
                 "\t-h (or --help) will print out this screen\n");
-        out.println("Files/formats: \n" +
-                "\tFASTA: sequences (most preferred path at each ancestor, gapped or not gapped)\n" +
-                "\tCLUSTAL: sequences (most preferred path at each ancestor, gapped)\n" +
-                "\tTREE: phylogenetic tree with ancestor nodes labelled\n" +
-                "\tDISTRIB: character distributions for each position (indexed by POG, only available for marginal reconstruction)\n" +
-                "\tASR: complete reconstruction as JSON, incl. POGs of ancestors and extants, and tree (ASR.json)\n" +
-                "\tDOT: partial-order graphs of ancestors in DOT format\n" +
-                "\tTREES: position-specific trees with ancestor states labelled\n" +
-                "\tTrAVIS: Produce commandline parameters for running TrAVIS\n" +
-                "\tSIMUL: Run TrAVIS based on parameters from joint reconstruction, and save tree and alignments");
-        out.println("Indel-methods: \n" +
-                "\tBEP: bi-directional edge (maximum) parsimony\n" +
-                "\tBEML: bi-directional edge maximum likelihood (uses uniform evolutionary model akin to JC)\n" +
-                "\tSICP: simple indel-coding (maximum) parsimony (based on Simmons and Ochoterena)\n" +
-                "\tSICML: simple indel-coding maximum likelihood (uses uniform evolutionary model)\n" +
-                "\tPSP: position-specific (maximum) parsimony\n" +
-                "\tPSML: position-specific maximum likelihood (uses uniform evolutionary model)\n" +
-                "\tSCIP: globally optimal parsimony-based indel history using the open-source\n\t\tSCIP solver (https://www.scipopt.org/). Does not support multi-threading\n" +
-                "\tGurobi: globally optimal parsimony-based indel history.\n\t\tRequires local installation of Gurobi to run (https://www.gurobi.com/downloads/)\n" +
-                "\tAdd '*' to method name for less conservative setting (if available) or to use globally optimal distance based parsimony \n");
-        out.println("Substitution-models: \n" +
-                "\tJTT: Jones-Taylor-Thornton (protein; default)\n" +
-                "\tDayhoff: Dayhoff-Schwartz-Orcutt (protein)\n" +
-                "\tLG: Le-Gasquel (protein)\n" +
-                "\tWAG: Whelan-Goldman (protein)\n" +
-                "\tJC: Jukes-Cantor (DNA)\n" +
-                "\tYang: Yang's general reversible process model (DNA)\n");
+        out.println("""
+                Files/formats:\s
+                \tFASTA: sequences (most preferred path at each ancestor, gapped or not gapped)
+                \tCLUSTAL: sequences (most preferred path at each ancestor, gapped)
+                \tTREE: phylogenetic tree with ancestor nodes labelled
+                \tDISTRIB: character distributions for each position (indexed by POG, only available for marginal reconstruction)
+                \tASR: complete reconstruction as JSON, incl. POGs of ancestors and extants, and tree (ASR.json)
+                \tDOT: partial-order graphs of ancestors in DOT format
+                \tTREES: position-specific trees with ancestor states labelled
+                \tTrAVIS: Produce commandline parameters for running TrAVIS
+                \tSIMUL: Run TrAVIS based on parameters from joint reconstruction, and save tree and alignments""");
+        out.println("""
+                Indel-methods:\s
+                \tBEP: bi-directional edge (maximum) parsimony
+                \tBEML: bi-directional edge maximum likelihood (uses uniform evolutionary model akin to JC)
+                \tSICP: simple indel-coding (maximum) parsimony (based on Simmons and Ochoterena)
+                \tSICML: simple indel-coding maximum likelihood (uses uniform evolutionary model)
+                \tPSP: position-specific (maximum) parsimony
+                \tPSML: position-specific maximum likelihood (uses uniform evolutionary model)
+                \tSCIP: globally optimal parsimony-based indel history using the open-source
+                \t\tSCIP solver (https://www.scipopt.org/). Does not support multi-threading
+                \tGurobi: globally optimal parsimony-based indel history.
+                \t\tRequires local installation of Gurobi to run (https://www.gurobi.com/downloads/)
+                \tAdd '*' to method name for less conservative setting (if available) or to use globally optimal distance based parsimony\s
+                """);
+        out.println("""
+                Substitution-models:\s
+                \tJTT: Jones-Taylor-Thornton (protein; default)
+                \tDayhoff: Dayhoff-Schwartz-Orcutt (protein)
+                \tLG: Le-Gasquel (protein)
+                \tWAG: Whelan-Goldman (protein)
+                \tJC: Jukes-Cantor (DNA)
+                \tYang: Yang's general reversible process model (DNA)
+                """);
         out.println("Notes: \n" +
                 "\tGreater number of threads may improve processing time up to a point when coordination chokes performance; default is 4 threads.\n" +
                 "\tRunning GRASP requires large memory and in most cases Java needs to be run with the option -Xmx20g, \n\twhere 20g specifies that 20GB of RAM should be available.\n" +
@@ -153,6 +155,14 @@ public class GRASP {
         System.exit(error);
     }
 
+
+    // GENERAL SETTINGS
+    public static boolean VERBOSE = false;
+    public static boolean TIME = false;
+    public static int NTHREADS = 4;
+    public static boolean NIBBLE = true;
+
+    // INPUT VARIABLES
     private static String ALIGNMENT = null;
     private static String ASRFILE = "ASR.json";
     private static String NEWICK = null;
@@ -169,30 +179,27 @@ public class GRASP {
     // Alphabet is decided by MODEL_IDX
     private static final Enumerable[] ALPHAS = new Enumerable[]{Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
 
-    // Indel approaches:
-    private static final String[] INDELS = new String[]{"BEP", "BEML", "SICP", "SICML", "PSP", "PSML", "SCIP", "Gurobi"};
-    private static int INDEL_IDX = 0; // default indel approach is that above indexed 0
-    private static final String[] SPATH = new String[]{"DIJKSTRA", "ASTAR"};
-    private static boolean GAPPY = true;
-
-    // output formats
-    private static boolean SAVE_AS = false;
-    private static boolean INCLUDE_EXTANTS = false;
-    private static final String[] FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "POAG"};
-
-    // default inference mode
-    private static Inference MODE = Inference.JOINT;
+    // COLUMN INFERENCE SETTINGS
+    private static Inference MODE = Inference.JOINT; // default inference mode
     // ancestor to reconstruct if inference mode is "marginal"
     private static Integer MARG_NODE = null;
     private static int SEED;
     private static boolean BYPASS = false; // bypass inference, default is false
     private static boolean NEED_CONSENSUS = false;
+    public enum Inference {
+        JOINT,
+        MARGINAL
+    }
+
 
     // OUTPUT FORMATS
+    private static boolean SAVE_AS = false;
+    private static boolean INCLUDE_EXTANTS = false;
+    private static final String[] FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "TREE", "ASR", "DOT", "TREES", "POAG"};
+    private static boolean GAPPY = true;
     private static final boolean[] SAVE_AS_IDX = new boolean[FORMATS.length];
     // select to compute consensus path for these output formats
     private static final boolean[] CONSENSUS = new boolean[]{true, false, true, false, false, false, false, false};
-
     private static final int FASTA = 0;
     private static final int DISTRIB = 1;
     private static final int CLUSTAL = 2;
@@ -202,7 +209,7 @@ public class GRASP {
     private static final int TREES = 6;
     private static final int POAG = 7;
 
-    // INDEL INFERENCE METHODS
+    // INDEL INFERENCE SETTINGS
     private static final int BEP = 0;
     private static final int BEPML = 1;
     private static final int SICP = 2;
@@ -211,6 +218,20 @@ public class GRASP {
     private static final int PSML = 5;
     private static final int SCIP = 6;
     private static final int GUROBI = 7;
+    public static RATE_CATEGORY INDEL_RATE = RATE_CATEGORY.HIGH;
+    public static int MIP_SOLVER_TIME_LIMIT_MINUTES = 720; // 12 hours
+    private static final String[] INDELS = new String[]{"BEP", "BEML", "SICP", "SICML", "PSP", "PSML", "SCIP", "Gurobi"};
+    private static int INDEL_IDX = 0; // default indel approach is that above indexed 0
+    private static final String[] SPATH = new String[]{"DIJKSTRA", "ASTAR"};
+    public static boolean RANDOM_RATES = false;
+    public static boolean SIMPLE_RATES = false;
+    public static boolean INDEL_CONSERVATIVE = true;
+    public static boolean DISTANCE_BASED_MIP = false;
+
+    // Mode for BEP
+    public static boolean RECODE_NULL = true;
+    public static boolean REMOVE_INDEL_ORPHANS = true;
+    public static boolean ONLYINDEL = false;
 
     // TRAVIS PARAMS
     private static boolean RUN_TRAVIS = false;
@@ -223,7 +244,6 @@ public class GRASP {
     private static double DELETIONPROP = 0.5; // proportion of DELETIONS v INSERTIONS
     private static Double SCALEDIST = null;
     private static boolean LEARN = false;
-    private static final String[] TRAVIS_FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "DIR", "RATES"};
     private static int TRAVIS_FORMAT_IDX = 0;
     private static boolean EXTANTS_ONLY = false;
     private static boolean COPY_TREE = false;
@@ -241,48 +261,57 @@ public class GRASP {
 
     public static void main(String[] args) {
 
+        // Setup GRASP/TrAVIS to run
         SEED = new Random().nextInt();
-        RUN_TRAVIS = runTravis(args);
-
+        RUN_TRAVIS = travisFlagUsed(args);
         if (RUN_TRAVIS) {
             parseTravisArgs(args);
         } else {
             parseGRASPArgs(args);
         }
-
         checkArgsValid();
 
+        // main variables that will hold outputs
         EnumSeq.Alignment<Enumerable> aln = null;
         Tree tree = null;
-
         Object[][] ancseqs_gappy = null;
         Object[][] ancseqs_nogap = null;
         String[] ancnames = null;
         POGraph[] ancestors = null;
         Prediction indelpred = (INPUT != null) ? setupIndelPrediction() : null;
+        boolean reconstructionRequired = indelpred == null && !PERFORM_TRAVIS_SIMUL && !TRAVIS_LEARN_NO_RECON;
 
-        if (indelpred == null && !PERFORM_TRAVIS_SIMUL) {
+        // Basic data required for a reconstruction
+        if (reconstructionRequired) {
             try {
                 aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
                 tree = Utils.loadTree(NEWICK);
                 Utils.checkData(aln, tree);
             } catch (ASRException e) {
-                usage(22, "Invalid input for ASR: " + e.getMessage());
+                if (RUN_TRAVIS) {
+                    TrAVIS.usage(10, "Invalid input for ASR: " + e.getMessage() + "\n If you're learning TrAVIS params from an alignment and tree with ancestors, use --no-recon");
+                } else {
+                    usage(22, "Invalid input for ASR: " + e.getMessage());
+                }
             } catch (IOException e) {
-                usage(2, "Failed to read or write files: " + e.getMessage());
+                if (RUN_TRAVIS) {
+                    TrAVIS.usage(2, "Failed to read or write files: " + e.getMessage() + "\n");
+                } else {
+                    usage(2, "Failed to read or write files: " + e.getMessage());
+                }
             }
         }
 
         long START_TIME = System.currentTimeMillis();
 
         // INDEL INFERENCE
-        if (!BYPASS && indelpred == null && !PERFORM_TRAVIS_SIMUL) {
+        if (!BYPASS && reconstructionRequired) {
             POGTree pogtree = new POGTree(aln, tree);
             indelpred = performIndelInference(pogtree, aln);
         }
 
         // COLUMN INFERENCE
-        if (!BYPASS && !PERFORM_TRAVIS_SIMUL) {
+        if (!BYPASS && !PERFORM_TRAVIS_SIMUL && !TRAVIS_LEARN_NO_RECON) {
             if (indelpred == null)
                 usage(3, INDELS[INDEL_IDX] + " is not implemented");
 
@@ -300,67 +329,7 @@ public class GRASP {
         }
 
         if (RUN_TRAVIS) {
-            if (LEARN) {
-                if (TRAVIS_LEARN_NO_RECON) {
-                    try {
-                        aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
-                        tree = Utils.loadTree(NEWICK);
-                        Utils.checkData(aln, tree, true);
-
-                    } catch (ASRException e) {
-                        usage(22, "Invalid input for ASR: " + e.getMessage());
-                    } catch (IOException e) {
-                        usage(2, "Failed to read or write files: " + e.getMessage());
-                    }
-
-                    assert aln != null;
-                    assert tree != null;
-                    TrAVIS.learnTreeParams(tree, 3, SEED);
-                    TrAVIS.printRootSeq(aln, tree, null);
-                    TrAVIS.learnIndelLengthDistributions(tree, aln, SEED, null);
-                    TrAVIS.learnIndelRateDistribution(tree, aln, null, SEED);
-                } else {
-                    IdxTree mytree = indelpred.getTree();
-                    TrAVIS.learnTreeParams(mytree, 3, SEED);
-                    TrAVIS.printRootSeq(aln, mytree, ancseqs_nogap);
-                    System.out.println("--substitution-model " + MODEL.getName() + " \\");
-                    TrAVIS.learnIndelRateDistribution(tree, aln, ancseqs_gappy, SEED);
-                    TrAVIS.learnIndelLengthDistributions(tree, aln, SEED, ancseqs_gappy);
-                }
-            }
-
-            if (PERFORM_TRAVIS_SIMUL) {
-                // actually run the simulation
-                EnumSeq rootSeq = TrAVIS.createRootSeq(ANCSEQ, MODEL, ANCSEQ_LENGTH, SEED);
-                IdxTree simTree = TrAVIS.setupTree(
-                        NEWICK,
-                        COPY_TREE,
-                        TREE_DISTANCE_MODEL,
-                        LEAF2ROOT_DISTANCE_MODEL,
-                        EXTANTS_N,
-                        SEED,
-                        TREE_GAMMA_SHAPE,
-                        TREE_GAMMA_SCALE,
-                        DESCENDANTS_MIN,
-                        DESCENDANTS_MAX,
-                        SCALEDIST);
-
-                TrAVIS.TrackTree.Params params = TrAVIS.setupParams(
-                        simTree,
-                        rootSeq,
-                        INDEL_LENGTH_MODEL,
-                        INSERTION_LENGTH_MODEL,
-                        DELETION_LENGTH_MODEL,
-                        INDEL_RATE_MODEL,
-                        SUBST_RATE_MODEL,
-                        MODEL,
-                        DELETIONPROP,
-                        SEED);
-
-                TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(params, SEED);
-                EnumSeq[] seqs = tracker.getSequences();
-                TrAVIS.saveOutput(seqs, tracker, simTree, TRAVIS_FORMAT_IDX, GAPPY, EXTANTS_ONLY, OUTPUT, PREFIX);
-            }
+            runTravis(aln, tree, indelpred, ancseqs_nogap, ancseqs_gappy);
         } else {
             saveGraspOutput(ancnames, ancseqs_nogap, ancseqs_gappy, indelpred, tree, aln, ancestors);
         }
@@ -372,7 +341,7 @@ public class GRASP {
         }
     }
 
-    private static boolean runTravis(String[] args) {
+    private static boolean travisFlagUsed(String[] args) {
 
         boolean runTravis = false;
         for (String s : args) {
@@ -416,7 +385,7 @@ public class GRASP {
                     ALIGNMENT = args[++ a];
                 } else if (arg.equalsIgnoreCase("-nwk")  || arg.equalsIgnoreCase("n") && args.length > a + 1) {
                     NEWICK = args[++a];
-                } else if (arg.equalsIgnoreCase("-no-recon-learn")) {
+                } else if (arg.equalsIgnoreCase("-no-recon")) {
                     TRAVIS_LEARN_NO_RECON = true; // bypasses reconstruction and just produces TrAVIS parameters based on input tree and alignment
                 } else if (arg.equalsIgnoreCase("o") || arg.equalsIgnoreCase("-output-folder") && args.length > a + 1) {
                     OUTPUT = args[++a];
@@ -489,10 +458,10 @@ public class GRASP {
                     COPY_TREE = true;
                 } else if (arg.equalsIgnoreCase("-extants-only") && args.length > a + 1) {
                     EXTANTS_ONLY = true;
-                } else if (arg.equalsIgnoreCase("-sa") || arg.equalsIgnoreCase("-save-as") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("sa") || arg.equalsIgnoreCase("-save-as") && args.length > a + 1) {
                     boolean found_format = false;
-                    for (int i = 0; i < TRAVIS_FORMATS.length; i++) {
-                        if (args[a + 1].equalsIgnoreCase(TRAVIS_FORMATS[i])) {
+                    for (int i = 0; i < TrAVIS.TRAVIS_FORMATS.length; i++) {
+                        if (args[a + 1].equalsIgnoreCase(TrAVIS.TRAVIS_FORMATS[i])) {
                             TRAVIS_FORMAT_IDX = i;
                             found_format = true;
                         }
@@ -703,12 +672,12 @@ public class GRASP {
             setFilePrefix();
         }
 
-        if (TRAVIS_FORMATS[TRAVIS_FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
+        if (TrAVIS.TRAVIS_FORMATS[TRAVIS_FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
             GAPPY = true;
 
         if (!RUN_TRAVIS) {
             if (ALIGNMENT == null && INPUT == null)
-                usage(3, "Must specify alignment (--aln <Clustal or FASTA file>) or previously saved folder (--input-folder <folder>");
+                usage(3, "Must specify alignment (--aln <CLUSTAL or FASTA file>) or previously saved folder (--input-folder <folder>");
             else if (NEWICK == null && INPUT == null)
                 usage(4, "Must specify phylogenetic tree (Newick file) or previously saved folder (--input-folder <folder>");
         } else {
@@ -1081,6 +1050,70 @@ public class GRASP {
         if (VERBOSE)
             System.out.println("Saved POAG with " + aln.getHeight() + " sequences, under ancestor N" + MARG_NODE);
         poag.saveToDOT(OUTPUT + "/" + PREFIX + "_POAGunderN" + MARG_NODE + ".dot");
+    }
 
+    private static void runTravis( EnumSeq.Alignment<Enumerable> aln, Tree tree, Prediction indelpred,
+                                   Object[][] ancseqs_nogap, Object[][] ancseqs_gappy) {
+        if (LEARN) {
+            if (TRAVIS_LEARN_NO_RECON) {
+                try {
+                    aln = Utils.loadAlignment(ALIGNMENT, ALPHAS[MODEL_IDX]);
+                    tree = Utils.loadTree(NEWICK);
+                    Utils.checkData(aln, tree, true);
+
+                } catch (ASRException e) {
+                    usage(22, "Invalid input for ASR: " + e.getMessage());
+                } catch (IOException e) {
+                    usage(2, "Failed to read or write files: " + e.getMessage());
+                }
+
+                assert aln != null;
+                assert tree != null;
+                TrAVIS.learnTreeParams(tree, 3, SEED);
+                TrAVIS.printRootSeq(aln, tree, null);
+                TrAVIS.learnIndelLengthDistributions(tree, aln, SEED, null);
+                TrAVIS.learnIndelRateDistribution(tree, aln, null, SEED);
+            } else {
+                IdxTree mytree = indelpred.getTree();
+                TrAVIS.learnTreeParams(mytree, 3, SEED);
+                TrAVIS.printRootSeq(aln, mytree, ancseqs_nogap);
+                System.out.println("--substitution-model " + MODEL.getName() + " \\");
+                TrAVIS.learnIndelRateDistribution(tree, aln, ancseqs_gappy, SEED);
+                TrAVIS.learnIndelLengthDistributions(tree, aln, SEED, ancseqs_gappy);
+            }
+        }
+
+        if (PERFORM_TRAVIS_SIMUL) {
+            // actually run the simulation
+            EnumSeq rootSeq = TrAVIS.createRootSeq(ANCSEQ, MODEL, ANCSEQ_LENGTH, SEED);
+            IdxTree simTree = TrAVIS.setupTree(
+                    NEWICK,
+                    COPY_TREE,
+                    TREE_DISTANCE_MODEL,
+                    LEAF2ROOT_DISTANCE_MODEL,
+                    EXTANTS_N,
+                    SEED,
+                    TREE_GAMMA_SHAPE,
+                    TREE_GAMMA_SCALE,
+                    DESCENDANTS_MIN,
+                    DESCENDANTS_MAX,
+                    SCALEDIST);
+
+            TrAVIS.TrackTree.Params params = TrAVIS.setupParams(
+                    simTree,
+                    rootSeq,
+                    INDEL_LENGTH_MODEL,
+                    INSERTION_LENGTH_MODEL,
+                    DELETION_LENGTH_MODEL,
+                    INDEL_RATE_MODEL,
+                    SUBST_RATE_MODEL,
+                    MODEL,
+                    DELETIONPROP,
+                    SEED);
+
+            TrAVIS.TrackTree tracker = new TrAVIS.TrackTree(params, SEED);
+            EnumSeq[] seqs = tracker.getSequences();
+            TrAVIS.saveOutput(seqs, tracker, simTree, TRAVIS_FORMAT_IDX, GAPPY, EXTANTS_ONLY, OUTPUT, PREFIX);
+        }
     }
 }

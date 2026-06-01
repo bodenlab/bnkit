@@ -136,18 +136,19 @@ public class TrAVIS {
     private static Distrib LEAF2ROOT_DISTANCE_MODEL = null;
     private static Integer ANCSEQ_LENGTH = null;
     private static boolean GAPPY = false;
-    private static final String[] FORMATS = new String[]{"FASTA", "DISTRIB", "CLUSTAL", "DOT", "TREE", "DIR", "RATES"};
+    public static final String[] TRAVIS_FORMATS = new String[]{"FASTA", "CLUSTAL", "DOT", "ALL", "RATES"};
     private static int FORMAT_IDX = 0;
     private static final int FASTA = 0;
-    private static final int DOT = 3;
-    private static final int CLUSTAL = 2;
-    private static final int ALL = 5;
-    private static final int RATES = 6;
+    private static final int CLUSTAL = 1;
+    private static final int DOT = 2;
+    private static final int ALL = 3;
+    private static final int RATES = 4;
     private static boolean COPY_TREE = false;
     private static boolean EXTANTS_ONLY = false;
     private static boolean LEARN = false;
     private static String ALIGNMENT;
     public enum LineageState {HAS_CONTENT, DELETED, NEVER_HAD_CONTENT }
+    private static int ROOT_IDX = 0;
 
     public static void main(String[] args) {
 
@@ -530,8 +531,8 @@ public class TrAVIS {
                     EXTANTS_ONLY = true;
                 } else if (arg.equalsIgnoreCase("-save-as") || arg.equalsIgnoreCase("sa") && args.length > a + 1) {
                     boolean found_format = false;
-                    for (int i = 0; i < FORMATS.length; i++) {
-                        if (args[a + 1].equalsIgnoreCase(FORMATS[i])) {
+                    for (int i = 0; i < TRAVIS_FORMATS.length; i++) {
+                        if (args[a + 1].equalsIgnoreCase(TRAVIS_FORMATS[i])) {
                             FORMAT_IDX = i;
                             found_format = true;
                         }
@@ -572,7 +573,7 @@ public class TrAVIS {
             usage(1, "Model " + EVOL_MODELS[EVOL_MODEL_IDX] + " could not be created");
         }
 
-        if (FORMATS[FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
+        if (TRAVIS_FORMATS[FORMAT_IDX].equalsIgnoreCase("CLUSTAL")) // Clustal files can only be "gappy"
             GAPPY = true;
 
     }
@@ -726,7 +727,7 @@ public class TrAVIS {
 
         params.PROPORTION_DELETION = deletionProportion;
 
-        //params.setSeed(seed);
+        params.setSeed(seed);
 
         return params;
     }
@@ -780,7 +781,7 @@ public class TrAVIS {
             case DOT: // DOT
                 POAGraph poag = tracker.getPOAG();
                 try {
-                    poag.saveToDOT(outputDir);
+                    poag.saveToDOT(outputDir + "/" + prefix + "_travis.dot");
                 } catch (IOException e) {
                     usage(6, "DOT file could not be saved");
                 }
@@ -801,7 +802,7 @@ public class TrAVIS {
                 try {
 
                     FastaWriter fw = new FastaWriter(new File(outputDir,  prefix + "_travis.fa"));
-                    if (!GAPPY) {
+                    if (!gappy) {
                         fw.save(seqs);
                     } else { // gappy
                         fw.save(aseqs);
@@ -1040,7 +1041,6 @@ public class TrAVIS {
         return new int[]{indelOpenings, matches, mismatches};
     }
 
-
     /**
      * Class to track ancestor sequence to extants via intermediate ancestors.
      * Matches/substitutions are determined by a probability p=exp^-rt where rt is the rate times the evolutionary distance from the ancestor to the descendant.
@@ -1048,8 +1048,8 @@ public class TrAVIS {
      * The length of an insertion or deletion is determined by a Poisson with mean (lambda) 1; note that this means that 0.37 of indels are length 0.
      * The implementation is inspired by rules extracted from.
      * Position specific rates can be supplied to the constructor.
-     * Cartwright R. Problems and Solutions for Estimating Indel Rates and Length Distributions.
-     * Mol. Biol. Evol. 26(2):473–480. 2009. https://doi.org/10.1093/molbev/msn275
+     *  <a href="https://doi.org/10.1093/molbev/msn275">Cartwright R. Problems and Solutions for Estimating Indel Rates and Length Distributions.
+     *  Mol. Biol. Evol. 26(2):473–480. 2009.</a>
      */
     static class TrackTree {
 
@@ -1188,8 +1188,7 @@ public class TrAVIS {
 
             USERATES = (params.substratemodel != null); // check if we will generate position specific rates using the model; if not, use a constant rate
             INDELRATES = (params.indelratemodel != null);
-//            if (USERATES)
-//                params.substratemodel.setSeed(SEED);
+
             myType = ancseq.getType();
             IdxTree tree = params.tree;
             int[][] deletions  = new int[tree.getSize()][];
@@ -1199,16 +1198,24 @@ public class TrAVIS {
             EnumSeq[] bpseqs = new EnumSeq[tree.getSize()];
             int length_sum = 0;
             int indel_cnt = 0;
-            //Random rand = params.getRandom();
-
             for (int idx : tree) {
-                if (idx == 0) {
-                    bpseqs[0] = ancseq;
-                    substRates[0] = new double[ancseq.length()];
-                    colIndelRates[0] = new double[ancseq.length()];
+                if (idx == ROOT_IDX) {
+                    bpseqs[ROOT_IDX] = ancseq;
+                    substRates[ROOT_IDX] = new double[ancseq.length()];
+                    colIndelRates[ROOT_IDX] = new double[ancseq.length()];
                     for (int i = 0; i < ancseq.length(); i++) {
-                        substRates[0][i] = params.ancrates != null ? params.ancrates[i] : (USERATES ? params.substratemodel.sample() : 1);
-                        colIndelRates[0][i] = INDELRATES ? params.indelratemodel.sample() : 1;
+
+                        if (params.ancrates != null) {
+                            substRates[ROOT_IDX][i] = params.ancrates[i];
+                        } else {
+                            if (USERATES) {
+                                substRates[ROOT_IDX][i] = params.substratemodel.sample();
+                            } else {
+                                substRates[ROOT_IDX][i] = 1.0;
+                            }
+                        }
+
+                        colIndelRates[ROOT_IDX][i] = INDELRATES ? params.indelratemodel.sample() : 1;
                     }
                 } else { // branchpoint has parents, all of which have been instantiated (iterator order ensures this, starting with branchpoint idx 0)
                     int paridx = tree.getParent(idx);           // idx of parent
@@ -1358,58 +1365,49 @@ public class TrAVIS {
             ti_insertions = new TreeInstance(tree, insertions);
             ti_seqs = new TreeInstance(tree, bpseqs);
 
-            if (VERBOSE) {
-                //System.out.println(rList);
-//                try (BufferedWriter writer = new BufferedWriter(new FileWriter((OUTPUT!=null? OUTPUT:"") + "_result_rlist.txt"))) {
-//                    for (Double r : rList) {
-//                        writer.write(r.toString());
-//                        writer.newLine();
+//            if (VERBOSE) {
+//                String outputFile = (OUTPUT != null ? OUTPUT : "")  +"_travis_report.txt";
+//
+//                try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
+//
+//                    System.out.println(tree);
+//                    pw.println(tree);
+//
+//                    for (int idx : tree) {
+//                        BranchPoint bp = tree.getBranchPoint(idx);
+//                        BranchPoint parent = bp.getParent();
+//
+//                        System.out.println(bp.getLabel() + "\t" + bpseqs[idx]);
+//                        pw.println(bp.getLabel() + "\t" + bpseqs[idx]);
+//
+//                        if (idx != 0 && parent != null) {
+//                            for (int i = 0; i < deletions[idx].length; i++) {
+//                                if (deletions[idx][i] > 0) {
+//                                    String line = "\tDELETE " + parent.getLabel() + "->"
+//                                            + bp.getLabel() + "@" + i + ":" + deletions[idx][i];
+//
+//                                    System.out.println(line);
+//                                    pw.println(line);
+//                                }
+//                            }
+//                            for (int i = 0; i < insertions[idx].length; i++) {
+//                                if (insertions[idx][i] > 0) {
+//                                    String line = "\tINSERT " + parent.getLabel() + "->"
+//                                            + bp.getLabel() + "@" + i + ":" + insertions[idx][i];
+//
+//                                    System.out.println(line);
+//                                    pw.println(line);
+//                                }
+//                            }
+//                        }
 //                    }
+//
+//                    pw.flush();
+//
 //                } catch (IOException e) {
 //                    e.printStackTrace();
 //                }
-                String outputFile = (OUTPUT != null ? OUTPUT : "")  +"_travis_report.txt";
-
-                try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
-
-                    System.out.println(tree);
-                    pw.println(tree);
-
-                    for (int idx : tree) {
-                        BranchPoint bp = tree.getBranchPoint(idx);
-                        BranchPoint parent = bp.getParent();
-
-                        System.out.println(bp.getLabel() + "\t" + bpseqs[idx]);
-                        pw.println(bp.getLabel() + "\t" + bpseqs[idx]);
-
-                        if (idx != 0 && parent != null) {
-                            for (int i = 0; i < deletions[idx].length; i++) {
-                                if (deletions[idx][i] > 0) {
-                                    String line = "\tDELETE " + parent.getLabel() + "->"
-                                            + bp.getLabel() + "@" + i + ":" + deletions[idx][i];
-
-                                    System.out.println(line);
-                                    pw.println(line);
-                                }
-                            }
-                            for (int i = 0; i < insertions[idx].length; i++) {
-                                if (insertions[idx][i] > 0) {
-                                    String line = "\tINSERT " + parent.getLabel() + "->"
-                                            + bp.getLabel() + "@" + i + ":" + insertions[idx][i];
-
-                                    System.out.println(line);
-                                    pw.println(line);
-                                }
-                            }
-                        }
-                    }
-
-                    pw.flush();
-
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+//            }
         }
 
         public TreeInstance getTreeWithSequences() {
