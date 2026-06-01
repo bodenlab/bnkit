@@ -1469,7 +1469,7 @@ public class IdxTree implements Iterable<Integer> {
     public static IdxTree generateTreeFromDistrib(RateModel distmodel, Distrib leaf2root, int NLEAVES, long SEED, int NITER) {
         // 2. Generate a new tree based on the above mixture of Gamma distributions
         //   a) assume that branch lengths are uniformly distributed across topology
-        Tree tree = null;
+        Tree tree;
         tree = Tree.Random(NLEAVES, distmodel, 2,2, SEED);
         if (leaf2root == null)
             return tree;

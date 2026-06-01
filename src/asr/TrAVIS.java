@@ -66,6 +66,7 @@ public class TrAVIS {
                 "  -o, --output-folder <folder>                 Output directory for results (created if missing)\n" +
                 "  -n, --nwk <file>                             Phylogenetic tree in Newick format\n" +
                 "  --extants <number>                           Number of extant leaves (default: 5)\n" +
+                "  -pre, --prefix <stub>                        file prefix for outputs\n" +
                 "  --no-recon                                   Bypasses reconstruction and just produces TrAVIS parameters based on input tree and alignment\n" +
                 "  -s, --substitution-model <model>             Substitution model: JTT (default), Dayhoff, LG, WAG, JC, Yang\n" +
                 "  -l, --length <number>                        Length of ancestor sequence (if not provided with --ancestor). \n" +
@@ -83,9 +84,10 @@ public class TrAVIS {
                 "      --learn                                  Don't do simulation, only infer simulation parameters\n" +
                 "      --copy-tree                              Use the tree from -nwk to perform the simulation\n" +
                 "      --extants-only                           Create a separate FASTA file with simulated extants only\n" +
-                "      --gap                                    Include gap character in output (default for CLUSTAL)\n" +
+                "      --no-gap                                 exclude gap characters in output\n" +
                 "      -sa, --save-as <type>                         Output format: FASTA (default), CLUSTAL, DOT, TREE, RATES, DIR\n" +
                 "      --seed <number>                          Random seed\n" +
+                "      -t, --threads <number>                   Number of threads to use. \n" +
                 "      --verbose                                Print details of generated events\n" +
                 "  -h, --help                                   Show this help message\n");
         out.println("Notes:\n" +
@@ -188,8 +190,7 @@ public class TrAVIS {
                                     TREE_GAMMA_SCALE,
                                     DESCENDANTS_MIN,
                                     DESCENDANTS_MAX,
-                                    SCALEDIST,
-                                    OUTPUT);
+                                    SCALEDIST);
 
             TrackTree.Params params = setupParams(
                                                 tree,
@@ -207,7 +208,7 @@ public class TrAVIS {
 
             EnumSeq[] seqs = tracker.getSequences();
 
-            saveOutput(seqs, tracker, tree, FORMAT_IDX, GAPPY, EXTANTS_ONLY, OUTPUT);
+            saveOutput(seqs, tracker, tree, FORMAT_IDX, GAPPY, EXTANTS_ONLY, OUTPUT, ALIGNMENT);
         }
     }
 
@@ -237,7 +238,7 @@ public class TrAVIS {
         RateModel ddistrib = IdxTree.getGammaMixture(tree, nComponents, seed);
         System.out.println("--dist-distrib " + ddistrib.getTrAVIS() + " \\");
         GaussianDistrib l2rdistrib = tree.getLeaf2RootDistrib();
-        IdxTree newrtree = Tree.Random(tree.getNLeaves(), ddistrib, 2, 2, SEED);
+        IdxTree newrtree = Tree.Random(tree.getNLeaves(), ddistrib, 2, 2, seed);
         newrtree.fitDistances(100, l2rdistrib, seed + 202);
         System.out.println("--leaf2root-distrib " + l2rdistrib.getTrAVIS() + " \\");
 
@@ -269,7 +270,7 @@ public class TrAVIS {
 
 
         System.out.println("--ancestor " + n0 + " \\");
-        System.out.println("--length " + n0.length() + " Use instead of --ancestor to generate a random sequence according to the substitution model \\");
+        System.out.println("--length " + n0.length() + " (Use instead of --ancestor to generate a random sequence according to the substitution model) \\");
     }
 
 
@@ -500,26 +501,26 @@ public class TrAVIS {
                     SRATESFILE = args[++a];
                 } else if (arg.equalsIgnoreCase("-subst-rate-distrib") && args.length > a + 1) {
                     String[] params = parseDistribParamString(args[a+1]);
-                    SUBST_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    SUBST_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS], SEED);
                 } else if (arg.equalsIgnoreCase("-indel-rate-distrib") && args.length > a + 1) {
                     String[] params = parseDistribParamString(args[a+1]);
-                    INDEL_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    INDEL_RATE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS], SEED);
                 } else if (arg.equalsIgnoreCase("-indel-length-distrib") && args.length > a + 1) {
                     String[] params = parseDistribParamString(args[a+1]);
-                    INDEL_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    INDEL_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS], SEED);
                 } else if (arg.equalsIgnoreCase("-insertion-length-distrib") && args.length > a + 1) {
                     String[] params = parseDistribParamString(args[a+1]);
-                    INSERTION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    INSERTION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS], SEED);
                 } else if (arg.equalsIgnoreCase("-deletion-length-distrib") && args.length > a + 1) {
                     String[] params = parseDistribParamString(args[a+1]);
-                    DELETION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    DELETION_LENGTH_MODEL = IndelModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS], SEED);
                 } else if (arg.equalsIgnoreCase("-delprop") && args.length > a + 1) {
                     DELETIONPROP = Double.parseDouble(args[++a]);
                 } else if (arg.equalsIgnoreCase("-length") || arg.equalsIgnoreCase("l") && args.length > a + 1) {
                     ANCSEQ_LENGTH = Integer.parseInt(args[++a]);
                 } else if (arg.equalsIgnoreCase("-dist-distrib") && args.length > a + 1) {
                     String[] params = parseDistribParamString(args[a+1]);
-                    TREE_DISTANCE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
+                    TREE_DISTANCE_MODEL = RateModel.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS], SEED);
                 } else if (arg.equalsIgnoreCase("-leaf2root-distrib") && args.length > a + 1) {
                     String[] params = parseDistribParamString(args[a + 1]);
                     LEAF2ROOT_DISTANCE_MODEL = Distrib.create(params[DISTRIB_NAME], params[DISTRIB_PARAMS]);
@@ -579,7 +580,7 @@ public class TrAVIS {
     public static IdxTree setupTree(String newickFile, boolean copyTree, RateModel treeDistanceModel,
                                      Distrib leaf2rootDistanceModel, int numExtants, long seed,
                                      double treeGammaShape, double treeGammaScale, int descendantsMin,
-                                     int descendantsMax, Double scaleDist, String output) {
+                                     int descendantsMax, Double scaleDist) {
 
         IdxTree tree = null;
 
@@ -601,7 +602,7 @@ public class TrAVIS {
         if (tree == null) {
             // no tree provided but parameters given
             if (treeDistanceModel != null)
-                tree = IdxTree.generateTreeFromDistrib(treeDistanceModel, leaf2rootDistanceModel, numExtants, SEED, 100);
+                tree = IdxTree.generateTreeFromDistrib(treeDistanceModel, leaf2rootDistanceModel, numExtants, seed, 100);
             else {
                 // otherwise create a completely random tree
                 tree = Tree.Random(numExtants, seed, treeGammaShape, 1.0 / treeGammaScale, descendantsMax, descendantsMin);
@@ -612,13 +613,6 @@ public class TrAVIS {
                 tree.adjustDistances(scaleDist);
         } else {
             tree = Tree.generateTreeFromMixture(tree,3, seed,100);
-        }
-
-        // a tree should exist now
-        try {
-            Newick.save(tree, output + "/travis.nwk", Newick.MODE_DEFAULT);
-        } catch (IOException e) {
-            usage(2, "Tree file could not be saved");
         }
 
         return tree;
@@ -711,9 +705,11 @@ public class TrAVIS {
         TrackTree.Params params = new TrackTree.Params(tree, rootSeq, model, seed);
 
         if (indelLengthModel == null) {
-            params.setIndelModel(IndelModel.create("Zipf", "1.7,50"));
+            params.setIndelModel(IndelModel.create("Zipf", "1.7,50", seed));
+        } else {
+            params.setIndelModel(indelLengthModel);
         }
-        params.setIndelModel(indelLengthModel);
+
 
         if (insertionLengthModel != null) {
             params.setInsertmodel(insertionLengthModel);
@@ -730,18 +726,22 @@ public class TrAVIS {
 
         params.PROPORTION_DELETION = deletionProportion;
 
-        params.setSeed(seed);
+        //params.setSeed(seed);
 
         return params;
     }
 
     public static void saveOutput(EnumSeq[] seqs, TrackTree tracker, IdxTree tree,
-                                  int formatIdx, boolean gappy, boolean extantsOnly, String output) {
+                                  int formatIdx, boolean gappy, boolean extantsOnly, String outputDir,
+                                  String prefix) {
+
+        File file = new File(outputDir);
+        file.mkdirs();// true if the directory was created, false otherwise
 
         switch (formatIdx) {
             case FASTA: // FASTA
                 try {
-                    FastaWriter fw = new FastaWriter(output);
+                    FastaWriter fw = new FastaWriter(new File(outputDir, prefix +  "_travis.fa"));
                     if (!gappy) {
                         fw.save(seqs);
                     } else { // gappy
@@ -760,18 +760,27 @@ public class TrAVIS {
                                 count++;
                             }
                         }
-                        FastaWriter fwExtants = new FastaWriter("extants_" + output);
+                        FastaWriter fwExtants = new FastaWriter(new File(outputDir, prefix + "_extants_travis.fa"));
                         fwExtants.save(extants);
                         fwExtants.close();
                     }
                 } catch (IOException e) {
                     usage(6, "FASTA file could not be saved");
                 }
+
+                try {
+                    Newick.save(tree, outputDir + "/" + prefix + "_travis.nwk", Newick.MODE_DEFAULT);
+                } catch (IOException e) {
+                    usage(2, "Tree file could not be saved");
+                }
+
+
+
                 break;
             case DOT: // DOT
                 POAGraph poag = tracker.getPOAG();
                 try {
-                    poag.saveToDOT(output);
+                    poag.saveToDOT(outputDir);
                 } catch (IOException e) {
                     usage(6, "DOT file could not be saved");
                 }
@@ -779,7 +788,7 @@ public class TrAVIS {
             case CLUSTAL: // CLUSTAL
                 EnumSeq[] aln = tracker.getAlignment();
                 try {
-                    AlnWriter aw = new AlnWriter(output);
+                    AlnWriter aw = new AlnWriter(new File(outputDir, prefix + "_travis.aln"));
                     aw.save(aln);
                     aw.close();
                 } catch (IOException e) {
@@ -790,25 +799,20 @@ public class TrAVIS {
                 POAGraph poaGraph = tracker.getPOAG();
                 EnumSeq[] aseqs = tracker.getAlignment();
                 try {
-                    File file = new File(output);
-                    if (file.mkdirs()) { // true if the directory was created, false otherwise
-                    } else {
-                        // System.err.println("Directory " + OUTPUT + " already exists");
-                        // throw new ASRException("Directory " + directory + " already exists");
-                    }
-                    FastaWriter fw = new FastaWriter(output+"/travis.fa");
+
+                    FastaWriter fw = new FastaWriter(new File(outputDir,  prefix + "_travis.fa"));
                     if (!GAPPY) {
                         fw.save(seqs);
                     } else { // gappy
                         fw.save(aseqs);
                     }
                     fw.close();
-                    AlnWriter aw = new AlnWriter(output+"/travis.aln");
+                    AlnWriter aw = new AlnWriter(new File(outputDir, prefix +"_travis.aln"));
                     aw.save(aseqs);
                     aw.close();
-                    poaGraph.saveToDOT(output+"/travis.dot");
-                    poaGraph.saveToMatrix(output+"/travis.m");
-                    Newick.save(tree, output+"/travis.nwk", Newick.MODE_DEFAULT);
+                    poaGraph.saveToDOT(outputDir + "/" + prefix + "_travis.dot");
+                    poaGraph.saveToMatrix(outputDir + "/" + prefix + "_travis.m");
+                    Newick.save(tree, outputDir + "/" + prefix + "_travis.nwk", Newick.MODE_DEFAULT);
 
                     EnumSeq[] alnTracker = tracker.getAlignment();
                     EnumSeq[] extants = new EnumSeq[tree.getNLeaves()];
@@ -819,7 +823,7 @@ public class TrAVIS {
                             count++;
                         }
                     }
-                    FastaWriter fwExtants = new FastaWriter(output + "/extants_travis.fa");
+                    FastaWriter fwExtants = new FastaWriter(new File(outputDir, prefix + "_extants_travis.fa"));
                     fwExtants.save(extants);
                     fwExtants.close();
 
@@ -833,21 +837,9 @@ public class TrAVIS {
                                 data[i] = new Object[]{i, indelRates[i - 1]};
                         }
                         TSVFile ratesfile = new TSVFile(data, true);
-                        ratesfile.save(output + "/indel_rates_travis.tsv");
+                        ratesfile.save(outputDir + "/" + prefix + "_indel_rates_travis.tsv");
                     }
 
-                    if (GAMMA_ALPHA != null) {
-                        double[] rates = tracker.getSubstRates();
-                        Object[][] data = new Object[rates.length + 1][2];
-                        for (int i = 0; i <= rates.length; i++) {
-                            if (i == 0) // header
-                                data[0] = new Object[]{"Site", "Rate"};
-                            else
-                                data[i] = new Object[]{i, rates[i - 1]};
-                        }
-                        TSVFile ratesfile = new TSVFile(data, true);
-                        ratesfile.save(output + "/travis.tsv");
-                    }
                 } catch (IOException e) {
                     usage(7, "Something went wrong saving files in directory");
                 }
@@ -864,28 +856,11 @@ public class TrAVIS {
                     }
                     try {
                         TSVFile ratesfile = new TSVFile(data, true);
-                        ratesfile.save(output + "_indel_rates.tsv");
+                        ratesfile.save(outputDir + "/" + prefix + "_indel_rates_travis.tsv");
                     } catch (IOException e) {
                         usage(6, "Indel rates file could not be saved");
                     }
                 }
-
-//                if (GAMMA_ALPHA != null) {
-//                    double[] rates = tracker.getSubstRates();
-//                    Object[][] data = new Object[rates.length + 1][2];
-//                    for (int i = 0; i <= rates.length; i++) {
-//                        if (i == 0) // header
-//                            data[0] = new Object[]{"Site", "Rate"};
-//                        else
-//                            data[i] = new Object[]{i, rates[i - 1]};
-//                    }
-//                    try {
-//                        TSVFile ratesfile = new TSVFile(data, true);
-//                        ratesfile.save(OUTPUT);
-//                    } catch (IOException e) {
-//                        usage(6, "RATES file could not be saved");
-//                    }
-//                }
         }
     }
 
@@ -1090,7 +1065,6 @@ public class TrAVIS {
             public IndelModel insertmodel = null;   // distribution from which insertion lengths are sampled
             public IndelModel deletemodel = null;   // distribution from which deletion lengths are sampled
 
-
             public double PROPORTION_DELETION = 0.5;   // the proportion of deletion events (as opposed to insertion) amongst all indels
             public Random rand = null;
 
@@ -1164,11 +1138,12 @@ public class TrAVIS {
             }
 
             public void setSeed(long SEED) {
+                this.rand = new Random(SEED);
                 if (insertmodel != null) insertmodel.setSeed(SEED);
                 if (deletemodel != null) deletemodel.setSeed(SEED);
                 if (substratemodel != null) substratemodel.setSeed(SEED);
                 if (indelratemodel != null) indelratemodel.setSeed(SEED);
-                this.rand = new Random(SEED);
+
             }
 
             public Random getRandom() {
@@ -1224,7 +1199,7 @@ public class TrAVIS {
             EnumSeq[] bpseqs = new EnumSeq[tree.getSize()];
             int length_sum = 0;
             int indel_cnt = 0;
-            Random rand = params.getRandom();
+            //Random rand = params.getRandom();
 
             for (int idx : tree) {
                 if (idx == 0) {
@@ -1304,10 +1279,10 @@ public class TrAVIS {
                                 // we place it at either end with a uniform coin toss
                                 int indel_length = params.insertmodel.sample(); // length, can only delete what is left of the sequence
                                 length_sum += indel_length;
-                                insertions[idx][i == 0 ? (rand.nextBoolean() ? 0 : parseq.length) : i] += indel_length; // insertions can be on top of another
+                                insertions[idx][i == 0 ? (params.rand.nextBoolean() ? 0 : parseq.length) : i] += indel_length; // insertions can be on top of another
                                 for (int j = 0; j < indel_length; j ++) {
                                     Object nchar = null;
-                                    double tossagain = rand.nextDouble();
+                                    double tossagain = params.rand.nextDouble();
                                     double sump = 0;
                                     for (Object c : params.substmodel.getDomain().getValues()) {
                                         sump += params.substmodel.getProb(c);

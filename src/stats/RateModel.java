@@ -1,7 +1,6 @@
 package stats;
 
 import bn.prob.GammaDistrib;
-
 /**
  * Interface for rate models, e.g. for substitution, or insertions/deletions.
  * Used by TrAVIS.
@@ -21,7 +20,7 @@ public interface RateModel {
         }
     }
 
-     static RateModel create(String distrib_name, String params) {
+     static RateModel create(String distrib_name, String params, long seed) {
         double[] params_arr = parseParams(params);
         switch (distrib_name) {
             case "ZIG":
@@ -31,12 +30,12 @@ public interface RateModel {
                 if (params_arr.length == 3)
                     return new ZeroInflatedGamma(params_arr[0], params_arr[1], params_arr[2]);
                 else if (params_arr.length == 2)
-                    return new ZeroInflatedGamma(1.0, params_arr[0], params_arr[1]);
+                    return new ZeroInflatedGamma(1.0, params_arr[0], params_arr[1], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "Gamma":
             case "gamma":
                 if (params_arr.length == 2)
-                    return new GammaDistrib(params_arr[0], 1 / params_arr[1]);
+                    return new GammaDistrib(params_arr[0], 1 / params_arr[1], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "MixtureGamma":
             case "mixturegamma":
@@ -44,7 +43,7 @@ public interface RateModel {
                     GammaDistrib[] gammas = new GammaDistrib[params_arr.length / 3];
                     double[] priors = new double[params_arr.length / 3];
                     for (int i = 0; i < params_arr.length; i += 3) { // three params for each gamma distrib
-                        gammas[i/3] = new GammaDistrib(params_arr[i], 1 / params_arr[i + 1]);
+                        gammas[i/3] = new GammaDistrib(params_arr[i], 1 / params_arr[i + 1], seed);
                         priors[i/3] = params_arr[i + 2];
                     }
                     return new GammaDistrib.Mixture(gammas, priors);
@@ -56,11 +55,11 @@ public interface RateModel {
                     GammaDistrib[] gammas = new GammaDistrib[params_arr.length / 3];
                     double[] priors = new double[params_arr.length / 3];
                     for (int i = 1; i < params_arr.length; i += 3) { // three params for each gamma distrib
-                        gammas[i/3] = new GammaDistrib(params_arr[i], 1 / params_arr[i + 1]);
+                        gammas[i/3] = new GammaDistrib(params_arr[i], 1 / params_arr[i + 1], seed);
                         priors[i/3] = params_arr[i + 2];
                     }
 
-                    return new ZeroInflatedGamma.Mixture(params_arr[0], gammas, priors, 42);
+                    return new ZeroInflatedGamma.Mixture(params_arr[0], gammas, priors, seed);
                 }
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             default:

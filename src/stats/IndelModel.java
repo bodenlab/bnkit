@@ -1,5 +1,7 @@
 package stats;
 
+import java.util.Random;
+
 public interface IndelModel {
     /**
      * Samples a value from the distribution
@@ -57,7 +59,7 @@ public interface IndelModel {
         }
     }
 
-    static IndelModel create(String distrib_name, String params) {
+    static IndelModel create(String distrib_name, String params, long seed) {
         double[] params_arr = parseParams(params);
         switch (distrib_name) {
             case "ZTP":
@@ -65,26 +67,26 @@ public interface IndelModel {
             case "zerotruncatedpoisson":
             case "ztp":
                 if (params_arr.length == 1)
-                    return new ZeroTruncatedPoisson(params_arr[0]);
+                    return new ZeroTruncatedPoisson(params_arr[0], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "Poisson":
             case "poisson":
                 if (params_arr.length == 1)
-                    return new Poisson(params_arr[0]);
+                    return new Poisson(params_arr[0], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "Lavalette":
             case "lavalette":
                 if (params_arr.length == 1)
-                    return new Lavalette(params_arr[0]);
+                    return new Lavalette(params_arr[0], seed);
                 else if (params_arr.length == 2)
-                    return new Lavalette(params_arr[0], (int) params_arr[1]);
+                    return new Lavalette(params_arr[0], (int) params_arr[1], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "Zipf":
             case "zipf":
                 if (params_arr.length == 1)
-                    return new Zipf(params_arr[0]);
+                    return new Zipf(params_arr[0], seed);
                 else if (params_arr.length == 2)
-                    return new Zipf(params_arr[0], (int) params_arr[1]);
+                    return new Zipf(params_arr[0], (int) params_arr[1], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             default:
                 throw new RuntimeException("Invalid distribution " + distrib_name);
