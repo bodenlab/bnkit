@@ -16,13 +16,16 @@ import java.util.concurrent.TimeUnit;
 import com.google.ortools.linearsolver.MPVariable;
 import com.google.ortools.linearsolver.MPSolver;
 import dat.pog.POGTree;
+import dat.pog.POGraph;
+import stats.RateModel;
 import util.Binner;
 
 public class Mip {
 
     private static final double MAX_PENALTY = 1000.0;
+    private static final int NUM_GAMMA_CATEGORIES = 20;
     public static double MIN_MU_LAMBDA_VALUE = 0;
-    public static double MAX_MU_LAMBDA_VALUE = 0.5;
+    public static double MAX_MU_LAMBDA_VALUE = 0.25;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
@@ -298,9 +301,22 @@ public class Mip {
 
         if (useBranchLengths) {
 
-            double[] rates = IndelSegmentation.MEAN_RATES.get(GRASP.INDEL_RATE);
+
+            Prediction bepIndels =  Prediction.PredictByBidirEdgeParsimony(pogTree);
+
+            bepIndels.getJoint(GRASP.MODEL, GRASP.RATES);
+            Map<Object, POGraph> pogs = bepIndels.getAncestors(GRASP.Inference.JOINT);
+            String[] ancnames = new String[pogs.size()];
+            Object[][] ancSeqsGappy = new Object[pogs.size()][];
+            Object[][] ancSeqsNoGap = new Object[pogs.size()][];
+            GRASP.extractAncestralSequences(ancSeqsGappy, ancSeqsNoGap, pogs, bepIndels, ancnames);
+            double[] rateSampleCollection = TrAVIS.calculateColumnIndelRates(bepIndels.getTree(), aln, ancSeqsGappy);
+            RateModel indelRateDist = RateModel.bestfit(rateSampleCollection, 42);
+            double[] rates = indelRateDist.getMeanGammaRates(NUM_GAMMA_CATEGORIES);
+            double[] ratePriors = new double[NUM_GAMMA_CATEGORIES];
+            Arrays.fill(ratePriors, Math.log(1.0 / NUM_GAMMA_CATEGORIES));
+
             double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
-            ;
             int[] columnRateCategories = null;
 
             if (GRASP.RANDOM_RATES) {
@@ -323,7 +339,6 @@ public class Mip {
                 }
 
             } else {
-
                 double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
                 if (GRASP.VERBOSE) {
                     System.out.println("Optimising indel parameters for distance-based MIP...");
@@ -339,7 +354,8 @@ public class Mip {
                         System.out.println("Rate category " + i + ": " + rates[i]);
                     }
                 }
-                double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel, geometric_seq_len_param, rates, GRASP.NTHREADS);
+                double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel,
+                        geometric_seq_len_param, rates, GRASP.NTHREADS);
 
                 if (GRASP.VERBOSE) {
                     System.out.println("Computing prefix sums for indel segment assignment...");
@@ -350,7 +366,7 @@ public class Mip {
                     System.out.println("Assigning optimal indel rate segments...");
                 }
 
-                int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, IndelSegmentation.RATE_PRIORS,
+                int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
                         prefix_sums);
 
                 columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
@@ -372,7 +388,6 @@ public class Mip {
 
             calcLogDistPenalties(columnRateCategories, rates, rateAdjustedDists, treeNeighbourAlphaPen);
             //calcNormalisedInverseEvoDists(columnRateCategories, rates, rateAdjustedDists, treeNeighbourAlphaPen);
-
 
         } else {
             for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {

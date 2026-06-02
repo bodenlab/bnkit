@@ -118,6 +118,29 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
         }
     }
 
+    public double meanGammaRate(double lowerBound, double upperBound) {
+        return gamma.meanGammaRate(lowerBound, upperBound);
+    }
+
+    public double[] computeBounds(int numCategories) {
+        return gamma.computeBounds(numCategories);
+    }
+
+
+    /**
+     * Calculate the means for N discrete categories of the distribution each with a
+     * probability of 1/N.
+     * <p>
+     * Source: Equation 10 from Yang, 1994 Maximum likelihood phylogenetic
+     * estimation from DNA sequences with variable rates over sites:
+     * Approximate methods
+     * @param numCategories the number of discrete categories
+     * @return the mean of x between these bounds
+     */
+    public double[] getMeanGammaRates(int numCategories) {
+        return gamma.getMeanGammaRates(numCategories);
+    }
+
     /**
      * Estimates the parameters (p, k, θ) from data using MLE / MOM.
      *
@@ -277,6 +300,36 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             }
             return (1.0 - zeromass) * prob;
         }
+
+        /**
+         * Calculate the mean of the portion of the distribution falling between
+         * the lower and upper bound. This is the conditional expectation of
+         * X given that X is in the interval [lowerBound, upperBound].
+         * Denominator is the CDF of the gamma over that bound.
+         * Numerator is the integral of x * pdf(x) over that bound.
+         * Note that this is just for the Gamma component of the distribution.
+         *
+         * <p>
+         * Source: Equation 10 from Yang, 1994 Maximum likelihood phylogenetic
+         * estimation from DNA sequences with variable rates over sites:
+         * Approximate methods
+         * @param numCategories number of discrete categories
+         * @return the mean of x between these bounds
+         */
+        public double[] getMeanGammaRates(int numCategories) {
+
+            double[] cumulativeMeanRates = new double[numCategories];
+            for (int i = 0; i < distribs.length; i++) {
+                double[] componentMeanRates = distribs[i].getMeanGammaRates(numCategories);
+                for (int j = 0; j < numCategories; j++) {
+                    cumulativeMeanRates[j] += priors[i] * componentMeanRates[j];
+                }
+            }
+
+            return cumulativeMeanRates;
+        }
+
+
 
         @Override
         public double cdf(double x) {

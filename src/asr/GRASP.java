@@ -170,12 +170,12 @@ public class GRASP {
     private static String INPUT = null;
     private static String PREFIX = null;
     private static String RATESFILE = null;
-    private static double[] RATES = null;
+    public static double[] RATES = null;
     private static String EMPIRICAL_FREQS_FILE = null;
     private static double[] EMPIRICAL_FREQS = null;
     private static final String[] MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
     private static int MODEL_IDX = 0; // default model is that above indexed 0
-    private static SubstModel MODEL = null;
+    public static SubstModel MODEL = null;
     // Alphabet is decided by MODEL_IDX
     private static final Enumerable[] ALPHAS = new Enumerable[]{Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
 
@@ -867,7 +867,7 @@ public class GRASP {
         return ancestors;
     }
 
-    private static void extractAncestralSequences(Object[][] ancseqs_gappy, Object[][] ancseqs_nogap,
+    public static void extractAncestralSequences(Object[][] ancseqs_gappy, Object[][] ancseqs_nogap,
                                                   Map<Object, POGraph> pogs, Prediction indelpred, String[] ancnames) {
 
         int ii = 0;

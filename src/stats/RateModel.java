@@ -155,6 +155,8 @@ public interface RateModel {
     boolean isValidForIndels();
 
 
+    double[] getMeanGammaRates(int numCategories);
+
     /**
      * Computes the probability mass function (PMF) for a given value
      * @param rate the rate value
