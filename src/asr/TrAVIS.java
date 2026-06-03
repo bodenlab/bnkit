@@ -85,7 +85,7 @@ public class TrAVIS {
                 "      --copy-tree                              Use the tree from -nwk to perform the simulation\n" +
                 "      --extants-only                           Create a separate FASTA file with simulated extants only\n" +
                 "      --no-gap                                 exclude gap characters in output\n" +
-                "      -sa, --save-as <type>                         Output format: FASTA (default), CLUSTAL, DOT, TREE, RATES, DIR\n" +
+                "      -sa, --save-as <type>                         Output format: FASTA (default), CLUSTAL, DOT, TREE, RATES, ALL\n" +
                 "      --seed <number>                          Random seed\n" +
                 "      -t, --threads <number>                   Number of threads to use. \n" +
                 "      --verbose                                Print details of generated events\n" +
@@ -102,7 +102,7 @@ public class TrAVIS {
                 "      ZeroTruncatedPoisson/Poisson: <lambda>\n" +
                 "      Zipf: <s[,max]>\n" +
                 "      Lavalette: <a[,max]>\n" +
-                "  - Output formats: FASTA, CLUSTAL, DOT, TREE, RATES, DIR\n" +
+                "  - Output formats: FASTA, CLUSTAL, DOT, TREE, RATES, ALL\n" +
                 "  - For more details, see documentation or contact the authors.\n" +
                 "  ~ This is part of GRASP-Suite version " + GRASP.VERSION + " ~");
         System.exit(error);

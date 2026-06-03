@@ -28,7 +28,7 @@ import asr.IndelSegmentation.RATE_CATEGORY;
  */
 public class GRASP {
 
-    public static String VERSION = "28-MAY-2026";
+    public static String VERSION = "3-June-2026";
 
     public static void usage() {
         usage(0, null);

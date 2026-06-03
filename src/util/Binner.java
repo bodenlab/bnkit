@@ -206,7 +206,7 @@ public abstract class Binner {
 
             double[] binEdges = new double[nBuckets + 1];
             for (int i = 0; i <= nBuckets; i++) {
-                double p = (double) i / nBuckets;  // 0.0 → 1.0
+                double p = (double) i / nBuckets;
                 binEdges[i] = percentile(sorted, p);
             }
 

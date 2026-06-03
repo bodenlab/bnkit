@@ -7,6 +7,7 @@ import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
 import dat.EnumSeq;
 import dat.Enumerable;
+import dat.file.TSVFile;
 import dat.phylo.IdxTree;
 import dat.phylo.Tree;
 import dat.pog.POAGraph;
@@ -18,6 +19,7 @@ import com.google.ortools.linearsolver.MPSolver;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import stats.RateModel;
+import stats.ZeroInflatedGamma;
 import util.Binner;
 
 public class Mip {
@@ -303,7 +305,6 @@ public class Mip {
 
 
             Prediction bepIndels =  Prediction.PredictByBidirEdgeParsimony(pogTree);
-
             bepIndels.getJoint(GRASP.MODEL, GRASP.RATES);
             Map<Object, POGraph> pogs = bepIndels.getAncestors(GRASP.Inference.JOINT);
             String[] ancnames = new String[pogs.size()];
@@ -311,9 +312,19 @@ public class Mip {
             Object[][] ancSeqsNoGap = new Object[pogs.size()][];
             GRASP.extractAncestralSequences(ancSeqsGappy, ancSeqsNoGap, pogs, bepIndels, ancnames);
             double[] rateSampleCollection = TrAVIS.calculateColumnIndelRates(bepIndels.getTree(), aln, ancSeqsGappy);
-            RateModel indelRateDist = RateModel.bestfit(rateSampleCollection, 42);
-            double[] rates = indelRateDist.getMeanGammaRates(NUM_GAMMA_CATEGORIES);
-            double[] ratePriors = new double[NUM_GAMMA_CATEGORIES];
+            double[] rates;
+            double[] ratePriors;
+
+            if (rateSampleCollection.length > 0) {
+                RateModel indelRateDist = RateModel.bestfit(rateSampleCollection, 42);
+                rates = indelRateDist.getMeanGammaRates(NUM_GAMMA_CATEGORIES);
+
+            } else {
+                rates = new double[NUM_GAMMA_CATEGORIES];
+                Arrays.fill(rates, 1.0);
+            }
+
+            ratePriors = new double[NUM_GAMMA_CATEGORIES];
             Arrays.fill(ratePriors, Math.log(1.0 / NUM_GAMMA_CATEGORIES));
 
             double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
@@ -371,7 +382,7 @@ public class Mip {
 
                 columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
                 if (GRASP.VERBOSE) {
-                    System.out.println("column_index,rate_category");
+                    System.out.println("column_index,Rate");
                     for (int i = 0; i < columnRateCategories.length; i++) {
                         System.out.println(i + "," + columnRateCategories[i]);
                     }
