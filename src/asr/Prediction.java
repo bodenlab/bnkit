@@ -1726,7 +1726,6 @@ public class Prediction {
         int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
         IdxTree tree = pogTree.getTree();  // indexed tree (quick access to branch points, no editing)
 
-
         Mip mipSolver = new Mip(pogTree, aln, solver, substModelName, nThreads, useDistances);
 
         if (GRASP.VERBOSE) {
