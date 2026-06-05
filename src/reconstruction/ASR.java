@@ -516,7 +516,7 @@ public class ASR {
      */
     public GammaDistrib calcGammaDistrib(){
         //estimates parameters of gamma distribution
-        double alpha = GammaDistrib.getAlpha(R);
+        double alpha = GammaDistrib.calcAlpha(R);
         double beta = 1 / alpha;
         //Creates a gamma distribution
         return new GammaDistrib(alpha, 1/beta);

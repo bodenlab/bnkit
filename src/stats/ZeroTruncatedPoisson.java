@@ -6,7 +6,7 @@ import java.util.Arrays;
 import java.util.Random;
 public class ZeroTruncatedPoisson implements IndelModel {
 
-    private double lambda;
+    private final double lambda;
     private Random rand;
 
 
@@ -19,6 +19,10 @@ public class ZeroTruncatedPoisson implements IndelModel {
     public ZeroTruncatedPoisson(double lambda, long seed) {
         this.lambda = lambda;
         this.rand = new Random(seed);
+    }
+
+    public boolean isValidForIndels() {
+        return lambda > 0.0;
     }
 
     /**

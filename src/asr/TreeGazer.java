@@ -79,6 +79,7 @@ public class TreeGazer {
                 \tIf specified values are discrete, a multinomial distribution conditioned on latent state is learned.
                 \tInference is either joint (default) or marginal (marginal allows a branch-point to be nominated; if one is not given all uninstantiated nodes are inferred)
                 """);
+        out.println("This is version " + VERSION);
         System.exit(error);
     }
 
@@ -96,6 +97,8 @@ public class TreeGazer {
     private static final int DEFAULT_ENTRIES_IDX = 0;
     private static final String[] FORMATS = new String[] {"TSV", "TREE", "STDOUT", "ITOL"};
     private static final String[] MODELS = new String[] {"uniform"};
+    public static String VERSION = "1.0.0";
+    public static String DATE = "12-May-2026";
 
 
     public static void main(String[] args) {

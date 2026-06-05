@@ -181,7 +181,7 @@ public class ASRwGamma {
                 System.out.println(col + "\t" + asr_root.charAt(col) + "\t" + R[col]);
             } 
             */
-            double alpha = GammaDistrib.getAlpha(R);
+            double alpha = GammaDistrib.calcAlpha(R);
             
             // ******
             //alpha = alphas[a];

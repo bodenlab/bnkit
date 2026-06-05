@@ -1,6 +1,6 @@
 package stats;
 
-import bn.prob.GammaDistrib;
+import java.util.Random;
 
 public interface IndelModel {
     /**
@@ -8,6 +8,13 @@ public interface IndelModel {
      * @return the sampled value
      */
     int sample();
+
+
+        /**
+        * Checks if the distribution is valid for modeling indel lengths (e.g. non-negative integers)
+        * @return true if valid, false otherwise
+        */
+    boolean isValidForIndels();
 
     /**
      * Computes the probability mass function (PMF) for a given value
@@ -29,17 +36,17 @@ public interface IndelModel {
      */
     String getTrAVIS();
 
-    public void setSeed(long seed);
+    void setSeed(long seed);
 
     /**
      * Calculate the log likelihood of the data given the model/distribution
      * @param data dataset
      * @return the log-likelihood of the data given the model
      */
-    public double getLogLikelihood(int[] data);
+    double getLogLikelihood(int[] data);
 
 
-    public static double[] parseParams(String str) throws RuntimeException {
+    static double[] parseParams(String str) throws RuntimeException {
         try {
             String[] parts = str.split(",");
             double[] result = new double[parts.length];
@@ -52,7 +59,7 @@ public interface IndelModel {
         }
     }
 
-    static IndelModel create(String distrib_name, String params) {
+    static IndelModel create(String distrib_name, String params, long seed) {
         double[] params_arr = parseParams(params);
         switch (distrib_name) {
             case "ZTP":
@@ -60,26 +67,26 @@ public interface IndelModel {
             case "zerotruncatedpoisson":
             case "ztp":
                 if (params_arr.length == 1)
-                    return new ZeroTruncatedPoisson(params_arr[0]);
+                    return new ZeroTruncatedPoisson(params_arr[0], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "Poisson":
             case "poisson":
                 if (params_arr.length == 1)
-                    return new Poisson(params_arr[0]);
+                    return new Poisson(params_arr[0], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "Lavalette":
             case "lavalette":
                 if (params_arr.length == 1)
-                    return new Lavalette(params_arr[0]);
+                    return new Lavalette(params_arr[0], seed);
                 else if (params_arr.length == 2)
-                    return new Lavalette(params_arr[0], (int) params_arr[1]);
+                    return new Lavalette(params_arr[0], (int) params_arr[1], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             case "Zipf":
             case "zipf":
                 if (params_arr.length == 1)
-                    return new Zipf(params_arr[0]);
+                    return new Zipf(params_arr[0], seed);
                 else if (params_arr.length == 2)
-                    return new Zipf(params_arr[0], (int) params_arr[1]);
+                    return new Zipf(params_arr[0], (int) params_arr[1], seed);
                 throw new RuntimeException("Failed to parse parameters \"" + params + "\" for nominated distribution " + distrib_name);
             default:
                 throw new RuntimeException("Invalid distribution " + distrib_name);
@@ -98,17 +105,25 @@ public interface IndelModel {
                 ZeroTruncatedPoisson.fitMLE(indel_data, seed),
                 Poisson.fitMLE(indel_data, seed),
         };
-        double best_ll = Double.MIN_VALUE;
-        IndelModel best_model = null;
+        double best_ll = Double.NEGATIVE_INFINITY;
         int best_idx = 0;
         for (int i = 0; i < models.length; i++) {
             IndelModel model = models[i];
+            if (!model.isValidForIndels()) {
+                System.out.println("Model parameters " + model.getTrAVIS() + " are not valid for indel data");
+                continue; // skip invalid models
+            }
             double ll = model.getLogLikelihood(indel_data);
             if (ll > best_ll) {
                 best_ll = ll;
                 best_idx = i;
             }
         }
+
+        if (best_ll == Double.NEGATIVE_INFINITY) {
+            throw new RuntimeException("No valid model found for the given indel data");
+        }
+
         return models[best_idx];
     }
 

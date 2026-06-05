@@ -1348,51 +1348,69 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                                                                       EnumSeq.Alignment<Enumerable> aln) {
         int ROOT_IDX = 0;
         int violationCount = 0;
+        int deletionCount = 0;
+        int insertionCount = 0;
+        enum LineageState {HAS_CONTENT, DELETED, NEVER_HAD_CONTENT }
+        Map<Integer, LineageState> lineageState = new HashMap<>();
 
         IdxTree tree = pogTree.getTree();
-
         for (int alnPosition = 0; alnPosition < aln.getWidth(); alnPosition++) {
             Iterator<Integer> dfs = tree.getDepthFirstIterator();
-
-            Map<Integer, Boolean> deletionInLineage = new HashMap<>();
 
             while (dfs.hasNext()) {
 
                 int bpidx = dfs.next();
                 if (bpidx == ROOT_IDX) {
-                    deletionInLineage.put(bpidx, false);
+                    boolean rootHasContent = doesNodeHaveContentAtPosition(tree, bpidx, pogTree, alnPosition,
+                            ancestralPogs);
+
+                    if (rootHasContent) {
+                        lineageState.put(bpidx, LineageState.HAS_CONTENT);
+                    } else {
+                        lineageState.put(bpidx, LineageState.NEVER_HAD_CONTENT);
+                    }
                     continue;
                 }
 
                 boolean currentNodeHasContent = doesNodeHaveContentAtPosition(tree, bpidx, pogTree,
                                                                                 alnPosition, ancestralPogs);
 
-                int parentIdx = tree.getParent(bpidx);
-                boolean parentHasContent = doesNodeHaveContentAtPosition(tree, parentIdx, pogTree,
-                                                                                alnPosition, ancestralPogs);
-                boolean deletionInParentLineage = deletionInLineage.getOrDefault(parentIdx, false);
+                LineageState parentState = lineageState.get(tree.getParent(bpidx));
 
-                if (deletionInParentLineage && currentNodeHasContent) {
+                if ((parentState == LineageState.DELETED || parentState == LineageState.NEVER_HAD_CONTENT) && currentNodeHasContent) {
+                    insertionCount++;
+                } else if (parentState == LineageState.HAS_CONTENT && !currentNodeHasContent) {
+                    deletionCount++;
+                }
+
+                if (parentState == LineageState.DELETED && currentNodeHasContent) {
                     String currentNodeLabel = (String) tree.getBranchPoint(bpidx).getLabel();
-                    if (!tree.isLeaf(bpidx)) {
-                        currentNodeLabel = "N" + currentNodeLabel;
-                    }
-
-                    System.out.println("Phylogenetic violation at aln pos " + (alnPosition + 1) +" at node " + currentNodeLabel);
+//                    if (!tree.isLeaf(bpidx)) {
+//                        currentNodeLabel = currentNodeLabel;
+//                    }
+//
+//                    System.out.println("Phylogenetic violation at aln pos " + (alnPosition + 1) +" at node " + currentNodeLabel);
                     violationCount += 1;
                 }
 
-                // Update deletion status for current node
-                if (!currentNodeHasContent && parentHasContent) {
-                    deletionInLineage.put(bpidx, true);
-                } else if (deletionInParentLineage || (!parentHasContent && !currentNodeHasContent)) {
-                    deletionInLineage.put(bpidx, true);
+                LineageState currentState;
+                if (currentNodeHasContent) {
+                    currentState = LineageState.HAS_CONTENT;
+                } else if (parentState == LineageState.HAS_CONTENT) {
+                    currentState = LineageState.DELETED;
+                } else if (parentState == LineageState.DELETED) {
+                    currentState = LineageState.DELETED;
                 } else {
-                    deletionInLineage.put(bpidx, false);
+                    currentState = LineageState.NEVER_HAD_CONTENT;
                 }
+
+                lineageState.put(bpidx, currentState);
+
             }
         }
 
+        System.out.println("Insertions: " + insertionCount);
+        System.out.println("Deletions: " + deletionCount);
         return violationCount;
     }
 

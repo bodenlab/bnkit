@@ -3,6 +3,7 @@ package dat.file;
 import asr.ASRException;
 import dat.EnumSeq;
 import dat.Enumerable;
+import dat.phylo.BranchPoint;
 import dat.phylo.Tree;
 import dat.pog.Edge;
 import dat.pog.POGraph;
@@ -105,7 +106,7 @@ public class Utils {
         Format format = sp.getFormat();
         if (format == null) throw new ASRException("Format of alignment is unknown");
         BufferedReader reader = new BufferedReader(new FileReader(filename));
-        List<EnumSeq.Gappy<Enumerable>> seqs = null;         // List of sequences (characters)
+        List<EnumSeq.Gappy<Enumerable>> seqs;         // List of sequences (characters)
         if (format == Format.CLUSTAL) {
             seqs = EnumSeq.Gappy.loadClustal(reader, alphabet);
         } else if (format == Format.FASTA) {
@@ -138,6 +139,10 @@ public class Utils {
     }
 
     public static void checkData(EnumSeq.Alignment aln, Tree tree) throws ASRException {
+        checkData(aln, tree, false);
+    }
+
+    public static void checkData(EnumSeq.Alignment aln, Tree tree, boolean includeAncestorLabels) throws ASRException {
         ASRException.FileIssues exception = new ASRException.FileIssues();
         // Check if there are duplicate extant node names in the phylogenetic tree
         // Duplicate extant node names not allowed - will influence reconstruction outcomes
@@ -149,6 +154,15 @@ public class Utils {
                 duplicates_in_tree.add(name.toString());
             names_in_tree.add(name.toString());
         }
+        if (includeAncestorLabels) {
+            for (int idx : tree.getAncestors()) {
+                BranchPoint bp = tree.getBranchPoint(idx);
+                if (names_in_tree.contains(bp.getLabel().toString()))
+                    duplicates_in_tree.add(bp.getLabel().toString());
+                names_in_tree.add(bp.getLabel().toString());
+            }
+        }
+
         if (duplicates_in_tree.size() > 0)
             exception.add("Duplicate identifiers in tree: ", duplicates_in_tree);
         // Check if there are duplicate sequence names in the extant sequences

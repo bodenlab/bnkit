@@ -676,6 +676,7 @@ public class Prediction {
         if (bpidx == -1) {
             throw new ASRRuntimeException("Invalid ancestor ID: " + ancID);
         }
+
         int[] idxs = getConsensus(bpidx);
         if (idxs == null)
             throw new ASRRuntimeException("Failed to find optimal path for ancestor ID: " + ancID);
@@ -1721,7 +1722,6 @@ public class Prediction {
         Map<Object, POGraph> ancestors = new HashMap<>(); // prepare where predictions will go
         int nPos = pogTree.getPositions(); // find the number of indices that the POGs (input and ancestors) can use
         IdxTree tree = pogTree.getTree();  // indexed tree (quick access to branch points, no editing)
-
 
         Mip mipSolver = new Mip(pogTree, aln, solver, substModelName, nThreads, useDistances);
 

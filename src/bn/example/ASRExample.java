@@ -207,7 +207,7 @@ public class ASRExample {
                 System.out.println(margin_distribs[col] + "\t" + asr_root.charAt(col) + "\t" + R[col]);
             }    
             //estimates parameters of gamma distribution
-            double alpha = GammaDistrib.getAlpha(R);
+            double alpha = GammaDistrib.calcAlpha(R);
             double beta = 1 / alpha;
             System.out.println("Gamma alpha = " + alpha + " beta = " + beta);
             //Creates a gamma distribution

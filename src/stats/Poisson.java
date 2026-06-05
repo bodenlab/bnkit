@@ -24,6 +24,10 @@ public class Poisson implements IndelModel {
         this.rand = new Random(seed);
     }
 
+    public boolean isValidForIndels() {
+        return lambda > 0.0;
+    }
+
     /**
      * Define a Poisson distribution
      *

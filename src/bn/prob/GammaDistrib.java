@@ -3,11 +3,13 @@ package bn.prob;
 
 import bn.Distrib;
 import dat.Enumerable;
+import smile.math.special.Gamma;
 import smile.stat.distribution.ExponentialFamilyMixture;
 import smile.stat.distribution.GammaDistribution;
 import smile.stat.distribution.Mixture.Component;
 import stats.RateModel;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.*;
 
@@ -25,6 +27,7 @@ import java.util.*;
 
 public class GammaDistrib implements Distrib, Serializable, RateModel {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public static final double GAMMA = 0.577215664901532860606512090082;
@@ -51,6 +54,10 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         this.k = k;
         this.lambda = lambda;
         this.rand = new Random(seed);
+    }
+
+    public boolean isValidForIndels() {
+        return k > 0.0 && lambda > 0.0;
     }
 
     /**
@@ -130,9 +137,26 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         return get(x);
     }
 
+    /**
+     *
+     * @param x input to the PDF
+     * @return the log probability density at x
+     */
+    public double logP(double x) {
+        if (x <= 0) return Double.NEGATIVE_INFINITY;
+        double shape = getShape();
+        double scale = getScale();
+        return (shape - 1.0) * Math.log(x) - lgamma(shape) - shape * Math.log(scale) - x / scale;
+    }
+
     @Override
     public double cdf(double x) {
-        throw new RuntimeException("GammaDistrib cdf() not implemented");
+
+        if (x < 0) {
+            return 0.0;
+        } else {
+            return Gamma.regularizedIncompleteGamma(k, x / getScale());
+        }
     }
 
     @Override
@@ -176,7 +200,6 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         return (alpha - 1) * Math.log(s) - beta * s;
         // constant terms dropped (not needed for MAP)
     }
-
 
     /*
      * used for parameter learning
@@ -223,10 +246,6 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         return k;
     }
 
-    public double getBeta() {
-        return lambda;
-    }
-
     public void setBeta(double beta) {
         lambda = beta;
     }
@@ -240,11 +259,11 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * Based on Thomas Minka "Estimating a Gamma distribution" 2002.
      * http://research.microsoft.com/en-us/um/people/minka/papers/minka-gamma.pdf
      * @param X data
-     * @return the log likelihood of the data; log p(X|alpha, beta)
+     * @return the log likelihood of the data; log p(X|alpha, scale)
      */
     public double getLogLikelihood(double[] X) {
-        double a = getAlpha();  // aka shape
-        double b = getBeta();   // aka rate
+        double a = getShape();  // aka shape
+        double b = getScale();   // aka scale
         int n = X.length;
         double x_mean = 0;
         double log_x_mean = 0;
@@ -269,6 +288,78 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
     }
 
     /**
+     * Get the quantile corresponding to the lower tail probability q. This is the
+     * percent point function which is the inverse of the CDF.
+     * @param p lower tail probability.
+     * @return
+     */
+    public double quantile(double p) {
+        if (p < 0.0 || p > 1.0) {
+            throw new IllegalArgumentException("Invalid p: " + p);
+        }
+
+        return Gamma.inverseRegularizedIncompleteGamma(k, p) * this.getScale();
+    }
+
+    /**
+     * Calculate the mean of the portion of the distribution falling between
+     * the lower and upper bound. This is the conditional expectation of
+     * X given that X is in the interval [lowerBound, upperBound].
+     * Denominator is the CDF of the gamma over that bound.
+     * Numerator is the integral of x * pdf(x) over that bound.
+     * <p>
+     * Source: Equation 10 from Yang, 1994 Maximum likelihood phylogenetic
+     * estimation from DNA sequences with variable rates over sites:
+     * Approximate methods
+     * @param lowerBound lower bound value
+     * @param upperBound upper bound value
+     * @return the mean of x between these bounds
+     */
+    public double meanGammaRate(double lowerBound, double upperBound) {
+
+        double numerator = Gamma.regularizedIncompleteGamma(k + 1,upperBound * lambda) -
+                Gamma.regularizedIncompleteGamma(k + 1, lowerBound * lambda);
+
+        double denominator = Gamma.regularizedIncompleteGamma(k,upperBound * lambda) -
+                Gamma.regularizedIncompleteGamma(k, lowerBound * lambda);
+
+        // we assume that the denominator is equal width
+        return (k/lambda) * numerator / denominator; // (1.0/numCategories);
+    }
+
+    public double[] computeBounds(int numCategories) {
+        double[] bounds = new double[numCategories + 1];
+        bounds[numCategories] = Double.POSITIVE_INFINITY;
+        for (int i = 1; i < numCategories; i++) {
+            bounds[i] = quantile((double) i / numCategories);
+        }
+
+        return bounds;
+    }
+
+    /**
+     * Calculate the means for N discrete categories of the distribution each with a
+     * probability of 1/N.
+     * <p>
+     * Source: Equation 10 from Yang, 1994 Maximum likelihood phylogenetic
+     * estimation from DNA sequences with variable rates over sites:
+     * Approximate methods
+     * @param numCategories the number of discrete categories
+     * @return the mean of x between these bounds
+     */
+    public double[] getMeanGammaRates(int numCategories) {
+        double[] bounds = computeBounds(numCategories);
+        double[] meanRates = new double[numCategories];
+        for (int i = 0; i < bounds.length - 1; i++) {
+            double lowerBound = bounds[i];
+            double upperBound = bounds[i + 1];
+            meanRates[i] = meanGammaRate(lowerBound, upperBound);
+        }
+
+        return meanRates;
+    }
+
+    /**
      * Estimate the parameters of a gamma distribution from data.
      * Specifically the implementation estimates alpha (shape), and beta (rate) is given by
      * beta = mean(x) / alpha.
@@ -277,7 +368,7 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * @param X data
      * @return alpha parameter (same as lambda here)
      */
-    public static double getAlpha(double[] X) {
+    public static double calcAlpha(double[] X) {
         double delta = 1;
         int n = X.length;
         double x_mean = 0;
@@ -292,6 +383,10 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         x_mean /= n;
         log_x_mean /= n;
         double a = 0.5 / (Math.log(x_mean) - log_x_mean); // good starting point (see Minka 2002)
+        if (a == Double.NEGATIVE_INFINITY || a == Double.POSITIVE_INFINITY || Double.isNaN(a)) {
+            a = 0.5; // fallback starting point
+        }
+
         double a_inv = 1.0 / a;
         for (int r = 0; r < 10; r ++) { // max 10 iterations, should converge in ~4
             double numerator = log_x_mean - Math.log(x_mean) + Math.log(a) - digamma(a);
@@ -300,7 +395,8 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
             double next_a = 1.0 / next_inv;
             delta = Math.abs(next_a - a);
             a = next_a;
-            if (delta < .01) {
+            a_inv = next_inv;
+            if (delta < .001) {
                 //System.out.println("Converged after " + (r + 1) + " rounds");
                 break;
             }
@@ -309,12 +405,12 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
     }
     
     /**
-     * Get beta that maximises likelihood as computed for a specified alpha.
+     * Get scale that maximises likelihood as computed for a specified alpha.
      * @param X data
      * @param alpha
-     * @return beta
+     * @return scale
      */
-    public static double getBeta(double[] X, double alpha) {
+    public static double calcScale(double[] X, double alpha) {
         int n = X.length;
         double x_mean = 0;
         for (double xi : X) {
@@ -346,9 +442,9 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * @return a GammaDistrib object with the estimated parameters
      */
     public static GammaDistrib fitMLE(double[] X, long seed) {
-        double alpha = getAlpha(X);
-        double beta = getBeta(X, alpha);
-        return new GammaDistrib(alpha, beta, seed);
+        double alpha = calcAlpha(X);
+        double scale = calcScale(X, alpha);
+        return new GammaDistrib(alpha, 1/scale, seed);
     }
 
     /**
@@ -381,6 +477,8 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         }
         return fitMLE(x, seed);
     }
+
+
 
     /*
     The following two methods: digamma and trigamma are ...
@@ -420,6 +518,7 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * @since 2.0
      */
     public static double digamma(double x) {
+
         if (x > 0 && x <= S_LIMIT) {
             // use method 5 from Bernardo AS103
             // accurate to O(x)
@@ -468,10 +567,12 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
     public static class Mixture implements RateModel {
         public GammaDistrib[] distribs;
         public double[] priors;
+
         public Mixture(GammaDistrib[] distribs, double[] priors) {
             this.distribs = distribs;
             this.priors = priors;
         }
+
         public String toString() {
             StringBuilder sb = new StringBuilder();
             sb.append("GammaMixture[");
@@ -479,6 +580,13 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
                 sb.append(String.format("%s,%.3f;", distribs[i].getTrAVIS(), priors[i]));
             sb.append("]");
             return sb.toString();
+        }
+
+        public boolean isValidForIndels() {
+            for (int i = 0; i < distribs.length; i++)
+                if (!distribs[i].isValidForIndels())
+                    return false;
+            return true;
         }
 
         /**
@@ -510,6 +618,33 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
             for (int i = 0; i < distribs.length; i++)
                 cumulative += distribs[i].p(rate) * priors[i];
             return cumulative;
+        }
+
+
+        /**
+         * Calculate the mean of the portion of the distribution falling between
+         * the lower and upper bound. This is the conditional expectation of
+         * X given that X is in the interval [lowerBound, upperBound].
+         * Denominator is the CDF of the gamma over that bound.
+         * Numerator is the integral of x * pdf(x) over that bound.
+         * <p>
+         * Source: Equation 10 from Yang, 1994 Maximum likelihood phylogenetic
+         * estimation from DNA sequences with variable rates over sites:
+         * Approximate methods
+         * @param numCategories number of discrete categories
+         * @return the mean of x between these bounds
+         */
+        public double[] getMeanGammaRates(int numCategories) {
+
+            double[] cumulativeMeanRates = new double[numCategories];
+            for (int i = 0; i < distribs.length; i++) {
+                double[] componentMeanRates = distribs[i].getMeanGammaRates(numCategories);
+                for (int j = 0; j < numCategories; j++) {
+                    cumulativeMeanRates[j] += priors[i] * componentMeanRates[j];
+                }
+            }
+
+            return cumulativeMeanRates;
         }
 
         /**
@@ -551,9 +686,6 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
             for (int i = 0; i < components; i++) {
                 System.arraycopy(data, i*subset.length, subset, 0, subset.length);
                 gamma[i] = GammaDistribution.fit(subset);
-                for (int j = 0; j < subset.length; j++) {
-                    // System.out.print(subset[j] + " ");
-                }
                 comps[i] = new Component(1.0/components, gamma[i]);
             }
             try {
@@ -661,22 +793,60 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         }
     }
 
-    public static void main0(String[] args) {
-        double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5, 0.001, 1.2, 2.3, 3.1, 5.9, 1.5, 1.4, 2.3, 1.9, 3.5, 2.3, 2.1, 2.9, 0.5, 0.4, 0.3, 0.9, 0.15, 0.01, 0.22, 0.23, 0.123};
-        double alpha = GammaDistrib.getAlpha(X);
-        double beta = GammaDistrib.getBeta(X, alpha);
-        //double beta = 1 / alpha; // force mean to be 1
-        System.out.println("Setting Gamma distrib with alpha = " + alpha + " beta = " + beta);
-        GammaDistrib gd = new GammaDistrib(alpha, 1/beta);
-        double mean = 0.0;
-        System.out.println("Sample");
-        int N = 2000;
-        for (int i = 0; i < N; i ++) {
-            double y = gd.sample();
-            mean += y;
-            //System.out.println(i + "\t" + y);
-        }
-        System.out.println("Mean\t" + mean / N);
+    public static void main(String[] args) {
+//        double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5, 0.001, 1.2, 2.3, 3.1, 5.9, 1.5, 1.4, 2.3, 1.9, 3.5, 2.3, 2.1, 2.9, 0.5, 0.4, 0.3, 0.9, 0.15, 0.01, 0.22, 0.23, 0.123};
+//        double alpha = GammaDistrib.calcAlpha(X);
+//        double scale = GammaDistrib.calcScale(X, alpha);
+//        //double beta = 1 / alpha; // force mean to be 1
+//        System.out.println("Setting Gamma distrib with alpha = " + alpha + " scale = " + scale);
+//        GammaDistrib gd = new GammaDistrib(alpha, 1/scale, 42);
+//
+//        System.out.println(gd.p(0.5) + "\t" + Math.exp(gd.logP(0.5)));
+//
+//        double mean = 0.0;
+//        System.out.println("Sample");
+//        int N = 2000;
+//        double[] sampledRates = new double[N];
+//        for (int i = 0; i < N; i ++) {
+//            double y = gd.sample();
+//            sampledRates[i] = y;
+//            mean += y;
+//            //System.out.println(i + "\t" + y);
+//        }
+//
+//        double approxAlpha = GammaDistrib.calcAlpha(sampledRates);
+//        double approxScale = GammaDistrib.calcScale(sampledRates, approxAlpha);
+//
+//        double mommean = Arrays.stream(sampledRates).average().orElse(0.0);
+//        double monvariance = Arrays.stream(sampledRates)
+//                .map(x -> Math.pow(x - mommean, 2))
+//                .sum() / sampledRates.length;
+//
+//        double mom_shape = (mommean * mommean) / monvariance;
+//        double mom_scale = monvariance / mommean;
+//
+//
+//        System.out.println("MOM Alpha " + mom_shape);
+//        System.out.println("MOM Scale " + mom_scale);
+//
+//        System.out.println("Approximated Alpha " + approxAlpha);
+//        System.out.println("Approximated Scale " + approxScale);
+//        System.out.println("Approximated mean "  + alpha * approxScale);
+//        System.out.println("Sample Mean\t" + mean / N);
+
+
+        System.out.println(Gamma.regularizedIncompleteGamma(0.5, 0.4));
+        GammaDistrib gd = new GammaDistrib(0.5, 0.5, 42);
+        System.out.println(gd);
+        System.out.println("Quantile upper bound " + gd.quantile(0.25) + " mean rate: " +  gd.meanGammaRate(gd.quantile(0), gd.quantile(0.25)));
+        System.out.println("Quantile upper bound " + gd.quantile(0.5) + " mean rate: " +  gd.meanGammaRate(gd.quantile(0.25), gd.quantile(0.5)));
+        System.out.println("Quantile upper bound " + gd.quantile(0.75) + " mean rate: " +  gd.meanGammaRate(gd.quantile(0.5), gd.quantile(0.75)));
+        System.out.println("Quantile upper bound " + gd.quantile(1.0) + " mean rate: " +  gd.meanGammaRate(gd.quantile(0.75), gd.quantile(1)));
+
+        System.out.println(Gamma.regularizedIncompleteGamma(0.5, Double.POSITIVE_INFINITY));
+        double[] meanRates = gd.getMeanGammaRates(4);
+        System.out.println(Arrays.toString(meanRates));
+
     }
 
     /**
@@ -779,7 +949,7 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * Example that finds a mixture of Gammas using EM
      * @param args
      */
-    public static void main(String[] args) {
+    public static void main0(String[] args) {
         double[] X = {0.000001, 11.2, 8.3, 13.1, 15.9, 11.5, 11.4, 12.3, 11.9, 5.5, 0.001, 1.2, 2.3, 3.1, 5.9, 1.5, 1.4, 2.3, 1.9, 3.5, 2.3, 2.1, 2.9, 0.5, 0.4, 0.3, 0.9, 0.15, 0.01, 0.22, 0.23, 0.123};
         GammaDistrib.Mixture mixture = GammaDistrib.Mixture.fitMLE(X, 2, 321);
         GammaDistrib gamma = GammaDistrib.fitMLE(X, 321);

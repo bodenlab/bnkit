@@ -15,13 +15,17 @@ public class Zipf implements IndelModel {
      * Defines a Zipf distribution
      *
      * @param s The exponent parameter of the distribution
-     * @param seed The random seed for sampling
      * @param maxK The maximum value for the sampling range
+     * @param seed The random seed for sampling
      */
-    public Zipf(double s, long seed, int maxK) {
+    public Zipf(double s, int maxK, long seed) {
         this.s = s;
         this.maxK = maxK;
         this.rand = new Random(seed);
+    }
+
+    public boolean isValidForIndels() {
+        return s > 0.0 || maxK > 0;
     }
 
     /**
@@ -31,7 +35,7 @@ public class Zipf implements IndelModel {
      * @param maxK The maximum value for the sampling range
      */
     public Zipf(double s, int maxK) {
-        this(s, System.currentTimeMillis(), maxK);
+        this(s, maxK, System.currentTimeMillis());
     }
 
     /** Default max value to be observed */
@@ -42,7 +46,11 @@ public class Zipf implements IndelModel {
      * @param s The exponent parameter of the distribution
      */
     public Zipf(double s) {
-        this(s, System.currentTimeMillis(), DEFAULT_MAXK);
+        this(s, DEFAULT_MAXK, System.currentTimeMillis());
+    }
+
+    public Zipf(double s, long seed) {
+        this(s, DEFAULT_MAXK, seed);
     }
 
     public String toString() {
@@ -214,7 +222,7 @@ public class Zipf implements IndelModel {
 
             if (Math.abs(step) < 1e-8) break; // convergence
         }
-        return new Zipf(s, seed, N);
+        return new Zipf(s, N, seed);
     }
 
 
@@ -245,10 +253,10 @@ public class Zipf implements IndelModel {
      * @param data dataset
      * @return an instance of Zipf with parameter value
      */
-    public static Zipf fitMAP(int[] data, double alpha, double beta, double lower, double upper) {
+    public static Zipf fitMAP(int[] data, double alpha, double beta, double lower, double upper, long seed) {
         int N = Arrays.stream(data).max().getAsInt();
         double s = goldenSectionSearch(data, N, alpha, beta, lower, upper,1e-6, 1000);
-        return new Zipf(s, N);
+        return new Zipf(s, N, seed);
     }
 
 
@@ -302,7 +310,7 @@ public class Zipf implements IndelModel {
         double upper = 5.0;
 
         // Run golden-section search
-        System.out.printf("MAP gives " + fitMAP(data, alpha, beta, lower, upper));
+        System.out.printf("MAP gives " + fitMAP(data, alpha, beta, lower, upper, 42));
     }
 
     public static void main1(String[] args) {

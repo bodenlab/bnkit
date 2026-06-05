@@ -6,7 +6,7 @@ import smile.math.Function;
 public class Minimise {
 
     private static final int MAX = 500;
-    private static final double EPS = 10e-6;
+    private static final double EPS = 10e-4;
     private static final double INVPHI = (1.0 + Math.sqrt(5.0)) / 2.0 - 1.0;
     private static final double RATIO = (3.0 - Math.sqrt(5.0)) / 2;
 

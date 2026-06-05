@@ -451,36 +451,40 @@ public abstract class SubstModel {
         System.out.println("R (LG)");
         bn.math.Matrix.print(sm_lg.getR());
 
-        double time = .1;
-        System.out.println("\n\nTransition probabilities of R (Gap) @ time = " + time);
+        double time = .5;
+//        System.out.println("\n\nTransition probabilities of R (Gap) @ time = " + time);
         double[][] prob = sm_gap.getProbs(time, sm_gap.getRexp());
-        bn.math.Matrix.print(prob);
-
-        System.out.println("\n\nTransition probabilities of R (GLOOME1) @ time = " + time);
-        prob = sm_gloome1.getProbs(time, sm_gloome1.getRexp());
-        bn.math.Matrix.print(prob);
-
-        System.out.println("\n\nTransition probabilities of R (Yang) @ time = " + time);
-        prob = sm_yang.getProbs(time, sm_yang.getRexp());
-        bn.math.Matrix.print(prob);
-
-        System.out.println("\n\nTransition probabilities of R (WAG) @ time = " + time);
-        prob = sm_wag.getProbs(time, sm_wag.getRexp());
-        bn.math.Matrix.print(prob);
+//        bn.math.Matrix.print(prob);
+//
+//        System.out.println("\n\nTransition probabilities of R (GLOOME1) @ time = " + time);
+//        prob = sm_gloome1.getProbs(time, sm_gloome1.getRexp());
+//        bn.math.Matrix.print(prob);
+//
+//        System.out.println("\n\nTransition probabilities of R (Yang) @ time = " + time);
+//        prob = sm_yang.getProbs(time, sm_yang.getRexp());
+//        bn.math.Matrix.print(prob);
+//
+//        System.out.println("\n\nTransition probabilities of R (WAG) @ time = " + time);
+//        prob = sm_wag.getProbs(time, sm_wag.getRexp());
+//        bn.math.Matrix.print(prob);
 
         System.out.println("\nTransition probabilities of R (LG) @ time = " + time);
         prob = sm_lg.getProbs(time, sm_lg.getRexp());
         bn.math.Matrix.print(prob);
         bn.math.Matrix.printLaTeX(prob, sm_lg.getDomain().getValues(), sm_lg.getDomain().getValues());
+        double pb = sm_dh.getProb('C', 'R', time);
+        System.out.println("P(D|A) = " + pb);
+        pb = sm_dh.getProb('W', 'R', time);
+        System.out.println("P(C|A) = " + pb);
 
-        System.out.println("\nTransition probabilities of R (JTT) @ time = " + time);
-        prob = sm_jtt.getProbs(time, sm_jtt.getRexp());
-        bn.math.Matrix.print(prob);
-
-        System.out.println("\nTransition probabilities of R (Dayhoff) @ time = " + time);
-        prob = sm_dh.getProbs(time, sm_dh.getRexp());
-        bn.math.Matrix.print(prob);
-        double p = sm_dh.getProb('K', 'R', time);
-        System.out.println("P(K|R) = " + p);
+//        System.out.println("\nTransition probabilities of R (JTT) @ time = " + time);
+//        prob = sm_jtt.getProbs(time, sm_jtt.getRexp());
+//        bn.math.Matrix.print(prob);
+//
+//        System.out.println("\nTransition probabilities of R (Dayhoff) @ time = " + time);
+//        prob = sm_dh.getProbs(time, sm_dh.getRexp());
+//        bn.math.Matrix.print(prob);
+//        double p = sm_dh.getProb('K', 'R', time);
+//        System.out.println("P(K|R) = " + p);
     }
 }

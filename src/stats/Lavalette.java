@@ -6,24 +6,28 @@ import java.util.Random;
 
 public class Lavalette implements IndelModel {
 
-    private double a;  // Exponent parameter of the Lavalette distribution
-    private int maxK;  // Maximum rank value (N in the formula)
+    private final double a;  // Exponent parameter of the Lavalette distribution
+    private final int maxK;  // Maximum rank value (N in the formula)
     private Random rand;
 
-    public Lavalette(double a, long seed, int maxK) {
+    public Lavalette(double a,int maxK, long seed) {
         this.a = a;
         this.maxK = maxK;
         this.rand = new Random(seed);
     }
 
     public Lavalette(double a, int maxK) {
-        this(a, System.currentTimeMillis(), maxK);
+        this(a, maxK, System.currentTimeMillis());
     }
 
     public static int DEFAULT_MAXK = 1000; //
 
     public Lavalette(double a) {
-        this(a, System.currentTimeMillis(), DEFAULT_MAXK);
+        this(a, DEFAULT_MAXK, System.currentTimeMillis());
+    }
+
+    public Lavalette(double a, long seed) {
+        this(a, DEFAULT_MAXK, seed);
     }
 
     public String toString() {
@@ -192,7 +196,7 @@ public class Lavalette implements IndelModel {
 
             if (Math.abs(step) < 1e-8) break; // convergence
         }
-        return new Lavalette(a, seed, N);
+        return new Lavalette(a, N, seed);
     }
 
     // Log posterior (up to constant)
@@ -212,6 +216,10 @@ public class Lavalette implements IndelModel {
         double logPrior = GammaDistrib.logPrior(s, alpha, beta);
 
         return logLikelihood + logPrior;
+    }
+
+    public boolean isValidForIndels() {
+        return a > 0.0 && maxK > 0;
     }
 
     /**

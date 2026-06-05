@@ -9,12 +9,8 @@ import dat.file.Newick;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
-import smile.stat.distribution.ExponentialFamilyMixture;
-import smile.stat.distribution.GammaDistribution;
-import smile.stat.distribution.Mixture;
 import stats.RateModel;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
@@ -1027,8 +1023,12 @@ public class IdxTree implements Iterable<Integer> {
     public double getMeanDistance() {
         double d = 0;
         try {
-            for (int i = 0; i < bpoints.length; i ++)
-                d += bpoints[i].getDistance();
+            for (int i = 0; i < bpoints.length; i ++) {
+                BranchPoint bp = bpoints[i];
+                if (bp.getParent() == null)
+                    continue; // skip the root
+                d += bp.getDistance();
+            }
         } catch (TreeRuntimeException e) {
             throw new TreeRuntimeException("One or more branchpoints do not have distances assigned");
         }
@@ -1206,8 +1206,8 @@ public class IdxTree implements Iterable<Integer> {
      */
     public double[] getGammaParams() {
         double[] dists_arr = getValidDistances();
-        double alpha1 = GammaDistrib.getAlpha(dists_arr);
-        double beta1 = GammaDistrib.getBeta(dists_arr, alpha1);
+        double alpha1 = GammaDistrib.calcAlpha(dists_arr);
+        double beta1 = GammaDistrib.calcScale(dists_arr, alpha1);
         return new double[] {alpha1, beta1};
     }
 
@@ -1469,7 +1469,7 @@ public class IdxTree implements Iterable<Integer> {
     public static IdxTree generateTreeFromDistrib(RateModel distmodel, Distrib leaf2root, int NLEAVES, long SEED, int NITER) {
         // 2. Generate a new tree based on the above mixture of Gamma distributions
         //   a) assume that branch lengths are uniformly distributed across topology
-        Tree tree = null;
+        Tree tree;
         tree = Tree.Random(NLEAVES, distmodel, 2,2, SEED);
         if (leaf2root == null)
             return tree;

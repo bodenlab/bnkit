@@ -124,9 +124,9 @@ public class Gamma {
      * Regularized Incomplete Gamma Function
      * P(s,x) = <i>&#8747;<sub><small>0</small></sub><sup><small>x</small></sup> e<sup>-t</sup> t<sup>(s-1)</sup> dt</i>
      *
-     * \param s {@code s >= 0}
-     * \param x {@code x >= 0}
-     * \return the function value.
+     * @param s {@code s >= 0}
+     * @param x {@code x >= 0}
+     * @return the function value.
      */
     public static double regularizedIncompleteGamma(double s, double x) {
         if (s < 0.0) {
@@ -135,6 +135,10 @@ public class Gamma {
 
         if (x < 0.0) {
             throw new IllegalArgumentException("Invalid x: " + x);
+        }
+
+        if (x == Double.POSITIVE_INFINITY) {
+            return 1.0;
         }
 
         double igf;
@@ -336,9 +340,9 @@ public class Gamma {
     /**
      * The inverse of regularized incomplete gamma function.
      *
-     * \param a {@code a > 0}
-     * \param p a real number.
-     * \return the function value.
+     * @param a {@code a > 0}
+     * @param p a real number.
+     * @return the function value.
      */
     public static double inverseRegularizedIncompleteGamma(double a, double p) {
         if (a <= 0.0) {
