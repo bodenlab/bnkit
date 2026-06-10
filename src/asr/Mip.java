@@ -2,6 +2,7 @@ package asr;
 
 import bn.ctmc.GapSubstModel;
 import bn.ctmc.matrix.*;
+import bn.prob.GammaDistrib;
 import com.google.ortools.Loader;
 import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
@@ -25,7 +26,7 @@ import util.Binner;
 public class Mip {
 
     private static final double MAX_PENALTY = 1000.0;
-    private static final int NUM_GAMMA_CATEGORIES = 20;
+    private static final int NUM_GAMMA_CATEGORIES = 10;
     public static double MIN_MU_LAMBDA_VALUE = 0;
     public static double MAX_MU_LAMBDA_VALUE = 0.25;
     private static final int GAP = 0;
@@ -316,8 +317,9 @@ public class Mip {
             double[] ratePriors;
 
             if (rateSampleCollection.length > 0) {
-                RateModel indelRateDist = RateModel.bestfit(rateSampleCollection, 42);
-                rates = indelRateDist.getMeanGammaRates(NUM_GAMMA_CATEGORIES);
+                ZeroInflatedGamma zig = ZeroInflatedGamma.fitMLE(rateSampleCollection, 42);
+                GammaDistrib gd = new GammaDistrib(zig.getShape(), zig.getShape(), 42);
+                rates = gd.getMeanGammaRates(NUM_GAMMA_CATEGORIES);
 
             } else {
                 rates = new double[NUM_GAMMA_CATEGORIES];
