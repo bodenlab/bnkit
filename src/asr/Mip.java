@@ -39,7 +39,7 @@ public class Mip {
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
-    private static final int DEFAULT_GAP_PENALTY = 1;
+    private static final int DEFAULT_GAP_PENALTY = 2;
     private final HashMap<Integer, Integer[]> extantBinarySeqs;
     private final POAGraph alnPog;
     private final POGTree pogTree;
@@ -347,7 +347,7 @@ public class Mip {
                 stateDists.sort((a, b) -> Double.compare(b.getValue().getMean(), a.getValue().getMean()));
                 Map<Object, Double> penaltyMap = new LinkedHashMap<>();
                 for (int i = 0; i < stateDists.size(); i++) {
-                    double penalty = DEFAULT_GAP_PENALTY + i;
+                    double penalty = (1 + i);
                     penaltyMap.put(stateDists.get(i).getKey(), penalty);
                 }
 
@@ -401,7 +401,7 @@ public class Mip {
                             continue; // ignore root
                         }
                         double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
-                        treeNeighbourAlphaPen[colIdx][bpidx] = penalty * 2.0; // introducing gap 2x worse than diff
+                        treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     }
                 }
             }
@@ -778,11 +778,7 @@ public class Mip {
 
                         objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
                         DiffKey diffKey = new DiffKey(ancestralIdx, childIdx, pos);
-                        if (useBranchLengths) {
-                            objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos] * Math.log(1.0 + 1.0/tree.getDistance(childIdx)));
-                        } else {
-                            objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos]);
-                        }
+                        objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos]);
 
                     } else {
 
@@ -883,13 +879,8 @@ public class Mip {
 
                         double existingPen = objective.getCoefficient(pen[pos]);
                         double existingDiff = objective.getCoefficient(diffPos[pos]);
+                        objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
                         objective.setCoefficient(pen[pos], existingPen + treeNeighbourAlphaPen[pos][childIdx]);
-                        if (useBranchLengths) {
-                            objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos] * Math.log(1.0 + 1.0/tree.getDistance(childIdx)));
-                        } else {
-                            objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
-                        }
-
                     }
                 }
             }
