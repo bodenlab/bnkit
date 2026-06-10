@@ -224,7 +224,7 @@ public class GRASP {
     private static int INDEL_IDX = 0; // default indel approach is that above indexed 0
     private static final String[] SPATH = new String[]{"DIJKSTRA", "ASTAR"};
     public static boolean RANDOM_RATES = false;
-    public static boolean SIMPLE_RATES = false;
+    public static boolean SEQ_RATES = false;
     public static boolean INDEL_CONSERVATIVE = true;
     public static boolean DISTANCE_BASED_MIP = false;
 
@@ -509,8 +509,8 @@ public class GRASP {
                     MODE = Inference.JOINT;
                 } else if (arg.equalsIgnoreCase("-random-rates")) {
                     RANDOM_RATES = true;
-                } else if (arg.equalsIgnoreCase("-simple-rates")) {
-                    SIMPLE_RATES = true;
+                } else if (arg.equalsIgnoreCase("-seq-rates")) {
+                    SEQ_RATES = true;
                 } else if ((arg.equalsIgnoreCase("-marginal") || arg.equalsIgnoreCase("m")) && args.length > a + 1) {
                     MODE = Inference.MARGINAL;
                     String ancid = args[++a];
