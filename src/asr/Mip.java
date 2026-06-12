@@ -322,7 +322,7 @@ public class Mip {
                 }
                 int numLatentStates = 3;
                 Object[] stateLabels = new Object[numLatentStates];
-                for (int i = 0; i < stateLabels.length; i++){
+                for (int i = 0; i < stateLabels.length; i++) {
                     stateLabels[i] = (char) ('A' + i);
                 }
                 SubstModel model = new JC(1.0, stateLabels);
@@ -338,8 +338,8 @@ public class Mip {
                 System.out.println(pbn.getMasterJSON().toString());
 
                 List<Map.Entry<Object, GaussianDistrib>> stateDists = new ArrayList<>();
-                for (Object state: stateLabels) {
-                    Object[] cond = new Object[] {state};
+                for (Object state : stateLabels) {
+                    Object[] cond = new Object[]{state};
                     GaussianDistrib dist = (GaussianDistrib) gdt.getDistrib(cond);
                     stateDists.add(Map.entry(state, dist));
                 }
@@ -368,7 +368,7 @@ public class Mip {
                         double bestLogProb = Double.NEGATIVE_INFINITY;
                         int bestIndex = -1;
                         for (int i = 0; i < stateDists.size(); i++) {
-                            GaussianDistrib stateDist =  stateDists.get(i).getValue();
+                            GaussianDistrib stateDist = stateDists.get(i).getValue();
                             double logProb = Math.log(stateDist.get(d));
                             if (logProb > bestLogProb) {
                                 bestIndex = i;
@@ -382,17 +382,120 @@ public class Mip {
                     }
                 }
 
-                for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
-                    for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                        if (tree.getParent(bpidx) == -1) {
-                            continue; // ignore root
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_seq_rates.csv")))) {
+                    writer.write("col_idx,bpidx,label,penalty");
+                    writer.newLine();
+
+                    for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+                        for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                            if (tree.getParent(bpidx) == -1) {
+                                continue; // ignore root
+                            }
+                            double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
+                            Object seqGapState = save[bpidx][1];
+                            double gapOpeningPenalty = penaltyMap.get(seqGapState);
+                            treeNeighbourAlphaPen[colIdx][bpidx] = penalty * gapOpeningPenalty;
+                            String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                            writer.write(colIdx + "," + bpidx + "," + label + "," + penalty);
+                            writer.newLine();
                         }
-                        double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
-                        Object seqGapState = save[bpidx][1];
-                        double gapOpeningPenalty = penaltyMap.get(seqGapState);
-                        treeNeighbourAlphaPen[colIdx][bpidx] = penalty * gapOpeningPenalty;
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+
+            } else if (GRASP.COL_RATES) {
+                Prediction bepIndels =  Prediction.PredictByBidirEdgeParsimony(pogTree);
+                bepIndels.getJoint(GRASP.MODEL, GRASP.RATES);
+                Map<Object, POGraph> pogs = bepIndels.getAncestors(GRASP.Inference.JOINT);
+                String[] ancnames = new String[pogs.size()];
+                Object[][] ancSeqsGappy = new Object[pogs.size()][];
+                Object[][] ancSeqsNoGap = new Object[pogs.size()][];
+                GRASP.extractAncestralSequences(ancSeqsGappy, ancSeqsNoGap, pogs, bepIndels, ancnames);
+                double[] rateSampleCollection = TrAVIS.calculateColumnIndelRates(bepIndels.getTree(), aln, ancSeqsGappy);
+                double[] rates;
+                double[] ratePriors;
+
+                if (rateSampleCollection.length > 0) {
+                    ZeroInflatedGamma zig = ZeroInflatedGamma.fitMLE(rateSampleCollection, 42);
+                    GammaDistrib gd = new GammaDistrib(zig.getShape(), zig.getShape(), 42);
+                    rates = gd.getMeanGammaRates(NUM_GAMMA_CATEGORIES);
+
+                } else {
+                    rates = new double[NUM_GAMMA_CATEGORIES];
+                    Arrays.fill(rates, 1.0);
+                }
+
+                ratePriors = new double[NUM_GAMMA_CATEGORIES];
+                Arrays.fill(ratePriors, Math.log(1.0 / NUM_GAMMA_CATEGORIES));
+
+                double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
+                int[] columnRateCategories = null;
+
+
+                if (GRASP.RANDOM_RATES) {
+                    System.out.println("Random indel rates selected - assigning random rates to each column...");
+                } else if (GRASP.SIMPLE_RATES) {
+                    double[] gapOccupancy = new double[aln.getWidth()];
+                    for (int i = 0; i < aln.getWidth(); i++) {
+                        gapOccupancy[i] = 1 - (aln.getOccupancy(i) / (double) aln.getHeight());
+                    }
+
+                    int numSections = rates.length;
+                    Binner splitter = new Binner.QuantileBinner(numSections, false);
+                    splitter.fit(gapOccupancy, true);
+                    System.out.println(Arrays.toString(splitter.getBinEdges()));
+                    columnRateCategories = new int[aln.getWidth()];
+                    for (int i = 0; i < aln.getWidth(); ++i) {
+                        double occupancy = gapOccupancy[i];
+                        int rateCategory = splitter.transform(occupancy);
+                        columnRateCategories[i] = rateCategory;
+                    }
+                } else {
+                    double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Optimising indel parameters for distance-based MIP...");
+                    }
+                    double optimal_mu = IndelPeeler.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
+                            tree, geometric_seq_len_param, aln);
+
+                    GapSubstModel gapModel = createGapSubstModel(optimal_mu);
+
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Computing column priors under different indel rate categories...");
+                        for (int i = 0; i < rates.length; i++) {
+                            System.out.println("Rate category " + i + ": " + rates[i]);
+                        }
+                    }
+                    double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel,
+                            geometric_seq_len_param, rates, GRASP.NTHREADS);
+
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Computing prefix sums for indel segment assignment...");
+                    }
+                    double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
+
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Assigning optimal indel rate segments...");
+                    }
+
+                    int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
+                            prefix_sums);
+
+                    columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
+                }
+
+                for (int rateIdx = 0; rateIdx < rates.length; rateIdx++) {
+                    for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                        // adjust each length by the assigned rate category
+                        double adjustedDist = rates[rateIdx] * tree.getDistance(bpidx);
+                        rateAdjustedDists[rateIdx][bpidx] = adjustedDist;
                     }
                 }
+
+                calcLogDistPenalties(columnRateCategories, rates, rateAdjustedDists, treeNeighbourAlphaPen);
 
             } else {
                 for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
@@ -404,12 +507,42 @@ public class Mip {
                         treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     }
                 }
+
+
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
+                    writer.write("col_idx,bpidx,label,penalty");
+                    writer.newLine();
+                    for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                        if (tree.getParent(bpidx) == -1) {
+                            continue; // ignore root
+                        }
+                        double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
+                        String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                        writer.write("-1," + bpidx + "," + label + "," + penalty);
+                        writer.newLine();
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
 
 
         } else {
-            for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
-                Arrays.fill(treeNeighbourAlphaPen[colIdx], DEFAULT_GAP_PENALTY);
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
+
+                writer.write("col_idx,bpidx,label,penalty");
+                writer.newLine();
+                for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+                    Arrays.fill(treeNeighbourAlphaPen[colIdx], DEFAULT_GAP_PENALTY);
+                    writer.write(colIdx + ",-1,-1," + DEFAULT_GAP_PENALTY);
+                    writer.newLine();
+                }
+
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
 
@@ -418,18 +551,29 @@ public class Mip {
 
     private void calcLogDistPenalties(int[] columnRateCategories, double[] rates,
                                       double[][] rateAdjustedDists, double[][] treeNeighbourAlphaPen) {
-        for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
-            int rateIdx;
-            if (GRASP.RANDOM_RATES) {
-                rateIdx = new Random().nextInt(rates.length);
-            } else {
-                rateIdx = columnRateCategories[colIdx];
-            }
 
-            for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
-                treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
+
+            writer.write("col_idx,bpidx,label,penalty");
+            writer.newLine();
+            for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+                int rateIdx;
+                if (GRASP.RANDOM_RATES) {
+                    rateIdx = new Random().nextInt(rates.length);
+                } else {
+                    rateIdx = columnRateCategories[colIdx];
+                }
+
+                for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                    double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
+                    treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
+                    String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
+                    writer.write(colIdx + "," + bpidx + "," + label + "," + treeNeighbourAlphaPen[colIdx][bpidx]);
+                    writer.newLine();
+                }
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 

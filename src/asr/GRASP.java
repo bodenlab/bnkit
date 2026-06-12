@@ -166,9 +166,9 @@ public class GRASP {
     private static String ALIGNMENT = null;
     private static String ASRFILE = "ASR.json";
     private static String NEWICK = null;
-    private static String OUTPUT = null;
+    static String OUTPUT = null;
     private static String INPUT = null;
-    private static String PREFIX = null;
+    static String PREFIX = null;
     private static String RATESFILE = null;
     public static double[] RATES = null;
     private static String EMPIRICAL_FREQS_FILE = null;
@@ -224,7 +224,9 @@ public class GRASP {
     private static int INDEL_IDX = 0; // default indel approach is that above indexed 0
     private static final String[] SPATH = new String[]{"DIJKSTRA", "ASTAR"};
     public static boolean RANDOM_RATES = false;
+    public static boolean SIMPLE_RATES = false;
     public static boolean SEQ_RATES = false;
+    public static boolean COL_RATES = false; 
     public static boolean INDEL_CONSERVATIVE = true;
     public static boolean DISTANCE_BASED_MIP = false;
 
@@ -509,8 +511,12 @@ public class GRASP {
                     MODE = Inference.JOINT;
                 } else if (arg.equalsIgnoreCase("-random-rates")) {
                     RANDOM_RATES = true;
+                } else if (arg.equalsIgnoreCase("-simple-rates")) {
+                    SIMPLE_RATES = true;
                 } else if (arg.equalsIgnoreCase("-seq-rates")) {
                     SEQ_RATES = true;
+                } else if (arg.equalsIgnoreCase("-col-rates")) {
+                    COL_RATES = true;
                 } else if ((arg.equalsIgnoreCase("-marginal") || arg.equalsIgnoreCase("m")) && args.length > a + 1) {
                     MODE = Inference.MARGINAL;
                     String ancid = args[++a];
