@@ -33,13 +33,14 @@ import util.Binner;
 public class Mip {
 
     private static final double MAX_PENALTY = 1000.0;
-    private static final int NUM_GAMMA_CATEGORIES = 20;
+    private static final int NUM_GAMMA_CATEGORIES = 5;
     public static double MIN_MU_LAMBDA_VALUE = 0;
     public static double MAX_MU_LAMBDA_VALUE = 0.25;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
     private static final int DEFAULT_GAP_PENALTY = 2;
+    private static final int MAX_GAP_PENALTY = 10;
     private final HashMap<Integer, Integer[]> extantBinarySeqs;
     private final POAGraph alnPog;
     private final POGTree pogTree;
@@ -383,7 +384,7 @@ public class Mip {
                 }
 
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_seq_rates.csv")))) {
-                    writer.write("col_idx,bpidx,label,penalty");
+                    writer.write("col_idx,bpidx,label,penalty,rate");
                     writer.newLine();
 
                     for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
@@ -391,12 +392,13 @@ public class Mip {
                             if (tree.getParent(bpidx) == -1) {
                                 continue; // ignore root
                             }
+
                             double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
                             Object seqGapState = save[bpidx][1];
                             double gapOpeningPenalty = penaltyMap.get(seqGapState);
                             treeNeighbourAlphaPen[colIdx][bpidx] = penalty * gapOpeningPenalty;
                             String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
-                            writer.write(colIdx + "," + bpidx + "," + label + "," + penalty);
+                            writer.write(colIdx + "," + bpidx + "," + label + "," + penalty + "," + gapOpeningPenalty);
                             writer.newLine();
                         }
                     }
@@ -407,7 +409,7 @@ public class Mip {
 
 
             } else if (GRASP.COL_RATES) {
-                Prediction bepIndels =  Prediction.PredictByBidirEdgeParsimony(pogTree);
+                Prediction bepIndels = Prediction.PredictByParsimony(pogTree); // Prediction.PredictByBidirEdgeParsimony(pogTree);
                 bepIndels.getJoint(GRASP.MODEL, GRASP.RATES);
                 Map<Object, POGraph> pogs = bepIndels.getAncestors(GRASP.Inference.JOINT);
                 String[] ancnames = new String[pogs.size()];
@@ -510,7 +512,7 @@ public class Mip {
 
 
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
-                    writer.write("col_idx,bpidx,label,penalty");
+                    writer.write("col_idx,bpidx,label,penalty,rate");
                     writer.newLine();
                     for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                         if (tree.getParent(bpidx) == -1) {
@@ -518,7 +520,7 @@ public class Mip {
                         }
                         double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
                         String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
-                        writer.write("-1," + bpidx + "," + label + "," + penalty);
+                        writer.write("-1," + bpidx + "," + label + "," + penalty + ",");
                         writer.newLine();
                     }
 
@@ -532,11 +534,11 @@ public class Mip {
 
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
 
-                writer.write("col_idx,bpidx,label,penalty");
+                writer.write("col_idx,bpidx,label,penalty,rate");
                 writer.newLine();
                 for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                     Arrays.fill(treeNeighbourAlphaPen[colIdx], DEFAULT_GAP_PENALTY);
-                    writer.write(colIdx + ",-1,-1," + DEFAULT_GAP_PENALTY);
+                    writer.write(colIdx + ",-1,-1," + DEFAULT_GAP_PENALTY + ",");
                     writer.newLine();
                 }
 
@@ -553,8 +555,7 @@ public class Mip {
                                       double[][] rateAdjustedDists, double[][] treeNeighbourAlphaPen) {
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
-
-            writer.write("col_idx,bpidx,label,penalty");
+            writer.write("col_idx,bpidx,label,penalty,rate");
             writer.newLine();
             for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                 int rateIdx;
@@ -568,7 +569,7 @@ public class Mip {
                     double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
                     treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
-                    writer.write(colIdx + "," + bpidx + "," + label + "," + treeNeighbourAlphaPen[colIdx][bpidx]);
+                    writer.write(colIdx + "," + bpidx + "," + label + "," + treeNeighbourAlphaPen[colIdx][bpidx] + "," + rates[rateIdx]);
                     writer.newLine();
                 }
             }

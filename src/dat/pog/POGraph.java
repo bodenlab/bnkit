@@ -3,6 +3,7 @@ package dat.pog;
 import asr.ASRException;
 import asr.ASRRuntimeException;
 import asr.GRASP;
+import asr.TrAVIS;
 import bn.prob.EnumDistrib;
 import dat.EnumSeq;
 import dat.Enumerable;
@@ -1351,53 +1352,45 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
         int deletionCount = 0;
         int insertionCount = 0;
         enum LineageState {HAS_CONTENT, DELETED, NEVER_HAD_CONTENT }
-        Map<Integer, LineageState> lineageState = new HashMap<>();
 
         IdxTree tree = pogTree.getTree();
         for (int alnPosition = 0; alnPosition < aln.getWidth(); alnPosition++) {
             Iterator<Integer> dfs = tree.getDepthFirstIterator();
 
+            Map<Integer, LineageState> lineageState = new HashMap<>();
             while (dfs.hasNext()) {
 
                 int bpidx = dfs.next();
-                if (bpidx == ROOT_IDX) {
-                    boolean rootHasContent = doesNodeHaveContentAtPosition(tree, bpidx, pogTree, alnPosition,
-                            ancestralPogs);
 
-                    if (rootHasContent) {
-                        lineageState.put(bpidx, LineageState.HAS_CONTENT);
-                    } else {
-                        lineageState.put(bpidx, LineageState.NEVER_HAD_CONTENT);
-                    }
+                boolean currentNodeHasContent = doesNodeHaveContentAtPosition(tree,
+                                                                                bpidx,
+                                                                                pogTree,
+                                                                                alnPosition,
+                                                                                ancestralPogs);
+
+                if (bpidx == ROOT_IDX) {
+                    lineageState.put(bpidx, currentNodeHasContent ? LineageState.HAS_CONTENT : LineageState.NEVER_HAD_CONTENT);
                     continue;
                 }
 
-                boolean currentNodeHasContent = doesNodeHaveContentAtPosition(tree, bpidx, pogTree,
-                                                                                alnPosition, ancestralPogs);
-
                 LineageState parentState = lineageState.get(tree.getParent(bpidx));
+                boolean indelEventOccurred = ((parentState == LineageState.DELETED || parentState == LineageState.NEVER_HAD_CONTENT) && currentNodeHasContent) ||
+                        (parentState == LineageState.HAS_CONTENT && !currentNodeHasContent);
 
-                if ((parentState == LineageState.DELETED || parentState == LineageState.NEVER_HAD_CONTENT) && currentNodeHasContent) {
-                    insertionCount++;
-                } else if (parentState == LineageState.HAS_CONTENT && !currentNodeHasContent) {
-                    deletionCount++;
-                }
 
-                if (parentState == LineageState.DELETED && currentNodeHasContent) {
-                    String currentNodeLabel = (String) tree.getBranchPoint(bpidx).getLabel();
-//                    if (!tree.isLeaf(bpidx)) {
-//                        currentNodeLabel = currentNodeLabel;
-//                    }
-//
-//                    System.out.println("Phylogenetic violation at aln pos " + (alnPosition + 1) +" at node " + currentNodeLabel);
-                    violationCount += 1;
-                }
-
+                // bookkeeping so we can identify indel events.
                 LineageState currentState;
                 if (currentNodeHasContent) {
                     currentState = LineageState.HAS_CONTENT;
+                    if (parentState == LineageState.DELETED) {
+                        violationCount += 1;
+                        insertionCount += 1;
+                    } else if (parentState == LineageState.NEVER_HAD_CONTENT) {
+                        insertionCount += 1;
+                    }
                 } else if (parentState == LineageState.HAS_CONTENT) {
                     currentState = LineageState.DELETED;
+                    deletionCount += 1;
                 } else if (parentState == LineageState.DELETED) {
                     currentState = LineageState.DELETED;
                 } else {
@@ -1405,12 +1398,12 @@ public class POGraph extends IdxEdgeGraph<POGraph.StatusEdge> {
                 }
 
                 lineageState.put(bpidx, currentState);
-
             }
         }
 
         System.out.println("Insertions: " + insertionCount);
         System.out.println("Deletions: " + deletionCount);
+        System.out.println("Phylogenetic violaions: " + violationCount);
         return violationCount;
     }
 

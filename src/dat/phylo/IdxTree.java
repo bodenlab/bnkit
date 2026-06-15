@@ -1035,6 +1035,17 @@ public class IdxTree implements Iterable<Integer> {
         return d;
     }
 
+    public double getMedianDistance() {
+        double[] sorted = Arrays.stream(getValidDistances()).sorted().toArray();
+
+        int n = sorted.length;
+        if (n % 2 == 0) {
+            return (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+        } else {
+            return sorted[n / 2];
+        }
+    }
+
     /**
      * Calculate the mean distance for any leaf to their root
      * @return mean distance
