@@ -412,7 +412,7 @@ public class GRASP {
                 } else if (arg.equalsIgnoreCase("-verbose")) {
                     VERBOSE = true;
                 } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
-                    usage();
+                    TrAVIS.usage();
                 } else if ((arg.equalsIgnoreCase("s") || arg.equalsIgnoreCase("-substitution-model")) && args.length > a + 1) {
                     boolean found_model = false;
                     for (int i = 0; i < MODELS.length; i++) {
@@ -422,7 +422,7 @@ public class GRASP {
                         }
                     }
                     if (!found_model)
-                        usage(1, args[a + 1] + " is not a valid model name for option --substitution-model");
+                        TrAVIS.usage(1, args[a + 1] + " is not a valid model name for option --substitution-model");
 
                 } else if ((arg.equalsIgnoreCase("-rates-file") || arg.equalsIgnoreCase("rf")) && args.length > a + 1) {
                     RATESFILE = args[++a];
@@ -478,10 +478,8 @@ public class GRASP {
                         try {
                             NTHREADS = Integer.parseInt(args[++a]);
                         } catch (NumberFormatException e) {
-                            usage(2, "Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
+                            TrAVIS.usage(2, "Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
                         }
-                } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
-                    TrAVIS.usage();
                 } else {
                     TrAVIS.usage(5, "Unknown option or missing required argument: \"" + args[a] + "\"");
                 }

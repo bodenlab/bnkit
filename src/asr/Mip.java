@@ -383,6 +383,8 @@ public class Mip {
                     }
                 }
 
+                double medianDist = tree.getMedianDistance();
+                double normFactor = DEFAULT_GAP_PENALTY / -Math.log(1 - Math.exp(-medianDist));
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_seq_rates.csv")))) {
                     writer.write("col_idx,bpidx,label,penalty,rate");
                     writer.newLine();
@@ -393,7 +395,8 @@ public class Mip {
                                 continue; // ignore root
                             }
 
-                            double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
+                            //double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
+                            double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx))) * normFactor;
                             Object seqGapState = save[bpidx][1];
                             double gapOpeningPenalty = penaltyMap.get(seqGapState);
                             treeNeighbourAlphaPen[colIdx][bpidx] = penalty * gapOpeningPenalty;
@@ -500,12 +503,17 @@ public class Mip {
                 calcLogDistPenalties(columnRateCategories, rates, rateAdjustedDists, treeNeighbourAlphaPen);
 
             } else {
+
+
+                double medianDist = tree.getMedianDistance();
+                double normFactor = DEFAULT_GAP_PENALTY / -Math.log(1 - Math.exp(-medianDist));
                 for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                     for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                         if (tree.getParent(bpidx) == -1) {
                             continue; // ignore root
                         }
-                        double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
+                        //double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
+                        double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx))) * normFactor;
                         treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     }
                 }
@@ -518,7 +526,8 @@ public class Mip {
                         if (tree.getParent(bpidx) == -1) {
                             continue; // ignore root
                         }
-                        double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
+                        //double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
+                        double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx)));
                         String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                         writer.write("-1," + bpidx + "," + label + "," + penalty + ",");
                         writer.newLine();
@@ -554,6 +563,9 @@ public class Mip {
     private void calcLogDistPenalties(int[] columnRateCategories, double[] rates,
                                       double[][] rateAdjustedDists, double[][] treeNeighbourAlphaPen) {
 
+
+        double medianDist = tree.getMedianDistance();
+        double normFactor = DEFAULT_GAP_PENALTY / -Math.log(1 - Math.exp(-medianDist));
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
             writer.write("col_idx,bpidx,label,penalty,rate");
             writer.newLine();
@@ -566,7 +578,8 @@ public class Mip {
                 }
 
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                    double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
+                    //double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
+                    double penalty = -Math.log(1.0 - Math.exp(-rateAdjustedDists[rateIdx][bpidx])) * normFactor;
                     treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                     writer.write(colIdx + "," + bpidx + "," + label + "," + treeNeighbourAlphaPen[colIdx][bpidx] + "," + rates[rateIdx]);

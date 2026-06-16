@@ -331,7 +331,40 @@ public class TrAVIS {
         int ndeletions = Arrays.stream(del_total).sum();
         int nindel = ninsertions + ndeletions;
         double delprop = (double) ndeletions / (double) nindel;
+
+        try (PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_indel_metrics.csv"))))) {
+
+            StringBuilder cols = new StringBuilder();
+            StringBuilder data = new StringBuilder();
+            for (int i = 0; i < ins_total.length; i++) {
+                if (ins_total[i] != 0) {
+                    cols.append("insertion_len_").append(i + 1).append(",");
+                    data.append(ins_total[i]).append(",");
+                }
+
+
+            }
+            for (int i = 0; i < del_total.length; i++) {
+                if (del_total[i] != 0) {
+                    cols.append("deletion_len_").append(i + 1).append(",");
+                    data.append(del_total[i]).append(",");
+                }
+            }
+
+            cols.append("num_insertions,").append("num_deletions,").append("num_indels");
+            data.append(ninsertions).append(",").append(ndeletions).append(",").append(nindel);
+
+            out.println(cols);
+            out.println(data);
+            out.flush();
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         System.out.printf("--delprop %.2f \\\n", delprop);
+
+
     }
 
     private static Map<Integer, Object[]> getAllSeqs(IdxTree tree, EnumSeq.Alignment<Enumerable> aln,
@@ -1370,49 +1403,128 @@ public class TrAVIS {
             ti_insertions = new TreeInstance(tree, insertions);
             ti_seqs = new TreeInstance(tree, bpseqs);
 
-//            if (VERBOSE) {
-//                String outputFile = (OUTPUT != null ? OUTPUT : "")  +"_travis_report.txt";
-//
-//                try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
-//
-//                    System.out.println(tree);
-//                    pw.println(tree);
-//
-//                    for (int idx : tree) {
-//                        BranchPoint bp = tree.getBranchPoint(idx);
-//                        BranchPoint parent = bp.getParent();
-//
-//                        System.out.println(bp.getLabel() + "\t" + bpseqs[idx]);
-//                        pw.println(bp.getLabel() + "\t" + bpseqs[idx]);
-//
-//                        if (idx != 0 && parent != null) {
-//                            for (int i = 0; i < deletions[idx].length; i++) {
-//                                if (deletions[idx][i] > 0) {
-//                                    String line = "\tDELETE " + parent.getLabel() + "->"
-//                                            + bp.getLabel() + "@" + i + ":" + deletions[idx][i];
-//
-//                                    System.out.println(line);
-//                                    pw.println(line);
-//                                }
-//                            }
-//                            for (int i = 0; i < insertions[idx].length; i++) {
-//                                if (insertions[idx][i] > 0) {
-//                                    String line = "\tINSERT " + parent.getLabel() + "->"
-//                                            + bp.getLabel() + "@" + i + ":" + insertions[idx][i];
-//
-//                                    System.out.println(line);
-//                                    pw.println(line);
-//                                }
-//                            }
-//                        }
-//                    }
-//
-//                    pw.flush();
-//
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
+            if (GRASP.VERBOSE) {
+                //writeTravisReport(tree, bpseqs, deletions, insertions);
+
+                Map<Integer, Integer> insertMap = new HashMap<>();
+                Map<Integer, Integer> deleteMap = new HashMap<>();
+                for (int[] deletion : deletions) {
+                    if (deletion == null) {
+                        continue;
+                    }
+                    for (int i : deletion) {
+                        if (i == 0) {
+                            continue;
+                        }
+                        if (deleteMap.containsKey(i)) {
+                            deleteMap.put(i, deleteMap.get(i) + 1);
+                        } else {
+                            deleteMap.put(i, 1);
+                        }
+                    }
+                }
+
+                for (int[] insertion : insertions) {
+
+                    if (insertion == null) {
+                        continue;
+                    }
+                    for (int i : insertion) {
+                        if (i == 0) {
+                            continue;
+                        }
+                        if (insertMap.containsKey(i)) {
+                            insertMap.put(i, insertMap.get(i) + 1);
+                        } else {
+                            insertMap.put(i, 1);
+                        }
+                    }
+                }
+
+
+                try (PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter( new File(GRASP.OUTPUT,
+                        GRASP.PREFIX + "_indel_metrics.csv"))))) {
+
+                    StringBuilder cols = new StringBuilder();
+                    StringBuilder data = new StringBuilder();
+                    int numDeletions = 0;
+                    for (Map.Entry<Integer, Integer> entry : deleteMap.entrySet()) {
+                        int len = entry.getKey();
+                        int num = entry.getValue();
+                        numDeletions += num;
+                        cols.append("deletion_len_").append(len).append(",");
+                        data.append(num).append(",");
+                    }
+
+                    int numInsertions = 0;
+                    for (Map.Entry<Integer, Integer> entry : insertMap.entrySet()) {
+                        int len = entry.getKey();
+                        int num = entry.getValue();
+                        numInsertions += num;
+                        cols.append("insertion_len_").append(len).append(",");
+                        data.append(num).append(",");
+                    }
+
+                    cols.append("num_insertions,").append("num_deletions,").append("num_indels");
+                    data.append(numInsertions).append(",").append(numDeletions).append(",").append(numInsertions + numDeletions);
+
+                    out.println(cols);
+                    out.println(data);
+                    out.flush();
+
+                } catch (IOException e) {
+                    e.getMessage();
+                }
+
+            }
+        }
+
+        private static void writeTravisReport(IdxTree tree, EnumSeq[] bpseqs, int[][] deletions,
+                                  int[][] insertions) {
+
+
+            String outputFile = (OUTPUT != null ? OUTPUT : "")  +"_travis_report.txt";
+
+            try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
+
+                System.out.println(tree);
+                pw.println(tree);
+
+                for (int idx : tree) {
+                    BranchPoint bp = tree.getBranchPoint(idx);
+                    BranchPoint parent = bp.getParent();
+
+                    System.out.println(bp.getLabel() + "\t" + bpseqs[idx]);
+                    pw.println(bp.getLabel() + "\t" + bpseqs[idx]);
+
+                    if (idx != 0 && parent != null) {
+                        for (int i = 0; i < deletions[idx].length; i++) {
+                            if (deletions[idx][i] > 0) {
+                                String line = "\tDELETE " + parent.getLabel() + "->"
+                                        + bp.getLabel() + "@" + i + ":" + deletions[idx][i];
+
+                                System.out.println(line);
+                                pw.println(line);
+                            }
+                        }
+                        for (int i = 0; i < insertions[idx].length; i++) {
+                            if (insertions[idx][i] > 0) {
+                                String line = "\tINSERT " + parent.getLabel() + "->"
+                                        + bp.getLabel() + "@" + i + ":" + insertions[idx][i];
+
+                                System.out.println(line);
+                                pw.println(line);
+                            }
+                        }
+                    }
+                }
+
+                pw.flush();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
         }
 
         public TreeInstance getTreeWithSequences() {
