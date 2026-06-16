@@ -396,7 +396,7 @@ public class Mip {
                             }
 
                             //double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
-                            double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx))) * normFactor;
+                            double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx))) * DEFAULT_GAP_PENALTY;
                             Object seqGapState = save[bpidx][1];
                             double gapOpeningPenalty = penaltyMap.get(seqGapState);
                             treeNeighbourAlphaPen[colIdx][bpidx] = penalty * gapOpeningPenalty;
@@ -513,7 +513,7 @@ public class Mip {
                             continue; // ignore root
                         }
                         //double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
-                        double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx))) * normFactor;
+                        double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx))) * DEFAULT_GAP_PENALTY;
                         treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     }
                 }
@@ -579,7 +579,7 @@ public class Mip {
 
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                     //double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
-                    double penalty = -Math.log(1.0 - Math.exp(-rateAdjustedDists[rateIdx][bpidx])) * normFactor;
+                    double penalty = -Math.log(1.0 - Math.exp(-rateAdjustedDists[rateIdx][bpidx])) * DEFAULT_GAP_PENALTY;
                     treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                     writer.write(colIdx + "," + bpidx + "," + label + "," + treeNeighbourAlphaPen[colIdx][bpidx] + "," + rates[rateIdx]);
@@ -936,7 +936,9 @@ public class Mip {
 
                         objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
                         DiffKey diffKey = new DiffKey(ancestralIdx, childIdx, pos);
-                        objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos]);
+
+                        double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(childIdx)));
+                        objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + (this.nodeWeights[pos] * penalty));
 
                     } else {
 
@@ -1032,12 +1034,12 @@ public class Mip {
                             childConstraint.setCoefficient(diffPos[pos], -1.0);
                             addConstraintSum(childConstraint, childEdgesBypassingI, -1);
                             addConstraintSum(childConstraint, childEdgesBypassingIMinus1, -1);
-
                         }
 
                         double existingPen = objective.getCoefficient(pen[pos]);
                         double existingDiff = objective.getCoefficient(diffPos[pos]);
-                        objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
+                        double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(childIdx)));
+                        objective.setCoefficient(diffPos[pos], existingDiff + (this.nodeWeights[pos] * penalty));
                         objective.setCoefficient(pen[pos], existingPen + treeNeighbourAlphaPen[pos][childIdx]);
                     }
                 }
