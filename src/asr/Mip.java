@@ -39,8 +39,9 @@ public class Mip {
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
-    private static final int DEFAULT_GAP_PENALTY = 2;
-    private static final int MAX_GAP_PENALTY = 10;
+    private static final int DEFAULT_GAP_PENALTY = 5;
+    private static final int MAX_GAP_PENALTY = 3;
+    private static final int MIN_GAP_PENALTY = 1;
     private final HashMap<Integer, Integer[]> extantBinarySeqs;
     private final POAGraph alnPog;
     private final POGTree pogTree;
@@ -203,6 +204,7 @@ public class Mip {
             actualThreadsUsed = 1;
         } else if (solverName.equalsIgnoreCase("Gurobi")) {
             solver.setSolverSpecificParametersAsString("Presolve=-1, FeasibilityTol=1e-06, IntFeasTol=1e-05, OptimalityTol=1e-06, Method=1, DegenMoves=0, Threads=" + this.nThreads);
+            //solver.setSolverSpecificParametersAsString("Presolve=-1,Threads=" + this.nThreads);
         }
 
         if (GRASP.VERBOSE) {
@@ -352,7 +354,6 @@ public class Mip {
                     penaltyMap.put(stateDists.get(i).getKey(), penalty);
                 }
 
-
                 MaxLhoodJoint mlj = new MaxLhoodJoint(pbn);
                 mlj.decorate(ti);
                 Object[][] save = new Object[tree.getSize()][entryObjects.length];
@@ -383,8 +384,6 @@ public class Mip {
                     }
                 }
 
-                double medianDist = tree.getMedianDistance();
-                double normFactor = DEFAULT_GAP_PENALTY / -Math.log(1 - Math.exp(-medianDist));
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_seq_rates.csv")))) {
                     writer.write("col_idx,bpidx,label,penalty,rate");
                     writer.newLine();
@@ -395,11 +394,10 @@ public class Mip {
                                 continue; // ignore root
                             }
 
-                            //double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
-                            double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx))) * normFactor;
+                            double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
                             Object seqGapState = save[bpidx][1];
                             double gapOpeningPenalty = penaltyMap.get(seqGapState);
-                            treeNeighbourAlphaPen[colIdx][bpidx] = penalty * gapOpeningPenalty;
+                            treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                             String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                             writer.write(colIdx + "," + bpidx + "," + label + "," + penalty + "," + gapOpeningPenalty);
                             writer.newLine();
@@ -505,19 +503,28 @@ public class Mip {
             } else {
 
 
-                double medianDist = tree.getMedianDistance();
-                double normFactor = DEFAULT_GAP_PENALTY / -Math.log(1 - Math.exp(-medianDist));
+                double min = Double.POSITIVE_INFINITY;
+                double max = Double.NEGATIVE_INFINITY;
+
+                for (double val : tree.getValidDistances()) {
+                    if (val > max) {
+                        max = val;
+                    }
+                    if (val < min) {
+                        min = val;
+                    }
+                }
+
                 for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                     for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                         if (tree.getParent(bpidx) == -1) {
                             continue; // ignore root
                         }
-                        //double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
-                        double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx))) * normFactor;
-                        treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
+                        double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
+                        double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
+                        treeNeighbourAlphaPen[colIdx][bpidx] = scaledPenalty;
                     }
                 }
-
 
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
                     writer.write("col_idx,bpidx,label,penalty,rate");
@@ -526,8 +533,7 @@ public class Mip {
                         if (tree.getParent(bpidx) == -1) {
                             continue; // ignore root
                         }
-                        //double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
-                        double penalty = -Math.log(1.0 - Math.exp(-tree.getDistance(bpidx)));
+                        double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
                         String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                         writer.write("-1," + bpidx + "," + label + "," + penalty + ",");
                         writer.newLine();
@@ -560,12 +566,25 @@ public class Mip {
         return treeNeighbourAlphaPen;
     }
 
-    private void calcLogDistPenalties(int[] columnRateCategories, double[] rates,
+    private void
+    calcLogDistPenalties(int[] columnRateCategories, double[] rates,
                                       double[][] rateAdjustedDists, double[][] treeNeighbourAlphaPen) {
 
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
 
-        double medianDist = tree.getMedianDistance();
-        double normFactor = DEFAULT_GAP_PENALTY / -Math.log(1 - Math.exp(-medianDist));
+        for (double[] rateAdjustedDist : rateAdjustedDists) {
+            for (double val : rateAdjustedDist) {
+                if (val > max) {
+                    max = val;
+                }
+
+                if (val < min) {
+                    min = val;
+                }
+            }
+        }
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
             writer.write("col_idx,bpidx,label,penalty,rate");
             writer.newLine();
@@ -578,9 +597,9 @@ public class Mip {
                 }
 
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                    //double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
-                    double penalty = -Math.log(1.0 - Math.exp(-rateAdjustedDists[rateIdx][bpidx])) * normFactor;
-                    treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
+                    double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
+                    double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
+                    treeNeighbourAlphaPen[colIdx][bpidx] = scaledPenalty;
                     String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                     writer.write(colIdx + "," + bpidx + "," + label + "," + treeNeighbourAlphaPen[colIdx][bpidx] + "," + rates[rateIdx]);
                     writer.newLine();
@@ -934,7 +953,8 @@ public class Mip {
                         }
 
 
-                        objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
+                        //objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
+                        objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + Math.max(treeNeighbourAlphaPen[pos][childIdx], 0.05));
                         DiffKey diffKey = new DiffKey(ancestralIdx, childIdx, pos);
                         objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos]);
 
@@ -1038,7 +1058,7 @@ public class Mip {
                         double existingPen = objective.getCoefficient(pen[pos]);
                         double existingDiff = objective.getCoefficient(diffPos[pos]);
                         objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
-                        objective.setCoefficient(pen[pos], existingPen + treeNeighbourAlphaPen[pos][childIdx]);
+                        objective.setCoefficient(pen[pos], existingPen +  Math.max(treeNeighbourAlphaPen[pos][childIdx], 0.05));
                     }
                 }
             }
