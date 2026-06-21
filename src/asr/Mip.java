@@ -39,7 +39,7 @@ public class Mip {
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
-    private static final int DEFAULT_GAP_PENALTY = 5;
+    private static final int DEFAULT_GAP_PENALTY = 2;
     private static final int MAX_GAP_PENALTY = 3;
     private static final int MIN_GAP_PENALTY = 1;
     private final HashMap<Integer, Integer[]> extantBinarySeqs;
@@ -350,7 +350,7 @@ public class Mip {
                 stateDists.sort((a, b) -> Double.compare(b.getValue().getMean(), a.getValue().getMean()));
                 Map<Object, Double> penaltyMap = new LinkedHashMap<>();
                 for (int i = 0; i < stateDists.size(); i++) {
-                    double penalty = (1 + i);
+                    double penalty = 1 + i;
                     penaltyMap.put(stateDists.get(i).getKey(), penalty);
                 }
 
@@ -397,7 +397,7 @@ public class Mip {
                             double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
                             Object seqGapState = save[bpidx][1];
                             double gapOpeningPenalty = penaltyMap.get(seqGapState);
-                            treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
+                            treeNeighbourAlphaPen[colIdx][bpidx] = gapOpeningPenalty * penalty;
                             String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                             writer.write(colIdx + "," + bpidx + "," + label + "," + penalty + "," + gapOpeningPenalty);
                             writer.newLine();
@@ -521,8 +521,9 @@ public class Mip {
                             continue; // ignore root
                         }
                         double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
-                        double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
-                        treeNeighbourAlphaPen[colIdx][bpidx] = scaledPenalty;
+                        //double penalty = Math.exp(-tree.getDistance(bpidx));
+                        //double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
+                        treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     }
                 }
 
@@ -598,8 +599,9 @@ public class Mip {
 
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                     double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
-                    double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
-                    treeNeighbourAlphaPen[colIdx][bpidx] = scaledPenalty;
+                    //double penalty = Math.exp(-rateAdjustedDists[rateIdx][bpidx]);
+                    //double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
+                    treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                     writer.write(colIdx + "," + bpidx + "," + label + "," + treeNeighbourAlphaPen[colIdx][bpidx] + "," + rates[rateIdx]);
                     writer.newLine();
@@ -954,9 +956,9 @@ public class Mip {
 
 
                         //objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
-                        objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + Math.max(treeNeighbourAlphaPen[pos][childIdx], 0.05));
+                        objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
                         DiffKey diffKey = new DiffKey(ancestralIdx, childIdx, pos);
-                        objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos]);
+                        objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey))  + this.nodeWeights[pos]);
 
                     } else {
 
@@ -1058,7 +1060,7 @@ public class Mip {
                         double existingPen = objective.getCoefficient(pen[pos]);
                         double existingDiff = objective.getCoefficient(diffPos[pos]);
                         objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
-                        objective.setCoefficient(pen[pos], existingPen +  Math.max(treeNeighbourAlphaPen[pos][childIdx], 0.05));
+                        objective.setCoefficient(pen[pos], existingPen +  treeNeighbourAlphaPen[pos][childIdx]);
                     }
                 }
             }
