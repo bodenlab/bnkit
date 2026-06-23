@@ -21,6 +21,7 @@ public class GapSubstModel extends SubstModel {
 
     final double mu; // deletion rate
     final double lambda; // insertion rate
+    final double[] origF;
 
     public GapSubstModel(double[] F, double[][] IRM, Enumerable alphabet, double mu, double lambda,
                          boolean symmetric, boolean normalise, boolean copy) {
@@ -28,16 +29,83 @@ public class GapSubstModel extends SubstModel {
         super(F, IRM, alphabet, symmetric, normalise);
         this.mu = mu;
         this.lambda = lambda;
+        this.origF = F;
 
         if (!copy) {
-            double[][] R_EPS = constructIndelR();
-            this.R = R_EPS;
-            this.Rexp = new Exp(R_EPS);
-
             Character[] gap_alphabet = addGapToAlphabet();
             this.alpha = new Enumerable(gap_alphabet);
+            this.F = addGapToStationaryFreqs(F);
 
-            this.F = addGapToStationaryFreqs();
+            double[][] R_EPS = new double[F.length + 1][F.length + 1];
+            for (int i = 0; i < IRM.length; i ++) {
+                if (IRM[i].length != F.length)
+                    throw new IllegalArgumentException("IRM must be a square matrix");
+
+                // first make the matrix symmetric
+                if (symmetric) {
+                    for (int j = i + 1; j < IRM[i].length; j++) {
+                        double s = IRM[i][j];
+                        R_EPS[i][j] = s * F[j];
+                        R_EPS[j][i] = s * F[i];
+                    }
+                } else {
+                    for (int j = 0; j < IRM[i].length; j ++) {
+                        if (i == j)
+                            continue;
+                        R_EPS[i][j] = IRM[i][j];
+                    }
+                }
+            }
+
+            int numChars = F.length;
+            // Applies R - μI (substitutions with deletions)
+            for (int i = 0; i < numChars; i++) {
+                // last column all μ (deletions to gap)
+                R_EPS[i][numChars] = this.mu;
+
+//                for (int j = 0; j < numChars; j++) {
+//                    if (i == j) {
+//                        R_EPS[i][j] -= this.mu;
+//                    }
+//                }
+            }
+
+            //  Bottom row: λ * π_j (insertions from gap)
+            for (int j = 0; j < numChars; ++j) {
+                R_EPS[numChars][j] = F[j] * this.lambda;
+            }
+            // sums bottom row to zero
+            R_EPS[numChars][numChars] = -this.lambda;
+
+            //double[][] R_EPS = constructIndelR(F, IRM);
+
+            // make sum of rows == 0
+            int dim = R_EPS.length;
+            for (int i = 0; i < dim; i++) {
+                double sum = 0.0;
+                for (int j = 0; j < dim; j++) {
+                    if (i != j)
+                        sum += R_EPS[i][j];
+                }
+                R_EPS[i][i] = -sum;
+            }
+
+            // normalise
+            if (normalise) {
+                double sum = 0.0;
+                for (int i = 0; i < dim; i++) {
+                    sum += -R_EPS[i][i]*this.F[i];
+                }
+                for (int i = 0; i < dim; i++) {
+                    for (int j = 0; j < dim; j++)
+                        R_EPS[i][j] = R_EPS[i][j]/sum;
+                }
+            }
+
+            this.R = R_EPS;
+
+            this.Rexp = new Exp(R);
+
         }
     }
 
@@ -58,17 +126,28 @@ public class GapSubstModel extends SubstModel {
      * as per Eddy & Rivas (2008).
      * @return a double array of shape (numChars + 1) x (numChars + 1) to account for gaps
      */
-    private double[][] constructIndelR() {
+    private double[][] constructIndelR(double[] F, double[][] IRM) {
 
         double[][] R_EPS = new double[F.length + 1][F.length + 1];
-        int numChars = this.alpha.size();
+        for (int i = 0; i < IRM.length; i ++) {
+            if (IRM[i].length != F.length)
+                throw new IllegalArgumentException("IRM must be a square matrix");
+
+            // first make the matrix symmetric
+            for (int j = i + 1; j < IRM[i].length; j++) {
+                double s = IRM[i][j];
+                R_EPS[i][j] = s * F[j];
+                R_EPS[j][i] = s * F[i];
+            }
+        }
+
+        int numChars = F.length;
         // Applies R - μI (substitutions with deletions)
         for (int i = 0; i < numChars; i++) {
             // last column all μ (deletions to gap)
             R_EPS[i][numChars] = this.mu;
 
             for (int j = 0; j < numChars; j++) {
-                R_EPS[i][j] = this.R[i][j];
                 if (i == j) {
                     R_EPS[i][j] -= this.mu;
                 }
@@ -77,9 +156,9 @@ public class GapSubstModel extends SubstModel {
 
         //  Bottom row: λ * π_j (insertions from gap)
         for (int j = 0; j < numChars; ++j) {
-            R_EPS[numChars][j] = this.F[j] * this.lambda;
+            R_EPS[numChars][j] = F[j] * this.lambda;
         }
-        // sums row to zero
+        // sums bottom row to zero
         R_EPS[numChars][numChars] = -this.lambda;
 
         return R_EPS;
@@ -104,11 +183,11 @@ public class GapSubstModel extends SubstModel {
      *
      *  @return array of modified stationary frequencies with gap stationary frequency added
      */
-    private double[] addGapToStationaryFreqs() {
+    private double[] addGapToStationaryFreqs(double[] F) {
 
         double[] fGap = new double[alpha.size()];
 
-        if (mu + lambda < 0) {
+        if (lambda < 0 || mu < 0) {
             throw new IllegalArgumentException("mu + lambda must be >= 0");
         } else if (mu + lambda > 0) {
             // need to adjust stationary freqs by deletion ratio
@@ -242,8 +321,8 @@ public class GapSubstModel extends SubstModel {
     public double getProbOfInsertion(double time, Object state) {
 
         double insertionProb = ksiT(time);
-        double stationaryFreqResidue = getProb(state);
-
+        int index_X = alpha.getIndex(state);
+        double stationaryFreqResidue = origF[index_X];
         return insertionProb * stationaryFreqResidue;
     }
 

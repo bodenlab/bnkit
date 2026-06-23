@@ -7,6 +7,7 @@ import bn.ctmc.matrix.*;
 import bn.node.GDT;
 import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
+import bn.prob.MixtureDistrib;
 import com.google.ortools.Loader;
 import com.google.ortools.linearsolver.MPConstraint;
 import com.google.ortools.linearsolver.MPObjective;
@@ -33,13 +34,13 @@ import util.Binner;
 public class Mip {
 
     private static final double MAX_PENALTY = 1000.0;
-    private static final int NUM_GAMMA_CATEGORIES = 5;
+    private static final int NUM_GAMMA_CATEGORIES = 20;
     public static double MIN_MU_LAMBDA_VALUE = 0;
     public static double MAX_MU_LAMBDA_VALUE = 0.25;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
-    private static final int DEFAULT_GAP_PENALTY = 5;
+    private static final int DEFAULT_GAP_PENALTY = 2;
     private static final int MAX_GAP_PENALTY = 3;
     private static final int MIN_GAP_PENALTY = 1;
     private final HashMap<Integer, Integer[]> extantBinarySeqs;
@@ -422,9 +423,9 @@ public class Mip {
                 double[] ratePriors;
 
                 if (rateSampleCollection.length > 0) {
-                    ZeroInflatedGamma zig = ZeroInflatedGamma.fitMLE(rateSampleCollection, 42);
-                    GammaDistrib gd = new GammaDistrib(zig.getShape(), zig.getShape(), 42);
-                    rates = gd.getMeanGammaRates(NUM_GAMMA_CATEGORIES);
+                    ZeroInflatedGamma.Mixture zig = ZeroInflatedGamma.Mixture.fitMLE(rateSampleCollection,3, 42);
+                    //GammaDistrib gd = new GammaDistrib(zig.getShape(), zig.getShape(), 42);
+                    rates = zig.getMeanGammaRates(NUM_GAMMA_CATEGORIES);
 
                 } else {
                     rates = new double[NUM_GAMMA_CATEGORIES];
@@ -522,7 +523,7 @@ public class Mip {
                         }
                         double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
                         double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
-                        treeNeighbourAlphaPen[colIdx][bpidx] = scaledPenalty;
+                        treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     }
                 }
 
@@ -599,7 +600,7 @@ public class Mip {
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                     double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
                     double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
-                    treeNeighbourAlphaPen[colIdx][bpidx] = scaledPenalty;
+                    treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                     writer.write(colIdx + "," + bpidx + "," + label + "," + treeNeighbourAlphaPen[colIdx][bpidx] + "," + rates[rateIdx]);
                     writer.newLine();
@@ -954,7 +955,7 @@ public class Mip {
 
 
                         //objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
-                        objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + Math.max(treeNeighbourAlphaPen[pos][childIdx], 0.05));
+                        objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
                         DiffKey diffKey = new DiffKey(ancestralIdx, childIdx, pos);
                         objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos]);
 
@@ -1058,7 +1059,7 @@ public class Mip {
                         double existingPen = objective.getCoefficient(pen[pos]);
                         double existingDiff = objective.getCoefficient(diffPos[pos]);
                         objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
-                        objective.setCoefficient(pen[pos], existingPen +  Math.max(treeNeighbourAlphaPen[pos][childIdx], 0.05));
+                        objective.setCoefficient(pen[pos], existingPen +  treeNeighbourAlphaPen[pos][childIdx]);
                     }
                 }
             }
