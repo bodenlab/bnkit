@@ -14,7 +14,7 @@ public class IndelSegmentation {
 //    private static final double EXPECTED_INDEL_SEGMENT_LENGTH = 20.0;
 //    public static final double RHO = 1 / EXPECTED_INDEL_SEGMENT_LENGTH;
     private static final double DEFAULT_ZIPF_EXPONENT = 1.7;
-    private static final int DEFAULT_ZIPF_MAX_SAMPLE_RANGE = 150;
+    private static final int DEFAULT_ZIPF_MAX_SAMPLE_RANGE = 5;
     public static final double[] RATE_PRIORS = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
 
 

@@ -476,19 +476,35 @@ public class Mip {
                     double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel,
                             geometric_seq_len_param, rates, GRASP.NTHREADS);
 
-                    if (GRASP.VERBOSE) {
-                        System.out.println("Computing prefix sums for indel segment assignment...");
+//                    if (GRASP.VERBOSE) {
+//                        System.out.println("Computing prefix sums for indel segment assignment...");
+//                    }
+//                    double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
+//
+//                    if (GRASP.VERBOSE) {
+//                        System.out.println("Assigning optimal indel rate segments...");
+//                    }
+//
+//                    int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
+//                            prefix_sums);
+
+                    columnRateCategories = new int[aln.getWidth()];
+                    for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+                        if (colIdx == 19) {
+                            System.out.println();
+                        }
+                        double bestLL = Double.NEGATIVE_INFINITY;
+                        int bestRateIdx = -1;
+                        for (int rateIdx = 0; rateIdx < NUM_GAMMA_CATEGORIES; rateIdx++) {
+                            if (columnPriors[colIdx][rateIdx] > bestLL) {
+                                bestLL = columnPriors[colIdx][rateIdx];
+                                bestRateIdx = rateIdx;
+                            }
+                        }
+
+                        columnRateCategories[colIdx] = bestRateIdx;
                     }
-                    double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
-
-                    if (GRASP.VERBOSE) {
-                        System.out.println("Assigning optimal indel rate segments...");
-                    }
-
-                    int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
-                            prefix_sums);
-
-                    columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
+                    //columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
                 }
 
                 for (int rateIdx = 0; rateIdx < rates.length; rateIdx++) {
