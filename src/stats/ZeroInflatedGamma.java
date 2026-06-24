@@ -435,6 +435,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                 int zeroCount = (int) Arrays.stream(data).filter(x -> x == 0.0).count();
                 double zeromass = (double) zeroCount / data.length;
                 double[] nonZeroData = Arrays.stream(data).filter(x -> x > 0).toArray();
+
                 if (nonZeroData.length == 0) {
                     for (int i = 0; i < components; i++) {
                         distribs[i] = new GammaDistrib(1.0, 1.0, seed + i);
@@ -462,6 +463,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                 double prevLogLikelihood = Double.NEGATIVE_INFINITY;
                 for (int iter = 0; iter < maxIter; iter++) {
                     // E-step: compute responsibilities
+                    System.out.println("EM iteration " + iter + ", log-likelihood: " + prevLogLikelihood + " " +  Math.exp(prevLogLikelihood));
                     double logLikelihood = 0.0;
                     for (int i = 0; i < n; i++) {
 
@@ -489,24 +491,25 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                     for (int k = 0; k < components; k++) {
                         // Weighted data for component k
                         List<Double> weightedData = new ArrayList<>();
-                        int scale = 1000; // don't reduce scale below 1000, poor convergence otherwise
+                        double[] weights = new double[n];
+                        double sumResp = 0.0;
+                        int scale = 500; // don't reduce scale below 1000, poor convergence otherwise
                         for (int i = 0; i < n; i++) {
-                            for (int r = 0; r < (int) (resp[i][k] * scale); r++) {
-                                weightedData.add(nonZeroData[i]);
-                            }
-                        }
-                        if (!weightedData.isEmpty()) {
-                            distribs[k] = GammaDistrib.fitMLE(weightedData, seed + k);
-                        }
-                        // Update priors
-                        double sumResp = 0;
-                        for (int i = 0; i < n; i++) {
+                            weights[i] = resp[i][k];
                             sumResp += resp[i][k];
+//                            for (int r = 0; r < (int) (resp[i][k] * scale); r++) {
+//                                weightedData.add(nonZeroData[i]);
+//                            }
                         }
-                        priors[k] = sumResp / n;
+                        if (sumResp > 1e-10) {
+                            // Update priors
+                            priors[k] = sumResp / n;
+                            distribs[k] = GammaDistrib.fitMLEWeighted(nonZeroData, weights, seed + k);
+                        }
+
                     }
 
-                    if (Math.abs(logLikelihood - prevLogLikelihood) < 1e-4) {
+                    if (Math.abs((logLikelihood - prevLogLikelihood) / Math.abs(prevLogLikelihood)) < 1e-6) {
                         //System.out.println("Convergence reached at iteration " + iter);
                         break;
                     }

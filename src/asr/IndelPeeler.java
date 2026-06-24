@@ -91,13 +91,14 @@ public class IndelPeeler {
      * given the tree, model, geometric sequence length parameter and indel rate.
      */
     public static double[][] computeColumnPriors(POGTree pogTree, SubstModel model,
-                                                 double geometricSeqLenParam, double[] rates, int nThreads) {
+                                                 double geometricSeqLenParam, double[] rates, int nThreads,
+                                                 SubstModel zeroGapModel) {
 
         int numRates = rates.length;
         int numCols = pogTree.getPositions();
-        double[][] columnPriors = new double[numCols][numRates];
+        double[][] columnPriors = new double[numCols][numRates + 1];
 
-        IndelPeeler[] peelers = new IndelPeeler[numRates * numCols];
+        IndelPeeler[] peelers = new IndelPeeler[(numRates+1) * numCols];
         for (int rateIdx = 0; rateIdx < numRates; ++rateIdx) {
             PhyloBN pbn = PhyloBN.create(pogTree.getTree(), model, rates[rateIdx]);
             for (int colIdx = 0; colIdx < numCols; ++colIdx) {
@@ -107,9 +108,17 @@ public class IndelPeeler {
             }
         }
 
+        PhyloBN pbn = PhyloBN.create(pogTree.getTree(), zeroGapModel, 1.0);
+        for (int colIdx = 0; colIdx < numCols; ++colIdx) {
+            //int idx = colIdx * numRates + rateIdx;
+            int idx = numRates * numCols + colIdx;
+            peelers[idx] = new IndelPeeler(pogTree, model, 1.0, colIdx, geometricSeqLenParam, pbn);
+        }
+
+
         // get back the results
         double[] results = runPeelingJobs(peelers, nThreads);
-        for (int rateIdx = 0; rateIdx < numRates; ++rateIdx) {
+        for (int rateIdx = 0; rateIdx < numRates + 1; ++rateIdx) {
             for (int colIdx = 0; colIdx < numCols; ++colIdx) {
                 //int idx = colIdx * numRates + rateIdx;
                 int idx = rateIdx * numCols + colIdx;

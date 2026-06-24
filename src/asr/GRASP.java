@@ -462,7 +462,7 @@ public class GRASP {
                     PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-copy-tree") && args.length > a + 1) {
                     COPY_TREE = true;
-                } else if (arg.equalsIgnoreCase("-extants-only") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("-extants-only")) {
                     EXTANTS_ONLY = true;
                 } else if (arg.equalsIgnoreCase("sa") || arg.equalsIgnoreCase("-save-as") && args.length > a + 1) {
                     boolean found_format = false;
