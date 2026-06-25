@@ -229,6 +229,7 @@ public class GRASP {
     public static boolean COL_RATES = false; 
     public static boolean INDEL_CONSERVATIVE = true;
     public static boolean DISTANCE_BASED_MIP = false;
+    public static int NUM_GAMMA_CATEGORIES = 20;
 
     // Mode for BEP
     public static boolean RECODE_NULL = true;
@@ -621,6 +622,13 @@ public class GRASP {
                     } catch (NumberFormatException e) {
                         usage(2, "Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
                     }
+                } else if ((arg.equalsIgnoreCase("-gamma-cat")) && args.length > a + 1) {
+                    try {
+                        NUM_GAMMA_CATEGORIES = Integer.parseInt(args[++a]);
+                    } catch (NumberFormatException e) {
+                        usage(2, "Failed to set number of discrete Gamma categories for option --gamma-cat: " + args[a] + " is not a valid integer");
+                    }
+
                 } else if (arg.equalsIgnoreCase("-nogap")) {
                     GAPPY = false;
                 } else if (arg.equalsIgnoreCase("-indel-prior")) {

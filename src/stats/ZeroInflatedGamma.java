@@ -7,6 +7,7 @@ import java.util.Random;
 
 import bn.Distrib;
 import bn.prob.GammaDistrib;
+import smile.math.special.Gamma;
 
 /**
  * A zero-inflated gamma distribution is a mixture of:
@@ -203,14 +204,13 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
 
     @Override
     public double cdf(double rate) {
-        throw new UnsupportedOperationException("CDF for ZeroInflatedGamma is not supported yet.");
-        /* // CDF for regular Gamma:
         if (rate < 0) {
             return 0.0;
+        } else if (rate == 0.0) {
+            return pi;
         } else {
-            return Gamma.regularizedIncompleteGamma(getShape(), rate / getScale());
+            return pi + (1 - pi) * gamma.cdf(rate);
         }
-         */
     }
 
     /**
@@ -318,15 +318,96 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
          */
         public double[] getMeanGammaRates(int numCategories) {
 
-            double[] cumulativeMeanRates = new double[numCategories];
-            for (int i = 0; i < distribs.length; i++) {
-                double[] componentMeanRates = distribs[i].getMeanGammaRates(numCategories);
-                for (int j = 0; j < numCategories; j++) {
-                    cumulativeMeanRates[j] += priors[i] * componentMeanRates[j];
-                }
+            double[] bounds = computeMixtureBounds(numCategories);
+            double[] meanRates = new double[numCategories];
+
+            for (int i = 0; i < numCategories; i++) {
+                meanRates[i] = meanMixtureRate(bounds[i], bounds[i+1]);
             }
 
-            return cumulativeMeanRates;
+            return meanRates;
+        }
+
+        private double meanMixtureRate(double lowerBound, double upperBound) {
+
+            double numerator = 0.0;
+            double denominator = 0.0;
+            double[] priors = getPriors();
+            GammaDistrib[] distribs = this.distribs;
+            for (int i = 0; i < distribs.length; i++) {
+                double shape_i = distribs[i].getShape();
+                double rate_i = distribs[i].getRate();
+                double wi = priors[i];
+                numerator += wi * (shape_i/rate_i) *
+                        (Gamma.regularizedIncompleteGamma(shape_i + 1,upperBound * rate_i) -
+                        Gamma.regularizedIncompleteGamma(shape_i + 1, lowerBound * rate_i));
+                denominator += wi * (Gamma.regularizedIncompleteGamma(shape_i,upperBound * rate_i) -
+                        Gamma.regularizedIncompleteGamma(shape_i, lowerBound * rate_i));
+            }
+
+            return numerator / denominator;
+        }
+
+        /**
+         * Compute the quantile of the mixture gamma CDF (excluding zero mass) at probability p.
+         * Uses bisection since no closed form exists for a mixture of gammas.
+         * The mixture CDF (conditional on x > 0) is: F_mix(x) = sum( priors[i] * distribs[i].cdf(x))
+         *
+         * @param p target cumulative probability in (0, 1)
+         * @return x such that F_mix(x) ~= p
+         */
+        private double mixtureQuantile(double p) {
+            // Initial bracket: find an upper bound that exceeds p
+            double lo = 0.0;
+            double hi = 1.0;
+            double cdfVal = mixtureCdfGammaPart(hi);
+            while (cdfVal < p) {
+                hi *= 2.0;
+                cdfVal = mixtureCdfGammaPart(hi);
+            }
+
+            // Bisection
+            for (int iter = 0; iter < 200; iter++) {
+                double mid = (lo + hi) / 2.0;
+                cdfVal = mixtureCdfGammaPart(mid);
+                if (cdfVal < p) {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
+                if (hi - lo < 1e-10) break;
+            }
+            return (lo + hi) / 2.0;
+        }
+
+        /**
+         * CDF of the gamma part of the mixture (i.e. excluding zero mass, not normalised by it).
+         * F_mix(x) = Σᵢ priors[i] * Fᵢ(x)
+         * where priors already sum to 1 over the gamma components.
+         */
+        private double mixtureCdfGammaPart(double x) {
+            double result = 0.0;
+            for (int i = 0; i < distribs.length; i++) {
+                result += priors[i] * distribs[i].cdf(x);
+            }
+            return result;
+        }
+
+        /**
+         * Compute K equal-probability quantile boundaries of the mixture gamma CDF.
+         * Boundaries are at mixture quantiles 0, 1/K, 2/K, ..., (K-1)/K, infinity.
+         *
+         * @param numCategories K
+         * @return array of K+1 boundary values
+         */
+        public double[] computeMixtureBounds(int numCategories) {
+            double[] bounds = new double[numCategories + 1];
+            bounds[0] = 0.0;
+            bounds[numCategories] = Double.POSITIVE_INFINITY;
+            for (int i = 1; i < numCategories; i++) {
+                bounds[i] = mixtureQuantile((double) i / numCategories);
+            }
+            return bounds;
         }
 
 
@@ -338,7 +419,7 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                 return 0.0;
             }
 
-            double result = x >= 0 ? zeromass : 0.0;
+            double result = zeromass;
             for (int i = 0; i < distribs.length; i++) {
                 result += (1 - zeromass) * priors[i] * distribs[i].cdf(x);
             }
@@ -388,6 +469,8 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
             }
             return logL;
         }
+
+
 
         /**
          * Get the number of mixture components.

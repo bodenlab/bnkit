@@ -35,7 +35,6 @@ import util.Binner;
 public class Mip {
 
     private static final double MAX_PENALTY = 1000.0;
-    private static final int NUM_GAMMA_CATEGORIES = 20;
     public static double MIN_MU_LAMBDA_VALUE = 0;
     public static double MAX_MU_LAMBDA_VALUE = 0.25;
     private static final int GAP = 0;
@@ -399,9 +398,9 @@ public class Mip {
                             double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
                             Object seqGapState = save[bpidx][1];
                             double gapOpeningPenalty = penaltyMap.get(seqGapState);
-                            treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
+                            treeNeighbourAlphaPen[colIdx][bpidx] = penalty * gapOpeningPenalty;
                             String label = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
-                            writer.write(colIdx + "," + bpidx + "," + label + "," + penalty + "," + gapOpeningPenalty);
+                            writer.write(colIdx + "," + bpidx + "," + label + "," + penalty + "," + gapOpeningPenalty * gapOpeningPenalty);
                             writer.newLine();
                         }
                     }
@@ -412,7 +411,7 @@ public class Mip {
 
 
             } else if (GRASP.COL_RATES) {
-                System.out.println("Inferring postitions");
+                System.out.println("Inferring positions");
                 Prediction bepIndels = Prediction.PredictByParsimony(pogTree); // Prediction.PredictByBidirEdgeParsimony(pogTree);
                 bepIndels.getJoint(GRASP.MODEL, GRASP.RATES);
 
@@ -430,41 +429,79 @@ public class Mip {
                 RateModel zig;
 
                 if (rateSampleCollection.length > 0) {
-                    zig = RateModel.bestfit(Arrays.stream(rateSampleCollection).toArray(), 42);
                     System.out.println("Fitting zero-inflated gamma mixture model to column indel rate samples...");
-//                    ZeroInflatedGamma.Mixture gd = ZeroInflatedGamma.Mixture.fitMLE(Arrays.stream(rateSampleCollection).toArray(), 3,42);
-//                    ZeroInflatedGamma gd1 = new ZeroInflatedGamma(gd.getZIP(), gd.getShape(), 1.0/gd.getShape(), 42);
+                    zig = RateModel.bestfit(Arrays.stream(rateSampleCollection).toArray(), 42);
+                    ZeroInflatedGamma gd = ZeroInflatedGamma.fitMLE(Arrays.stream(rateSampleCollection).toArray(),42);
+                    ZeroInflatedGamma gd1 = new ZeroInflatedGamma(gd.getZIP(), gd.getShape(), 1.0/gd.getShape(), 42);
+                    double[] test = zig.getMeanGammaRates(GRASP.NUM_GAMMA_CATEGORIES);
+                    System.out.println(Arrays.toString(test));
 //                    System.out.println(zig.getTrAVIS());
-                    System.out.println(zig.getTrAVIS());
-                    rates = zig.getMeanGammaRates(NUM_GAMMA_CATEGORIES);
+                    System.out.println(gd1.getTrAVIS());
+                    rates = gd1.getMeanGammaRates(GRASP.NUM_GAMMA_CATEGORIES);
                     System.out.println(Arrays.toString(rates));
 
                 } else {
-                    rates = new double[NUM_GAMMA_CATEGORIES];
+                    rates = new double[GRASP.NUM_GAMMA_CATEGORIES];
                     Arrays.fill(rates, 1.0);
                 }
 
-                int[] columnRateCategories = new int[aln.getWidth()];
-                double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
-                for (int alnPos = 0; alnPos < aln.getWidth(); alnPos++) {
-                    int assignedRate = -1;
-                    double averageRate = columnRates[alnPos];
+                ratePriors = new double[GRASP.NUM_GAMMA_CATEGORIES];
+                Arrays.fill(ratePriors, Math.log(1.0 / GRASP.NUM_GAMMA_CATEGORIES));
 
-                    if (averageRate == -1.0) {
-                        columnRateCategories[alnPos] = -1;
-                        continue;
+                double[][] rateAdjustedDists = new double[rates.length][tree.getSize()];
+                int[] columnRateCategories = null;
+
+                if (GRASP.RANDOM_RATES) {
+                    System.out.println("Random indel rates selected - assigning random rates to each column...");
+                } else if (GRASP.SIMPLE_RATES) {
+                    double[] gapOccupancy = new double[aln.getWidth()];
+                    for (int i = 0; i < aln.getWidth(); i++) {
+                        gapOccupancy[i] = 1 - (aln.getOccupancy(i) / (double) aln.getHeight());
                     }
 
-                    for (int i = 0; i < rates.length; i++) {
-                        if (averageRate < rates[i]) {
-                            assignedRate = i;
-                            break;
+                    int numSections = rates.length;
+                    Binner splitter = new Binner.QuantileBinner(numSections, false);
+                    splitter.fit(gapOccupancy, true);
+                    System.out.println(Arrays.toString(splitter.getBinEdges()));
+                    columnRateCategories = new int[aln.getWidth()];
+                    for (int i = 0; i < aln.getWidth(); ++i) {
+                        double occupancy = gapOccupancy[i];
+                        int rateCategory = splitter.transform(occupancy);
+                        columnRateCategories[i] = rateCategory;
+                    }
+
+                } else {
+                    double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Optimising indel parameters for distance-based MIP...");
+                    }
+                    double optimal_mu = IndelPeeler.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
+                            tree, geometric_seq_len_param, aln);
+
+                    GapSubstModel gapModel = createGapSubstModel(optimal_mu);
+
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Computing column priors under different indel rate categories...");
+                        for (int i = 0; i < rates.length; i++) {
+                            System.out.println("Rate category " + i + ": " + rates[i]);
                         }
                     }
-                    if (assignedRate == -1) {
-                        assignedRate = rates.length - 1;
+                    double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel, geometric_seq_len_param, rates, GRASP.NTHREADS);
+
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Computing prefix sums for indel segment assignment...");
                     }
-                    columnRateCategories[alnPos] = assignedRate;
+                    double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
+
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Assigning optimal indel rate segments...");
+                    }
+
+                    int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
+                            prefix_sums);
+
+                    columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
+
                 }
 
                 for (int rateIdx = 0; rateIdx < rates.length; rateIdx++) {
@@ -477,106 +514,8 @@ public class Mip {
 
                 calcLogDistPenalties(columnRateCategories, rates, rateAdjustedDists, treeNeighbourAlphaPen);
 
-//                ratePriors = new double[NUM_GAMMA_CATEGORIES];
-//                Arrays.fill(ratePriors, Math.log(1.0 / NUM_GAMMA_CATEGORIES));
-
-
-//                if (GRASP.RANDOM_RATES) {
-//                    System.out.println("Random indel rates selected - assigning random rates to each column...");
-//                } else if (GRASP.SIMPLE_RATES) {
-//                    double[] gapOccupancy = new double[aln.getWidth()];
-//                    for (int i = 0; i < aln.getWidth(); i++) {
-//                        gapOccupancy[i] = 1 - (aln.getOccupancy(i) / (double) aln.getHeight());
-//                    }
-//
-//                    int numSections = rates.length;
-//                    Binner splitter = new Binner.QuantileBinner(numSections, false);
-//                    splitter.fit(gapOccupancy, true);
-//                    System.out.println(Arrays.toString(splitter.getBinEdges()));
-//                    columnRateCategories = new int[aln.getWidth()];
-//                    for (int i = 0; i < aln.getWidth(); ++i) {
-//                        double occupancy = gapOccupancy[i];
-//                        int rateCategory = splitter.transform(occupancy);
-//                        columnRateCategories[i] = rateCategory;
-//                    }
-//                } else {
-
-//                    double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
-//                    if (GRASP.VERBOSE) {
-//                        System.out.println("Optimising indel parameters for distance-based MIP...");
-//                    }
-//                    double optimal_mu = IndelPeeler.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
-//                            tree, geometric_seq_len_param, aln);
-//
-//                    GapSubstModel gapModel = createGapSubstModel(optimal_mu);
-//                    GapSubstModel zeroGapModel = createGapSubstModel(0.0);
-//
-//                    if (GRASP.VERBOSE) {
-//                        System.out.println("Computing column priors under different indel rate categories...");
-//                        for (int i = 0; i < rates.length; i++) {
-//                            System.out.println("Rate category " + i + ": " + rates[i]);
-//                        }
-//                    }
-//                    double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel,
-//                            geometric_seq_len_param, rates, GRASP.NTHREADS, zeroGapModel);
-
-//                    if (GRASP.VERBOSE) {
-//                        System.out.println("Computing prefix sums for indel segment assignment...");
-//                    }
-//                    double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
-//
-//                    if (GRASP.VERBOSE) {
-//                        System.out.println("Assigning optimal indel rate segments...");
-//                    }
-//
-//                    int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
-//                            prefix_sums);
-
-//                    columnRateCategories = new int[aln.getWidth()];
-//                    for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
-//
-//                        int bestRateIdx = -1;
-//                        double bestLL = columnPriors[colIdx][NUM_GAMMA_CATEGORIES];// +Math.log(zig.zeromass);
-//
-//                        for (int rateIdx = 0; rateIdx < NUM_GAMMA_CATEGORIES; rateIdx++) {
-//                            double rateProb = columnPriors[colIdx][rateIdx];// + Math.log((1 - zig.zeromass) / NUM_GAMMA_CATEGORIES);
-//                            if (rateProb > bestLL) {
-//                                bestLL = rateProb;
-//                                bestRateIdx = rateIdx;
-//                            }
-//
-//                        }
-
-//                        columnRateCategories[colIdx] = bestRateIdx;
-//                    }
-                    //columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
-//                }
-//
-//                for (int rateIdx = 0; rateIdx < rates.length; rateIdx++) {
-//                    for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-//                        // adjust each length by the assigned rate category
-//                        double adjustedDist = rates[rateIdx] * tree.getDistance(bpidx);
-//                        rateAdjustedDists[rateIdx][bpidx] = adjustedDist;
-//                    }
-//                }
-//
-//                calcLogDistPenalties(columnRateCategories, rates, rateAdjustedDists, treeNeighbourAlphaPen);
 
             } else {
-
-
-                double min = Double.POSITIVE_INFINITY;
-                double max = Double.NEGATIVE_INFINITY;
-
-                for (double val : tree.getValidDistances()) {
-                    double pen = Math.log(1 + 1.0/val);
-                    if (pen > max) {
-                        max = pen;
-                    }
-                    if (pen < min) {
-                        min = pen;
-                    }
-                }
 
                 for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
                     for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
@@ -584,8 +523,7 @@ public class Mip {
                             continue; // ignore root
                         }
                         double penalty = Math.log(1.0 + 1.0 / tree.getDistance(bpidx));
-                        double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
-                        treeNeighbourAlphaPen[colIdx][bpidx] = Math.exp(-tree.getDistance(bpidx));
+                        treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                     }
                 }
 
@@ -670,12 +608,7 @@ public class Mip {
                 writer.newLine();
 
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
-                    double penalty;
-                    if (rateIdx == -1) {
-                        penalty = DEFAULT_GAP_PENALTY + 0.5;// Math.log(1 + 1/rateAdjustedDists[0][bpidx]);// Math.log(1); // + 1/tree.getDistance(bpidx));
-                    } else {
-                        penalty = DEFAULT_GAP_PENALTY * Math.exp((-rateAdjustedDists[rateIdx][bpidx])) + 0.5; // Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
-                    }
+                    double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
 
                     //double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
                     treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
@@ -1030,9 +963,14 @@ public class Mip {
 
 
                         //objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
-                        objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
+                        double penCoeff = objective.getCoefficient(pen[pos]);
+                        if (treeNeighbourAlphaPen[pos][childIdx] <= 1e-13 || treeNeighbourAlphaPen[pos][childIdx] == 0.0) {
+                            System.out.println(treeNeighbourAlphaPen[pos][childIdx]);
+                        }
+                        objective.setCoefficient(pen[pos],  penCoeff + treeNeighbourAlphaPen[pos][childIdx]);
                         DiffKey diffKey = new DiffKey(ancestralIdx, childIdx, pos);
-                        objective.setCoefficient(this.diff.get(diffKey),  objective.getCoefficient(this.diff.get(diffKey)) + this.nodeWeights[pos]);
+                        double diffCoeff = objective.getCoefficient(this.diff.get(diffKey));
+                        objective.setCoefficient(this.diff.get(diffKey),  diffCoeff + this.nodeWeights[pos]);
 
                     } else {
 
@@ -1132,9 +1070,14 @@ public class Mip {
                         }
 
                         double existingPen = objective.getCoefficient(pen[pos]);
+                        if (treeNeighbourAlphaPen[pos][childIdx] <= 1e-13) {
+                            System.out.println(treeNeighbourAlphaPen[pos][childIdx]);
+                        }
+                        objective.setCoefficient(pen[pos], existingPen +  treeNeighbourAlphaPen[pos][childIdx]);
+
                         double existingDiff = objective.getCoefficient(diffPos[pos]);
                         objective.setCoefficient(diffPos[pos], existingDiff + this.nodeWeights[pos]);
-                        objective.setCoefficient(pen[pos], existingPen +  treeNeighbourAlphaPen[pos][childIdx]);
+
                     }
                 }
             }
