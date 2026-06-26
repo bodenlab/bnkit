@@ -508,8 +508,12 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
          */
         public static Mixture fitMLE(double[] data, int components, long seed) {
 
-            try {
+            if (components <= 0) {
+                System.out.println("Invalid number of components");
+                return null;
+            }
 
+            try {
                 if (data.length == 0) {
                     throw new IllegalArgumentException("Data cannot be empty.");
                 }
@@ -546,7 +550,6 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                 double prevLogLikelihood = Double.NEGATIVE_INFINITY;
                 for (int iter = 0; iter < maxIter; iter++) {
                     // E-step: compute responsibilities
-                    System.out.println("EM iteration " + iter + ", log-likelihood: " + prevLogLikelihood + " " +  Math.exp(prevLogLikelihood));
                     double logLikelihood = 0.0;
                     for (int i = 0; i < n; i++) {
 
@@ -559,12 +562,15 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                             }
                         }
 
+                        // Log sum exp = c + log(sum(exp(x - c)))
                         double sumExp = 0.0;
                         for (int k = 0; k < components; k++) {
                             sumExp += Math.exp(logResp[i][k] - maxLog);
                         }
                         double logNorm = maxLog + Math.log(sumExp);
                         logLikelihood += logNorm;
+
+                        // apply the norm: exp(x - logsumexp(data))
                         for (int k = 0; k < components; k++) {
                             resp[i][k] = Math.exp(logResp[i][k] - logNorm);
                         }
@@ -576,7 +582,6 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                         List<Double> weightedData = new ArrayList<>();
                         double[] weights = new double[n];
                         double sumResp = 0.0;
-                        int scale = 500; // don't reduce scale below 1000, poor convergence otherwise
                         for (int i = 0; i < n; i++) {
                             weights[i] = resp[i][k];
                             sumResp += resp[i][k];
@@ -588,6 +593,9 @@ public class ZeroInflatedGamma implements RateModel, Distrib {
                             // Update priors
                             priors[k] = sumResp / n;
                             distribs[k] = GammaDistrib.fitMLEWeighted(nonZeroData, weights, seed + k);
+                        } else {
+                            System.out.println("EM collapsed for " + components + " components, trying " + (components - 1) + " components");
+                            return Mixture.fitMLE(data, components - 1, seed);
                         }
 
                     }

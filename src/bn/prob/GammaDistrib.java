@@ -408,8 +408,8 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
      * Estimate the parameters of a gamma distribution from data.
      * Specifically the implementation estimates alpha (shape), and beta (rate) is given by
      * beta = mean(x) / alpha.
-     * It uses a fast approximation based on Thomas Minka "Estimating a Gamma distribution" 2002.
-     * http://research.microsoft.com/en-us/um/people/minka/papers/minka-gamma.pdf
+     * It uses a fast approximation based on
+     * <a href="http://research.microsoft.com/en-us/um/people/minka/papers/minka-gamma.pdf">Thomas Minka "Estimating a Gamma distribution" 2002</a>
      * @param X data
      * @return alpha parameter (same as lambda here)
      */
