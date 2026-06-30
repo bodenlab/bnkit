@@ -22,7 +22,6 @@ public class JCGap extends GapSubstModel {
                 false, false);
     }
 
-
     public JCGap(double[][] IRM, double mu, double lambda, boolean symmetric, boolean normalise) {
         super(F, IRM, new Enumerable(S), mu, lambda, symmetric, normalise, false);
     }

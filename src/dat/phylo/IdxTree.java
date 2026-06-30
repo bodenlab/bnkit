@@ -1,11 +1,16 @@
 package dat.phylo;
 
+import asr.ASRException;
 import bn.Distrib;
+import bn.ctmc.JCPIP;
+import bn.ctmc.SubstNode;
 import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
+import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Newick;
+import dat.file.Utils;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
@@ -1492,43 +1497,110 @@ public class IdxTree implements Iterable<Integer> {
     }
 
     public static void main(String[] args) {
-        long SEED = System.currentTimeMillis(); // random seed
-        int NCOMP = 3; // number of components in Gamma mixture to model branch distances
-        int NITER = 100; // max number of iterations to estimate mixture distribution (EM)
-        IdxTree tree1 = null;
-        for (int argc = 0; argc < args.length; argc++) {
-            switch (args[argc]) {
-                case "--ncomp":
-                    NCOMP = Integer.parseInt(args[++argc]);
-                    break;
-                case "--seed":
-                    SEED = Long.parseLong(args[++argc]);
-                    break;
-                case "--niter":
-                    NITER = Integer.parseInt(args[++argc]);
-                    break;
-                case "--nwk":
-                    try {
-                        tree1 = Newick.load(args[++argc]);
-                    } catch (IOException e) {
-                        System.err.println("Error loading " + args[argc] + ": " + e.getMessage());
-                        System.exit(1);
+
+        EnumSeq.Alignment<Enumerable> aln = null;
+        Tree tree = null;
+        Enumerable alpha = new Enumerable(new Object[]{'A', 'C', 'G', 'T'});
+        try {
+            aln = Utils.loadAlignment("test.fa", alpha);
+            tree = Utils.loadTree("test.nwk");
+            Utils.checkData(aln, tree, true);
+
+        } catch (ASRException | IOException e) {
+            System.exit(1);
+        }
+
+        int totalNodes = tree.getSize();
+        JCPIP jc = new JCPIP(0.1, 0.1);
+        Map<String, Integer> alnMap = aln.getMap();
+        double[][] fTldrV = new double[totalNodes][alpha.size()]; // nodes x num_letters
+        int colIdx = 0;
+        PhyloBN pbn = PhyloBN.create(tree, jc, 1.0);
+
+        // iterate through branch point indices backwards for postorder traversal
+        for (int bpidx = totalNodes - 1; bpidx >= 0; bpidx--) {
+            for (Object c : alpha.getValues()) {
+                Character sigma = (Character) c;
+                int sigmaResIdx = jc.getDomain().getIndex(sigma);
+
+                BranchPoint node = tree.getBranchPoint(bpidx);
+                String nodeLabel = (String) node.getLabel();
+                EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(nodeLabel));
+
+                Character sigmaPrime = (Character) gseq.get(colIdx);
+                int sigmaPrimeResIdx = jc.getDomain().getIndex(sigmaPrime);
+
+                double val;
+                if (node.isLeaf()) {
+                    if (sigma.equals(sigmaPrime)) {
+                       val = 1.0;
+                    } else {
+                        val = 0.0;
                     }
-                default:
-                    break;
+                } else {
+                    int[] children = tree.getChildren(bpidx);
+                    double parentValue = 0.0;
+                    for (int childIdx : children) {
+                        double llChild = 0.0;
+                        SubstNode substNode = (SubstNode) pbn.getBNode(childIdx);
+                        for (Object c2 : alpha.getValues()) {
+                            Character sigmaChild = (Character) c2;
+                            int sigmaChildResIdx = jc.getDomain().getIndex(sigmaChild);
+                            double prob = substNode.getProb(sigmaChild, sigma);
+                            double fTldrChild = fTldrV[childIdx][sigmaChildResIdx];
+                            val = Math.log(prob) + fTldrChild;
+                            llChild += val;
+                        }
+
+
+                    }
+
+
+                }
+
             }
+
         }
-        if (tree1 != null) {
-            // What this function does: IdxTree ntree = generateTreeFromMixture(tree, NCOMP, SEED, NITER);
-            // Namely... process an already loaded tree or synthesise a new tree
-            GaussianDistrib gds1 = IdxTree.getLeafDistanceDistribution(tree1.getDistance2RootMatrix());
-            // Then estimate a mixture of Gamma distributions from the first/source tree (loaded or synthesised)
-            RateModel distmodel = getGammaMixture(tree1, NCOMP, SEED);
-            // Then generate a new tree based on the above mixture of Gamma distributions
-            Tree tree2 = Tree.Random(tree1.getNLeaves(), distmodel, 2, 2, SEED);
-            // Finally, adjust the placement of distances to better fit the original distribution
-            tree2.fitDistances(NITER, gds1, SEED + 202);
-            System.out.println("--dist-distrib " + distmodel.getTrAVIS() + "\n--leaf2root-distrib " + gds1.getTrAVIS());
-        }
+
+
+
+//        long SEED = System.currentTimeMillis(); // random seed
+//        int NCOMP = 3; // number of components in Gamma mixture to model branch distances
+//        int NITER = 100; // max number of iterations to estimate mixture distribution (EM)
+//        IdxTree tree1 = null;
+//        for (int argc = 0; argc < args.length; argc++) {
+//            switch (args[argc]) {
+//                case "--ncomp":
+//                    NCOMP = Integer.parseInt(args[++argc]);
+//                    break;
+//                case "--seed":
+//                    SEED = Long.parseLong(args[++argc]);
+//                    break;
+//                case "--niter":
+//                    NITER = Integer.parseInt(args[++argc]);
+//                    break;
+//                case "--nwk":
+//                    try {
+//                        tree1 = Newick.load(args[++argc]);
+//                    } catch (IOException e) {
+//                        System.err.println("Error loading " + args[argc] + ": " + e.getMessage());
+//                        System.exit(1);
+//                    }
+//                default:
+//                    break;
+//            }
+//        }
+//        if (tree1 != null) {
+//            // What this function does: IdxTree ntree = generateTreeFromMixture(tree, NCOMP, SEED, NITER);
+//            // Namely... process an already loaded tree or synthesise a new tree
+//            GaussianDistrib gds1 = IdxTree.getLeafDistanceDistribution(tree1.getDistance2RootMatrix());
+//            // Then estimate a mixture of Gamma distributions from the first/source tree (loaded or synthesised)
+//            RateModel distmodel = getGammaMixture(tree1, NCOMP, SEED);
+//            // Then generate a new tree based on the above mixture of Gamma distributions
+//            Tree tree2 = Tree.Random(tree1.getNLeaves(), distmodel, 2, 2, SEED);
+//            // Finally, adjust the placement of distances to better fit the original distribution
+//            tree2.fitDistances(NITER, gds1, SEED + 202);
+//            System.out.println("--dist-distrib " + distmodel.getTrAVIS() + "\n--leaf2root-distrib " + gds1.getTrAVIS());
+//        }
     }
 }

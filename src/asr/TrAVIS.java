@@ -1154,10 +1154,10 @@ public class TrAVIS {
      * Matches/substitutions are determined by a probability p=exp^-rt where rt is the rate times the evolutionary distance from the ancestor to the descendant.
      * If not a match/substitution, insertions and deletions are equally probable, i.e. (1-p)/2 each.
      * The length of an insertion or deletion is determined by a Poisson with mean (lambda) 1; note that this means that 0.37 of indels are length 0.
-     * The implementation is inspired by rules extracted from.
+     * The implementation is inspired by rules extracted from <a href="https://doi.org/10.1093/molbev/msn275">Cartwright R.
+     * Problems and Solutions for Estimating Indel Rates and Length Distributions. Mol. Biol. Evol. 26(2):473–480. 2009</a>
      * Position specific rates can be supplied to the constructor.
-     *  <a href="https://doi.org/10.1093/molbev/msn275">Cartwright R. Problems and Solutions for Estimating Indel Rates and Length Distributions.
-     *  Mol. Biol. Evol. 26(2):473–480. 2009.</a>
+     *
      */
     static class TrackTree {
 
