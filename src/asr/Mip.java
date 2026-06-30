@@ -412,7 +412,7 @@ public class Mip {
 
             } else if (GRASP.COL_RATES) {
                 System.out.println("Inferring positions");
-                Prediction bepIndels = Prediction.PredictByParsimony(pogTree); // Prediction.PredictByBidirEdgeParsimony(pogTree);
+                Prediction bepIndels = Prediction.PredictByBidirEdgeParsimony(pogTree); // Prediction.PredictByBidirEdgeParsimony(pogTree);
                 bepIndels.getJoint(GRASP.MODEL, GRASP.RATES);
 
                 System.out.println("Retrieving POGS");
@@ -430,13 +430,13 @@ public class Mip {
 
                 if (rateSampleCollection.length > 0) {
                     System.out.println("Fitting zero-inflated gamma mixture model to column indel rate samples...");
-                    zig = RateModel.bestfit(Arrays.stream(rateSampleCollection).toArray(), 42);
+//                    zig = RateModel.bestfit(Arrays.stream(rateSampleCollection).toArray(), 42);
                     ZeroInflatedGamma gd = ZeroInflatedGamma.fitMLE(Arrays.stream(rateSampleCollection).toArray(),42);
                     ZeroInflatedGamma gd1 = new ZeroInflatedGamma(gd.getZIP(), gd.getShape(), 1.0/gd.getShape(), 42);
-                    double[] test = zig.getMeanGammaRates(GRASP.NUM_GAMMA_CATEGORIES);
-                    System.out.println(Arrays.toString(test));
-//                    System.out.println(zig.getTrAVIS());
+//                    double[] test = zig.getMeanGammaRates(GRASP.NUM_GAMMA_CATEGORIES);
+//                    System.out.println(Arrays.toString(test));
                     System.out.println(gd1.getTrAVIS());
+//                    System.out.println(gd1.getTrAVIS());
                     rates = gd1.getMeanGammaRates(GRASP.NUM_GAMMA_CATEGORIES);
                     System.out.println(Arrays.toString(rates));
 
@@ -571,28 +571,6 @@ public class Mip {
     calcLogDistPenalties(int[] columnRateCategories, double[] rates,
                                       double[][] rateAdjustedDists, double[][] treeNeighbourAlphaPen) {
 
-//        double min = Double.POSITIVE_INFINITY;
-//        double max = Double.NEGATIVE_INFINITY;
-//
-//        for (double[] rateAdjustedDist : rateAdjustedDists) {
-//            for (double val : rateAdjustedDist) {
-//                double pen;
-//                if (val == 0) {
-//                    pen = Math.log(1);
-//                } else {
-//                    pen = Math.log(1 + 1.0/val);
-//                }
-//
-//                if (pen > max) {
-//                    max = pen;
-//                }
-//
-//                if (pen < min) {
-//                    min = pen;
-//                }
-//            }
-//        }
-
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_col_rates.csv")))) {
             writer.write("col_idx,bpidx,label,penalty,rate");
             writer.newLine();
@@ -609,8 +587,6 @@ public class Mip {
 
                 for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
                     double penalty = Math.log(1 + 1/rateAdjustedDists[rateIdx][bpidx]);
-
-                    //double scaledPenalty = ((penalty - min) / (max - min)) * (MAX_GAP_PENALTY - MIN_GAP_PENALTY) + MIN_GAP_PENALTY;
                     treeNeighbourAlphaPen[colIdx][bpidx] = penalty;
                 }
             }
@@ -961,12 +937,7 @@ public class Mip {
                             }
                         }
 
-
-                        //objective.setCoefficient(pen[pos],  objective.getCoefficient(pen[pos]) + treeNeighbourAlphaPen[pos][childIdx]);
                         double penCoeff = objective.getCoefficient(pen[pos]);
-                        if (treeNeighbourAlphaPen[pos][childIdx] <= 1e-13 || treeNeighbourAlphaPen[pos][childIdx] == 0.0) {
-                            System.out.println(treeNeighbourAlphaPen[pos][childIdx]);
-                        }
                         objective.setCoefficient(pen[pos],  penCoeff + treeNeighbourAlphaPen[pos][childIdx]);
                         DiffKey diffKey = new DiffKey(ancestralIdx, childIdx, pos);
                         double diffCoeff = objective.getCoefficient(this.diff.get(diffKey));
@@ -1070,9 +1041,6 @@ public class Mip {
                         }
 
                         double existingPen = objective.getCoefficient(pen[pos]);
-                        if (treeNeighbourAlphaPen[pos][childIdx] <= 1e-13) {
-                            System.out.println(treeNeighbourAlphaPen[pos][childIdx]);
-                        }
                         objective.setCoefficient(pen[pos], existingPen +  treeNeighbourAlphaPen[pos][childIdx]);
 
                         double existingDiff = objective.getCoefficient(diffPos[pos]);
