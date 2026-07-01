@@ -22,6 +22,8 @@ import stats.RateModel;
 import java.io.IOException;
 import java.util.*;
 
+import static asr.IndelPeeler.calcProbAlnGivenTree;
+
 /**
  * Indexed (light-weight) view of tree, or set of trees.
  * Not meant to be edited, instead create new instances.
@@ -1537,7 +1539,7 @@ public class IdxTree implements Iterable<Integer> {
                 }
 
                 // set gap value at leaf
-                logFTldrV[bpidx][alpha.size()] = ('-' == sigmaPrime) ? 0.0 : Double.NEGATIVE_INFINITY;
+                logFTldrV[bpidx][alpha.size()] = (sigmaPrime.equals('-')) ? 0.0 : Double.NEGATIVE_INFINITY;
 
                 // set real character values at leaf
                 for (Object c : alpha.getValues()) {
@@ -1581,6 +1583,8 @@ public class IdxTree implements Iterable<Integer> {
         }
         return logFTldrV;
     }
+
+
 
     /**
      * Compute log fTilde_v (Equation 2) — marginalise over real characters
@@ -1680,7 +1684,7 @@ public class IdxTree implements Iterable<Integer> {
             String nodeLabel = (String) node.getLabel();
             EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(nodeLabel));
             Character state = (Character) gseq.get(colIdx);
-            if (state != null) {
+            if (state != null && !state.equals('-')) {
                 S.add(leafBpIdx);
             }
         }
@@ -1688,11 +1692,11 @@ public class IdxTree implements Iterable<Integer> {
         return S;
     }
 
-    public static double getColumnProb(PIPSubstModel jc, int colIdx, Tree tree, EnumSeq.Alignment<Enumerable> aln) {
+    public static double getColumnProb(PIPSubstModel jc, int colIdx, Tree tree, EnumSeq.Alignment<Enumerable> aln,
+                                       PhyloBN pbn) {
 
 
        Enumerable alphabet =  jc.getDomain();
-        PhyloBN pbn = PhyloBN.create(tree, jc, 1.0);
         double[][] logFTldrV = computeLogFTilde(tree, aln, pbn, jc,  alphabet, colIdx);
         // now construct fv not conditioned on character
         double[] logFTildeScalar = computeLogFTildeScalar(logFTldrV, jc,  alphabet);
@@ -1762,11 +1766,10 @@ public class IdxTree implements Iterable<Integer> {
         }
         JCPIP jc = new JCPIP(1.0, alpha, 0.5, 0.5);
         int colIdx = 2;
+        PhyloBN pbn = PhyloBN.create(tree, jc, 1.0);
 
-        double logColumnProb = getColumnProb(jc, colIdx, tree, aln);
+        double logColumnProb = getColumnProb(jc, colIdx, tree, aln, pbn);
         System.out.println(logColumnProb);
-
-
 
 //        long SEED = System.currentTimeMillis(); // random seed
 //        int NCOMP = 3; // number of components in Gamma mixture to model branch distances

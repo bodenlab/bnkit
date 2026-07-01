@@ -35,8 +35,8 @@ import util.Binner;
 public class Mip {
 
     private static final double MAX_PENALTY = 1000.0;
-    public static double MIN_MU_LAMBDA_VALUE = 0;
-    public static double MAX_MU_LAMBDA_VALUE = 0.25;
+    public static double MIN_MU_LAMBDA_VALUE = 0.01;
+    public static double MAX_MU_LAMBDA_VALUE = 50;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
@@ -412,7 +412,7 @@ public class Mip {
 
             } else if (GRASP.COL_RATES) {
                 System.out.println("Inferring positions");
-                Prediction bepIndels = Prediction.PredictByBidirEdgeParsimony(pogTree); // Prediction.PredictByBidirEdgeParsimony(pogTree);
+                Prediction bepIndels = Prediction.PredictByParsimony(pogTree); // Prediction.PredictByBidirEdgeParsimony(pogTree);
                 bepIndels.getJoint(GRASP.MODEL, GRASP.RATES);
 
                 System.out.println("Retrieving POGS");
@@ -471,36 +471,36 @@ public class Mip {
                     }
 
                 } else {
-                    double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
-                    if (GRASP.VERBOSE) {
-                        System.out.println("Optimising indel parameters for distance-based MIP...");
-                    }
+//                    double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
+//                    if (GRASP.VERBOSE) {
+//                        System.out.println("Optimising indel parameters for distance-based MIP...");
+//                    }
                     double optimal_mu = IndelPeeler.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
-                            tree, geometric_seq_len_param, aln);
+                            tree, aln);
 
                     GapSubstModel gapModel = createGapSubstModel(optimal_mu);
-
-                    if (GRASP.VERBOSE) {
-                        System.out.println("Computing column priors under different indel rate categories...");
-                        for (int i = 0; i < rates.length; i++) {
-                            System.out.println("Rate category " + i + ": " + rates[i]);
-                        }
-                    }
-                    double[][] columnPriors = IndelPeeler.computeColumnPriors(pogTree, gapModel, geometric_seq_len_param, rates, GRASP.NTHREADS);
-
-                    if (GRASP.VERBOSE) {
-                        System.out.println("Computing prefix sums for indel segment assignment...");
-                    }
-                    double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
-
-                    if (GRASP.VERBOSE) {
-                        System.out.println("Assigning optimal indel rate segments...");
-                    }
-
-                    int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
-                            prefix_sums);
-
-                    columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
+//
+//                    if (GRASP.VERBOSE) {
+//                        System.out.println("Computing column priors under different indel rate categories...");
+//                        for (int i = 0; i < rates.length; i++) {
+//                            System.out.println("Rate category " + i + ": " + rates[i]);
+//                        }
+//                    }
+//                    double[][] columnPriors = IndelPeeler.computeColumnPriors(tree, gapModel, geometric_seq_len_param, rates, GRASP.NTHREADS);
+//
+//                    if (GRASP.VERBOSE) {
+//                        System.out.println("Computing prefix sums for indel segment assignment...");
+//                    }
+//                    double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
+//
+//                    if (GRASP.VERBOSE) {
+//                        System.out.println("Assigning optimal indel rate segments...");
+//                    }
+//
+//                    int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
+//                            prefix_sums);
+//
+//                    columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
 
                 }
 

@@ -20,6 +20,14 @@ public class PIPSubstModel extends SubstModel{
         this.lambda = lambda;
     }
 
+    public double getMu() {
+        return mu;
+    }
+
+    public double getLambda() {
+        return lambda;
+    }
+
     public PIPSubstModel(double[] F, double[][] S, Enumerable alphabet, double mu, double lambda, boolean symmetric, boolean normalise) {
         super(F, S, alphabet, symmetric, normalise);
         this.mu = mu;
@@ -59,10 +67,25 @@ public class PIPSubstModel extends SubstModel{
             return X.equals('-') ? 1.0 : 0.0;
         } else if (X.equals('-')) {
             // child is gap, parent is real — deletion occurred
-            return 1.0 - Math.exp(-mu * t);
+            return (1.0 - Math.exp(-mu * t));
+
         } else {
             // both real characters — standard substitution
             return super.getProb(X, Y, t);
+        }
+    }
+
+    /**
+     * Get probability P(X=x)
+     * @param X
+     * @return
+     */
+    @Override
+    public double getProb(Object X) {
+        if (X.equals("-")) {
+            return 0.0;
+        } else {
+            return super.getProb(X);
         }
     }
 

@@ -34,20 +34,6 @@ public class JCPIP extends PIPSubstModel {
         super(JC.F(domain.size()), JC.Q(alpha, domain.size()), domain, mu, lambda,false, false);
     }
 
-    /**
-     * Get probability P(X=x)
-     * @param X
-     * @return
-     */
-    @Override
-    public double getProb(Object X) {
-        if (X.equals("-")) {
-            return 0.0;
-        } else {
-            return super.getProb(X);
-        }
-    }
-
     public JCPIP(double mu, double lambda) {
         super(F, Q, new Enumerable(S), mu, lambda);
     }
