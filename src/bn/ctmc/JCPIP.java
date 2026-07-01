@@ -1,5 +1,6 @@
 package bn.ctmc;
 
+import bn.ctmc.matrix.JC;
 import dat.Enumerable;
 
 public class JCPIP extends PIPSubstModel {
@@ -27,6 +28,24 @@ public class JCPIP extends PIPSubstModel {
      */
     public JCPIP(double[] F, double[][] S, Enumerable alphabet, double mu, double lambda) {
         super(F, S, alphabet, mu, lambda);
+    }
+
+    public JCPIP(double alpha, Enumerable domain, double mu, double lambda) {
+        super(JC.F(domain.size()), JC.Q(alpha, domain.size()), domain, mu, lambda,false, false);
+    }
+
+    /**
+     * Get probability P(X=x)
+     * @param X
+     * @return
+     */
+    @Override
+    public double getProb(Object X) {
+        if (X.equals("-")) {
+            return 0.0;
+        } else {
+            return super.getProb(X);
+        }
     }
 
     public JCPIP(double mu, double lambda) {

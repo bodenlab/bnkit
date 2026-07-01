@@ -20,6 +20,12 @@ public class PIPSubstModel extends SubstModel{
         this.lambda = lambda;
     }
 
+    public PIPSubstModel(double[] F, double[][] S, Enumerable alphabet, double mu, double lambda, boolean symmetric, boolean normalise) {
+        super(F, S, alphabet, symmetric, normalise);
+        this.mu = mu;
+        this.lambda = lambda;
+    }
+
     public double getInsertionProb(double treeLength) {
 
         double factor = 1.0 / (treeLength + (1.0 / mu));
@@ -48,11 +54,14 @@ public class PIPSubstModel extends SubstModel{
 
     @Override
     public double getProb(Object X, Object Y, double t) {
-        if (X.equals('-')) {
-            return mu;
-        } else if (Y.equals('-')) {
-            return 0.0;
+        if (Y.equals('-')) {
+            // parent is gap — absorbing state
+            return X.equals('-') ? 1.0 : 0.0;
+        } else if (X.equals('-')) {
+            // child is gap, parent is real — deletion occurred
+            return 1.0 - Math.exp(-mu * t);
         } else {
+            // both real characters — standard substitution
             return super.getProb(X, Y, t);
         }
     }
