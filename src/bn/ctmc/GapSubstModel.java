@@ -70,12 +70,11 @@ public class GapSubstModel extends SubstModel {
 //                }
             }
 
-            //  Bottom row: λ * π_j (insertions from gap)
             for (int j = 0; j < numChars; ++j) {
-                R_EPS[numChars][j] = F[j] * this.lambda;
+                R_EPS[numChars][j] = 0.0;
             }
             // sums bottom row to zero
-            R_EPS[numChars][numChars] = -this.lambda;
+            R_EPS[numChars][numChars] = 0.0;
 
             //double[][] R_EPS = constructIndelR(F, IRM);
 
@@ -103,9 +102,7 @@ public class GapSubstModel extends SubstModel {
             }
 
             this.R = R_EPS;
-
             this.Rexp = new Exp(R);
-
         }
     }
 
@@ -189,25 +186,12 @@ public class GapSubstModel extends SubstModel {
 
         if (lambda < 0 || mu < 0) {
             throw new IllegalArgumentException("mu + lambda must be >= 0");
-        } else if (mu + lambda > 0) {
-            // need to adjust stationary freqs by deletion ratio
-            // first just adjust real letters
-            double gapFreq = mu / (mu + lambda);
-            for (int i = 0; i < alpha.size() - 1; i++) {
-                fGap[i] = (1 - gapFreq) * F[i];
-            }
-            // stationary prob for an indel
-            fGap[alpha.size() - 1] = gapFreq;
-
-        } else if (mu + lambda == 0) {
-            // no indels - zero prob of gaps
-            for (int i = 0; i < alpha.size() - 1; i++) {
-                fGap[i] = F[i];
-            }
-            fGap[alpha.size() - 1] = 0.0;
-        } else {
-            throw new IllegalArgumentException("mu and lambda combination not supported");
         }
+        // no indels - zero prob of gaps
+        for (int i = 0; i < alpha.size() - 1; i++) {
+            fGap[i] = F[i];
+        }
+        fGap[alpha.size() - 1] = 0.0;
 
         return fGap;
     }

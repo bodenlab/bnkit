@@ -35,6 +35,6 @@ public class JCPIP extends PIPSubstModel {
     }
 
     public JCPIP(double mu, double lambda) {
-        super(F, Q, new Enumerable(S), mu, lambda);
+        super(F, Q, new Enumerable(S), mu, lambda, false, false);
     }
 }

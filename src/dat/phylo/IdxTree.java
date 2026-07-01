@@ -3,6 +3,7 @@ package dat.phylo;
 import asr.ASRException;
 import bn.Distrib;
 import bn.ctmc.JCPIP;
+import bn.ctmc.JTTPIP;
 import bn.ctmc.PIPSubstModel;
 import bn.ctmc.SubstNode;
 import bn.ctmc.matrix.JC;
@@ -1522,7 +1523,7 @@ public class IdxTree implements Iterable<Integer> {
         int totalNodes = tree.getSize();
         Map<String, Integer> alnMap = aln.getMap();
 
-        double[][] logFTldrV = new double[totalNodes][alpha.size() + 1];
+        double[][] logFTldrV = new double[totalNodes][alpha.size()];
         for (double[] row : logFTldrV) {
             Arrays.fill(row, Double.NEGATIVE_INFINITY);
         }
@@ -1539,7 +1540,7 @@ public class IdxTree implements Iterable<Integer> {
                 }
 
                 // set gap value at leaf
-                logFTldrV[bpidx][alpha.size()] = (sigmaPrime.equals('-')) ? 0.0 : Double.NEGATIVE_INFINITY;
+                //logFTldrV[bpidx][alpha.size() - 1] = (sigmaPrime.equals('-')) ? 0.0 : Double.NEGATIVE_INFINITY;
 
                 // set real character values at leaf
                 for (Object c : alpha.getValues()) {
@@ -1558,7 +1559,7 @@ public class IdxTree implements Iterable<Integer> {
 
                     for (int childIdx : children) {
                         SubstNode substNode = (SubstNode) pbn.getBNode(childIdx);
-                        double[] logTerms = new double[alpha.size() + 1];
+                        double[] logTerms = new double[alpha.size()];
                         int termIdx = 0;
 
                         // sum over real child states sigma'
@@ -1570,9 +1571,9 @@ public class IdxTree implements Iterable<Integer> {
                             logTerms[termIdx++] = logProb + logFChild;
                         }
 
-                        // gap child term
-                        double logProbGap = Math.log(jc.getProb('-', sigma, substNode.getTime()));
-                        logTerms[termIdx] = logProbGap + logFTldrV[childIdx][alpha.size()];
+//                        // gap child term
+//                        double logProbGap = Math.log(jc.getProb('-', sigma, substNode.getTime()));
+//                        logTerms[termIdx] = logProbGap + logFTldrV[childIdx][alpha.size()];
 
                         // inner sum over sigma', accumulate product over children
                         logTotalProb += MathEx.logsumexp(logTerms);
@@ -1600,8 +1601,8 @@ public class IdxTree implements Iterable<Integer> {
         double[] logFTildeScalar = new double[totalNodes];
 
         for (int bpidx = 0; bpidx < totalNodes; bpidx++) {
-            double[] logTerms = new double[alpha.size()];
-            for (int alphaIdx = 0; alphaIdx < alpha.size(); alphaIdx++) {
+            double[] logTerms = new double[jc.getOriginalAlpha().size()];
+            for (int alphaIdx = 0; alphaIdx < jc.getOriginalAlpha().size(); alphaIdx++) {
                 logTerms[alphaIdx] = Math.log(jc.getProb(alpha.get(alphaIdx)))
                         + logFTldrV[bpidx][alphaIdx];
             }
@@ -1696,15 +1697,19 @@ public class IdxTree implements Iterable<Integer> {
                                        PhyloBN pbn) {
 
 
-       Enumerable alphabet =  jc.getDomain();
-        double[][] logFTldrV = computeLogFTilde(tree, aln, pbn, jc,  alphabet, colIdx);
+       Enumerable alphabet =  jc.getOriginalAlpha();
+        double[][] logFTldrV = computeLogFTilde(tree, aln, pbn, jc, jc.getDomain(), colIdx);
         // now construct fv not conditioned on character
-        double[] logFTildeScalar = computeLogFTildeScalar(logFTldrV, jc,  alphabet);
+        double[] logFTildeScalar = computeLogFTildeScalar(logFTldrV, jc, alphabet);
         double treeLength = Arrays.stream(tree.getValidDistances()).sum();
         // Find the set of leaves that are non-gapped
         Set<Integer> S = findNonGappedLeaves(tree, aln, colIdx);
 
         if (S.isEmpty()) {
+//            System.out.println("=== Gap column debug ===");
+//            System.out.println("S.isEmpty()=" + S.isEmpty());
+//            System.out.println("numNodes=" + tree.getSize());
+
             // all gaps
             double[] nodeProbs = new double[tree.getSize()];
             for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
@@ -1722,6 +1727,11 @@ public class IdxTree implements Iterable<Integer> {
                 double logInsertProb = Math.log(isRoot ?
                         jc.getInsertionProb(treeLength) :
                         jc.getInsertionProb(tree.getDistance(bpidx), treeLength));
+
+                System.out.println("node=" + bpidx
+                        + " beta=" + beta
+                        + " iota=" + logInsertProb
+                        + " logFTildeScalar=" + logFTildeScalar[bpidx]);
 
                 nodeProbs[bpidx] = logInsertProb + logFv;
             }
@@ -1757,19 +1767,44 @@ public class IdxTree implements Iterable<Integer> {
         Tree tree = null;
         Enumerable alpha = new Enumerable(new Object[]{'A', 'C', 'G', 'T'});
         try {
-            aln = Utils.loadAlignment("/Users/uqsporra/IdeaProjects/bnkit/test.fa", alpha);
-            tree = Utils.loadTree("/Users/uqsporra/IdeaProjects/bnkit/test.nwk");
+            aln = Utils.loadAlignment("/Users/sporras/IdeaProjects/bnkit/test.fa", alpha);
+            tree = Utils.loadTree("/Users/sporras/IdeaProjects/bnkit/test.nwk");
             Utils.checkData(aln, tree, false);
 
         } catch (ASRException | IOException e) {
             System.exit(1);
         }
-        JCPIP jc = new JCPIP(1.0, alpha, 0.5, 0.5);
-        int colIdx = 2;
-        PhyloBN pbn = PhyloBN.create(tree, jc, 1.0);
+        JTTPIP jc = new JTTPIP(1, 2);
+        double sum = 0.0;
+        for (Object c : jc.getDomain().getValues()) {
+            Character sigma = (Character) c;
+            sum += jc.getProb(sigma, 'A', 1.0);
+        }
+        //sum += jc.getProb('-', 'A', 1.0);
+        System.out.println("Row sum (expect 1.0): " + sum);
 
-        double logColumnProb = getColumnProb(jc, colIdx, tree, aln, pbn);
-        System.out.println(logColumnProb);
+
+        // add a method to expose R matrix for debugging
+        for (int i = 0; i < 5; i++) {
+            System.out.println("R[" + i + "][" + i + "] = " + jc.getR()[i][i]);
+            System.out.println("R[" + i + "][4] = " + jc.getR()[i][4]);  // gap column
+        }
+
+        double[][] R = jc.getR();
+        System.out.println("Q matrix diagonal:");
+        for (int i = 0; i < R.length; i++) {
+            System.out.println("R[" + i + "][" + i + "] = " + R[i][i]);
+        }
+        System.out.println("R[0][20] = " + R[0][20]); // gap column for first char
+
+        System.out.println("Q matrix row sums (all should be ~0):");
+        for (int i = 0; i < R.length; i++) {
+            double rowSum = 0;
+            for (int j = 0; j < R[i].length; j++) {
+                rowSum += R[i][j];
+            }
+            System.out.println("row " + i + " sum = " + rowSum);
+        }
 
 //        long SEED = System.currentTimeMillis(); // random seed
 //        int NCOMP = 3; // number of components in Gamma mixture to model branch distances
