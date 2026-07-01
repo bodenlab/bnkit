@@ -1696,23 +1696,40 @@ public class IdxTree implements Iterable<Integer> {
         double[][] logFTldrV = computeLogFTilde(tree, aln, pbn, jc,  alphabet, colIdx);
         // now construct fv not conditioned on character
         double[] logFTildeScalar = computeLogFTildeScalar(logFTldrV, jc,  alphabet);
-
-        // need to create a dummy aln containing only gaps
-        EnumSeq.Alignment<Enumerable> gap_aln = createGapColumn(alphabet, aln);
-        double[][] logFTldrVGapOnly = computeLogFTilde(tree, gap_aln, pbn, jc, alphabet, 0);
-        // now construct fv not conditioned on character
-        double[] logFTildeScalarGapOnly = computeLogFTildeScalar(logFTldrVGapOnly, jc, alphabet);
-
-
+        double treeLength = Arrays.stream(tree.getValidDistances()).sum();
         // Find the set of leaves that are non-gapped
         Set<Integer> S = findNonGappedLeaves(tree, aln, colIdx);
+
+        if (S.isEmpty()) {
+            // all gaps
+            double[] nodeProbs = new double[tree.getSize()];
+            for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                boolean isRoot = tree.getParent(bpidx) == -1;
+                double beta = jc.survivalProb(tree.getDistance(bpidx), isRoot);
+                double logBeta = Math.log(beta);
+                double log1MinusBeta = Math.log(1 - beta);
+                // f_v = (1 - beta) + beta * fTilde_v  in log space
+                double logFv = MathEx.logsumexp(new double[]{
+                        log1MinusBeta,
+                        logBeta + logFTildeScalar[bpidx]
+                });
+
+                // then weight by insertion probability
+                double logInsertProb = Math.log(isRoot ?
+                        jc.getInsertionProb(treeLength) :
+                        jc.getInsertionProb(tree.getDistance(bpidx), treeLength));
+
+                nodeProbs[bpidx] = logInsertProb + logFv;
+            }
+
+            return MathEx.logsumexp(nodeProbs);
+        }
 
         int mrca = findMRCA(tree, S);
         Set<Integer> A = getAllAncestorsToRoot(mrca, tree);
 
         double[] validNodes = new double[A.size()];
         int nodeCounter = 0;
-        double treeLength = Arrays.stream(tree.getValidDistances()).sum();
         for (int bpidx : A) {
             boolean isRoot = tree.getParent(bpidx) == -1;
             double logBeta = Math.log(jc.survivalProb(tree.getDistance(bpidx), isRoot));
@@ -1743,8 +1760,8 @@ public class IdxTree implements Iterable<Integer> {
         } catch (ASRException | IOException e) {
             System.exit(1);
         }
-        JCPIP jc = new JCPIP(1.0, alpha, 0.1, 0.1);
-        int colIdx = 1;
+        JCPIP jc = new JCPIP(1.0, alpha, 0.5, 0.5);
+        int colIdx = 2;
 
         double logColumnProb = getColumnProb(jc, colIdx, tree, aln);
         System.out.println(logColumnProb);
