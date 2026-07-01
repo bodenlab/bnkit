@@ -36,7 +36,7 @@ public class Mip {
 
     private static final double MAX_PENALTY = 1000.0;
     public static double MIN_MU_LAMBDA_VALUE = 0.01;
-    public static double MAX_MU_LAMBDA_VALUE = 50;
+    public static double MAX_MU_LAMBDA_VALUE = 10;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;

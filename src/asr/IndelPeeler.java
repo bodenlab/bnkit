@@ -92,7 +92,6 @@ public class IndelPeeler {
 
         double columnLogLikelihoods = 0.0;
         int numCols = aln.getWidth();
-        // rebuild pbn with current model parameters — no longer passed in
 
         IndelPeeler[] peelers = createPeelingJobs(tree, model, numCols, aln, pbn);
         double[] columnProbs = runPeelingJobs(peelers, nThreads);
@@ -102,7 +101,6 @@ public class IndelPeeler {
 
         // total insertion rate mass
         double treeLength = Arrays.stream(tree.getValidDistances()).sum();
-        //double nu = model.getLambda() * (treeLength + (1.0 / model.getMu()));
 
         EnumSeq.Alignment<Enumerable> gapCol =  IdxTree.createGapColumn(model.getDomain(), aln);
         double logPc0 = IdxTree.getColumnProb(model, 0, (Tree) tree, gapCol, pbn);
@@ -119,7 +117,7 @@ public class IndelPeeler {
 
         double logPhi =  -logFactorialM
                 + numCols * Math.log(nu)
-                + nu * (pc0 - 1.0);
+                + (nu * (pc0 - 1.0));
 
 
         return logPhi + columnLogLikelihoods;
@@ -188,12 +186,14 @@ public class IndelPeeler {
 
 
         LikelihoodEvaluator evaluator = new LikelihoodEvaluator(tree, aln, substModelName);
+
         double mu = 0.1;      // initial values
         double lambda = 10.0;
+        evaluator.setLambda(lambda);
+        evaluator.setMu(mu);
         double prevLogLik = Double.NEGATIVE_INFINITY;
         double tol = 1e-6;
         int maxIter = 100;
-        double treeLength = Arrays.stream(tree.getValidDistances()).sum();
         PIPSubstModel model;
         switch (substModelName) {
             case "JC" -> model = new JCPIP(mu, lambda);
@@ -221,7 +221,7 @@ public class IndelPeeler {
             evaluator.setLambda(bestLambda);
 
             // check convergence
-            double logLik = evaluator.evaluate();
+            double logLik = -evaluator.evaluate();
             System.out.println("Iter=" + iter
                     + " mu=" + bestMu
                     + " lambda=" + bestLambda
