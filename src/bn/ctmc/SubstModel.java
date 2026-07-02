@@ -258,6 +258,7 @@ public abstract class SubstModel {
     public double getProb(Object X, Object Y, double time) {
         if (this.time != time || probs == null) // only re-compute matrix if time has changed
             probs = getCache(time);
+
         int index_X = alpha.getIndex(X);
         int index_Y = alpha.getIndex(Y);
         return probs[index_Y][index_X];
