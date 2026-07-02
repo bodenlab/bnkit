@@ -1,8 +1,7 @@
 package asr;
 
 import bn.Distrib;
-import bn.ctmc.GapSubstModel;
-import bn.ctmc.SubstModel;
+import bn.ctmc.*;
 import bn.ctmc.matrix.*;
 import bn.node.GDT;
 import bn.prob.GammaDistrib;
@@ -36,7 +35,7 @@ public class Mip {
 
     private static final double MAX_PENALTY = 1000.0;
     public static double MIN_MU_LAMBDA_VALUE = 0.01;
-    public static double MAX_MU_LAMBDA_VALUE = 10;
+    public static double MAX_MU_LAMBDA_VALUE = 50;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
@@ -471,36 +470,47 @@ public class Mip {
                     }
 
                 } else {
-//                    double geometric_seq_len_param = (double) 1 / aln.getAvgSeqLength();
-//                    if (GRASP.VERBOSE) {
-//                        System.out.println("Optimising indel parameters for distance-based MIP...");
-//                    }
-                    double optimal_mu = IndelPeeler.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Optimising indel parameters for distance-based MIP...");
+                    }
+                    double[] optimalParams = IndelPeeler.optimiseMuLambda(MIN_MU_LAMBDA_VALUE, MAX_MU_LAMBDA_VALUE, substModelName,
                             tree, aln);
 
-                    GapSubstModel gapModel = createGapSubstModel(optimal_mu);
+                    PIPSubstModel gapModel = createGapSubstModel(optimalParams[0], optimalParams[1]);
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Computing column priors under different indel rate categories...");
+                        for (int i = 0; i < rates.length; i++) {
+                            System.out.println("Rate category " + i + ": " + rates[i]);
+                        }
+                    }
+
+
+                    Set[] nonGappedLeaveSets = new Set[aln.getWidth()];
+                    Set[] ancestorsToRootFromMRCA = new Set[aln.getWidth()];
+                    Map<String, Integer> alnMap = aln.getMap();
+                    for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+                        Set<Integer> S = IdxTree.findNonGappedLeaves(tree, aln, colIdx, alnMap);
+                        nonGappedLeaveSets[colIdx] = S;
+                        int mrca = IdxTree.findMRCA(tree, S);
+                        Set<Integer> A = IdxTree.getAllAncestorsToRoot(mrca, tree);
+                        ancestorsToRootFromMRCA[colIdx] = A;
+                    }
+                    double[][] columnPriors = IndelPeeler.computeColumnPriors(tree, gapModel, rates, GRASP.NTHREADS,
+                            aln.getWidth(), aln, nonGappedLeaveSets, ancestorsToRootFromMRCA, alnMap);
 //
-//                    if (GRASP.VERBOSE) {
-//                        System.out.println("Computing column priors under different indel rate categories...");
-//                        for (int i = 0; i < rates.length; i++) {
-//                            System.out.println("Rate category " + i + ": " + rates[i]);
-//                        }
-//                    }
-//                    double[][] columnPriors = IndelPeeler.computeColumnPriors(tree, gapModel, geometric_seq_len_param, rates, GRASP.NTHREADS);
-//
-//                    if (GRASP.VERBOSE) {
-//                        System.out.println("Computing prefix sums for indel segment assignment...");
-//                    }
-//                    double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
-//
-//                    if (GRASP.VERBOSE) {
-//                        System.out.println("Assigning optimal indel rate segments...");
-//                    }
-//
-//                    int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
-//                            prefix_sums);
-//
-//                    columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Computing prefix sums for indel segment assignment...");
+                    }
+                    double[][] prefix_sums = IndelSegmentation.computePrefixSums(columnPriors);
+
+                    if (GRASP.VERBOSE) {
+                        System.out.println("Assigning optimal indel rate segments...");
+                    }
+
+                    int[][] segments = IndelSegmentation.assignSegments(columnPriors.length, ratePriors,
+                            prefix_sums);
+
+                    columnRateCategories = IndelSegmentation.expandSegmentOrder(segments);
 
                 }
 
@@ -625,15 +635,12 @@ public class Mip {
             }
     }
 
-    private GapSubstModel createGapSubstModel(double optimal_mu) {
-        GapSubstModel gapModel;
+    private PIPSubstModel createGapSubstModel(double mu, double lambda) {
+        PIPSubstModel gapModel;
         switch (substModelName) {
-            case "JTT" -> gapModel = new JTTGap(optimal_mu, optimal_mu);
-            case "JC" -> gapModel = new JCGap(optimal_mu, optimal_mu);
-            case "LG" -> gapModel = new LGGap(optimal_mu, optimal_mu);
-            case "Dayhoff" -> gapModel = new DayhoffGap(optimal_mu, optimal_mu);
-            case "WAG" -> gapModel = new WAGGap(optimal_mu, optimal_mu);
-            case "Yang" -> gapModel = new YangGap(optimal_mu, optimal_mu);
+            case "JTT" -> gapModel = new JTTPIP(mu, lambda);
+            case "JC" -> gapModel = new JCPIP(mu, lambda);
+
             default -> throw new IllegalArgumentException("Unrecognized gap substitution model: " + substModelName);
         }
         return gapModel;

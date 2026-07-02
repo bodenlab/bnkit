@@ -52,15 +52,15 @@ public class Minimise {
         int new_i = i + 1;
         double m = 0.5 * (a + b);
         if (GRASP.VERBOSE) {
-            System.out.println("Iteration: " + new_i + " Current interval: [" + a + ", " + b + "] Current best: " + m);
+            System.out.println("Iteration: " + new_i + " Search interval: [" + a + ", " + b + "] Best param: " + m);
         }
         if (b - a <= EPS) {
-            System.out.println("Number of iterations: " + (i + 1));
-            System.out.println("Optimal mu/lambda value: " + m);
+            System.out.println("Convergence after " + (i + 1) + " iterations");
+            System.out.println("Optimal value: " + m);
             return m;
         } else if (i > MAX) {
             System.out.println("Exhausted iterations before convergence");
-            System.out.println("Approximate mu/lambda value: " + m);
+            System.out.println("Approximate value: " + m);
             return m;
         }
 

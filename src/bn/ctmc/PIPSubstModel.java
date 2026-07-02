@@ -46,33 +46,6 @@ public class PIPSubstModel extends SubstModel{
                     R_EPS[i][j] = this.R[i][j];
                 }
             }
-//            for (int i = 0; i < numChars; i++) {
-//                for (int j = i + 1; j < IRM[i].length; j ++) {
-//                    double s = IRM[i][j];
-//                    R_EPS[i][j] = s*F[j];
-//                    R_EPS[j][i] = s*F[i];
-//                }
-//            }
-//
-//            for (int i = 0; i < R_EPS.length; i++) {
-//                double sum = 0.0;
-//                for (int j = 0; j <  R_EPS.length; j++) {
-//                    if (i != j) {
-//                        sum += R_EPS[i][j];
-//                    }
-//                }
-//                R_EPS[i][i] -= sum;
-//            }
-//
-//            int dim = R_EPS.length;
-//            double sum = 0.0;
-//            for (int i = 0; i < dim; i++) {
-//                sum += -R_EPS[i][i]*this.F[i];
-//            }
-//            for (int i = 0; i < dim; i++) {
-//                for (int j = 0; j < dim; j++)
-//                    R_EPS[i][j] = R_EPS[i][j]/sum;
-//            }
 
             for (int i = 0; i < numChars; i++) {
                 R_EPS[i][numChars] = mu;
@@ -176,10 +149,9 @@ public class PIPSubstModel extends SubstModel{
         if (Y.equals('-')) {
             // parent is gap — absorbing state
             return X.equals('-') ? 1.0 : 0.0;
-        } else if (X.equals('-')) {
-            // child is gap, parent is real — deletion occurred
-            return (1.0 - Math.exp(-mu * t));
-
+//        } else if (X.equals('-')) {
+//            // child is gap, parent is real — deletion occurred
+//            return (1.0 - Math.exp(-mu * t));
         } else {
             // both real characters — standard substitution
             return super.getProb(X, Y, t);
