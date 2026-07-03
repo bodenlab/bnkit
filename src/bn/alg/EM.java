@@ -459,7 +459,8 @@ public class EM extends LearningAlg {
                 }
             }
 
-            if (round % 10 == 0) { // || round == 1) {
+            int checkInterval = 1;
+            if (round % checkInterval == 0) { // || round == 1) {
                 // for each sample with observations...
                 for (int i = 0; i < values.length; i++) {
                     // set variables and keys according to observations
@@ -490,11 +491,13 @@ public class EM extends LearningAlg {
                 }
             }
 
-            if (round % 10 == 0) { // & round %50 == 0
+
+            if (round % checkInterval == 0) { // & round %50 == 0
                 // summarise progress
                 double sd_LL = 0;
                 // copy previous LL (log-likelihood of data)
-                if (round <= 50) {
+                int minRoundsBeforeCheck = last_LL.length * checkInterval;
+                if (round <= minRoundsBeforeCheck) {
                     for (int i = 0; i < last_LL.length - 1; i++) {
                         last_LL[i] = last_LL[i + 1]; // shuffle llhs through list - only ever record 5
                     }
@@ -506,6 +509,7 @@ public class EM extends LearningAlg {
                         last_LL[i] = last_LL[i + 1];
                         mean_LL += (last_LL[i] / last_LL.length);
                     }
+                    last_LL[last_LL.length - 1] = log_likelihood;
                     double[] sdl_LL = new double[last_LL.length];
                     for (int j = 0; j < last_LL.length; j++) {
                     	sdl_LL[j] = (last_LL[j] - mean_LL)*(last_LL[j] - mean_LL);
@@ -515,7 +519,7 @@ public class EM extends LearningAlg {
                         sdl_LL[i] = sdl_LL[i + 1];
                         sd_LL += (sdl_LL[i] / sdl_LL.length);
                     }
-                    last_LL[last_LL.length - 1] = log_likelihood;
+                    //last_LL[last_LL.length - 1] = log_likelihood;
 //                    if ((-mean_LL - -log_likelihood) < (EM_CONVERGENCE_CRITERION * 0.01 * -mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION
                     if(mean_LL > 0) {
                         if (sd_LL < (EM_CONVERGENCE_CRITERION * 0.01 * mean_LL)) // percent improvement < EM_CONVERGENCE_CRITERION

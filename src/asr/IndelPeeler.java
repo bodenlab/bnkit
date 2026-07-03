@@ -211,34 +211,43 @@ public class IndelPeeler {
         double tol = 1e-5;
         int maxIter = 100;
 
-        for (int iter = 0; iter < maxIter; iter++) {
+        System.out.println("Optimising Lambda, fixed Mu");
+        double bestLambda = Minimise.brent(lambda_ -> {
+            evaluator.setLambda(lambda_);
+            evaluator.setMu(lambda_);
+            return -evaluator.evaluate();  // negate for minimisation
+        }, min_val, max_val);
+        evaluator.setLambda(bestLambda);
+        evaluator.setMu(bestLambda);
 
-            // optimise mu with lambda fixed
-            System.out.println("Optimising Mu, fixed Lambda");
-            double bestMu = Minimise.brent(mu_ -> {evaluator.setMu(mu_); return -evaluator.evaluate();}, min_val, max_val);
-            evaluator.setMu(bestMu);
-
-            // optimise lambda with mu fixed
-            System.out.println("Optimising Lambda, fixed Mu");
-            double bestLambda = Minimise.brent(lambda_ -> {
-                evaluator.setLambda(lambda_);
-                return -evaluator.evaluate();  // negate for minimisation
-            }, min_val, max_val);
-            evaluator.setLambda(bestLambda);
-
-            // check convergence
-            double logLik = -evaluator.evaluate();
-            System.out.println("Iter=" + iter
-                    + " mu=" + bestMu
-                    + " lambda=" + bestLambda
-                    + " logLik=" + -logLik);
-
-            if (Math.abs(logLik - prevLogLik) < tol) {
-                System.out.println("Converged at iteration " + iter);
-                break;
-            }
-            prevLogLik = logLik;
-        }
+//        for (int iter = 0; iter < maxIter; iter++) {
+//
+//            // optimise mu with lambda fixed
+//            System.out.println("Optimising Mu, fixed Lambda");
+//            double bestMu = Minimise.brent(mu_ -> {evaluator.setMu(mu_); return -evaluator.evaluate();}, min_val, max_val);
+//            evaluator.setMu(bestMu);
+//
+//            // optimise lambda with mu fixed
+//            System.out.println("Optimising Lambda, fixed Mu");
+//            double bestLambda = Minimise.brent(lambda_ -> {
+//                evaluator.setLambda(lambda_);
+//                return -evaluator.evaluate();  // negate for minimisation
+//            }, min_val, max_val);
+//            evaluator.setLambda(bestLambda);
+//
+//            // check convergence
+//            double logLik = -evaluator.evaluate();
+//            System.out.println("Iter=" + iter
+//                    + " mu=" + bestMu
+//                    + " lambda=" + bestLambda
+//                    + " logLik=" + -logLik);
+//
+//            if (Math.abs(logLik - prevLogLik) < tol) {
+//                System.out.println("Converged at iteration " + iter);
+//                break;
+//            }
+//            prevLogLik = logLik;
+//        }
 
         return new double[]{evaluator.mu, evaluator.lambda};
     }
