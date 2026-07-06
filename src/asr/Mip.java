@@ -34,8 +34,8 @@ import util.Binner;
 public class Mip {
 
     private static final double MAX_PENALTY = 1000.0;
-    public static double MIN_MU_LAMBDA_VALUE = 0.01;
-    public static double MAX_MU_LAMBDA_VALUE = 10;
+    public static double MIN_MU_LAMBDA_VALUE = 0.001;
+    public static double MAX_MU_LAMBDA_VALUE = 25;
     private static final int GAP = 0;
     private static final int NON_GAP = 1;
     private static final int VIRTUAL_START = -1;
@@ -87,7 +87,6 @@ public class Mip {
     private void identifyNodesToSkip() {
         int previousNode = 0;
         for (int nodeIdx = 0; nodeIdx < nPos - 1; nodeIdx++) {
-
 
             if ((getForwardEdges(nodeIdx).length == 1)
                     && Arrays.stream(getForwardEdges(nodeIdx)).min().orElseThrow() == (nodeIdx + 1)
@@ -685,12 +684,17 @@ public class Mip {
         for (int ancestorIdx : tree.getAncestors()) {
 
             // VIRTUAL STARTS TO REAL STARTS //
+            List<MPVariable> all_edges_from_start = new LinkedList<>();
+            MPConstraint startConstraint = solver.makeConstraint(1, 1);
             for (int edgeEnd : startIndices) {
                 // Variable for each edge from virtual start to a "real" start node
                 MPVariable edge = solver.makeBoolVar("");
+                all_edges_from_start.add(edge);
                 EdgeKey edgeKey = new EdgeKey(VIRTUAL_START, edgeEnd, ancestorIdx);
                 edges.put(edgeKey, edge);
             }
+            addConstraintSum(startConstraint, all_edges_from_start, 1);
+
 
             for (int nodeIdx = 0; nodeIdx < alnPog.maxsize(); nodeIdx++) {
                 // first go through and find nodes where we actually need edge variables
@@ -761,6 +765,17 @@ public class Mip {
                     }
                 }
             }
+
+            List<MPVariable> all_edges_to_end = new LinkedList<>();
+            MPConstraint endConstraint = solver.makeConstraint(1, 1);
+            for (int edgeStart : alnPog.getEnds()) {
+                EdgeKey edgeKey = new EdgeKey(edgeStart, virtualEndIdx, ancestorIdx);
+                MPVariable edge = edges.get(edgeKey);
+                all_edges_to_end.add(edge);
+            }
+            addConstraintSum(endConstraint, all_edges_to_end, 1);
+
+
         }
     }
 
