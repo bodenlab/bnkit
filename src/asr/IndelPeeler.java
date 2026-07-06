@@ -203,51 +203,72 @@ public class IndelPeeler {
         LikelihoodEvaluator evaluator = new LikelihoodEvaluator(tree, aln, substModelName, nonGappedLeaveSets,
                 ancestorsToRootFromMRCA, alnMap);
 
-        double mu = 0.1;      // initial values
-        double lambda = 10.0;
-        evaluator.setLambda(lambda);
-        evaluator.setMu(mu);
+        double minLogHalfWindow = Math.log(3.0);
+        double maxLogHalfWindow = 0.5 * (Math.log(max_val) - Math.log(min_val));
+
+        double initLambda = 10.0;
+        double initMu = 0.1;
+        evaluator.setLambda(initLambda);
+        evaluator.setMu(initMu);
+
+        System.out.println("Warm start: optimising Lambda, Mu fixed at " + initMu);
+        double lamMin = Math.max(min_val, initLambda / 20.0);
+        double lamMax = Math.min(max_val, initLambda * 20.0);
+
+        Minimise warmLambda = Minimise.brentLogSpaceWithReexpansion(lambda_ -> {
+            evaluator.setLambda(lambda_);
+            return -evaluator.evaluate();}, lamMin, lamMax);
+        evaluator.setLambda(warmLambda.bestX);
+
+        double bestMu = initMu;
+        double bestLambda = warmLambda.bestX;
+        double muLogWindowWidth = Math.log(3.0);
+        double lambdaLogWindowWidth = warmLambda.finalBracketWidth;
+
         double prevLogLik = Double.NEGATIVE_INFINITY;
         double tol = 1e-5;
         int maxIter = 100;
 
-        System.out.println("Optimising Lambda, fixed Mu");
-        double bestLambda = Minimise.brent(lambda_ -> {
-            evaluator.setLambda(lambda_);
-            evaluator.setMu(lambda_);
-            return -evaluator.evaluate();  // negate for minimisation
-        }, min_val, max_val);
-        evaluator.setLambda(bestLambda);
-        evaluator.setMu(bestLambda);
+        for (int iter = 0; iter < maxIter; iter++) {
 
-//        for (int iter = 0; iter < maxIter; iter++) {
-//
-//            // optimise mu with lambda fixed
-//            System.out.println("Optimising Mu, fixed Lambda");
-//            double bestMu = Minimise.brent(mu_ -> {evaluator.setMu(mu_); return -evaluator.evaluate();}, min_val, max_val);
-//            evaluator.setMu(bestMu);
-//
-//            // optimise lambda with mu fixed
-//            System.out.println("Optimising Lambda, fixed Mu");
-//            double bestLambda = Minimise.brent(lambda_ -> {
-//                evaluator.setLambda(lambda_);
-//                return -evaluator.evaluate();  // negate for minimisation
-//            }, min_val, max_val);
-//            evaluator.setLambda(bestLambda);
-//
-//            // check convergence
-//            double logLik = -evaluator.evaluate();
-//            System.out.println("Iter=" + iter
-//                    + " mu=" + bestMu
-//                    + " lambda=" + bestLambda
-//                    + " logLik=" + -logLik);
-//
-//            if (Math.abs(logLik - prevLogLik) < tol) {
-//                System.out.println("Converged at iteration " + iter);
-//                break;
-//            }
-//            prevLogLik = logLik;
-//        }
+            //  ---- optimise mu, lambda fixed ----
+            double[] muBounds = Minimise.nextLogWindowBounds(bestMu, muLogWindowWidth, minLogHalfWindow, maxLogHalfWindow);
+            muBounds[0] = Math.max(muBounds[0], min_val);
+            muBounds[1] = Math.min(muBounds[1], max_val);
+
+            // optimise lambda with mu fixed
+            System.out.println("Optimising Mu in [" + muBounds[0] + ", " + muBounds[1] + "], Lambda fixed at " + bestLambda);
+            Minimise muResult = Minimise.brentLogSpaceWithReexpansion(mu_ -> {
+                evaluator.setMu(mu_);
+                return -evaluator.evaluate();
+            }, muBounds[0], muBounds[1]);
+            bestMu = muResult.bestX;
+            muLogWindowWidth = muResult.finalBracketWidth;
+            evaluator.setMu(bestMu);
+
+            double[] lambdaBounds = Minimise.nextLogWindowBounds(bestLambda, lambdaLogWindowWidth, minLogHalfWindow, maxLogHalfWindow);
+
+            lambdaBounds[0] = Math.max(lambdaBounds[0], min_val);
+            lambdaBounds[1] = Math.min(lambdaBounds[1], max_val);
+            System.out.println("Optimising Lambda in [" + Math.exp(lambdaBounds[0]) + ", " + Math.exp(lambdaBounds[1]) + "], Mu fixed at " + bestMu);
+            Minimise lambdaResult = Minimise.brentLogSpaceWithReexpansion(lambda_ -> {
+                evaluator.setLambda(lambda_);
+                return -evaluator.evaluate();
+            }, lambdaBounds[0], lambdaBounds[1]);
+            bestLambda = lambdaResult.bestX;
+            lambdaLogWindowWidth = lambdaResult.finalBracketWidth;
+            evaluator.setLambda(bestLambda);
+
+            // check convergence
+            double logLik = -lambdaResult.bestF;   // negate back, since brent minimized -evaluate()
+            System.out.println("Iter=" + iter + " mu=" + bestMu + " lambda=" + bestLambda + " logLik=" + logLik);
+
+            if (Math.abs(logLik - prevLogLik) < tol) {
+                System.out.println("Converged at iteration " + iter);
+                break;
+            }
+            prevLogLik = logLik;
+        }
 
         return new double[]{evaluator.mu, evaluator.lambda};
     }
