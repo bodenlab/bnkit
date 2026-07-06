@@ -203,27 +203,15 @@ public class IndelPeeler {
         LikelihoodEvaluator evaluator = new LikelihoodEvaluator(tree, aln, substModelName, nonGappedLeaveSets,
                 ancestorsToRootFromMRCA, alnMap);
 
+        double bestMu = 0.1;
+        double bestLambda = 10.0;
+        evaluator.setLambda(bestLambda);
+        evaluator.setMu(bestMu);
+
         double minLogHalfWindow = Math.log(3.0);
         double maxLogHalfWindow = 0.5 * (Math.log(max_val) - Math.log(min_val));
-
-        double initLambda = 10.0;
-        double initMu = 0.1;
-        evaluator.setLambda(initLambda);
-        evaluator.setMu(initMu);
-
-        System.out.println("Warm start: optimising Lambda, Mu fixed at " + initMu);
-        double lamMin = Math.max(min_val, initLambda / 20.0);
-        double lamMax = Math.min(max_val, initLambda * 20.0);
-
-        Minimise warmLambda = Minimise.brentLogSpaceWithReexpansion(lambda_ -> {
-            evaluator.setLambda(lambda_);
-            return -evaluator.evaluate();}, lamMin, lamMax);
-        evaluator.setLambda(warmLambda.bestX);
-
-        double bestMu = initMu;
-        double bestLambda = warmLambda.bestX;
         double muLogWindowWidth = Math.log(3.0);
-        double lambdaLogWindowWidth = warmLambda.finalBracketWidth;
+        double lambdaLogWindowWidth = Math.log(3.0);
 
         double prevLogLik = Double.NEGATIVE_INFINITY;
         double tol = 1e-5;
@@ -237,7 +225,7 @@ public class IndelPeeler {
             muBounds[1] = Math.min(muBounds[1], max_val);
 
             // optimise lambda with mu fixed
-            System.out.println("Optimising Mu in [" + muBounds[0] + ", " + muBounds[1] + "], Lambda fixed at " + bestLambda);
+            System.out.println("Optimising Mu in [" + Math.exp(muBounds[0]) + ", " + Math.exp(muBounds[1]) + "], Lambda fixed at " + bestLambda);
             Minimise muResult = Minimise.brentLogSpaceWithReexpansion(mu_ -> {
                 evaluator.setMu(mu_);
                 return -evaluator.evaluate();

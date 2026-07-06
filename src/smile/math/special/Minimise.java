@@ -26,9 +26,20 @@ public class Minimise {
     }
 
     public static Minimise brent(Function func, double a, double b) {
+
+        double origA = a;
+        double origB = b;
+        double origWidth = b - a;
+
         double x = b + INVPHI * (a - b);
         double fx = func.apply(x);
-        return brentRecursive(func, a, b, x, fx, x, fx, x, fx, 0.0, 0.0, 0);
+
+        Minimise inner = brentRecursive(func, a, b, x, fx, x, fx, x, fx, 0.0, 0.0, 0);
+
+        boolean hitLower = (inner.bestX - origA) <= 0.01 * origWidth;
+        boolean hitUpper = (origB - inner.bestX) <= 0.01 * origWidth;
+
+        return new Minimise(inner.bestX, inner.bestF, inner.finalBracketWidth, hitLower, hitUpper);
     }
 
     /**
@@ -71,16 +82,16 @@ public class Minimise {
         int newI = i + 1;
         double m = 0.5 * (a + b);
         if (VERBOSE) {
-            System.out.println("Iteration: " + newI + " Search interval: [" + a + ", " + b
-                    + "] Best point so far: " + x + " f(x)=" + fx);
+            System.out.println("Iteration: " + newI + " Search interval: [" + Math.exp(a) + ", " + Math.exp(b)
+                    + "] Best point so far: " + Math.exp(x));
         }
 
         if (b - a <= EPS) {
-            if (VERBOSE) System.out.println("Converged after " + newI + " iterations. Optimal x=" + x);
-            return new Minimise(x, fx, b - a, isNear(x, a, EPS), isNear(x, b, EPS));
+            if (VERBOSE) System.out.println("Converged after " + newI + " iterations. Optimal x=" + Math.exp(x));
+            return new Minimise(x, fx, b - a, false, false);
         } else if (i > MAX) {
-            if (VERBOSE) System.out.println("Exhausted iterations. Approximate x=" + x);
-            return new Minimise(x, fx, b - a, isNear(x, a, EPS), isNear(x, b, EPS));
+            if (VERBOSE) System.out.println("Exhausted iterations. Approximate x=" + Math.exp(x));
+            return new Minimise(x, fx, b - a, false, false);
         }
 
         double r = (x - w) * (fx - fv);
@@ -154,7 +165,7 @@ public class Minimise {
             double newMax = Math.exp(logCenter + newHalfWindow);
 
             if (VERBOSE) {
-                System.out.println("Bracket [" + minVal + ", " + maxVal
+                System.out.println("Bracket [" + Math.exp(minVal) + ", " + Math.exp(maxVal)
                         + "] was too narrow (best value hit the edge). Re-expanding to ["
                         + newMin + ", " + newMax + "] and retrying.");
             }
