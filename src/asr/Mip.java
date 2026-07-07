@@ -774,8 +774,6 @@ public class Mip {
                 all_edges_to_end.add(edge);
             }
             addConstraintSum(endConstraint, all_edges_to_end, 1);
-
-
         }
     }
 
@@ -1005,6 +1003,13 @@ public class Mip {
                             c5.setCoefficient(pen[pos], 1.0);
                             c5.setCoefficient(diffPos[pos], -1.0);
                         } else {
+
+                            // detect if sequence has changed
+                            MPConstraint c0 = solver.makeConstraint(0, Double.POSITIVE_INFINITY);
+                            c0.setCoefficient(pen[pos], 1);
+                            c0.setCoefficient(diffPos[pos], -1);
+                            c0.setCoefficient(diffPos[pos - 1], 1);
+
                             List<MPVariable> parentEdgesBypassingI = new LinkedList<>();
                             List<MPVariable> childEdgesBypassingI = new LinkedList<>();
                             // get the set of edges that leave i-1 AND BYPASS i
