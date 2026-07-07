@@ -165,7 +165,7 @@ public class Minimise {
             double newMax = Math.exp(logCenter + newHalfWindow);
 
             if (VERBOSE) {
-                System.out.println("Bracket [" + Math.exp(minVal) + ", " + Math.exp(maxVal)
+                System.out.println("Bracket [" + minVal + ", " + maxVal
                         + "] was too narrow (best value hit the edge). Re-expanding to ["
                         + newMin + ", " + newMax + "] and retrying.");
             }
@@ -201,7 +201,7 @@ public class Minimise {
     public static double[] nextLogWindowBounds(double bestValue, double lastLogBracketWidth,
                                                double minLogHalfWindow, double maxLogHalfWindow) {
         double halfWindow = Math.max(minLogHalfWindow,
-                Math.min(maxLogHalfWindow, 4.0 * Math.max(lastLogBracketWidth, EPS)));
+                Math.min(maxLogHalfWindow, 2.0 * Math.max(lastLogBracketWidth, EPS)));
         double logCenter = Math.log(bestValue);
         return new double[] { Math.exp(logCenter - halfWindow), Math.exp(logCenter + halfWindow) };
     }

@@ -210,6 +210,7 @@ public class IndelPeeler {
 
         double minLogHalfWindow = Math.log(3.0);
         double maxLogHalfWindow = 0.5 * (Math.log(max_val) - Math.log(min_val));
+
         double muLogWindowWidth = Math.log(3.0);
         double lambdaLogWindowWidth = Math.log(3.0);
 
@@ -225,7 +226,7 @@ public class IndelPeeler {
             muBounds[1] = Math.min(muBounds[1], max_val);
 
             // optimise lambda with mu fixed
-            System.out.println("Optimising Mu in [" + Math.exp(muBounds[0]) + ", " + Math.exp(muBounds[1]) + "], Lambda fixed at " + bestLambda);
+            System.out.println("Optimising Mu in [" + muBounds[0] + ", " + muBounds[1] + "], Lambda fixed at " + bestLambda);
             Minimise muResult = Minimise.brentLogSpaceWithReexpansion(mu_ -> {
                 evaluator.setMu(mu_);
                 return -evaluator.evaluate();
@@ -238,7 +239,7 @@ public class IndelPeeler {
 
             lambdaBounds[0] = Math.max(lambdaBounds[0], min_val);
             lambdaBounds[1] = Math.min(lambdaBounds[1], max_val);
-            System.out.println("Optimising Lambda in [" + Math.exp(lambdaBounds[0]) + ", " + Math.exp(lambdaBounds[1]) + "], Mu fixed at " + bestMu);
+            System.out.println("Optimising Lambda in [" + lambdaBounds[0] + ", " + lambdaBounds[1] + "], Mu fixed at " + bestMu);
             Minimise lambdaResult = Minimise.brentLogSpaceWithReexpansion(lambda_ -> {
                 evaluator.setLambda(lambda_);
                 return -evaluator.evaluate();
@@ -258,7 +259,7 @@ public class IndelPeeler {
             prevLogLik = logLik;
         }
 
-        return new double[]{evaluator.mu, evaluator.lambda};
+        return new double[]{bestMu, bestLambda};
     }
 
     public static class LikelihoodEvaluator {
