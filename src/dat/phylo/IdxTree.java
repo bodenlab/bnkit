@@ -190,7 +190,7 @@ public class IdxTree implements Iterable<Integer> {
      * @param dmat the distance matrix
      * @return  an array of distances from the root to each leaf
      */
-    protected static double[] getLeafDistances(Double[][] dmat) {
+    public static double[] getLeafDistances(Double[][] dmat) {
         double[] leafdist = new double[dmat.length];
         for (int i = 0; i < dmat.length; i ++) { // each row is a leaf
             for (int j = 0; j < dmat[i].length; j ++) // each col is a branch (with a node idx)
