@@ -834,33 +834,6 @@ public class TreeGazer {
 
         } catch (ClassCastException e) { // Mixture of Gaussians, probably
             try {
-
-//                Old IWD calculation, removed for now as unclear if useful, also costly to compute
-//                double instance_dub = (Double) instance;
-//                MaxLhoodMarginal<EnumDistrib> instan_inf = new MaxLhoodMarginal<>(bpidx, pbn);
-//                ti.setInstance(bpidx, null); // remove evidence, treat as uninstantiated
-//
-//                // perform marginal inference
-//                instan_inf.decorate(ti);
-//                // retrieve the distribution at the node previously nominated
-//                Distrib instan_anydistrib = instan_inf.getDecoration(bpidx);
-//
-//                ti.setInstance(bpidx, instance); // replace the value in the tree
-//
-//                // cast under assumption using a Gaussian mixture
-//                MixtureDistrib mixtureDistrib = (MixtureDistrib) instan_anydistrib;
-//
-//                double[] samples = new double[NSAMPLES];
-//                for (int i = 0; i < NSAMPLES; i++) {
-//                    samples[i] = (Double) instan_anydistrib.sample();
-//                }
-//
-//                GaussianDistrib gd = GaussianDistrib.estimate(samples);
-//
-//                double abs_error = Math.abs(instance_dub - gd.getMean());
-//                double iwd = mixtureDistrib.cdf(gd.getMean() + abs_error) - mixtureDistrib.cdf(gd.getMean() - abs_error);
-//                save[bpcnt][IWD_VAL] = iwd;
-
                 double[] samples = new double[NSAMPLES];
                 for (int i = 0; i < NSAMPLES; i++) {
                     samples[i] = (Double) anydistrib.sample();
