@@ -949,6 +949,7 @@ public class TreeGazer {
             ti.setInstance(bpidx, save[bpcnt][MEAN]); // replace the value in the with predicted value
 
             double totalKL = 0.0;
+            Integer nodesCounted = 0;
             //now we look for leaves that are uninstantiated but also less than 1 branch length away
             for (int leafBpidx : leafIndices) {
 
@@ -958,6 +959,7 @@ public class TreeGazer {
                 double leaf2LeafDist = distances[bpidx][leafBpidx];
                 if (leaf2LeafDist < 1.0 && leaf2LeafDist > 0.0) {
                     // inference below; first create the inference instance
+                    nodesCounted += 1;
                     MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal<>(leafBpidx, pbn);
                     // perform marginal inference
                     inf.decorate(ti);
@@ -984,7 +986,14 @@ public class TreeGazer {
                 }
             }
 
-            save[bpcnt][UCB_VAL] = totalKL;
+
+            if (nodesCounted > 0) {
+                save[bpcnt][UCB_VAL] = totalKL / nodesCounted; // average KL divergence for leaves within 1 branch length
+            } else {
+                save[bpcnt][UCB_VAL] = 0.0;
+            }
+
+
             ti.setInstance(bpidx, null); // remove predicted value
             bpcnt += 1;
         }
