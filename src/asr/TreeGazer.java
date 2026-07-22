@@ -899,7 +899,8 @@ public class TreeGazer {
 
         save = new Object[bpidxs.length][headers.length];
         int bpcnt = 0; // count nodes that are inferred (excl those that are null)
-        for (int bpidx : bpidxs) { // go through all nodes to be inferred
+        for (int bpidx : bpidxs) {
+            // go through all nodes to be inferred
             // inference below; first create the inference instance
             MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal<>(bpidx, pbn);
 
@@ -919,7 +920,6 @@ public class TreeGazer {
             bpcnt += 1;
         }
 
-
         Double[][] dmat = tree.getDistance2RootMatrix();
         double[] leafdist = IdxTree.getLeafDistances(dmat);
         double[][] distances = new double[tree.getSize()][tree.getSize()];
@@ -936,72 +936,139 @@ public class TreeGazer {
             }
         }
 
-        bpcnt = 0; // count nodes that are inferred (excl those that are null)
-        for (int bpidx : bpidxs) { // go through all nodes to be inferred
+        double maxDist = 1.0;
+        int maxAttempts = 5;
+        boolean klSaved = false;
 
-            // ignore instantiated nodes
-            if (save[bpcnt][SD] == null) {
-                bpcnt++;
-                continue;
-            }
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
 
-            // look for nodes that were previously inferred
-            ti.setInstance(bpidx, save[bpcnt][MEAN]); // replace the value in the with predicted value
-
-            double totalKL = 0.0;
-            Integer nodesCounted = 0;
-            //now we look for leaves that are uninstantiated but also less than 1 branch length away
-            for (int leafBpidx : leafIndices) {
-
-                if (save[leafBpidx][SD] == null) {
+            bpcnt = 0; // count nodes that are inferred (excl those that are null)
+            for (int bpidx : bpidxs) {
+                // go through all nodes to be inferred
+                // ignore instantiated nodes
+                if (save[bpcnt][SD] == null) {
+                    bpcnt++;
                     continue;
                 }
-                double leaf2LeafDist = distances[bpidx][leafBpidx];
-                if (leaf2LeafDist < 1.0 && leaf2LeafDist > 0.0) {
-                    // inference below; first create the inference instance
-                    nodesCounted += 1;
-                    MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal<>(leafBpidx, pbn);
-                    // perform marginal inference
-                    inf.decorate(ti);
-                    // retrieve the distribution at the node previously nominated
-                    Distrib anydistrib = inf.getDecoration(leafBpidx);
-                    MixtureDistrib md = (MixtureDistrib) anydistrib;
-                    double[] weights = md.getAllWeights();
-                    double[] prevWeights = Arrays.stream(save[leafBpidx][UCB_VAL + 1].toString().split(";"))
-                            .mapToDouble(Double::parseDouble)
-                            .toArray();
-                    double kl = 0.0;
-                    for (int i = 0; i < weights.length; i++){
-                        double p = weights[i];
-                        if (p < 1e-12) {
-                            p = 1e-12;
-                        }
-                        double q = prevWeights[i];
-                        if (q < 1e-12) {
-                            q = 1e-12;
-                        }
-                        kl += (p * Math.log(p /q));
+
+                // look for nodes that were previously inferred
+                ti.setInstance(bpidx, save[bpcnt][MEAN]); // replace the value in the with predicted value
+                double totalKL = 0.0;
+                int nodesCounted = 0;
+
+                for (int leafBpidx : leafIndices) {
+
+                    if (save[leafBpidx][SD] == null) {
+                        continue;
                     }
-                    totalKL += kl;
+                    double leaf2LeafDist = distances[bpidx][leafBpidx];
+                    if (leaf2LeafDist < maxDist && leaf2LeafDist > 0.0) {
+                        // inference below; first create the inference instance
+                        nodesCounted += 1;
+                        MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal<>(leafBpidx, pbn);
+                        // perform marginal inference
+                        inf.decorate(ti);
+                        // retrieve the distribution at the node previously nominated
+                        Distrib anydistrib = inf.getDecoration(leafBpidx);
+                        MixtureDistrib md = (MixtureDistrib) anydistrib;
+                        double[] weights = md.getAllWeights();
+                        double[] prevWeights = Arrays.stream(save[leafBpidx][UCB_VAL + 1].toString().split(";"))
+                                .mapToDouble(Double::parseDouble)
+                                .toArray();
+                        double kl = 0.0;
+                        for (int i = 0; i < weights.length; i++) {
+                            double p = weights[i];
+                            if (p < 1e-12) {
+                                p = 1e-12;
+                            }
+                            double q = prevWeights[i];
+                            if (q < 1e-12) {
+                                q = 1e-12;
+                            }
+                            kl += (p * Math.log(p / q));
+                        }
+                        totalKL += kl;
+                    }
                 }
+
+                if (nodesCounted > 0) {
+                    save[bpcnt][UCB_VAL] = totalKL ; // average KL divergence for leaves within 1 branch length
+                    //save[bpcnt][UCB_VAL] = totalKL / nodesCounted; // average KL divergence for leaves within 1 branch length
+                    klSaved = true;
+                } else {
+                    save[bpcnt][UCB_VAL] = 0.0;
+                }
+
+                ti.setInstance(bpidx, null); // remove predicted value
+                bpcnt += 1;
             }
 
-
-            if (nodesCounted > 0) {
-                save[bpcnt][UCB_VAL] = totalKL / nodesCounted; // average KL divergence for leaves within 1 branch length
-            } else {
-                save[bpcnt][UCB_VAL] = 0.0;
+            if (klSaved) {
+                break;
             }
 
-
-            ti.setInstance(bpidx, null); // remove predicted value
-            bpcnt += 1;
+            // no leaves found within range; widen the search and try again
+            maxDist += 1.0;
         }
 
         // we have all our node marginals and prediction with no extra evidence in save.
         TSVFile tempTsv = new TSVFile(headers, save);
         // now we go through every
         saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, NBINS, ENTRY_VALUES, CMAX, CMIN);
+
+//        bpcnt = 0; // count nodes that are inferred (excl those that are null)
+//        for (int bpidx : bpidxs) { // go through all nodes to be inferred
+//
+//            // ignore instantiated nodes
+//            if (save[bpcnt][SD] == null) {
+//                bpcnt++;
+//                continue;
+//            }
+//
+//            // look for nodes that were previously inferred
+//            ti.setInstance(bpidx, save[bpcnt][MEAN]); // replace the value in the with predicted value
+//
+//            double totalKL = 0.0;
+//            nodesCounted = 0;
+//
+//            for (int leafBpidx : leafIndices) {
+//
+//                if (save[leafBpidx][SD] == null) {
+//                    continue;
+//                }
+//                double leaf2LeafDist = distances[bpidx][leafBpidx];
+//                if (leaf2LeafDist < maxDist && leaf2LeafDist > 0.0) {
+//                    // inference below; first create the inference instance
+//                    nodesCounted += 1;
+//                    MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal<>(leafBpidx, pbn);
+//                    // perform marginal inference
+//                    inf.decorate(ti);
+//                    // retrieve the distribution at the node previously nominated
+//                    Distrib anydistrib = inf.getDecoration(leafBpidx);
+//                    MixtureDistrib md = (MixtureDistrib) anydistrib;
+//                    double[] weights = md.getAllWeights();
+//                    double[] prevWeights = Arrays.stream(save[leafBpidx][UCB_VAL + 1].toString().split(";"))
+//                            .mapToDouble(Double::parseDouble)
+//                            .toArray();
+//                    double kl = 0.0;
+//                    for (int i = 0; i < weights.length; i++) {
+//                        double p = weights[i];
+//                        if (p < 1e-12) {
+//                            p = 1e-12;
+//                        }
+//                        double q = prevWeights[i];
+//                        if (q < 1e-12) {
+//                            q = 1e-12;
+//                        }
+//                        kl += (p * Math.log(p / q));
+//                    }
+//                    totalKL += kl;
+//                }
+//            }
+
+
+//            save[bpcnt][UCB_VAL] = totalKL;
+
 
     }
 }
