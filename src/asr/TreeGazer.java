@@ -936,25 +936,28 @@ public class TreeGazer {
             }
         }
 
-        double maxDist = 1.0;
-        int maxAttempts = 5;
-        boolean klSaved = false;
 
-        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+        bpcnt = 0; // count nodes that are inferred (excl those that are null)
+        boolean foundLeaf = false;
+        for (int bpidx : bpidxs) {
+            // go through all nodes to be inferred
+            // ignore instantiated nodes
+            if (save[bpcnt][SD] == null) {
+                bpcnt++;
+                continue;
+            }
 
-            bpcnt = 0; // count nodes that are inferred (excl those that are null)
-            for (int bpidx : bpidxs) {
-                // go through all nodes to be inferred
-                // ignore instantiated nodes
-                if (save[bpcnt][SD] == null) {
-                    bpcnt++;
-                    continue;
-                }
+            // look for nodes that were previously inferred
+            ti.setInstance(bpidx, save[bpcnt][MEAN]); // replace the value in the with predicted value
 
-                // look for nodes that were previously inferred
-                ti.setInstance(bpidx, save[bpcnt][MEAN]); // replace the value in the with predicted value
-                double totalKL = 0.0;
-                int nodesCounted = 0;
+            double totalKL = 0.0;
+            Integer nodesCounted = 0;
+            double maxDist = 1.0;
+            int maxAttempts = 3;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++) {
+                totalKL = 0.0;
+                nodesCounted = 0;
 
                 for (int leafBpidx : leafIndices) {
 
@@ -992,23 +995,27 @@ public class TreeGazer {
                 }
 
                 if (nodesCounted > 0) {
-                    save[bpcnt][UCB_VAL] = totalKL ; // average KL divergence for leaves within 1 branch length
-                    //save[bpcnt][UCB_VAL] = totalKL / nodesCounted; // average KL divergence for leaves within 1 branch length
-                    klSaved = true;
-                } else {
-                    save[bpcnt][UCB_VAL] = 0.0;
+                    break;
                 }
 
-                ti.setInstance(bpidx, null); // remove predicted value
-                bpcnt += 1;
+//                if (foundLeaf) {
+//                    break;
+//                }
+
+                // no leaves found within range; widen the search and try again
+                maxDist += 0.5;
             }
 
-            if (klSaved) {
-                break;
+//            save[bpcnt][UCB_VAL] = totalKL;
+            if (nodesCounted > 0) {
+                save[bpcnt][UCB_VAL] = totalKL;// / nodesCounted; // average KL divergence for leaves within 1 branch length
+                foundLeaf = true;
+            } else {
+                save[bpcnt][UCB_VAL] = 0.0;
             }
 
-            // no leaves found within range; widen the search and try again
-            maxDist += 1.0;
+            ti.setInstance(bpidx, null); // remove predicted value
+            bpcnt += 1;
         }
 
         // we have all our node marginals and prediction with no extra evidence in save.
