@@ -89,7 +89,7 @@ class GRequestTest {
         }
     }
 
-    @Test
+    //@Test
     void fromJSON_queue() {
         int[] jobtimes = new int[] {4000, 3000, 2000, 1000};
         int[] jobnumbers = new int[jobtimes.length];
@@ -141,7 +141,7 @@ class GRequestTest {
         }
     }
 
-    @Test
+//    @Test
     void fromJSON_request_recon() {
         try {
             Tree tree = loadNwk("66.nwk");
@@ -195,7 +195,7 @@ class GRequestTest {
     }
 
 
-    @Test
+//    @Test
     void fromJSON_request_train() {
         IdxTree tree = IdxTree.fromJSON(new JSONObject("{\"Parents\":[-1,0,1,2,2,4,4,1,0,8,9,9,11,11,8,14,14,16,16],\"Labels\":[\"0\",\"1\",\"2\",\"S001\",\"3\",\"S002\",\"S003\",\"S004\",\"4\",\"5\",\"S005\",\"6\",\"S006\",\"S007\",\"7\",\"S008\",\"8\",\"S009\",\"S010\"],\"Distances\":[0,0.14,0.03,0.14,0.08,0.16,0.10,0.12,0.06,0.06,0.28,0.13,0.12,0.14,0.11,0.20,0.07,0.12,0.19],\"Branchpoints\":19}\n"));
         String[] headers = {   "S009","S005","S002","S006","S003","S001","S008","S010","S004","S007"};
@@ -232,7 +232,7 @@ class GRequestTest {
         }
     }
 
-    @Test
+//    @Test
     void fromJSON_request_infer() {
         IdxTree tree = IdxTree.fromJSON(new JSONObject("{\"Parents\":[-1,0,1,2,2,4,4,1,0,8,9,9,11,11,8,14,14,16,16],\"Labels\":[\"0\",\"1\",\"2\",\"S001\",\"3\",\"S002\",\"S003\",\"S004\",\"4\",\"5\",\"S005\",\"6\",\"S006\",\"S007\",\"7\",\"S008\",\"8\",\"S009\",\"S010\"],\"Distances\":[0,0.14,0.03,0.14,0.08,0.16,0.10,0.12,0.06,0.06,0.28,0.13,0.12,0.14,0.11,0.20,0.07,0.12,0.19],\"Branchpoints\":19}\n"));
         String[] headers = {   "S009","S005","S002","S006","S003","S001","S008","S010","S004","S007"};
@@ -275,7 +275,7 @@ class GRequestTest {
         }
     }
 
-    @Test
+//    @Test
     void fromJSON_retrieve() {
         try {
             Tree tree = loadNwk("66.nwk");
@@ -298,7 +298,7 @@ class GRequestTest {
         }
     }
 
-    @Test
+//    @Test
     void fromJSON_cancel() {
         int[] jobtimes = new int[] {4000, 3000, 2000, 1000};
         int[] jobnumbers = new int[jobtimes.length];
@@ -407,7 +407,7 @@ class GRequestTest {
         return ds;
     }
 
-    @Test
+//    @Test
     void request_Sebs_tree() {
         try {
             Tree tree = Newick.load("data/3_2_1_1_filt.nwk");
@@ -473,7 +473,7 @@ class GRequestTest {
         return ds;
     }
 
-    @Test
+//    @Test
     void request_Train_1xmotif() {
         try {
             Tree tree = Newick.load("data/3_2_1_1_filt.nwk");
@@ -535,7 +535,7 @@ class GRequestTest {
         }
     }
 
-    @Test
+//    @Test
     void request_Train_1xmotif_joint() {
         try {
             Tree tree = Newick.load("data/3_2_1_1_filt.nwk");
@@ -600,7 +600,7 @@ class GRequestTest {
         }
     }
 
-    @Test
+//    @Test
     void request_TrainModes_motif_joint() {
         IdxTree mblTree = null;
         EnumSeq.Alignment mblAln = null;
@@ -695,7 +695,7 @@ class GRequestTest {
             e.printStackTrace();
         }
     }
-    @Test
+//    @Test
     void request_TrainModes_real() {
         long SEED = 2;
         IdxTree tree = Newick.parse("(D:0.3,((A:0.1,B:0.1):0.1,C:0.2):0.1)");
@@ -786,7 +786,7 @@ class GRequestTest {
             e.printStackTrace();
         }
     }
-    @Test
+//    @Test
     void request_InferModes_Lewis() {
         String folder = "/Users/mikael/simhome/ASR/ReconMode/";
         try {

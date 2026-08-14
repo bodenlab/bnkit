@@ -45,7 +45,7 @@ class ThreadedDecoratorsTest {
     static void setThingsUp() {
         Tree tree;
         try {
-            tree = Tree.load("bnkit/src/test/resources/cyp2u1_recon.nwk", "newick");
+            tree = Tree.load("test/resources/cyp2u1_recon.nwk", "newick");
             testtree = (IdxTree)tree;
         } catch (IOException e) {
             System.err.println(e.getMessage());

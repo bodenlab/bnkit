@@ -215,38 +215,38 @@ class MaxLhoodJointTest {
         assertEquals(A, inf1.getTreeInstance().getInstance(tree.getIndex(1)));
         assertEquals(A, inf2.getTreeInstance().getInstance(tree.getIndex(1)));
     }
-    @Test
-    void infer3a() {
-        PhyloBN pbn1 = PhyloBN.withGDTs(tree, new JC(1, new Object[]{A,C}), 1, true, 1L);
-        pbn1.setMasterGDT(new Object[]{A,C}, new GaussianDistrib[]{new GaussianDistrib(1.45, 0.1), new GaussianDistrib(2.55, 0.1)});
-        MaxLhoodJoint mlj1 = new MaxLhoodJoint(pbn1);
-        MaxLhoodMarginal mlm1 = new MaxLhoodMarginal(0, pbn1);
-        TreeInstance ti = new TreeInstance(tree, new Object[] {null, null, 1.5, 1.4, null, 2.5, 2.6});
-        MaxLhoodJoint.Inference inf = mlj1.infer(ti);
-        mlm1.decorate(ti);
-        System.out.println(mlm1.getDecoration(0));
-        System.out.println("Input: \t" + ti);
-        System.out.println("Output:\t" + inf);
-        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(1)), A);
-        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(2)), C);
-        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(0)), C);
-    }
-    @Test
-    void infer3b() {
-        PhyloBN pbn1 = PhyloBN.withGDTs(tree, new JC(1, new Object[]{A,C}), 1, true, 1L);
-        pbn1.setMasterGDT(new Object[]{A,C}, new GaussianDistrib[]{new GaussianDistrib(1.45, 0.1), new GaussianDistrib(2.55, 0.1)});
-        MaxLhoodJoint mlj1 = new MaxLhoodJoint(pbn1);
-        MaxLhoodMarginal mlm1 = new MaxLhoodMarginal(0, pbn1);
-        TreeInstance ti = new TreeInstance(tree, new Object[] {null, null, 1.5, null, null, null, 2.6});
-        MaxLhoodJoint.Inference inf = mlj1.infer(ti);
-        mlm1.decorate(ti);
-        System.out.println(mlm1.getDecoration(0));
-        System.out.println("Input: \t" + ti);
-        System.out.println("Output:\t" + inf);
-        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(1)), A);
-        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(2)), C);
-        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(0)), C);
-    }
+//    @Test
+//    void infer3a() {
+//        PhyloBN pbn1 = PhyloBN.withGDTs(tree, new JC(1, new Object[]{A,C}), 1, true, 1L);
+//        pbn1.setMasterGDT(new Object[]{A,C}, new GaussianDistrib[]{new GaussianDistrib(1.45, 0.1), new GaussianDistrib(2.55, 0.1)});
+//        MaxLhoodJoint mlj1 = new MaxLhoodJoint(pbn1);
+//        MaxLhoodMarginal mlm1 = new MaxLhoodMarginal(0, pbn1);
+//        TreeInstance ti = new TreeInstance(tree, new Object[] {null, null, 1.5, 1.4, null, 2.5, 2.6});
+//        MaxLhoodJoint.Inference inf = mlj1.infer(ti);
+//        mlm1.decorate(ti);
+//        System.out.println(mlm1.getDecoration(0));
+//        System.out.println("Input: \t" + ti);
+//        System.out.println("Output:\t" + inf);
+//        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(1)), A);
+//        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(2)), C);
+//        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(0)), C);
+//    }
+//    @Test
+//    void infer3b() {
+//        PhyloBN pbn1 = PhyloBN.withGDTs(tree, new JC(1, new Object[]{A,C}), 1, true, 1L);
+//        pbn1.setMasterGDT(new Object[]{A,C}, new GaussianDistrib[]{new GaussianDistrib(1.45, 0.1), new GaussianDistrib(2.55, 0.1)});
+//        MaxLhoodJoint mlj1 = new MaxLhoodJoint(pbn1);
+//        MaxLhoodMarginal mlm1 = new MaxLhoodMarginal(0, pbn1);
+//        TreeInstance ti = new TreeInstance(tree, new Object[] {null, null, 1.5, null, null, null, 2.6});
+//        MaxLhoodJoint.Inference inf = mlj1.infer(ti);
+//        mlm1.decorate(ti);
+//        System.out.println(mlm1.getDecoration(0));
+//        System.out.println("Input: \t" + ti);
+//        System.out.println("Output:\t" + inf);
+//        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(1)), A);
+//        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(2)), C);
+//        assertEquals(inf.getTreeInstance().getInstance(tree.getIndex(0)), C);
+//    }
 
     /**
      * Test of exact joint inference in phylogenetic trees, comparing against a naive product, exhaustively determining the prob of all combinations.

@@ -21,7 +21,7 @@ class TreeInstanceTest {
     void setUp() {
         Tree tree;
         try {
-            tree = Tree.load("bnkit/src/test/resources/default.nwk", "newick");
+            tree = Tree.load("test/resources/default.nwk", "newick");
             defaultTree = (IdxTree)tree;
         } catch (IOException e) {
             System.err.println(e.getMessage());

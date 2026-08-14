@@ -954,6 +954,43 @@ public class TreeGazer {
             Integer nodesCounted = 0;
             double maxDist = 1.0;
             int maxAttempts = 3;
+            for (int leafBpidx : leafIndices) {
+
+                if (save[leafBpidx][SD] == null) {
+                    continue;
+                }
+                double leaf2LeafDist = distances[bpidx][leafBpidx];
+                if (leaf2LeafDist < maxDist && leaf2LeafDist > 0.0) {
+                    // inference below; first create the inference instance
+                    nodesCounted += 1;
+                    MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal<>(leafBpidx, pbn);
+                    // perform marginal inference
+                    inf.decorate(ti);
+                    // retrieve the distribution at the node previously nominated
+                    Distrib anydistrib = inf.getDecoration(leafBpidx);
+                    MixtureDistrib md = (MixtureDistrib) anydistrib;
+                    double[] weights = md.getAllWeights();
+                    double[] prevWeights = Arrays.stream(save[leafBpidx][UCB_VAL + 1].toString().split(";"))
+                            .mapToDouble(Double::parseDouble)
+                            .toArray();
+                    double kl = 0.0;
+                    for (int i = 0; i < weights.length; i++) {
+                        double p = weights[i];
+                        if (p < 1e-12) {
+                            p = 1e-12;
+                        }
+                        double q = prevWeights[i];
+                        if (q < 1e-12) {
+                            q = 1e-12;
+                        }
+                        kl += (p * Math.log(p / q));
+                    }
+                    totalKL += kl;
+                }
+            }
+
+            /*
+
 
             for (int attempt = 0; attempt < maxAttempts; attempt++) {
                 totalKL = 0.0;
@@ -1005,6 +1042,8 @@ public class TreeGazer {
                 // no leaves found within range; widen the search and try again
                 maxDist += 0.5;
             }
+
+             */
 
 //            save[bpcnt][UCB_VAL] = totalKL;
             if (nodesCounted > 0) {

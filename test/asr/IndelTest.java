@@ -84,8 +84,8 @@ class IndelTest {
 
         try {
 
-            Tree tree = Utils.loadTree("src/test/resources/indels/PSP_FAIL_6.nwk");
-            EnumSeq.Alignment aln = Utils.loadAlignment("src/test/resources/indels/PSP_FAIL_6.aln", Enumerable.aacid);
+            Tree tree = Utils.loadTree("test/resources/indels/PSP_FAIL_6.nwk");
+            EnumSeq.Alignment aln = Utils.loadAlignment("test/resources/indels/PSP_FAIL_6.aln", Enumerable.aacid);
             POGTree pogTree = new POGTree(aln, tree);
 
 //            Prediction indelpred = Prediction.PredictByParsimony(         pogTree);
@@ -113,8 +113,8 @@ class IndelTest {
 
         try {
 
-            Tree tree = Utils.loadTree("src/test/resources/indels/SIC_FAIL_6.nwk");
-            EnumSeq.Alignment aln = Utils.loadAlignment("src/test/resources/indels/SIC_FAIL_6.aln", Enumerable.aacid);
+            Tree tree = Utils.loadTree("test/resources/indels/SIC_FAIL_6.nwk");
+            EnumSeq.Alignment aln = Utils.loadAlignment("test/resources/indels/SIC_FAIL_6.aln", Enumerable.aacid);
             POGTree pogTree = new POGTree(aln, tree);
 
 //            Prediction indelpred = Prediction.PredictByParsimony(         pogTree);
@@ -142,11 +142,11 @@ class IndelTest {
     @DisplayName("Compare SICP POGs against FastML sequences")
     void SICP_v_FastML() throws IOException, ASRException {
 
-        String OUTPUT = "/Users/mikael/simhome/ASR/SICPtests/50";
+        String OUTPUT = "test/resources/indels/";
         try {
-            Tree tree = Utils.loadTree("src/test/resources/indels/FastML_50.nwk");
-            EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/FastML_test_50.aln", Enumerable.aacid);
-            EnumSeq.Alignment output = Utils.loadAlignment("src/test/resources/indels/FastMLp_ancestors_extants_50.aln", Enumerable.aacid);
+            Tree tree = Utils.loadTree("test/resources/indels/FastML_50.nwk");
+            EnumSeq.Alignment input = Utils.loadAlignment("test/resources/indels/FastML_test_50.aln", Enumerable.aacid);
+            EnumSeq.Alignment output = Utils.loadAlignment("test/resources/indels/FastMLp_ancestors_extants_50.aln", Enumerable.aacid);
             Map<String, Integer> name2idx = new HashMap<>();
             String[] names = output.getNames();
             for (int i = 0; i < names.length; i++)
@@ -225,11 +225,11 @@ class IndelTest {
     @Test
     @DisplayName("Compare SICML POGs against FastML sequences")
     void SICML_v_FastML() throws IOException, ASRException {
-        String OUTPUT = "/Users/mikael/simhome/ASR/SICMLtests/old50";
+        String OUTPUT = "test/resources/indels/";
         try {
-            Tree tree = Utils.loadTree("src/test/resources/indels/FastML_50.nwk");
-            EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/FastML_test_50.aln", Enumerable.aacid);
-            EnumSeq.Alignment output = Utils.loadAlignment("src/test/resources/indels/FastMLml_ancestors_extants_50.aln", Enumerable.aacid);
+            Tree tree = Utils.loadTree("test/resources/indels/FastML_50.nwk");
+            EnumSeq.Alignment input = Utils.loadAlignment("test/resources/indels/FastML_test_50.aln", Enumerable.aacid);
+            EnumSeq.Alignment output = Utils.loadAlignment("test/resources/indels/FastMLml_ancestors_extants_50.aln", Enumerable.aacid);
             Map<String, Integer> name2idx = new HashMap<>();
             String[] names = output.getNames();
             for (int i = 0; i < names.length; i++)
@@ -293,55 +293,55 @@ class IndelTest {
         }
 
     }
-
-    @Test
-    @DisplayName("Debugging BEML/BEP")
-    void BE_Fail() throws IOException, ASRException {
-        String OUTPUT = "/Users/mikael/simhome/ASR/BEMLtests/";
-        try {
-            Tree tree = Utils.loadTree("src/test/resources/indels/BEP_BEML_FAIL_750.nwk");
-            EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/BEP_BEML_FAIL_750s.aln", Enumerable.aacid);
-            POGTree pogTree = new POGTree(input, tree);
-            System.out.println("---Loaded data");
-            GRASP.VERBOSE = true;
-            Prediction indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogTree);
-            if (indelpred == null) {
-                System.err.println("Failed to perform indel prediction");
-                System.exit(111);
-            }
-            System.out.println("---Completed indel inference");
-            indelpred.getJoint(jtt);
-            Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
-            System.out.println("---Completed character inference");
-            POGraph[] ancestors = new POGraph[pogs.size()];
-            Object[][] ancseqs = new Object[pogs.size()][];
-            String[] ancnames = new String[pogs.size()];
-            int ii = 0;
-            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
-                ancnames[ii] = entry.getKey().toString();
-                ancestors[ii++] = entry.getValue();
-            }
-            IdxGraph.saveToDOT(OUTPUT, ancestors);
-            ii = 0;
-            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
-                ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
-            }
-            FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
-            fw.save(ancnames, ancseqs);
-            fw.close();
-        } catch (IOException | ASRException e) {
-            System.err.println(e.getMessage());
-            System.exit(1);
-        }
-    }
+//
+//    @Test
+//    @DisplayName("Debugging BEML/BEP")
+//    void BE_Fail() throws IOException, ASRException {
+//        String OUTPUT = "test/resources/";
+//        try {
+//            Tree tree = Utils.loadTree("test/resources/indels/BEP_BEML_FAIL_750.nwk");
+//            EnumSeq.Alignment input = Utils.loadAlignment("test/resources/indels/BEP_BEML_FAIL_750s.aln", Enumerable.aacid);
+//            POGTree pogTree = new POGTree(input, tree);
+//            System.out.println("---Loaded data");
+//            GRASP.VERBOSE = true;
+//            Prediction indelpred = Prediction.PredictByBidirEdgeMaxLhood(pogTree);
+//            if (indelpred == null) {
+//                System.err.println("Failed to perform indel prediction");
+//                System.exit(111);
+//            }
+//            System.out.println("---Completed indel inference");
+//            indelpred.getJoint(jtt);
+//            Map<Object, POGraph> pogs = indelpred.getAncestors(joint);
+//            System.out.println("---Completed character inference");
+//            POGraph[] ancestors = new POGraph[pogs.size()];
+//            Object[][] ancseqs = new Object[pogs.size()][];
+//            String[] ancnames = new String[pogs.size()];
+//            int ii = 0;
+//            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+//                ancnames[ii] = entry.getKey().toString();
+//                ancestors[ii++] = entry.getValue();
+//            }
+//            IdxGraph.saveToDOT(OUTPUT, ancestors);
+//            ii = 0;
+//            for (Map.Entry<Object, POGraph> entry : pogs.entrySet()) {
+//                ancseqs[ii++] = indelpred.getSequence(entry.getKey(), joint, true);
+//            }
+//            FastaWriter fw = new FastaWriter(new File(OUTPUT, "GRASP_ancestors.fasta"));
+//            fw.save(ancnames, ancseqs);
+//            fw.close();
+//        } catch (IOException | ASRException e) {
+//            System.err.println(e.getMessage());
+//            System.exit(1);
+//        }
+//    }
 
     @Test
     @DisplayName("Debugging SICML")
     void SICML_Fail() throws IOException, ASRException {
-        String OUTPUT = "/Users/mikael/simhome/ASR/SICMLtests/";
+        String OUTPUT = "test/resources/";
         try {
-            Tree tree = Utils.loadTree("src/test/resources/indels/SICML_FAIL_5.nwk");
-            EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/SICML_FAIL_5s.aln", Enumerable.aacid);
+            Tree tree = Utils.loadTree("test/resources/indels/SICML_FAIL_5.nwk");
+            EnumSeq.Alignment input = Utils.loadAlignment("test/resources/indels/SICML_FAIL_5s.aln", Enumerable.aacid);
             POGTree pogTree = new POGTree(input, tree);
             System.out.println("---Loaded data");
             GRASP.VERBOSE = true;
@@ -378,10 +378,10 @@ class IndelTest {
     @Test
     @DisplayName("Debugging SICP")
     void SICP_Fail() throws IOException, ASRException {
-        String OUTPUT = "/Users/mikael/simhome/ASR/250_SICP/";
+        String OUTPUT = "test/resources/";
         try {
-            Tree tree = Utils.loadTree("src/test/resources/indels/250.nwk");
-            EnumSeq.Alignment input = Utils.loadAlignment("src/test/resources/indels/250.aln", Enumerable.aacid);
+            Tree tree = Utils.loadTree("test/resources/indels/250.nwk");
+            EnumSeq.Alignment input = Utils.loadAlignment("test/resources/indels/250.aln", Enumerable.aacid);
             POGTree pogTree = new POGTree(input, tree);
             System.out.println("---Loaded data");
             GRASP.VERBOSE = true;

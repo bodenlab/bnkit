@@ -18,8 +18,8 @@ class TreeTest {
     String s2 = "(E:0.1,D:0.5):0.2,(C:0.4,(B:0.4,A:0.3):0.1):0.2"; // first comma is that preceding C
     String ss1 = "(" + s1 + ");";
     String ss2 = "(" + s2 + ");";
-    String ss3 = "((E:0.1,'D@ --':0.5)[&label=\"N_42\"]:0.2,(C:0.4,(B:0.4,A:0.3)'_mysubtree is cool':0.1):0.2)"; // try formatting, little NEXUS incorporated
-    String ss4 = "((E:0.1,'D':0.5)[&label=\"N_42\",!hilight={38,2.203965965632127,#ffffcc}]:0.2,(C:0.4,(B:0.4,A:0.3)'mysubtree':0.1):0.2)"; // try formatting, more NEXUS
+    String ss3 = "((E:0.1,'D@ --':0.5)[&label=\"N42\"]:0.2,(C:0.4,(B:0.4,A:0.3)'_mysubtree is cool':0.1):0.2)"; // try formatting, little NEXUS incorporated
+    String ss4 = "((E:0.1,'D':0.5)[&label=\"N42\",!hilight={38,2.203965965632127,#ffffcc}]:0.2,(C:0.4,(B:0.4,A:0.3)'mysubtree':0.1):0.2)"; // try formatting, more NEXUS
 
     @Test
     void getDescendants() {
@@ -89,7 +89,7 @@ class TreeTest {
     @Test
     void load() {
         try {
-            tree = Tree.load("bnkit/src/test/resources/small.nwk", "newick");
+            tree = Tree.load("test/resources/small.nwk", "newick");
         } catch (IOException e) {
             assertTrue(false);
         }
@@ -103,24 +103,24 @@ class TreeTest {
         try {
             t3 = Newick.parse(ss3);
             int n = t3.getRoot().getDescendants().size() + 1;
-            t3.save("bnkit/src/test/resources/saveme.nwk", "newick");
-            t3.save("bnkit/src/test/resources/saveme.anwk", "ancestor");
-            Newick.save(t3, "bnkit/src/test/resources/saveme.snwk", Newick.MODE_STRIPPED);
-            t3l = Tree.load("bnkit/src/test/resources/saveme.nwk", "newick");
+            t3.save("test/resources/saveme.nwk", "newick");
+            t3.save("test/resources/saveme.anwk", "ancestor");
+            Newick.save(t3, "test/resources/saveme.snwk", Newick.MODE_STRIPPED);
+            t3l = Tree.load("test/resources/saveme.nwk", "newick");
             assertNotNull(t3l);
             assertNotNull(t3l.find("_mysubtree is cool"));
             BranchPoint root1 = t3l.getRoot();
             assertEquals(n, root1.getSubtree().size());
-            t3l = Tree.load("bnkit/src/test/resources/saveme.anwk", "newick");
+            t3l = Tree.load("test/resources/saveme.anwk", "newick");
             assertNotNull(t3l);
             assertNull(t3l.find("_mysubtree is cool"));
             BranchPoint root2 = t3l.getRoot();
             assertEquals(root1.getSubtree().size(), root2.getSubtree().size());
-            t3l = Tree.load("bnkit/src/test/resources/saveme.snwk", "newick");
+            t3l = Tree.load("test/resources/saveme.snwk", "newick");
             assertNotNull(t3l);
             assertNull(t3l.find("_mysubtree is cool"));
-            Tree dtree = Newick.load("bnkit/src/test/resources/default.nwk");
-            dtree.save("bnkit/src/test/resources/default.anwk", "ancestor");
+            Tree dtree = Newick.load("test/resources/default.nwk");
+            dtree.save("test/resources/default.anwk", "ancestor");
         } catch (IOException e) {
             assertTrue(false);
         }
@@ -148,7 +148,7 @@ class TreeTest {
     @Test
     void iterator2() {
         try {
-            tree = Tree.load("bnkit/src/test/resources/small.nwk", "newick");
+            tree = Tree.load("test/resources/small.nwk", "newick");
             Iterator<Integer> iter = tree.getBreadthFirstIterator();
             Set<Integer> all = new HashSet<>();
             int prevdepth = 0;
@@ -179,7 +179,7 @@ class TreeTest {
     @BeforeAll
     static void setThingsUp() {
         try {
-            tree = Tree.load("bnkit/src/test/resources/default.nwk", "newick");
+            tree = Tree.load("test/resources/default.nwk", "newick");
         } catch (IOException e) {
             System.err.println(e.getMessage());
             System.exit(1);
