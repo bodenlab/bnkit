@@ -33,12 +33,12 @@ public class ParsimonyTests {
     public static void setUp() throws Exception {
         try {
             trees = new Tree[] { // MB: also successfully tried a 150-seq tree with alignment (not in test/resources)
-                    Tree.load("src/test/resources/large.nwk", "newick"),
-                    Tree.load("src/test/resources/default.nwk", "newick"),
+                    Tree.load("test/resources/large.nwk", "newick"),
+                    Tree.load("test/resources/default.nwk", "newick"),
             };
             alns = new EnumSeq.Alignment[] {
-                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("src/test/resources/large.aln", Enumerable.aacid)),
-                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("src/test/resources/default.aln", Enumerable.aacid)),
+                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("test/resources/large.aln", Enumerable.aacid)),
+                    new EnumSeq.Alignment(EnumSeq.Gappy.loadClustal("test/resources/default.aln", Enumerable.aacid)),
             };
         } catch (IOException ex) {
             ex.printStackTrace();

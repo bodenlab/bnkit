@@ -403,6 +403,57 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
         }
         return a;
     }
+
+    /**
+     * Estimate the parameters of a gamma distribution from data.
+     * Specifically the implementation estimates alpha (shape), and beta (rate) is given by
+     * beta = mean(x) / alpha.
+     * It uses a fast approximation based on
+     * <a href="http://research.microsoft.com/en-us/um/people/minka/papers/minka-gamma.pdf">Thomas Minka "Estimating a Gamma distribution" 2002</a>
+     * @param X data
+     * @return alpha parameter (same as lambda here)
+     */
+    public static double calcAlphaWeighted(double[] X, double[] weights) {
+        double delta = 1;
+
+        double sumW = 0;
+        double weightedMean = 0;
+        double weightedLogMean = 0;
+
+        for (int i = 0; i < X.length; i++) {
+            double xi = X[i];
+            if (xi <= 0) {
+                xi = Double.MIN_VALUE;
+            }
+            sumW += weights[i];
+            weightedMean += weights[i] * xi;
+            weightedLogMean += weights[i] * Math.log(xi);
+        }
+
+        weightedMean /= sumW;
+        weightedLogMean /= sumW;
+
+        double a = 0.5 / (Math.log(weightedMean) - weightedLogMean); // good starting point (see Minka 2002)
+        if (a == Double.NEGATIVE_INFINITY || a == Double.POSITIVE_INFINITY || Double.isNaN(a)) {
+            a = 0.5; // fallback starting point
+        }
+
+        double a_inv = 1.0 / a;
+        for (int r = 0; r < 10; r ++) { // max 10 iterations, should converge in ~4
+            double numerator = weightedLogMean - Math.log(weightedMean) + Math.log(a) - digamma(a);
+            double denominator = a * a * (1.0 / a - trigamma(a));
+            double next_inv = a_inv + numerator / denominator;
+            double next_a = 1.0 / next_inv;
+            delta = Math.abs(next_a - a);
+            a = next_a;
+            a_inv = next_inv;
+            if (delta < .001) {
+                //System.out.println("Converged after " + (r + 1) + " rounds");
+                break;
+            }
+        }
+        return a;
+    }
     
     /**
      * Get scale that maximises likelihood as computed for a specified alpha.
@@ -417,6 +468,19 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
             x_mean += xi;
         }
         x_mean /= n;
+        return x_mean / alpha;
+    }
+
+    public static double calcScaleWeighted(double[] X, double alpha, double[] weights) {
+        int n = X.length;
+        double x_mean = 0.0;
+        double sumResp = 0.0;
+        for (int i = 0; i < X.length; i++) {
+            x_mean += weights[i] * X[i];
+            sumResp += weights[i];
+        }
+
+        x_mean /= sumResp;
         return x_mean / alpha;
     }
 
@@ -476,6 +540,12 @@ public class GammaDistrib implements Distrib, Serializable, RateModel {
             x[i++] = d;
         }
         return fitMLE(x, seed);
+    }
+
+    public static GammaDistrib fitMLEWeighted(double[] X, double[] weights, long seed) {
+        double alpha = calcAlphaWeighted(X, weights);
+        double scale = calcScaleWeighted(X, alpha, weights);
+        return new GammaDistrib(alpha, 1/scale, seed);
     }
 
 

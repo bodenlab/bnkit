@@ -28,7 +28,7 @@ import asr.IndelSegmentation.RATE_CATEGORY;
  */
 public class GRASP {
 
-    public static String VERSION = "5-June-2026";
+    public static String VERSION = "14-Aug-2026";
 
     public static void usage() {
         usage(0, null);
@@ -52,12 +52,6 @@ public class GRASP {
                 \t{-j | --joint (default)}
                 \t{-m | --marginal <branchpoint-id>}
                 \t{--indel-method <methodname>} (select one from BEP(default) BEML SICP SICML PSP PSML SCIP Gurobi)
-                \t{--reuse-tree Re-use the reconstructed tree for TrAVIS}
-                \t{* --indel-prior <LOWGAP|MEDGAP|HIGHGAP>}
-                \t{--indel-rate-distrib <Gamma|ZeroInflatedGamma|ZIG|MixtureGamma>}
-                \t{--copy-rates Copy substitution rates from reconstructed ancestor
-                \t{--conflate-rates Modulate indel rate (rho) by site-specific substitution rate (r): p=e^(rho*r*t)
-                \t{--indel-length-distrib <ZeroTruncatedPoisson|ZTP|Poisson|Zipf|Lavalette>}
                 \t{--supported-path <methodname>} (select one from DIJKSTRA(default) ASTAR)
                 \t{--nogap}
                 \t{--seed <seed>}
@@ -101,9 +95,6 @@ public class GRASP {
                 "\t-s (or --substitution-model) specifies what evolutionary model to use for inferring character states (see below)\n" +
                 "\t-rf (or --rates-file) specifies a tabulated file with relative, position-specific substitution rates\n\t\tWe recommend the use of this generally, but specifically for trees with great distances, and with biologically diverse entries\n\t\tAs an example, IQ-TREE produces rates on the accepted format with the --rate option (--mlrate is NOT supported yet).\n" +
                 "\t-ef (or --empirical-freqs) specifies a tabulated file with the headers Character & Proportion that contain\n\t\tstationary character frequencies for the chosen substitution model. The standard stationary character frequencies of a\n\t\tchosen substitution model are used by default when -ef is not specified\n" +
-                "\t--indel-prior (not implemented but intended for TrAVIS) specifies Gamma priors pre-determined from Pfam alignments that have few, moderate, or large numbers of gaps.\n" +
-                "\t--indel-length-distrib specifies the indel length distribution function, which serves to model both deletions and insertions in TrAVIS\n" +
-                "\t--indel-rate-distrib the indel rate distribution, which serves to model both insertions and deletions in TrAVIS\n" +
                 "\t--include-extants means that extants are included in output files (when the format allows)\n" +
                 "\t--nogap means that the gap-character is excluded in the resulting output (when the format allows)\n" +
                 "\t--nonibble de-activates the removal of indices in partial order graphs that cannot form a path from start to end\n" +
@@ -120,9 +111,7 @@ public class GRASP {
                 \tDISTRIB: character distributions for each position (indexed by POG, only available for marginal reconstruction)
                 \tASR: complete reconstruction as JSON, incl. POGs of ancestors and extants, and tree (ASR.json)
                 \tDOT: partial-order graphs of ancestors in DOT format
-                \tTREES: position-specific trees with ancestor states labelled
-                \tTrAVIS: Produce commandline parameters for running TrAVIS
-                \tSIMUL: Run TrAVIS based on parameters from joint reconstruction, and save tree and alignments""");
+                \tTREES: position-specific trees with ancestor states labelled""");
         out.println("""
                 Indel-methods:\s
                 \tBEP: bi-directional edge (maximum) parsimony
@@ -131,9 +120,9 @@ public class GRASP {
                 \tSICML: simple indel-coding maximum likelihood (uses uniform evolutionary model)
                 \tPSP: position-specific (maximum) parsimony
                 \tPSML: position-specific maximum likelihood (uses uniform evolutionary model)
-                \tSCIP: globally optimal parsimony-based indel history using the open-source
+                \tSCIP: globally optimal distance sensitive parsimony-based indel history using the open-source
                 \t\tSCIP solver (https://www.scipopt.org/). Does not support multi-threading
-                \tGurobi: globally optimal parsimony-based indel history.
+                \tGurobi: globally optimal distance sensitive parsimony-based indel history.
                 \t\tRequires local installation of Gurobi to run (https://www.gurobi.com/downloads/)
                 \tAdd '*' to method name for less conservative setting (if available) or to use globally optimal distance based parsimony\s
                 """);
@@ -166,9 +155,9 @@ public class GRASP {
     private static String ALIGNMENT = null;
     private static String ASRFILE = "ASR.json";
     private static String NEWICK = null;
-    private static String OUTPUT = null;
+    static String OUTPUT = null;
     private static String INPUT = null;
-    private static String PREFIX = null;
+    static String PREFIX = null;
     private static String RATESFILE = null;
     public static double[] RATES = null;
     private static String EMPIRICAL_FREQS_FILE = null;
@@ -225,8 +214,11 @@ public class GRASP {
     private static final String[] SPATH = new String[]{"DIJKSTRA", "ASTAR"};
     public static boolean RANDOM_RATES = false;
     public static boolean SIMPLE_RATES = false;
+    public static boolean SEQ_RATES = false; // in development
+    public static boolean COL_RATES = false; // in development
     public static boolean INDEL_CONSERVATIVE = true;
-    public static boolean DISTANCE_BASED_MIP = false;
+    public static boolean DISTANCE_BASED_MIP = true;
+    public static int NUM_GAMMA_CATEGORIES = 20;
 
     // Mode for BEP
     public static boolean RECODE_NULL = true;
@@ -357,6 +349,10 @@ public class GRASP {
         return runTravis;
     }
 
+    /**
+     * Parse command line arguments for TrAVIS
+     * @param args command line arguments
+     */
     private static void parseTravisArgs(String[] args) {
 
         // Because we are creating distributions as we parse the data, need to find the seed first
@@ -410,7 +406,7 @@ public class GRASP {
                 } else if (arg.equalsIgnoreCase("-verbose")) {
                     VERBOSE = true;
                 } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
-                    usage();
+                    TrAVIS.usage();
                 } else if ((arg.equalsIgnoreCase("s") || arg.equalsIgnoreCase("-substitution-model")) && args.length > a + 1) {
                     boolean found_model = false;
                     for (int i = 0; i < MODELS.length; i++) {
@@ -420,7 +416,7 @@ public class GRASP {
                         }
                     }
                     if (!found_model)
-                        usage(1, args[a + 1] + " is not a valid model name for option --substitution-model");
+                        TrAVIS.usage(1, args[a + 1] + " is not a valid model name for option --substitution-model");
 
                 } else if ((arg.equalsIgnoreCase("-rates-file") || arg.equalsIgnoreCase("rf")) && args.length > a + 1) {
                     RATESFILE = args[++a];
@@ -460,7 +456,7 @@ public class GRASP {
                     PERFORM_TRAVIS_SIMUL = true;
                 } else if (arg.equalsIgnoreCase("-copy-tree") && args.length > a + 1) {
                     COPY_TREE = true;
-                } else if (arg.equalsIgnoreCase("-extants-only") && args.length > a + 1) {
+                } else if (arg.equalsIgnoreCase("-extants-only")) {
                     EXTANTS_ONLY = true;
                 } else if (arg.equalsIgnoreCase("sa") || arg.equalsIgnoreCase("-save-as") && args.length > a + 1) {
                     boolean found_format = false;
@@ -476,10 +472,8 @@ public class GRASP {
                         try {
                             NTHREADS = Integer.parseInt(args[++a]);
                         } catch (NumberFormatException e) {
-                            usage(2, "Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
+                            TrAVIS.usage(2, "Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
                         }
-                } else if (arg.equalsIgnoreCase("-help") || arg.equalsIgnoreCase("h")) {
-                    TrAVIS.usage();
                 } else {
                     TrAVIS.usage(5, "Unknown option or missing required argument: \"" + args[a] + "\"");
                 }
@@ -487,6 +481,10 @@ public class GRASP {
         }
     }
 
+    /**
+     * Parse command line arguments for GRASP
+     * @param args command line arguments
+     */
     private static void parseGRASPArgs(String[] args) {
         for (int a = 0; a < args.length; a++) {
             if (args[a].startsWith("-")) {
@@ -511,6 +509,10 @@ public class GRASP {
                     RANDOM_RATES = true;
                 } else if (arg.equalsIgnoreCase("-simple-rates")) {
                     SIMPLE_RATES = true;
+                } else if (arg.equalsIgnoreCase("-seq-rates")) {
+                    SEQ_RATES = true;
+                } else if (arg.equalsIgnoreCase("-col-rates")) {
+                    COL_RATES = true;
                 } else if ((arg.equalsIgnoreCase("-marginal") || arg.equalsIgnoreCase("m")) && args.length > a + 1) {
                     MODE = Inference.MARGINAL;
                     String ancid = args[++a];
@@ -542,7 +544,7 @@ public class GRASP {
                             found_indel = true;
                             if (args[a + 1].endsWith("*")) {
                                 INDEL_CONSERVATIVE = false;
-                                DISTANCE_BASED_MIP = true;
+                                DISTANCE_BASED_MIP = false;
                             }
                         }
                     }
@@ -617,6 +619,13 @@ public class GRASP {
                     } catch (NumberFormatException e) {
                         usage(2, "Failed to set number of threads for option --threads: " + args[a] + " is not a valid integer");
                     }
+                } else if ((arg.equalsIgnoreCase("-gamma-cat")) && args.length > a + 1) {
+                    try {
+                        NUM_GAMMA_CATEGORIES = Integer.parseInt(args[++a]);
+                    } catch (NumberFormatException e) {
+                        usage(2, "Failed to set number of discrete Gamma categories for option --gamma-cat: " + args[a] + " is not a valid integer");
+                    }
+
                 } else if (arg.equalsIgnoreCase("-nogap")) {
                     GAPPY = false;
                 } else if (arg.equalsIgnoreCase("-indel-prior")) {
@@ -656,6 +665,9 @@ public class GRASP {
         }
     }
 
+    /**
+     * Check that the command line arguments are valid and set up the substitution model and output formats
+     */
     private static void checkArgsValid() {
 
         if (OUTPUT == null)
@@ -765,6 +777,9 @@ public class GRASP {
         }
     }
 
+    /**
+     * Set up the substitution model based on the command line arguments
+     */
     private static void setupSubstModel() {
 
         if (EMPIRICAL_FREQS_FILE != null) {
@@ -778,6 +793,9 @@ public class GRASP {
 
     }
 
+    /**
+     * Set the output formats based on the command line arguments
+     */
     private static void setOutputFormats() {
 
         if (!SAVE_AS && MODE == Inference.JOINT) { // set default files to save for joint
@@ -1066,9 +1084,9 @@ public class GRASP {
                     Utils.checkData(aln, tree, true);
 
                 } catch (ASRException e) {
-                    usage(22, "Invalid input for ASR: " + e.getMessage());
+                    TrAVIS.usage(22, "Invalid input for TrAVIS " + e.getMessage());
                 } catch (IOException e) {
-                    usage(2, "Failed to read or write files: " + e.getMessage());
+                    TrAVIS.usage(2, "Failed to read or write files: " + e.getMessage());
                 }
 
                 assert aln != null;

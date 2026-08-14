@@ -1,14 +1,13 @@
 package asr;
 
-import bn.ctmc.GapSubstModel;
-import bn.ctmc.SubstModel;
-import bn.ctmc.SubstNode;
+import bn.ctmc.*;
 import bn.ctmc.matrix.*;
 import dat.EnumSeq;
 import dat.Enumerable;
 import dat.phylo.BranchPoint;
 import dat.phylo.IdxTree;
 import dat.phylo.PhyloBN;
+import dat.phylo.Tree;
 import dat.pog.POGTree;
 import dat.pog.POGraph;
 import dat.pog.SymNode;
@@ -16,94 +15,63 @@ import smile.math.Function;
 import smile.math.MathEx;
 import smile.math.special.Minimise;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 public class IndelPeeler {
 
-    private final GapSubstModel model;
-    private final POGTree pogTree;
+    private final PIPSubstModel model;
     final private IdxTree tree;
-    private final PhyloBN pbn;
+    double treeProb;
     private final int columnIdx;
-    private final double[][] nodeResidueProbs;
-    private final double[] nodeGapProbs;
-    private double[] containsGap = null;
-    private final int numResidues; // excluding gap
-    private final Object[] alphabet;
-    private final int alphabetSize; // including gap
-    private final double geometricSeqLenParam;
-    private double treeProb;
+    EnumSeq.Alignment<Enumerable> aln;
+    PhyloBN pbn;
+    Set nonGappedLeaves;
+    Set ancestorsToRootFromMRCA;
+    Map<String, Integer> alnMap;
 
-    public IndelPeeler(POGTree pogTree, SubstModel model, Double rate, int columnIdx, double geometricSeqLenParam, PhyloBN pbn) {
-        this.pogTree = pogTree;
-        this.tree = pogTree.getTree();
-        this.model = (GapSubstModel) model;
+    public IndelPeeler(IdxTree tree, PIPSubstModel model, int columnIdx,
+                       EnumSeq.Alignment<Enumerable> aln, PhyloBN pbn,
+                       Set nonGappedLeaves, Set ancestorsToRootFromMRCA, Map<String, Integer> alnMap) {
+        this.tree = tree;
+        this.model = model;
         this.columnIdx = columnIdx;
-        this.alphabet = model.getDomain().getValues();
-        this.numResidues = model.getDomain().size() - 1;
-        this.alphabetSize = model.getDomain().size();
-        this.geometricSeqLenParam = geometricSeqLenParam;
-
-
-        this.nodeResidueProbs = new double[tree.getSize()][model.getDomain().size() - 1]; // only residues, not gap
-        this.nodeGapProbs = new double[tree.getSize()];
-        // instantiate with negative infinity for subsequent log sum calculations
-        for (int i = 0; i < tree.getSize(); i++) {
-            Arrays.fill(nodeResidueProbs[i], Double.NEGATIVE_INFINITY);
-            nodeGapProbs[i] = Double.NEGATIVE_INFINITY;
-        }
-
-        if (pbn == null) {
-            if (rate == null) {
-                this.pbn = PhyloBN.create(tree, model);
-            } else {
-                this.pbn = PhyloBN.create(tree, model, rate);
-            }
-        } else {
-            this.pbn = pbn;
-        }
-
+        this.aln = aln;
+        this.pbn = pbn;
+        this.nonGappedLeaves = nonGappedLeaves;
+        this.ancestorsToRootFromMRCA = ancestorsToRootFromMRCA;
+        this.alnMap = alnMap;
     }
 
-    public IndelPeeler(POGTree pogTree, SubstModel model, Double rate, int columnIdx, double geometricSeqLenParam) {
-        this(pogTree, model, rate, columnIdx, geometricSeqLenParam, null);
-    }
-
-    public IndelPeeler(POGTree pogTree, SubstModel model, int columnIdx, double geometricSeqLenParam) {
-        this(pogTree, model, null, columnIdx, geometricSeqLenParam, null);
-    }
-
-
-    /**
-     * Calculates the likelihood of observing each column (independently)
-     * given a particular indel rate.
-     *
-     * @param pogTree              the partial order graph tree representing the alignment and phylogeny
-     * @param model                the gap augmented substitution model
-     * @param geometricSeqLenParam the geometric sequence length parameter
-     * @param rates                the indel rates to calculate the column likelihoods for
-     * @param nThreads             the number of threads to use for parallelisation
-     * @return matrix of shape (numRates, numColumns) where each entry is the log likelihood of observing that column
-     * given the tree, model, geometric sequence length parameter and indel rate.
-     */
-    public static double[][] computeColumnPriors(POGTree pogTree, SubstModel model,
-                                                 double geometricSeqLenParam, double[] rates, int nThreads) {
+//
+//    /**
+//     * Calculates the likelihood of observing each column (independently)
+//     * given a particular indel rate.
+//     *
+//     * @param pogTree              the partial order graph tree representing the alignment and phylogeny
+//     * @param model                the gap augmented substitution model
+//     * @param geometricSeqLenParam the geometric sequence length parameter
+//     * @param rates                the indel rates to calculate the column likelihoods for
+//     * @param nThreads             the number of threads to use for parallelisation
+//     * @return matrix of shape (numRates, numColumns) where each entry is the log likelihood of observing that column
+//     * given the tree, model, geometric sequence length parameter and indel rate.
+//     */
+    public static double[][] computeColumnPriors(IdxTree tree, PIPSubstModel model,
+                                                 double[] rates, int nThreads, int numCols,
+                                                 EnumSeq.Alignment<Enumerable> aln, Set[] nonGappedLeaveSets,
+                                                 Set[] ancestorsToRootFromMRCA, Map<String, Integer> alnMap) {
 
         int numRates = rates.length;
-        int numCols = pogTree.getPositions();
         double[][] columnPriors = new double[numCols][numRates];
 
         IndelPeeler[] peelers = new IndelPeeler[numRates * numCols];
         for (int rateIdx = 0; rateIdx < numRates; ++rateIdx) {
-            PhyloBN pbn = PhyloBN.create(pogTree.getTree(), model, rates[rateIdx]);
+            PhyloBN pbn = PhyloBN.create(tree, model, rates[rateIdx]);
             for (int colIdx = 0; colIdx < numCols; ++colIdx) {
                 //int idx = colIdx * numRates + rateIdx;
                 int idx = rateIdx * numCols + colIdx;
-                peelers[idx] = new IndelPeeler(pogTree, model, rates[rateIdx], colIdx, geometricSeqLenParam, pbn);
+                peelers[idx] = new IndelPeeler(tree, model, colIdx, aln, pbn, nonGappedLeaveSets[colIdx],
+                        ancestorsToRootFromMRCA[colIdx], alnMap);
             }
         }
 
@@ -119,88 +87,51 @@ public class IndelPeeler {
         }
 
         return columnPriors;
-
     }
 
-    public static double calcProbAlnGivenTree(POGTree pogTree, GapSubstModel model, EnumSeq.Alignment<Enumerable> aln,
-                                              double geometricSeqLenParam, Enumerable alpha, int nThreads) {
+    public static double calcProbAlnGivenTree(IdxTree tree, PIPSubstModel model, EnumSeq.Alignment<Enumerable> aln,
+                                              int nThreads, PhyloBN pbn, double treeLength,
+                                              EnumSeq.Alignment<Enumerable> gapCol, Set[] nonGappedLeaveSets,
+                                              Set[] ancestorsToRootFromMRCA, Map<String, Integer> alnMap) {
 
-        double logLikelihood = 0.0;
+
+        double columnLogLikelihoods = 0.0;
         int numCols = aln.getWidth();
 
-        PhyloBN pbn = PhyloBN.create(pogTree.getTree(), model, 1.0);
-        IndelPeeler[] peelers = createPeelingJobs(pogTree, model, geometricSeqLenParam, numCols, null, pbn);
+        IndelPeeler[] peelers = createPeelingJobs(tree, model, numCols, aln, pbn,
+                nonGappedLeaveSets, ancestorsToRootFromMRCA, alnMap);
         double[] columnProbs = runPeelingJobs(peelers, nThreads);
         for (int colIdx = 0; colIdx < numCols; colIdx++) {
-            logLikelihood += columnProbs[colIdx];
+            columnLogLikelihoods += columnProbs[colIdx];
         }
 
-        double probExtraCol = probExtraCol(pogTree.getTree(), model, geometricSeqLenParam); // add the normalisation term
+        double logPc0 = IdxTree.getColumnProb(model, 0, (Tree) tree,
+                gapCol, pbn, new HashSet<>(), new HashSet<>(), alnMap);
 
-        // need to create a dummy aln containing only gaps
-        List<EnumSeq.Gappy<Enumerable>> seqArray = new ArrayList<>();
-        for (int i = 0; i < aln.getHeight(); i++) {
-            EnumSeq<Enumerable> seq = aln.getEnumSeq(i);
-            EnumSeq.Gappy<Enumerable> gap_copy = new EnumSeq.Gappy<>(alpha);
-            gap_copy.set(new Character[1]); // add an empty column
-            gap_copy.setName(seq.getName());
-            seqArray.add(gap_copy);
+        double nu = model.getLambda() * (treeLength + (1.0 / model.getMu()));
+        // log(|m|!) via log-sum
+        double logFactorialM = 0.0;
+        for (int i = 1; i <= numCols; i++) {
+            logFactorialM += Math.log(i);
         }
 
+        double logPhi =  -logFactorialM
+                + numCols * Math.log(nu)
+                + (nu * (Math.exp(logPc0) - 1.0));
 
-        EnumSeq.Alignment<Enumerable> gap_aln = new EnumSeq.Alignment<>(seqArray);
-        POGTree gapPogTree = new POGTree(gap_aln, pogTree.getTree());
-
-        //  Normalisation: log P★ - log(1 - P(col_gap))
-        IndelPeeler peeler = new IndelPeeler(gapPogTree, model, 0, geometricSeqLenParam);
-        double gapColumnProb = peeler.decorate(); // get the probability of an all gap column
-        double unobservedCols = MathEx.logm1exp(gapColumnProb);
-
-        double normalisationTerm = probExtraCol - unobservedCols;
-
-        return normalisationTerm + logLikelihood;
+        return logPhi + columnLogLikelihoods;
 
     }
 
-    public static double probExtraCol(IdxTree tree, GapSubstModel model, double geometricSeqLenParam) {
-
-
-        int nNodes = tree.getNLeaves() + tree.getNParents();
-
-        // First calculate the likelihood of an all gap column
-        double[] pStar = new double[nNodes];
-        Arrays.fill(pStar, Double.NEGATIVE_INFINITY);
-        for (int bpidx = nNodes - 1; bpidx >= 0; bpidx--) {
-            BranchPoint node = tree.getBranchPoint(bpidx);
-
-            if (node.isLeaf()) {
-                pStar[bpidx] = 0.0; // log(1)
-            } else {
-                // ancestor
-                int[] childrenBpindices = tree.getChildren(bpidx);
-                double childrenLL = 0.0;
-                for (int childBpidx : childrenBpindices) {
-                    childrenLL += pStar[childBpidx];
-                    // add probability of gap remaining
-                    childrenLL += Math.log(1 - model.ksiT(tree.getDistance(childBpidx)));
-                }
-                pStar[bpidx] = childrenLL;
-            }
-        }
-
-        double colLikelihood = 0.0;
-        colLikelihood += Math.log(1 - geometricSeqLenParam); // penalise for length of sequence
-        colLikelihood += pStar[0]; // add the probability of root node
-
-        return colLikelihood;
-    }
-
-    private static IndelPeeler[] createPeelingJobs(POGTree pogTree, SubstModel model,
-                                                   double geometricSeqLenParam, int numCols, Double rate, PhyloBN pbn) {
+    private static IndelPeeler[] createPeelingJobs(IdxTree tree, PIPSubstModel model,
+                                                   int numCols, EnumSeq.Alignment<Enumerable> aln, PhyloBN pbn,
+                                                   Set[] nonGappedLeaveSets, Set[] ancestorsToRootFromMRCA,
+                                                   Map<String, Integer> alnMap) {
 
         IndelPeeler[] peelers = new IndelPeeler[numCols];
         for (int colIdx = 0; colIdx < numCols; ++colIdx) {
-            peelers[colIdx] = new IndelPeeler(pogTree, model, rate, colIdx, geometricSeqLenParam, pbn);
+            peelers[colIdx] = new IndelPeeler(tree, model, colIdx, aln, pbn,
+                    nonGappedLeaveSets[colIdx], ancestorsToRootFromMRCA[colIdx], alnMap);
         }
 
         return peelers;
@@ -230,227 +161,14 @@ public class IndelPeeler {
      */
     public double decorate() {
 
-        felsensteinsExtendedPeeling();
-        int ROOT_INDEX = 0;
-        double rootGapProb = nodeGapProbs[ROOT_INDEX];
-
-        // sum over possible residue assignments
-        double[] residueTerms = new double[numResidues]; // number of alphabet letters
-        for (int resIdx = 0; resIdx < numResidues; resIdx++) {
-            double priorProb = Math.log(model.getProb(alphabet[resIdx]));
-            double rootResidueProb = nodeResidueProbs[ROOT_INDEX][resIdx];
-            residueTerms[resIdx] = priorProb + rootResidueProb; // weight by prior prob of residue
-        }
-
-        double weightedLogSumResidueProb = MathEx.logsumexp(residueTerms) + Math.log(geometricSeqLenParam);
-        double[] finalColTerms = {rootGapProb, weightedLogSumResidueProb};
-
-        double colProb = MathEx.logsumexp(finalColTerms);
-        treeProb = colProb;
-        return colProb;
-
+        treeProb = IdxTree.getColumnProb(model, columnIdx, (Tree) tree, aln, pbn,
+                nonGappedLeaves, ancestorsToRootFromMRCA, alnMap);
+        return treeProb;
     }
 
     public double getDecoration() {
         return treeProb;
     }
-
-
-    private void felsensteinsExtendedPeeling() {
-
-        containsGap = containsGap();
-
-        // iterate through branch point indices backwards for postorder traversal
-        for (int bpidx = tree.getSize() - 1; bpidx >= 0; bpidx--) {
-
-            if (tree.isLeaf(bpidx)) {
-                calcLeafPeelingProbabilities(bpidx);
-            } else {
-                calcAncestralPeelingProbabilities(bpidx);
-            }
-        }
-    }
-
-    private void calcLeafPeelingProbabilities(int bpidx) {
-        POGraph extantPog = pogTree.getExtant(bpidx);
-        SymNode n = (SymNode) extantPog.getNode(columnIdx);
-
-        if (n == null) {
-            nodeGapProbs[bpidx] = Double.NEGATIVE_INFINITY;
-        } else {
-            int resIdx = model.getDomain().getIndex(n.getValue());
-            nodeResidueProbs[bpidx][resIdx] = 0.0;
-        }
-
-    }
-
-    private void calcAncestralPeelingProbabilities(int bpidx) {
-
-        nodeGapProbs[bpidx] = MathEx.logsumexp(calcLogProbChildrenGivenAncestralGap(bpidx));
-
-        for (int parentResIdx = 0; parentResIdx < numResidues; parentResIdx++) {
-            nodeResidueProbs[bpidx][parentResIdx] = calcLogProbChildrenGivenAncestralResidue(bpidx, parentResIdx);
-        }
-
-    }
-
-    private double[] calcLogProbChildrenGivenAncestralGap(int bpidx) {
-
-        int[] childrenBpIndices = tree.getChildren(bpidx);
-        double[] allChildrenLogGapTerms = new double[childrenBpIndices.length];
-
-        int current_child = 0;
-        for (int childBpidx : childrenBpIndices) {
-            // collect all possible terms we will marginalise over
-            if (this.containsGap[childBpidx] == 1.0) {
-                // need to enumerate over every residue sum(Pu(L_child,q).P(q|-,t) and
-                // then add Pu(L_child, -) so full alphabet_size
-                double[] childLogProbTerms = new double[alphabetSize];
-                //1.0 sum(Pu(L_child,q).P(q|-,t)
-                for (int resIdx = 0; resIdx < numResidues; resIdx++) {
-                    double nodeResidueProb = nodeResidueProbs[childBpidx][resIdx];
-
-                    Object residue = model.getDomain().get(resIdx);
-                    double insertionProb = Math.log(getProbOfInsertion(bpidx, residue));
-
-                    childLogProbTerms[resIdx] = nodeResidueProb + insertionProb;
-                }
-
-                childLogProbTerms[numResidues] = nodeGapProbs[childBpidx];
-                allChildrenLogGapTerms[current_child] = MathEx.logsumexp(childLogProbTerms);
-
-            } else {
-                allChildrenLogGapTerms[current_child] = Double.NEGATIVE_INFINITY;
-            }
-            current_child++;
-        }
-
-        return allChildrenLogGapTerms;
-    }
-
-    private double calcLogProbChildrenGivenAncestralResidue(int bpidx, int parentResIdx) {
-
-        int[] childrenBpindices = tree.getChildren(bpidx);
-
-        double[] childrenLogProbTerms = new double[childrenBpindices.length];
-        int currentChildResIdx = 0;
-        for (int childBpidx : childrenBpindices) {
-
-            // only include full alphabet with gap if all children have gaps
-            double[] childLogProbTerms = (containsGap[childBpidx] == 1.0) ? new double[alphabetSize] : new double[numResidues];
-
-            for (int childResIdx = 0; childResIdx < numResidues; childResIdx++) {
-                double childNodeResidueProb = nodeResidueProbs[childBpidx][childResIdx];
-
-
-                double gapAugmentedResidueProb = Math.log(getProbGapAugmented(childBpidx, alphabet[childResIdx],
-                        alphabet[parentResIdx]));
-                childLogProbTerms[childResIdx] = childNodeResidueProb + gapAugmentedResidueProb;
-            }
-
-            if (containsGap[childBpidx] == 1.0) {
-                double deletionProb = Math.log(getProbOfGap(childBpidx));
-                childLogProbTerms[numResidues] = deletionProb;
-            }
-
-            double childLogProb = MathEx.logsumexp(childLogProbTerms);
-
-            childrenLogProbTerms[currentChildResIdx] = childLogProb;
-
-            currentChildResIdx++;
-        }
-
-        return MathEx.sum(childrenLogProbTerms);
-    }
-
-
-    public double[] containsGap() {
-
-        double[] containsGap = new double[tree.getSize()];
-
-        // If we want to do a postorder traversal, can just iterate
-        // through branch point indices backwards as these are labelled depth-first.
-        for (int bpidx = tree.getSize() - 1; bpidx >= 0; bpidx--) {
-
-            if (tree.isLeaf(bpidx)) {
-                POGraph extantPog = pogTree.getExtant(bpidx);
-                SymNode n = (SymNode) extantPog.getNode(columnIdx);
-                if (n == null) {
-                    containsGap[bpidx] = 1.0;
-                } else {
-                    containsGap[bpidx] = 0.0;
-                }
-            } else {
-                //ancestor
-                int[] children = tree.getChildren(bpidx);
-                double all_gaps = 1.0;
-                // if any of the children don't contain a gap, break and record
-                for (int child : children) {
-                    if (containsGap[child] == 0.0) {
-                        all_gaps = 0.0;
-                        break;
-                    }
-                }
-                containsGap[bpidx] = all_gaps;
-            }
-        }
-
-        return containsGap;
-    }
-
-    private double getProbOfInsertion(int bpidx, Object state) {
-
-        SubstNode substNode = (SubstNode) pbn.getBNode(bpidx);
-
-        double insertionProb = ksiT(substNode.getTime());
-        double stationaryFreqResidue = model.getProb(state);//  substNode.getProb(state);
-
-        return insertionProb * stationaryFreqResidue;
-    }
-
-    private double ksiT(double time) {
-
-        if (model.getMu() == 0 && model.getLambda() == 0) {
-            return 0.0;
-        }
-        double insertionRate = model.getLambda() / (model.getMu() + model.getLambda());
-        double indelProp = 1 - Math.exp(-((model.getMu() + model.getLambda()) * time));
-
-        return insertionRate * indelProp;
-    }
-
-    private double getProbGapAugmented(int bpidx, Object childState, Object parentState) {
-
-        SubstNode substNode = (SubstNode) pbn.getBNode(bpidx);
-        double probNoInsert = 1 - ksiT(substNode.getTime());
-        double conditinalProb = substNode.getProb(childState, parentState);
-
-        return conditinalProb * probNoInsert;
-    }
-
-    private double getProbOfGap(int bpidx) {
-
-        SubstNode substNode = (SubstNode) pbn.getBNode(bpidx);
-        double probNoInsertion = 1 - ksiT(substNode.getTime());
-        double probDeletion = gammaT(substNode.getTime());
-
-        return probNoInsertion * probDeletion;
-
-    }
-
-    public double gammaT(double time) {
-
-        if (model.getMu() == 0 && model.getLambda() == 0) {
-            return 0.0;
-        }
-
-        double indelTotal = model.getMu() + model.getLambda();
-        double deletionProp = model.getMu() / (indelTotal);
-        double indelProp = 1 - Math.exp(-((indelTotal) * time));
-
-        return deletionProp * indelProp;
-    }
-
 
     /**
      * Optimises mu and lambda (insertion and deletion rates) assuming they are equal. Uses Brent's method to find
@@ -461,144 +179,143 @@ public class IndelPeeler {
      * @param max_val              largest value to search
      * @param substModelName       index of the substitution model to use
      * @param tree                 phylogenetic tree
-     * @param geometricSeqLenParam geometric sequence length param for the alignment
      * @param aln                  the alignment
-     * @return the optimal mu and lambda value
+     * @return the optimal mu and lambda value respectively
      * @throws IllegalArgumentException if the model is not supported
      */
-    public static double optimiseMuLambda(double min_val, double max_val, String substModelName, IdxTree tree,
-                                          double geometricSeqLenParam,
+    public static double[] optimiseMuLambda(double min_val, double max_val, String substModelName, IdxTree tree,
                                           EnumSeq.Alignment<Enumerable> aln) throws IllegalArgumentException {
 
-        double[] F;
-        double[][] IRM;
-        Enumerable alpha;
-        if (substModelName.equals("JTT")) {
-            F = JTT.F;
-            IRM = JTT.Q;
-            alpha = new Enumerable(JTT.S);
-        } else if (substModelName.equals("JC")) {
-            F = JC.F(JC.S.length);
-            IRM = JC.Q(1, JC.S.length);
-            alpha = new Enumerable(JC.S);
-        } else if (substModelName.equals("Yang")) {
-            F = Yang.F;
-            IRM = Yang.Q;
-            alpha = new Enumerable(Yang.S);
-        } else if (substModelName.equals("LG")) {
-            F = LG.F;
-            IRM = LG.Q;
-            alpha = new Enumerable(LG.S);
-        } else if (substModelName.equals("WAG")) {
-            F = WAG.F;
-            IRM = WAG.Q;
-            alpha = new Enumerable(WAG.S);
-        } else if (substModelName.equals("Dayhoff")) {
-            F = Dayhoff.F;
-            IRM = Dayhoff.Q;
-            alpha = new Enumerable(Dayhoff.S);
-        } else {
-            throw new IllegalArgumentException(substModelName + " gap model not implemented yet");
+
+
+
+        Map<String, Integer> alnMap = aln.getMap();
+        Set[] nonGappedLeaveSets = new Set[aln.getWidth()];
+        Set[] ancestorsToRootFromMRCA = new Set[aln.getWidth()];
+        for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+            Set<Integer> S = IdxTree.findNonGappedLeaves(tree, aln, colIdx, alnMap);
+            nonGappedLeaveSets[colIdx] = S;
+            int mrca = IdxTree.findMRCA(tree, S);
+            Set<Integer> A = IdxTree.getAllAncestorsToRoot(mrca, tree);
+            ancestorsToRootFromMRCA[colIdx] = A;
         }
 
+        LikelihoodEvaluator evaluator = new LikelihoodEvaluator(tree, aln, substModelName, nonGappedLeaveSets,
+                ancestorsToRootFromMRCA, alnMap);
 
-        LikelihoodEvaluator evaluator =
-                new LikelihoodEvaluator(tree, aln, F, IRM, alpha, geometricSeqLenParam);
+        double bestMu = 0.1;
+        double bestLambda = 10.0;
+        evaluator.setLambda(bestLambda);
+        evaluator.setMu(bestMu);
 
-        IndelPeeler.AlnLikelihood alnLikelihood = new IndelPeeler.AlnLikelihood(evaluator);
+        double minLogHalfWindow = Math.log(3.0);
+        double maxLogHalfWindow = 0.5 * (Math.log(max_val) - Math.log(min_val));
 
-        return Minimise.brent(alnLikelihood, min_val, max_val);
-    }
+        double muLogWindowWidth = Math.log(3.0);
+        double lambdaLogWindowWidth = Math.log(3.0);
 
-    /**
-     * Function to calculate the likelihood of an alignment given a tree and gap augmented substitution model.
-     */
-    public static class AlnLikelihood implements Function {
+        double prevLogLik = Double.NEGATIVE_INFINITY;
+        double tol = 1e-5;
+        int maxIter = 100;
 
-        LikelihoodEvaluator evaluator;
+        for (int iter = 0; iter < maxIter; iter++) {
 
-        public AlnLikelihood(LikelihoodEvaluator evaluator) {
-            this.evaluator = evaluator;
+            //  ---- optimise mu, lambda fixed ----
+            double[] muBounds = Minimise.nextLogWindowBounds(bestMu, muLogWindowWidth, minLogHalfWindow, maxLogHalfWindow);
+            muBounds[0] = Math.max(muBounds[0], min_val);
+            muBounds[1] = Math.min(muBounds[1], max_val);
+
+            // optimise lambda with mu fixed
+            System.out.println("Optimising Mu in [" + muBounds[0] + ", " + muBounds[1] + "], Lambda fixed at " + bestLambda);
+            Minimise muResult = Minimise.brentLogSpaceWithReexpansion(mu_ -> {
+                evaluator.setMu(mu_);
+                return -evaluator.evaluate();
+            }, muBounds[0], muBounds[1]);
+            bestMu = muResult.bestX;
+            muLogWindowWidth = muResult.finalBracketWidth;
+            evaluator.setMu(bestMu);
+
+            double[] lambdaBounds = Minimise.nextLogWindowBounds(bestLambda, lambdaLogWindowWidth, minLogHalfWindow, maxLogHalfWindow);
+
+            lambdaBounds[0] = Math.max(lambdaBounds[0], min_val);
+            lambdaBounds[1] = Math.min(lambdaBounds[1], max_val);
+            System.out.println("Optimising Lambda in [" + lambdaBounds[0] + ", " + lambdaBounds[1] + "], Mu fixed at " + bestMu);
+            Minimise lambdaResult = Minimise.brentLogSpaceWithReexpansion(lambda_ -> {
+                evaluator.setLambda(lambda_);
+                return -evaluator.evaluate();
+            }, lambdaBounds[0], lambdaBounds[1]);
+            bestLambda = lambdaResult.bestX;
+            lambdaLogWindowWidth = lambdaResult.finalBracketWidth;
+            evaluator.setLambda(bestLambda);
+
+            // check convergence
+            double logLik = -lambdaResult.bestF;   // negate back, since brent minimized -evaluate()
+            System.out.println("Iter=" + iter + " mu=" + bestMu + " lambda=" + bestLambda + " logLik=" + logLik);
+
+            if (Math.abs(logLik - prevLogLik) < tol) {
+                System.out.println("Converged at iteration " + iter);
+                break;
+            }
+            prevLogLik = logLik;
         }
 
-        @Override
-        public double f(double muLambda) {
-            return -evaluator.evaluate(muLambda);
-        }
+        return new double[]{bestMu, bestLambda};
     }
 
     public static class LikelihoodEvaluator {
 
-        final POGTree pogTree;
-        GapSubstModel model;
-        final double[] F;
-        final double[][] IRM;
-        final Enumerable alpha;
+        final IdxTree tree;
+        PIPSubstModel model;
+        String substModelName;
         EnumSeq.Alignment<Enumerable> aln;
-        double geometricSeqLenParam;
+        PhyloBN pbn;
+        private double mu = 1.0;
+        private double lambda = 1.0;
+        private final double totalTreeLength;
+        EnumSeq.Alignment<Enumerable> gapCol = null;
+        Set[] nonGappedLeaveSets;
+        Set[] ancestorsToRootFromMRCA;
+        Map<String, Integer> alnMap;
+
 
         public LikelihoodEvaluator(
                 IdxTree tree,
                 EnumSeq.Alignment<Enumerable> aln,
-                double[] F,
-                double[][] IRM,
-                Enumerable alpha,
-                double geometricSeqLenParam
+                String substModelName,
+                Set[] nonGappedLeaveSets,
+                Set[] ancestorsToRootFromMRCA,
+                Map<String, Integer> alnMap
         ) {
-
-            this.pogTree = new POGTree(aln, tree);
+            this.tree = tree;
+            this.totalTreeLength = Arrays.stream(tree.getValidDistances()).sum();
             this.aln = aln;
-            this.geometricSeqLenParam = geometricSeqLenParam;
-            this.F = F;
-            this.IRM = IRM;
-            this.alpha = alpha;
-
+            this.substModelName = substModelName;
+            this.nonGappedLeaveSets = nonGappedLeaveSets;
+            this.ancestorsToRootFromMRCA = ancestorsToRootFromMRCA;
+            this.alnMap = alnMap;
         }
 
-        public double evaluate(double muLambda) {
-            model = new GapSubstModel(this.F, this.IRM, this.alpha, muLambda, muLambda);
+        public void setMu(double mu) { this.mu = mu; }
+        public void setLambda(double lambda) { this.lambda = lambda; }
+
+
+        public double evaluate() {
+
             // trying to maximise the log likelihood
-            return IndelPeeler.calcProbAlnGivenTree(pogTree, model, aln, geometricSeqLenParam, alpha, GRASP.NTHREADS);
+            switch (substModelName) {
+                case "JC" -> model = new JCPIP(mu, lambda);
+                case "JTT" -> model = new JTTPIP(mu, lambda);
+                default -> throw new ASRRuntimeException("Model not supported");
+            }
+
+            if (gapCol == null) {
+                this.gapCol = IdxTree.createGapColumn(model.getDomain(), aln);
+            }
+
+            this.pbn = PhyloBN.create(tree, model, 1.0);
+            return IndelPeeler.calcProbAlnGivenTree(tree, model, aln, GRASP.NTHREADS, pbn, totalTreeLength, gapCol,
+                    nonGappedLeaveSets, ancestorsToRootFromMRCA, alnMap);
 
         }
     }
 }
-
-
-//
-//        double[] F;
-//        double[][] IRM;
-//        Enumerable alpha;
-//        IdxTree tree;
-//        EnumSeq.Alignment<Enumerable> aln;
-//        double geometricSeqLenParam;
-//        POGTree pogTree;
-//        GapSubstModel model;
-//
-//        public AlnLikelihood(IdxTree tree, EnumSeq.Alignment<Enumerable> aln, double[] F, double[][] IRM,
-//                             Enumerable alpha, double geometricSeqLenParam) {
-//            this.tree = tree;
-//            this.aln = aln;
-//            this.geometricSeqLenParam = geometricSeqLenParam;
-//            this.F = F;
-//            this.IRM = IRM;
-//            this.alpha = alpha;
-//            this.pogTree = new POGTree(aln, tree);
-//        }
-//
-//        /**
-//         * Get the log likelihood of a particular alignment given the tree and gap augmented substitution model.
-//         * This is used by a minimisation routine to find optimal params for the substitution model.
-//         * @param muLambda Assumes mu (deletion rate) and lambda (insertion rate) are equal
-//         * @return likelihood of the alignment given the tree + mu + lambda.
-//         */
-//        @Override
-//        public double f(double muLambda) {
-//
-//            model = new GapSubstModel(this.F, this.IRM, this.alpha, muLambda, muLambda);
-//
-//            // trying to maximise the log likelihood
-//            return -1.0 * IndelPeeler.calcProbAlnGivenTree(pogTree, model, aln, geometricSeqLenParam, alpha, GRASP.NTHREADS);
-//        }
-
-

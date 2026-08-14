@@ -1,18 +1,29 @@
 package dat.phylo;
 
+import asr.ASRException;
 import bn.Distrib;
+import bn.ctmc.JCPIP;
+import bn.ctmc.JTTPIP;
+import bn.ctmc.PIPSubstModel;
+import bn.ctmc.SubstNode;
+import bn.ctmc.matrix.JC;
 import bn.prob.EnumDistrib;
 import bn.prob.GammaDistrib;
 import bn.prob.GaussianDistrib;
+import dat.EnumSeq;
 import dat.Enumerable;
 import dat.file.Newick;
+import dat.file.Utils;
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
+import smile.math.MathEx;
 import stats.RateModel;
 
 import java.io.IOException;
 import java.util.*;
+
+import static asr.IndelPeeler.calcProbAlnGivenTree;
 
 /**
  * Indexed (light-weight) view of tree, or set of trees.
@@ -179,7 +190,7 @@ public class IdxTree implements Iterable<Integer> {
      * @param dmat the distance matrix
      * @return  an array of distances from the root to each leaf
      */
-    protected static double[] getLeafDistances(Double[][] dmat) {
+    public static double[] getLeafDistances(Double[][] dmat) {
         double[] leafdist = new double[dmat.length];
         for (int i = 0; i < dmat.length; i ++) { // each row is a leaf
             for (int j = 0; j < dmat[i].length; j ++) // each col is a branch (with a node idx)
@@ -1035,6 +1046,17 @@ public class IdxTree implements Iterable<Integer> {
         return d;
     }
 
+    public double getMedianDistance() {
+        double[] sorted = Arrays.stream(getValidDistances()).sorted().toArray();
+
+        int n = sorted.length;
+        if (n % 2 == 0) {
+            return (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+        } else {
+            return sorted[n / 2];
+        }
+    }
+
     /**
      * Calculate the mean distance for any leaf to their root
      * @return mean distance
@@ -1480,44 +1502,517 @@ public class IdxTree implements Iterable<Integer> {
         }
     }
 
-    public static void main(String[] args) {
-        long SEED = System.currentTimeMillis(); // random seed
-        int NCOMP = 3; // number of components in Gamma mixture to model branch distances
-        int NITER = 100; // max number of iterations to estimate mixture distribution (EM)
-        IdxTree tree1 = null;
-        for (int argc = 0; argc < args.length; argc++) {
-            switch (args[argc]) {
-                case "--ncomp":
-                    NCOMP = Integer.parseInt(args[++argc]);
-                    break;
-                case "--seed":
-                    SEED = Long.parseLong(args[++argc]);
-                    break;
-                case "--niter":
-                    NITER = Integer.parseInt(args[++argc]);
-                    break;
-                case "--nwk":
-                    try {
-                        tree1 = Newick.load(args[++argc]);
-                    } catch (IOException e) {
-                        System.err.println("Error loading " + args[argc] + ": " + e.getMessage());
-                        System.exit(1);
+
+    /**
+     * Compute the log modified Felsenstein peeling values (log fTilde) for a single alignment column.
+     * Implements Equation 1 and 2 from Bouchard-Cote & Jordan (2013) supplementary material,
+     * as corrected by ARPIP (Jowkar et al.) Appendix Equation 5.
+     *
+     * @param tree     the phylogenetic tree
+     * @param aln      the alignment
+     * @param pbn      the phylogenetic Bayesian network
+     * @param jc       the PIP substitution model
+     * @param alpha    the alphabet (including gap)
+     * @param colIdx   the alignment column index
+     * @return         log fTilde values, shape [totalNodes][alpha.size() + 1]
+     *                 last index is gap, internal node gap entries are left as -Infinity
+     */
+    public static double[][] computeLogFTilde(Tree tree, EnumSeq.Alignment<Enumerable> aln,
+                                              PhyloBN pbn, PIPSubstModel jc,
+                                              Enumerable alpha, int colIdx, Map<String, Integer> alnMap) {
+        int totalNodes = tree.getSize();
+        double[][] logFTldrV = new double[totalNodes][alpha.size()];
+        for (double[] row : logFTldrV) {
+            Arrays.fill(row, Double.NEGATIVE_INFINITY);
+        }
+
+        for (int bpidx = totalNodes - 1; bpidx >= 0; bpidx--) {
+            BranchPoint node = tree.getBranchPoint(bpidx);
+            String nodeLabel = (String) node.getLabel();
+
+            if (node.isLeaf()) {
+                EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(nodeLabel));
+                Character sigmaPrime = (Character) gseq.get(colIdx);
+                if (sigmaPrime == null) {
+                    sigmaPrime = '-';
+                }
+
+                // set real character values at leaf
+                for (Object c : alpha.getValues()) {
+                    Character sigma = (Character) c;
+                    int sigmaResIdx = jc.getDomain().getIndex(sigma);
+                    logFTldrV[bpidx][sigmaResIdx] = sigma.equals(sigmaPrime) ? 0.0 : Double.NEGATIVE_INFINITY;
+                }
+
+            } else {
+                int[] children = tree.getChildren(bpidx);
+
+                for (Object c : alpha.getValues()) {
+                    Character sigma = (Character) c;
+                    int sigmaResIdx = jc.getDomain().getIndex(sigma);
+                    double logTotalProb = 0.0;
+
+                    for (int childIdx : children) {
+                        SubstNode substNode = (SubstNode) pbn.getBNode(childIdx);
+                        double[] logTerms = new double[alpha.size()];
+                        int termIdx = 0;
+
+                        // sum over real child states sigma'
+                        for (Object c2 : alpha.getValues()) {
+                            Character sigmaChild = (Character) c2;
+                            int sigmaChildResIdx = jc.getDomain().getIndex(sigmaChild);
+                            double logProb = Math.log(substNode.getProb(sigmaChild, sigma));
+                            double logFChild = logFTldrV[childIdx][sigmaChildResIdx];
+                            logTerms[termIdx++] = logProb + logFChild;
+                        }
+
+                        // inner sum over sigma', accumulate product over children
+                        logTotalProb += MathEx.logsumexp(logTerms);
                     }
-                default:
-                    break;
+                    logFTldrV[bpidx][sigmaResIdx] = logTotalProb;
+                }
             }
         }
-        if (tree1 != null) {
-            // What this function does: IdxTree ntree = generateTreeFromMixture(tree, NCOMP, SEED, NITER);
-            // Namely... process an already loaded tree or synthesise a new tree
-            GaussianDistrib gds1 = IdxTree.getLeafDistanceDistribution(tree1.getDistance2RootMatrix());
-            // Then estimate a mixture of Gamma distributions from the first/source tree (loaded or synthesised)
-            RateModel distmodel = getGammaMixture(tree1, NCOMP, SEED);
-            // Then generate a new tree based on the above mixture of Gamma distributions
-            Tree tree2 = Tree.Random(tree1.getNLeaves(), distmodel, 2, 2, SEED);
-            // Finally, adjust the placement of distances to better fit the original distribution
-            tree2.fitDistances(NITER, gds1, SEED + 202);
-            System.out.println("--dist-distrib " + distmodel.getTrAVIS() + "\n--leaf2root-distrib " + gds1.getTrAVIS());
+        return logFTldrV;
+    }
+
+
+
+    /**
+     * Compute log fTilde_v (Equation 2) — marginalise over real characters
+     * using stationary frequencies.
+     *
+     * @param logFTldrV  output of computeLogFTilde
+     * @param jc         the PIP substitution model
+     * @param alpha      the alphabet (excluding gap)
+     * @return           log fTilde_v for each node, shape [totalNodes]
+     */
+    public static double[] computeLogFTildeScalar(double[][] logFTldrV, PIPSubstModel jc, Enumerable alpha) {
+        int totalNodes = logFTldrV.length;
+        double[] logFTildeScalar = new double[totalNodes];
+
+        for (int bpidx = 0; bpidx < totalNodes; bpidx++) {
+            double[] logTerms = new double[jc.getOriginalAlpha().size()];
+            for (int alphaIdx = 0; alphaIdx < jc.getOriginalAlpha().size(); alphaIdx++) {
+                logTerms[alphaIdx] = Math.log(jc.getProb(jc.getOriginalAlpha().get(alphaIdx)))
+                        + logFTldrV[bpidx][alphaIdx];
+            }
+            logFTildeScalar[bpidx] = MathEx.logsumexp(logTerms);
         }
+        return logFTildeScalar;
+    }
+
+    public static EnumSeq.Alignment<Enumerable> createGapColumn(Enumerable alpha, EnumSeq.Alignment<Enumerable> aln) {
+        List<EnumSeq.Gappy<Enumerable>> seqArray = new ArrayList<>();
+        for (int i = 0; i < aln.getHeight(); i++) {
+            EnumSeq<Enumerable> seq = aln.getEnumSeq(i);
+            EnumSeq.Gappy<Enumerable> gap_copy = new EnumSeq.Gappy<>(alpha);
+            gap_copy.set(new Character[1]); // add an empty column
+            gap_copy.setName(seq.getName());
+            seqArray.add(gap_copy);
+        }
+
+        return new EnumSeq.Alignment<>(seqArray);
+    }
+
+    /**
+     *
+     * @param tree
+     * @param S
+     * @return the most recent common ancestor, otherwise -1
+     */
+    public static int findMRCA(IdxTree tree, Set<Integer> S) {
+
+        int totalNodes = tree.getSize();
+        int[] subtreeNodeCount = new int[totalNodes];
+
+        for (int bpidx = totalNodes - 1; bpidx >= 0; bpidx--) {
+            BranchPoint node = tree.getBranchPoint(bpidx);
+
+            if (node.isLeaf()) {
+                subtreeNodeCount[bpidx] += S.contains(bpidx) ? 1 : 0;
+            } else {
+                int[] children = tree.getChildren(bpidx);
+                for (int childIdx : children) {
+                    subtreeNodeCount[bpidx] += subtreeNodeCount[childIdx];
+                }
+            }
+        }
+
+        int sSize = S.size();
+        for (int bpidx = totalNodes - 1; bpidx >= 0; bpidx--) {
+            // first node we find with the correct count should be the MRCA
+            if (subtreeNodeCount[bpidx] == sSize) {
+                return bpidx;
+            }
+        }
+
+        return -1; //
+    }
+
+    public static Set<Integer> getAllAncestorsToRoot(int bpidx, IdxTree tree) {
+
+        Set<Integer> A = new HashSet<>();
+        int current = bpidx;
+        while (current >= 0) {
+            A.add(current);
+            if (tree.getParent(current) == -1) {
+                break;
+            }
+            current = tree.getParent(current);
+        }
+
+        return A;
+    }
+
+    public static Set<Integer> findNonGappedLeaves(IdxTree tree, EnumSeq.Alignment<Enumerable> aln, int colIdx,
+                                                   Map<String, Integer> alnMap ) {
+        // Find the set of leaves that are non-gapped
+        Set<Integer> S = new HashSet<>();
+        // find S — leaves with non-gap character
+        int[] leafBpindices = tree.getLeaves();
+        for (int leafBpIdx : leafBpindices) {
+            BranchPoint node = tree.getBranchPoint(leafBpIdx);
+            String nodeLabel = (String) node.getLabel();
+            EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(nodeLabel));
+            Character state = (Character) gseq.get(colIdx);
+            if (state != null && !state.equals('-')) {
+                S.add(leafBpIdx);
+            }
+        }
+
+        return S;
+    }
+
+    public static double getColumnProb(PIPSubstModel jc, int colIdx, Tree tree, EnumSeq.Alignment<Enumerable> aln,
+                                       PhyloBN pbn, Set<Integer> S, Set<Integer> A, Map<String, Integer> alnMap ) {
+
+
+       Enumerable alphabet =  jc.getOriginalAlpha();
+        double[][] logFTldrV = computeLogFTilde(tree, aln, pbn, jc, jc.getDomain(), colIdx, alnMap );
+        // now construct fv not conditioned on character
+        double[] logFTildeScalar = computeLogFTildeScalar(logFTldrV, jc, alphabet);
+        double treeLength = Arrays.stream(tree.getValidDistances()).sum();
+        // Find the set of leaves that are non-gapped
+
+        if (S.isEmpty()) {
+            // all gaps
+            double[] nodeProbs = new double[tree.getSize()];
+            for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+                boolean isRoot = tree.getParent(bpidx) == -1;
+                double beta = jc.survivalProb(tree.getDistance(bpidx), isRoot);
+                double logBeta = Math.log(beta);
+                double log1MinusBeta = Math.log(1 - beta);
+                // f_v = (1 - beta) + beta * fTilde_v  in log space
+                double logFv;
+                if (isRoot) {
+                    logFv = logFTildeScalar[bpidx];
+                } else {
+                    logFv = MathEx.logsumexp(new double[]{
+                            log1MinusBeta,
+                            logBeta + logFTildeScalar[bpidx]
+                    });
+                }
+
+                // then weight by insertion probability
+                double logInsertProb = Math.log(isRoot ?
+                        jc.getInsertionProb(treeLength) :
+                        jc.getInsertionProb(tree.getDistance(bpidx), treeLength));
+
+                nodeProbs[bpidx] = logInsertProb + logFv;
+            }
+
+            return MathEx.logsumexp(nodeProbs);
+        }
+
+        double[] validNodes = new double[A.size()];
+        int nodeCounter = 0;
+        for (int bpidx : A) {
+            boolean isRoot = tree.getParent(bpidx) == -1;
+            double logBeta = Math.log(jc.survivalProb(tree.getDistance(bpidx), isRoot));
+            double fv = logBeta + logFTildeScalar[bpidx];
+            double insertionProb;
+            if (isRoot) {
+                insertionProb = jc.getInsertionProb(treeLength);
+            } else {
+                insertionProb = jc.getInsertionProb(tree.getDistance(bpidx), treeLength);
+            }
+            fv += Math.log(insertionProb);
+            validNodes[nodeCounter++] = fv;
+        }
+
+        return MathEx.logsumexp(validNodes);
+    }
+
+    public static void main(String[] args) {
+
+        EnumSeq.Alignment<Enumerable> aln = null;
+        Tree tree = null;
+        Enumerable alpha = new Enumerable(new Object[]{'A', 'C', 'G', 'T'});
+        try {
+            aln = Utils.loadAlignment("/Users/uqsporra/IdeaProjects/bnkit/test.fa", alpha);
+            tree = Utils.loadTree("/Users/uqsporra/IdeaProjects/bnkit/test.nwk");
+            Utils.checkData(aln, tree, false);
+
+        } catch (ASRException | IOException e) {
+            System.exit(1);
+        }
+        JTTPIP jc = new JTTPIP(1, 2);
+//
+//        int colIdx = 2;
+//        Object[] alphabet =  new Object[]{'A'};
+//        Object[] gapAlpha = new Object[]{'A', '-'};
+//        PhyloBN pbn = PhyloBN.create(tree, jc, 1.0);
+//        pbn.getBNode(0);
+//
+//        //double[][] logFTldrV = computeLogFTilde(tree, aln, pbn, jc, jc.getDomain(), colIdx);
+//        int totalNodes = tree.getSize();
+//        Map<String, Integer> alnMap = aln.getMap();
+//        double[][] logFTldrV = new double[totalNodes][gapAlpha.length];
+//        for (double[] row : logFTldrV) {
+//            Arrays.fill(row, Double.NEGATIVE_INFINITY);
+//        }
+//
+//        for (int bpidx = totalNodes - 1; bpidx >= 0; bpidx--) {
+//            BranchPoint node = tree.getBranchPoint(bpidx);
+//            String nodeLabel = (String) node.getLabel();
+//
+//            if (node.isLeaf()) {
+//                EnumSeq.Gappy<Enumerable> gseq = aln.getEnumSeq(alnMap.get(nodeLabel));
+//                Character sigmaPrime = (Character) gseq.get(colIdx);
+//                if (sigmaPrime == null) {
+//                    sigmaPrime = '-';
+//                }
+//
+//                // set real character values at leaf
+//                for (Object c : gapAlpha) {
+//                    Character sigma = (Character) c;
+//                    int sigmaResIdx = sigma.equals('A') ? 0 : 1;
+//                    logFTldrV[bpidx][sigmaResIdx] = sigma.equals(sigmaPrime) ? 0.0 : Double.NEGATIVE_INFINITY;
+//                }
+//
+//            } else {
+//                int[] children = tree.getChildren(bpidx);
+//
+//                if (bpidx == 0) {};
+//                for (Object c : gapAlpha) {
+//                    Character sigma = (Character) c;
+//                    //int sigmaResIdx = jc.getDomain().getIndex(sigma);
+//                    int sigmaResIdx = sigma.equals('A') ? 0 : 1;
+//                    double logTotalProb = 0.0;
+//
+//                    for (int childIdx : children) {
+//                        SubstNode substNode = (SubstNode) pbn.getBNode(childIdx);
+//                        double[] logTerms = new double[gapAlpha.length];
+//                        int termIdx = 0;
+//
+//                        // sum over real child states sigma'
+//                        for (Object c2 : gapAlpha) {
+//                            Character sigmaChild = (Character) c2;
+//                            //int sigmaChildResIdx = jc.getDomain().getIndex(sigmaChild);
+//                            int sigmaChildResIdx = sigmaChild.equals('A') ? 0 : 1;
+//
+//                            // Construct the asymmetric transition matrix entries
+//                            double logProb;
+//                            if (sigma.equals('A')) {
+//                                if (sigmaChild.equals('-')) {
+//                                    // A -> gap (Deletion)
+//                                    logProb = Math.log(1.0 - Math.exp(-jc.getMu() * substNode.getTime()));
+//                                } else {
+//                                    // A -> A (Survival + Substitution mapping)
+//                                    logProb = Math.log(Math.exp(-jc.getMu() * substNode.getTime()));
+//                                }
+//                            } else { // Parent is a gap '-'
+//                                if (sigmaChild.equals('-')) {
+//                                    // gap -> gap (Absorbing state staying absorbing)
+//                                    System.out.println(substNode.getProb('-', '-'));
+//                                    logProb = 0.0; // log(1.0)
+//                                } else {
+//                                    // gap -> A (Impossible mutation backwards)
+//                                    System.out.println(substNode.getProb('A', '-'));
+//                                    System.out.println(Math.log(0.0));
+//                                    logProb = Double.NEGATIVE_INFINITY; // log(0.0)
+//                                }
+//                            }
+//
+//                            double logFChild = logFTldrV[childIdx][sigmaChildResIdx];
+//                            logTerms[termIdx++] = logProb + logFChild;
+//                        }
+//
+//                        // inner sum over sigma', accumulate product over children
+//                        logTotalProb += MathEx.logsumexp(logTerms);
+//                    }
+//                    logFTldrV[bpidx][sigmaResIdx] = logTotalProb;
+//                }
+//            }
+//        }
+//
+//        // now construct fv not conditioned on character
+//        double[] logFTildeScalar = new double[totalNodes];
+//
+//        for (int bpidx = 0; bpidx < totalNodes; bpidx++) {
+//            double[] logTerms = new double[alphabet.length];
+//            for (int alphaIdx = 0; alphaIdx < alphabet.length; alphaIdx++) {
+//                logTerms[alphaIdx] = Math.log(1.0) + logFTldrV[bpidx][alphaIdx];
+//            }
+//            logFTildeScalar[bpidx] = MathEx.logsumexp(logTerms);
+//        }
+//
+//        double treeLength = Arrays.stream(tree.getValidDistances()).sum();
+//        // Find the set of leaves that are non-gapped
+//        Set<Integer> S = findNonGappedLeaves(tree, aln, colIdx);
+//        double colProb;
+//
+//        if (S.isEmpty()) {
+//            // all gaps
+//            double[] nodeProbs = new double[tree.getSize()];
+//            for (int bpidx = 0; bpidx < tree.getSize(); bpidx++) {
+//                boolean isRoot = tree.getParent(bpidx) == -1;
+//                double beta = jc.survivalProb(tree.getDistance(bpidx), isRoot);
+//                double logBeta = Math.log(beta);
+//                double log1MinusBeta = Math.log(1 - beta);
+//                // f_v = (1 - beta) + beta * fTilde_v  in log space
+//                double logFv;
+//                if (isRoot) {
+//                    logFv = logFTildeScalar[bpidx];
+//                } else {
+//                    logFv = MathEx.logsumexp(new double[]{
+//                            log1MinusBeta,
+//                            logBeta + logFTildeScalar[bpidx]
+//                    });
+//                }
+//                // then weight by insertion probability
+//                double logInsertProb = Math.log(isRoot ?
+//                        jc.getInsertionProb(treeLength) :
+//                        jc.getInsertionProb(tree.getDistance(bpidx), treeLength));
+//
+//                nodeProbs[bpidx] = logInsertProb + logFv;
+//            }
+//
+//            colProb = MathEx.logsumexp(nodeProbs);
+//            System.out.println("Gap " + colProb);
+//        }
+//
+//        int mrca = findMRCA(tree, S);
+//        Set<Integer> A = getAllAncestorsToRoot(mrca, tree);
+//
+//        double[] validNodes = new double[A.size()];
+//        int nodeCounter = 0;
+//        for (int bpidx : A) {
+//            boolean isRoot = tree.getParent(bpidx) == -1;
+//            double logBeta = Math.log(jc.survivalProb(tree.getDistance(bpidx), isRoot));
+//            double fv = isRoot ?  logFTildeScalar[bpidx] : logBeta + logFTildeScalar[bpidx];
+//            double insertionProb;
+//            if (isRoot) {
+//                insertionProb = jc.getInsertionProb(treeLength);
+//            } else {
+//                insertionProb = jc.getInsertionProb(tree.getDistance(bpidx), treeLength);
+//            }
+//            fv += Math.log(insertionProb);
+//            validNodes[nodeCounter++] = fv;
+//        }
+//
+//        colProb = MathEx.logsumexp(validNodes);
+//
+//        System.out.println(colProb);
+//
+//        double colSUm = -6.250434614615136 + -3.8428286501707563;
+//        double gapProb = -0.6395341843242446;
+//        double m = 2;
+//
+//        treeLength = Arrays.stream(tree.getValidDistances()).sum();
+//        System.out.println(treeLength);
+//        double nu = jc.getLambda() * (treeLength + (1.0 / jc.getMu()));
+//        System.out.println(nu);
+//        System.out.println(Math.exp(gapProb));
+//
+//        // log(|m|!) via log-sum
+//        double logFactorialM = 0.0;
+//        for (int i = 1; i <= m; i++) {
+//            logFactorialM += Math.log(i);
+//        }
+//
+////        double logPhi =  -logFactorialM
+////                + m * Math.log(nu)
+////                + (nu * (pc0 - 1.0));
+//
+//        double logPhi = -logFactorialM
+//                + (m * Math.log(nu))
+//                + (nu * (Math.exp(gapProb) - 1.0));
+//
+//        System.out.println(logPhi + colSUm);
+//        SubstNode substNode = (SubstNode) pbn.getBNode(1);
+//        System.out.println(substNode.getProb('-', 'A'));
+
+//
+//        double sum = 0.0;
+//        for (Object c : jc.getDomain().getValues()) {
+//            Character sigma = (Character) c;
+//            sum += jc.getProb(sigma, 'A', 1.0);
+//        }
+//        //sum += jc.getProb('-', 'A', 1.0);
+//        System.out.println("Row sum (expect 1.0): " + sum);
+//
+//
+//        // add a method to expose R matrix for debugging
+//        for (int i = 0; i < 5; i++) {
+//            System.out.println("R[" + i + "][" + i + "] = " + jc.getR()[i][i]);
+//            System.out.println("R[" + i + "][4] = " + jc.getR()[i][4]);  // gap column
+//        }
+//
+//        double[][] R = jc.getR();
+//        System.out.println("Q matrix diagonal:");
+//        for (int i = 0; i < R.length; i++) {
+//            System.out.println("R[" + i + "][" + i + "] = " + R[i][i]);
+//        }
+//        System.out.println("R[0][20] = " + R[0][20]); // gap column for first char
+//
+//        System.out.println("Q matrix row sums (all should be ~0):");
+//        for (int i = 0; i < R.length; i++) {
+//            double rowSum = 0;
+//            for (int j = 0; j < R[i].length; j++) {
+//                rowSum += R[i][j];
+//            }
+//            System.out.println("row " + i + " sum = " + rowSum);
+//        }
+
+//        long SEED = System.currentTimeMillis(); // random seed
+//        int NCOMP = 3; // number of components in Gamma mixture to model branch distances
+//        int NITER = 100; // max number of iterations to estimate mixture distribution (EM)
+//        IdxTree tree1 = null;
+//        for (int argc = 0; argc < args.length; argc++) {
+//            switch (args[argc]) {
+//                case "--ncomp":
+//                    NCOMP = Integer.parseInt(args[++argc]);
+//                    break;
+//                case "--seed":
+//                    SEED = Long.parseLong(args[++argc]);
+//                    break;
+//                case "--niter":
+//                    NITER = Integer.parseInt(args[++argc]);
+//                    break;
+//                case "--nwk":
+//                    try {
+//                        tree1 = Newick.load(args[++argc]);
+//                    } catch (IOException e) {
+//                        System.err.println("Error loading " + args[argc] + ": " + e.getMessage());
+//                        System.exit(1);
+//                    }
+//                default:
+//                    break;
+//            }
+//        }
+//        if (tree1 != null) {
+//            // What this function does: IdxTree ntree = generateTreeFromMixture(tree, NCOMP, SEED, NITER);
+//            // Namely... process an already loaded tree or synthesise a new tree
+//            GaussianDistrib gds1 = IdxTree.getLeafDistanceDistribution(tree1.getDistance2RootMatrix());
+//            // Then estimate a mixture of Gamma distributions from the first/source tree (loaded or synthesised)
+//            RateModel distmodel = getGammaMixture(tree1, NCOMP, SEED);
+//            // Then generate a new tree based on the above mixture of Gamma distributions
+//            Tree tree2 = Tree.Random(tree1.getNLeaves(), distmodel, 2, 2, SEED);
+//            // Finally, adjust the placement of distances to better fit the original distribution
+//            tree2.fitDistances(NITER, gds1, SEED + 202);
+//            System.out.println("--dist-distrib " + distmodel.getTrAVIS() + "\n--leaf2root-distrib " + gds1.getTrAVIS());
+//        }
     }
 }

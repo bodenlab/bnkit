@@ -215,7 +215,8 @@ public class TrAVIS {
     }
 
     public static void learnIndelRateDistribution(IdxTree tree, EnumSeq.Alignment<Enumerable> aln, Object[][] ancseqs_gappy, long seed) {
-        double[] rateSampleCollection = calculateColumnIndelRates(tree, aln, ancseqs_gappy);
+        Double [] columnRates = new Double[aln.getWidth()];
+        double[] rateSampleCollection = calculateColumnIndelRates(tree, aln, ancseqs_gappy, columnRates);
         RateModel indelrateDist = RateModel.bestfit(rateSampleCollection, seed);
         if (indelrateDist != null) {
             System.out.println("--indel-rate-distrib " + indelrateDist.getTrAVIS());
@@ -331,10 +332,43 @@ public class TrAVIS {
         int ndeletions = Arrays.stream(del_total).sum();
         int nindel = ninsertions + ndeletions;
         double delprop = (double) ndeletions / (double) nindel;
+
+        try (PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(new File(GRASP.OUTPUT, GRASP.PREFIX + "_indel_metrics.csv"))))) {
+
+            StringBuilder cols = new StringBuilder();
+            StringBuilder data = new StringBuilder();
+            for (int i = 0; i < ins_total.length; i++) {
+                if (ins_total[i] != 0) {
+                    cols.append("insertion_len_").append(i + 1).append(",");
+                    data.append(ins_total[i]).append(",");
+                }
+
+
+            }
+            for (int i = 0; i < del_total.length; i++) {
+                if (del_total[i] != 0) {
+                    cols.append("deletion_len_").append(i + 1).append(",");
+                    data.append(del_total[i]).append(",");
+                }
+            }
+
+            cols.append("num_insertions,").append("num_deletions,").append("num_indels");
+            data.append(ninsertions).append(",").append(ndeletions).append(",").append(nindel);
+
+            out.println(cols);
+            out.println(data);
+            out.flush();
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         System.out.printf("--delprop %.2f \\\n", delprop);
+
+
     }
 
-    private static Map<Integer, Object[]> getAllSeqs(IdxTree tree, EnumSeq.Alignment<Enumerable> aln,
+    public static Map<Integer, Object[]> getAllSeqs(IdxTree tree, EnumSeq.Alignment<Enumerable> aln,
                                                      Object[][] ancseqs_gappy) {
 
         Iterator<Integer> dfs = tree.getDepthFirstIterator();
@@ -367,7 +401,7 @@ public class TrAVIS {
         return seqs;
     }
 
-    private static void processNodeForRate(int bpidx, Map<Integer, LineageState> lineageState,
+    public static void processNodeForRate(int bpidx, Map<Integer, LineageState> lineageState,
                                            Map<Integer, Integer> numNodesTraversedSinceIndel,
                                            Map<Integer, Double> distTraversedSinceIndel, IdxTree tree,
                                            List<Double> rateSampleCollection, boolean currentNodeHasContent) {
@@ -425,12 +459,14 @@ public class TrAVIS {
     }
 
     public static double[] calculateColumnIndelRates(IdxTree tree, EnumSeq.Alignment<Enumerable> aln,
-                                                     Object[][] ancseqs_gappy) {
+                                                     Object[][] ancseqs_gappy, Double[] columnRates) {
 
         List<Double> rateSampleCollection = new ArrayList<>();
         Map<Integer, Object[]> seqs = getAllSeqs(tree, aln, ancseqs_gappy);
+
         for (int alnPos = 0; alnPos < aln.getWidth(); alnPos++) {
 
+            List<Double> colRateSampleCollection = new ArrayList<>();
             Iterator<Integer> dfs = tree.getDepthFirstIterator();
 
             Map<Integer, LineageState> lineageState = new HashMap<>();
@@ -451,9 +487,76 @@ public class TrAVIS {
                     continue;
                 }
 
-                processNodeForRate(bpidx, lineageState, numNodesTraversedSinceIndel, distTraversedSinceIndel,
-                        tree, rateSampleCollection, currentNodeHasContent);
+                int parentIdx = tree.getParent(bpidx);
 
+                // need to track how many nodes since indel relative to the parent
+                int nodesParentTraversed = numNodesTraversedSinceIndel.get(parentIdx);
+                numNodesTraversedSinceIndel.put(bpidx, nodesParentTraversed + 1);
+
+                // same idea for distance traversed
+                double distTraversedParent = distTraversedSinceIndel.get(parentIdx);
+                distTraversedSinceIndel.put(bpidx, distTraversedParent + tree.getDistance(bpidx));
+
+                // now check the state of our parent
+                LineageState parentState = lineageState.get(parentIdx);
+                // two possible scenarios:
+                // 1) child has content: if the parent was deleted or never had content, this is an insertion.
+                // TODO - deletion in parent followed by insertion is technically a violation, potentially should stop recording indels below this node
+                // 2) Child does NOT have content; if parent had content we've identified a deletion.
+                boolean indelEventOccurred = ((parentState == LineageState.DELETED || parentState == LineageState.NEVER_HAD_CONTENT) && currentNodeHasContent) ||
+                        (parentState == LineageState.HAS_CONTENT && !currentNodeHasContent);
+
+                if (indelEventOccurred) {
+                    int localNodesTraversed = numNodesTraversedSinceIndel.get(bpidx);
+                    double localDistTraversed = distTraversedSinceIndel.get(bpidx);
+                    // there is 1 indel event after we traverse a certain number of nodes
+                    double indelRate = -Math.log(1.0 - ((double) 1 / localNodesTraversed)) / localDistTraversed;
+
+                    rateSampleCollection.add(indelRate);
+                    colRateSampleCollection.add(indelRate);
+                    // Except for the last node, we had no indel events, which we mark as a non-event.
+                    for (int x = 0; x < localNodesTraversed - 1; x++) {
+                        rateSampleCollection.add(0.0);
+                        colRateSampleCollection.add(0.0);
+                    }
+
+                    // reset all the counts
+                    numNodesTraversedSinceIndel.put(bpidx, 1);
+                    distTraversedSinceIndel.put(bpidx, 0.0);
+                }
+
+                // bookkeeping so we can identify indel events.
+                LineageState currentState;
+                if (currentNodeHasContent) {
+                    currentState = LineageState.HAS_CONTENT;
+                } else if (parentState == LineageState.HAS_CONTENT) {
+                    currentState = LineageState.DELETED;
+                } else if (parentState == LineageState.DELETED) {
+                    currentState = LineageState.DELETED;
+                } else {
+                    currentState = LineageState.NEVER_HAD_CONTENT;
+                }
+
+                lineageState.put(bpidx, currentState);
+
+//                processNodeForRate(bpidx, lineageState, numNodesTraversedSinceIndel, distTraversedSinceIndel,
+//                        tree, rateSampleCollection, currentNodeHasContent);
+            }
+
+            if (!colRateSampleCollection.isEmpty()) {
+                double sum = 0.0;
+                int obs = 0;
+                for (double val : colRateSampleCollection) {
+                    if (val != 0.0) {
+                        sum += val;
+                        obs += 1;
+                    }
+                }
+
+                double averageRate = obs > 0 ? sum / obs : 0.0;
+                columnRates[alnPos] = averageRate;
+            }  else {
+                columnRates[alnPos] = -1.0;
             }
         }
 
@@ -1051,10 +1154,10 @@ public class TrAVIS {
      * Matches/substitutions are determined by a probability p=exp^-rt where rt is the rate times the evolutionary distance from the ancestor to the descendant.
      * If not a match/substitution, insertions and deletions are equally probable, i.e. (1-p)/2 each.
      * The length of an insertion or deletion is determined by a Poisson with mean (lambda) 1; note that this means that 0.37 of indels are length 0.
-     * The implementation is inspired by rules extracted from.
+     * The implementation is inspired by rules extracted from <a href="https://doi.org/10.1093/molbev/msn275">Cartwright R.
+     * Problems and Solutions for Estimating Indel Rates and Length Distributions. Mol. Biol. Evol. 26(2):473–480. 2009</a>
      * Position specific rates can be supplied to the constructor.
-     *  <a href="https://doi.org/10.1093/molbev/msn275">Cartwright R. Problems and Solutions for Estimating Indel Rates and Length Distributions.
-     *  Mol. Biol. Evol. 26(2):473–480. 2009.</a>
+     *
      */
     static class TrackTree {
 
@@ -1370,49 +1473,128 @@ public class TrAVIS {
             ti_insertions = new TreeInstance(tree, insertions);
             ti_seqs = new TreeInstance(tree, bpseqs);
 
-//            if (VERBOSE) {
-//                String outputFile = (OUTPUT != null ? OUTPUT : "")  +"_travis_report.txt";
-//
-//                try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
-//
-//                    System.out.println(tree);
-//                    pw.println(tree);
-//
-//                    for (int idx : tree) {
-//                        BranchPoint bp = tree.getBranchPoint(idx);
-//                        BranchPoint parent = bp.getParent();
-//
-//                        System.out.println(bp.getLabel() + "\t" + bpseqs[idx]);
-//                        pw.println(bp.getLabel() + "\t" + bpseqs[idx]);
-//
-//                        if (idx != 0 && parent != null) {
-//                            for (int i = 0; i < deletions[idx].length; i++) {
-//                                if (deletions[idx][i] > 0) {
-//                                    String line = "\tDELETE " + parent.getLabel() + "->"
-//                                            + bp.getLabel() + "@" + i + ":" + deletions[idx][i];
-//
-//                                    System.out.println(line);
-//                                    pw.println(line);
-//                                }
-//                            }
-//                            for (int i = 0; i < insertions[idx].length; i++) {
-//                                if (insertions[idx][i] > 0) {
-//                                    String line = "\tINSERT " + parent.getLabel() + "->"
-//                                            + bp.getLabel() + "@" + i + ":" + insertions[idx][i];
-//
-//                                    System.out.println(line);
-//                                    pw.println(line);
-//                                }
-//                            }
-//                        }
-//                    }
-//
-//                    pw.flush();
-//
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
+            if (GRASP.VERBOSE) {
+                //writeTravisReport(tree, bpseqs, deletions, insertions);
+
+                Map<Integer, Integer> insertMap = new HashMap<>();
+                Map<Integer, Integer> deleteMap = new HashMap<>();
+                for (int[] deletion : deletions) {
+                    if (deletion == null) {
+                        continue;
+                    }
+                    for (int i : deletion) {
+                        if (i == 0) {
+                            continue;
+                        }
+                        if (deleteMap.containsKey(i)) {
+                            deleteMap.put(i, deleteMap.get(i) + 1);
+                        } else {
+                            deleteMap.put(i, 1);
+                        }
+                    }
+                }
+
+                for (int[] insertion : insertions) {
+
+                    if (insertion == null) {
+                        continue;
+                    }
+                    for (int i : insertion) {
+                        if (i == 0) {
+                            continue;
+                        }
+                        if (insertMap.containsKey(i)) {
+                            insertMap.put(i, insertMap.get(i) + 1);
+                        } else {
+                            insertMap.put(i, 1);
+                        }
+                    }
+                }
+
+
+                try (PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter( new File(GRASP.OUTPUT,
+                        GRASP.PREFIX + "_indel_metrics.csv"))))) {
+
+                    StringBuilder cols = new StringBuilder();
+                    StringBuilder data = new StringBuilder();
+                    int numDeletions = 0;
+                    for (Map.Entry<Integer, Integer> entry : deleteMap.entrySet()) {
+                        int len = entry.getKey();
+                        int num = entry.getValue();
+                        numDeletions += num;
+                        cols.append("deletion_len_").append(len).append(",");
+                        data.append(num).append(",");
+                    }
+
+                    int numInsertions = 0;
+                    for (Map.Entry<Integer, Integer> entry : insertMap.entrySet()) {
+                        int len = entry.getKey();
+                        int num = entry.getValue();
+                        numInsertions += num;
+                        cols.append("insertion_len_").append(len).append(",");
+                        data.append(num).append(",");
+                    }
+
+                    cols.append("num_insertions,").append("num_deletions,").append("num_indels");
+                    data.append(numInsertions).append(",").append(numDeletions).append(",").append(numInsertions + numDeletions);
+
+                    out.println(cols);
+                    out.println(data);
+                    out.flush();
+
+                } catch (IOException e) {
+                    e.getMessage();
+                }
+
+            }
+        }
+
+        private static void writeTravisReport(IdxTree tree, EnumSeq[] bpseqs, int[][] deletions,
+                                  int[][] insertions) {
+
+
+            String outputFile = (OUTPUT != null ? OUTPUT : "")  +"_travis_report.txt";
+
+            try (PrintWriter pw = new PrintWriter(new FileWriter(outputFile))) {
+
+                System.out.println(tree);
+                pw.println(tree);
+
+                for (int idx : tree) {
+                    BranchPoint bp = tree.getBranchPoint(idx);
+                    BranchPoint parent = bp.getParent();
+
+                    System.out.println(bp.getLabel() + "\t" + bpseqs[idx]);
+                    pw.println(bp.getLabel() + "\t" + bpseqs[idx]);
+
+                    if (idx != 0 && parent != null) {
+                        for (int i = 0; i < deletions[idx].length; i++) {
+                            if (deletions[idx][i] > 0) {
+                                String line = "\tDELETE " + parent.getLabel() + "->"
+                                        + bp.getLabel() + "@" + i + ":" + deletions[idx][i];
+
+                                System.out.println(line);
+                                pw.println(line);
+                            }
+                        }
+                        for (int i = 0; i < insertions[idx].length; i++) {
+                            if (insertions[idx][i] > 0) {
+                                String line = "\tINSERT " + parent.getLabel() + "->"
+                                        + bp.getLabel() + "@" + i + ":" + insertions[idx][i];
+
+                                System.out.println(line);
+                                pw.println(line);
+                            }
+                        }
+                    }
+                }
+
+                pw.flush();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
         }
 
         public TreeInstance getTreeWithSequences() {

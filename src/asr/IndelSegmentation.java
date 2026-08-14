@@ -14,8 +14,7 @@ public class IndelSegmentation {
 //    private static final double EXPECTED_INDEL_SEGMENT_LENGTH = 20.0;
 //    public static final double RHO = 1 / EXPECTED_INDEL_SEGMENT_LENGTH;
     private static final double DEFAULT_ZIPF_EXPONENT = 1.7;
-    private static final int DEFAULT_ZIPF_MAX_SAMPLE_RANGE = 150;
-    public static final double[] RATE_PRIORS = {Math.log(0.25), Math.log(0.25), Math.log(0.25),Math.log(0.25)};
+    private static final int DEFAULT_ZIPF_MAX_SAMPLE_RANGE = 5;
 
 
     public enum RATE_CATEGORY {
@@ -23,12 +22,6 @@ public class IndelSegmentation {
         MEDIUM,
         HIGH
     }
-
-    public static final Map<RATE_CATEGORY, double[]> MEAN_RATES =
-            Map.of(
-                    RATE_CATEGORY.LOW, new double[]{0.05232095611612595, 0.31014164181859905, 0.8793570120688997, 2.7581803899963764}, // UniRef30 alns
-                    RATE_CATEGORY.HIGH, new double[]{0.3064528315185123, 0.6665611413880662, 1.0725857374021792, 1.9544002896912422} // PFAM alns
-            );
 
     /**
      *
@@ -76,10 +69,9 @@ public class IndelSegmentation {
         int[][] back_path = new int[num_cols + 1][2];
         int K = rate_priors.length;
 
-        int max_seg_len = DEFAULT_ZIPF_MAX_SAMPLE_RANGE;
         for (int j = 1; j < num_cols + 1; j++) {
             // only look back as far as the maximum segment length
-            int i_min = Math.max(1, j - max_seg_len + 1);
+            int i_min = Math.max(1, j - DEFAULT_ZIPF_MAX_SAMPLE_RANGE + 1);
             double best_score = Double.NEGATIVE_INFINITY;
             int[] best_entry = new int[2];
             for (int i = i_min; i < (j + 1); i++) {

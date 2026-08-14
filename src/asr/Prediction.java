@@ -1703,18 +1703,15 @@ public class Prediction {
     }
 
 
-    public static void indelPred(POGTree pogTree, SubstModel model, double geometricSeqLenParam) {
-
-
-        IndelPeeler[] inf = new IndelPeeler[pogTree.getPositions()];
-
-        for (int pos = 0; pos < inf.length; pos++) {
-            inf[pos] = new IndelPeeler(pogTree, model, pos, geometricSeqLenParam);
-        }
-
-
-
-    }
+//    public static void indelPred(POGTree pogTree, SubstModel model, double geometricSeqLenParam) {
+//
+//
+//        IndelPeeler[] inf = new IndelPeeler[pogTree.getPositions()];
+//
+//        for (int pos = 0; pos < inf.length; pos++) {
+//            inf[pos] = new IndelPeeler(pogTree, model, pos, geometricSeqLenParam);
+//        }
+//    }
 
     public static Prediction PredictByMIP(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln,
                                           String solver, String substModelName, int nThreads, boolean useDistances) {

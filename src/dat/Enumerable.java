@@ -36,6 +36,7 @@ public class Enumerable implements Domain {
     final int order;
     final Object[] values;
     final Class datatype;
+    private final Map<Object, Integer> indexMap;
 
     public Enumerable(int order) {
         if (order < 2) {
@@ -47,6 +48,7 @@ public class Enumerable implements Domain {
             this.values[i] = i;
         }
         this.datatype = Integer.class;
+        this.indexMap = buildIndexMap(this.values);
     }
 
     /**
@@ -69,6 +71,7 @@ public class Enumerable implements Domain {
                 throw new RuntimeException("Invalid mix of values " + c.toString() + " and " + v.getClass().toString());
         }
         this.datatype = c;
+        this.indexMap = buildIndexMap(this.values);
     }
 
     /**
@@ -100,34 +103,56 @@ public class Enumerable implements Domain {
         return hash;
     }
 
-    /**
-     * Retrieve the index of the value in the domain.
-     * TODO: Improve speed for domains with many values.
-     * @param value
-     * @return 
-     */
+//    /**
+//     * Retrieve the index of the value in the domain.
+//     * TODO: Improve speed for domains with many values.
+//     * @param value
+//     * @return
+//     */
+//    public int getIndex(Object value) {
+//        if (value instanceof java.lang.String) {
+//            for (int i = 0; i < values.length; i++) {
+//                if (((String) value).equals(values[i])) {
+//                    return i;
+//                }
+//            }
+//            StringBuilder sb = new StringBuilder();
+//            for (int i = 0; i < values.length; i++)
+//                sb.append(values[i].toString() + ((i < values.length - 1)?", ":""));
+//            throw new RuntimeException("Value \"" + value.toString() + "\" unknown to enumerable domain " + this.toString() + " with values: " + sb.toString());
+//        } else {
+//            for (int i = 0; i < values.length; i++) {
+//                if (value.equals(values[i])) {
+//                    return i;
+//                }
+//            }
+//            StringBuilder sb = new StringBuilder();
+//            for (int i = 0; i < values.length; i++)
+//                sb.append(values[i].toString() + ((i < values.length - 1)?", ":""));
+//            throw new RuntimeException("Value \"" + value.toString() + "\" unknown to enumerable domain " + this.toString() + " with values: " + sb.toString());
+//        }
+//    }
+
     public int getIndex(Object value) {
-        if (value instanceof java.lang.String) {
-            for (int i = 0; i < values.length; i++) {
-                if (((String) value).equals(values[i])) {
-                    return i;
-                }
-            }
+        Integer index = indexMap.get(value);
+        if (index == null) {
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < values.length; i++)
-                sb.append(values[i].toString() + ((i < values.length - 1)?", ":""));
-            throw new RuntimeException("Value \"" + value.toString() + "\" unknown to enumerable domain " + this.toString() + " with values: " + sb.toString());
-        } else {
-            for (int i = 0; i < values.length; i++) {
-                if (value.equals(values[i])) {
-                    return i;
-                }
-            }
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < values.length; i++)
-                sb.append(values[i].toString() + ((i < values.length - 1)?", ":""));
-            throw new RuntimeException("Value \"" + value.toString() + "\" unknown to enumerable domain " + this.toString() + " with values: " + sb.toString());
+                sb.append(values[i].toString()).append(i < values.length - 1 ? ", " : "");
+            throw new RuntimeException("Value \"" + value + "\" unknown to enumerable domain "
+                    + this + " with values: " + sb);
         }
+        return index;
+    }
+
+    private static Map<Object, Integer> buildIndexMap(Object[] values) {
+        Map<Object, Integer> map = new HashMap<>(values.length * 2);
+        for (int i = 0; i < values.length; i++) {
+            if (map.put(values[i], i) != null) {
+                throw new RuntimeException("Duplicate value \"" + values[i] + "\" in enumerable domain");
+            }
+        }
+        return map;
     }
 
     /**

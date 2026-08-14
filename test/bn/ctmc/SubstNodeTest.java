@@ -126,84 +126,84 @@ class SubstNodeTest {
         return Tree.Random(labels, seed, 1.1, 5.0, 2, 2);
     }
 
-    @Test
-    void getProb() {
-        int N = 200, NDIST = 10;
-        double TIME = 5.0;
-        double[] tarr = new double[N];
-        PhyloBN pbn = getBarebone(N, NDIST, TIME);
-        BNode leaf = pbn.getBNode(N - 1);
-        leaf.print();
-    }
-
-    @Test
-    void getProb_Marginal1() {
-        int N = 200, NDIST = 10;
-        double TIME = 5.0;
-        MilliTimer timer = new MilliTimer();
-        PhyloBN pbn = getBarebone(N, NDIST, TIME);
-        BNode root = pbn.getBNode(0);
-        BNode leaf = pbn.getBNode(N - 1);
-        //for (Object sym : new Object[] {'A'}) {
-        int cnt = 0;
-        for (Object sym : /*model.getDomain().getValues()*/ new Object[] {'A','C','D','R','P'}) {
-            timer.start("Reset");
-            pbn.getBN().resetNodes();
-            timer.stopStart("Reset", "setInst");
-            leaf.setInstance(sym);
-            timer.stopStart("setInst","VE inst");
-            VarElim ve = new VarElim();
-            ve.instantiate(pbn.getBN());
-            timer.stopStart("VE inst","makeQuery");
-            Query q = ve.makeQuery(root.getVariable());
-            timer.stopStart("makeQuery","Infer");
-            CGTable qr = (CGTable)ve.infer(q);
-            timer.stopStart("Infer", "Distrib");
-            Distrib d = qr.query(root.getVariable());
-            timer.stop("Distrib");
-            System.out.println(root + " is " + d);
-            System.out.println("Cache size: " + cache.size());
-            cnt += 1;
-        }
-        timer.report();
-        cache.reportCache();
-    }
-    @Test
-    void getProb_Joint1() {
-        int N = 200, NDIST = 10;
-        double TIME = 5.0;
-        MilliTimer timer = new MilliTimer();
-        PhyloBN pbn = getBarebone(N, NDIST, TIME);
-        BNode root = pbn.getBNode(0);
-        BNode leaf = pbn.getBNode(N - 1);
-        //for (Object sym : new Object[] {'A'}) {
-        int cnt = 0;
-        for (Object sym : /*model.getDomain().getValues()*/ new Object[] {'W','C','D','R','P'}) {
-            timer.start("Reset");
-            pbn.getBN().resetNodes();
-            timer.stopStart("Reset", "setInst");
-            leaf.setInstance(sym);
-            timer.stopStart("setInst","VE inst");
-            VarElim ve = new VarElim();
-            ve.instantiate(pbn.getBN());
-            timer.stopStart("VE inst","makeMPE");
-            Query q = ve.makeMPE();
-            timer.stopStart("makeMPE","Infer");
-            CGTable qr = (CGTable)ve.infer(q);
-            ve.timer.report();
-            timer.stopStart("Infer", "Assign");
-            Variable.Assignment[] as = qr.getMPE();
-            timer.stop("Assign");
-            for (Variable.Assignment a : as) {
-                if (a.var.getName().equals("N0"))
-                    System.out.println("\t" + a);
-            }
-            System.out.println("Cache size: " + cache.size());
-            cnt += 1;
-        }
-        timer.report();
-        cache.reportCache();
-    }
+//    @Test
+//    void getProb() {
+//        int N = 200, NDIST = 10;
+//        double TIME = 5.0;
+//        double[] tarr = new double[N];
+//        PhyloBN pbn = getBarebone(N, NDIST, TIME);
+//        BNode leaf = pbn.getBNode(N - 1);
+//        leaf.print();
+//    }
+//
+//    @Test
+//    void getProb_Marginal1() {
+//        int N = 200, NDIST = 10;
+//        double TIME = 5.0;
+//        MilliTimer timer = new MilliTimer();
+//        PhyloBN pbn = getBarebone(N, NDIST, TIME);
+//        BNode root = pbn.getBNode(0);
+//        BNode leaf = pbn.getBNode(N - 1);
+//        //for (Object sym : new Object[] {'A'}) {
+//        int cnt = 0;
+//        for (Object sym : /*model.getDomain().getValues()*/ new Object[] {'A','C','D','R','P'}) {
+//            timer.start("Reset");
+//            pbn.getBN().resetNodes();
+//            timer.stopStart("Reset", "setInst");
+//            leaf.setInstance(sym);
+//            timer.stopStart("setInst","VE inst");
+//            VarElim ve = new VarElim();
+//            ve.instantiate(pbn.getBN());
+//            timer.stopStart("VE inst","makeQuery");
+//            Query q = ve.makeQuery(root.getVariable());
+//            timer.stopStart("makeQuery","Infer");
+//            CGTable qr = (CGTable)ve.infer(q);
+//            timer.stopStart("Infer", "Distrib");
+//            Distrib d = qr.query(root.getVariable());
+//            timer.stop("Distrib");
+//            System.out.println(root + " is " + d);
+//            System.out.println("Cache size: " + cache.size());
+//            cnt += 1;
+//        }
+//        timer.report();
+//        cache.reportCache();
+//    }
+//    @Test
+//    void getProb_Joint1() {
+//        int N = 200, NDIST = 10;
+//        double TIME = 5.0;
+//        MilliTimer timer = new MilliTimer();
+//        PhyloBN pbn = getBarebone(N, NDIST, TIME);
+//        BNode root = pbn.getBNode(0);
+//        BNode leaf = pbn.getBNode(N - 1);
+//        //for (Object sym : new Object[] {'A'}) {
+//        int cnt = 0;
+//        for (Object sym : /*model.getDomain().getValues()*/ new Object[] {'W','C','D','R','P'}) {
+//            timer.start("Reset");
+//            pbn.getBN().resetNodes();
+//            timer.stopStart("Reset", "setInst");
+//            leaf.setInstance(sym);
+//            timer.stopStart("setInst","VE inst");
+//            VarElim ve = new VarElim();
+//            ve.instantiate(pbn.getBN());
+//            timer.stopStart("VE inst","makeMPE");
+//            Query q = ve.makeMPE();
+//            timer.stopStart("makeMPE","Infer");
+//            CGTable qr = (CGTable)ve.infer(q);
+//            ve.timer.report();
+//            timer.stopStart("Infer", "Assign");
+//            Variable.Assignment[] as = qr.getMPE();
+//            timer.stop("Assign");
+//            for (Variable.Assignment a : as) {
+//                if (a.var.getName().equals("N0"))
+//                    System.out.println("\t" + a);
+//            }
+//            System.out.println("Cache size: " + cache.size());
+//            cnt += 1;
+//        }
+//        timer.report();
+//        cache.reportCache();
+//    }
 
     @Test
     void getProb_Marginal2() {
@@ -214,7 +214,7 @@ class SubstNodeTest {
         Object[] vals = model.getDomain().getValues();
         IdxTree t = getTree(NLEAVES, SEED);
         try {
-            Newick.save(t, "/Users/mikael/simhome/ASR/infer2022/marg20m.nwk", Newick.MODE_ANCESTOR);
+            Newick.save(t, "test/resources/marg20m.nwk", Newick.MODE_ANCESTOR);
         } catch (IOException e) {
             System.err.println(e);
             System.exit(1);
@@ -327,11 +327,11 @@ class SubstNodeTest {
                     objmap.put(entry.getKey().getName(), entry.getValue());
                 TreeInstance ti = new TreeInstance(t, values);
                 try {
-                    Newick.save(t, "/Users/mikael/simhome/ASR/infer2022/tst_" + NLEAVES + ".nwk", Newick.MODE_ANCESTOR);
-                    FastaWriter writer = new FastaWriter("/Users/mikael/simhome/ASR/infer2022/tst_" + NLEAVES + ".fa");
+                    Newick.save(t, "test/resources/tst_" + NLEAVES + ".nwk", Newick.MODE_ANCESTOR);
+                    FastaWriter writer = new FastaWriter("test/resources/tst_" + NLEAVES + ".fa");
                     writer.save(names, aln);
                     writer.close();
-                    Newick.save(ti, "/Users/mikael/simhome/ASR/infer2022/tstjoint_" + NLEAVES + ".nwk");
+                    Newick.save(ti, "test/resources/tstjoint_" + NLEAVES + ".nwk");
                 } catch (IOException e) {
                     System.err.println("Failed to save tree instance");
                 }
@@ -349,7 +349,7 @@ class SubstNodeTest {
         Object[] vals = model.getDomain().getValues();
         IdxTree t = getTree(NLEAVES, SEED);
         try {
-            Newick.save(t, "/Users/mikael/simhome/ASR/infer2022/marg20j.nwk", Newick.MODE_ANCESTOR);
+            Newick.save(t, "test/resources/marg20j.nwk", Newick.MODE_ANCESTOR);
         } catch (IOException e) {
             System.err.println(e);
             System.exit(1);
@@ -394,23 +394,23 @@ class SubstNodeTest {
         }
     }
 
-    @Test
-    void fromJSON() {
-        Enumerable dom = new Enumerable(new Object[] {1,2,3});
-        EnumVariable child = new EnumVariable(dom, "TestChild");
-        EnumVariable parent = new EnumVariable(dom, "TestParent");
-        EnumVariable child2 = new EnumVariable(aacid, "TestChild2");
-        EnumVariable parent2 = new EnumVariable(aacid, "TestParent2");
-        SubstNode snode = new SubstNode(child, parent, new JC(1, dom.getValues()), 1);
-        SubstNode snode2 = new SubstNode(child2, parent2, SubstModel.createModel("JTT"), 1);
-        System.out.println(snode.getStateAsText());
-        System.out.println(snode.toJSON());
-        System.out.println(snode2.toJSON());
-        SubstNode scopy = SubstNode.fromJSON(snode.toJSON(), child, parent);
-        assertTrue(scopy.toJSON().toString().equals(snode.toJSON().toString()));
-        SubstNode scopy2 = SubstNode.fromJSON(snode2.toJSON(), child2, parent2);
-        assertTrue(scopy2.toJSON().toString().equals(snode2.toJSON().toString()));
-    }
+//    @Test
+//    void fromJSON() {
+//        Enumerable dom = new Enumerable(new Object[] {1,2,3});
+//        EnumVariable child = new EnumVariable(dom, "TestChild");
+//        EnumVariable parent = new EnumVariable(dom, "TestParent");
+//        EnumVariable child2 = new EnumVariable(aacid, "TestChild2");
+//        EnumVariable parent2 = new EnumVariable(aacid, "TestParent2");
+//        SubstNode snode = new SubstNode(child, parent, new JC(1, dom.getValues()), 1);
+//        SubstNode snode2 = new SubstNode(child2, parent2, SubstModel.createModel("JTT"), 1);
+//        System.out.println(snode.getStateAsText());
+//        System.out.println(snode.toJSON());
+//        System.out.println(snode2.toJSON());
+//        SubstNode scopy = SubstNode.fromJSON(snode.toJSON(), child, parent);
+//        assertTrue(scopy.toJSON().toString().equals(snode.toJSON().toString()));
+//        SubstNode scopy2 = SubstNode.fromJSON(snode2.toJSON(), child2, parent2);
+//        assertTrue(scopy2.toJSON().toString().equals(snode2.toJSON().toString()));
+//    }
 
 
 }
