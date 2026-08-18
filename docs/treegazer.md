@@ -1,21 +1,132 @@
+<div align="center">
+
 # TreeGazer
 
-### Table of Contents
+**Annotate ancestor and extant nodes on a phylogenetic tree by learning from a subset of nodes with known properties.**
 
-- [Model background](#model-background)
-- [Command line reference](#command-line-reference)
+`version 1.0.0`
+
+</div>
+
+---
+
+## Table of Contents
+
+- [Quick Setup — Download & Run](#quick-setup--download--run)
+- [Building from Source — Maven](#building-from-source--maven)
+- [Model Background](#model-background)
+- [Command-Line Reference](#command-line-reference)
 - [Examples](#examples)
-- [Latent mode - learning](#latent-mode---learning)
-- [Latent mode - Marginal inference](#latent-mode---marginal-inference)
-- [Latent mode - joint inference](#latent-mode---joint-inference)
-- [Direct mode - joint inference](#direct-mode---joint-inference)
-- [Direct mode - marginal inference](#direct-mode---marginal-inference)
+    - [Latent mode — learning](#latent-mode--learning)
+    - [Latent mode — marginal inference](#latent-mode--marginal-inference)
+    - [Latent mode — joint inference](#latent-mode--joint-inference)
+    - [Direct mode — joint inference](#direct-mode--joint-inference)
+    - [Direct mode — marginal inference](#direct-mode--marginal-inference)
 
-### Command line reference
+---
 
-`Usage: asr.TreeGazer`
+## Quick Setup — Download & Run
 
-     [-nwk <tree-file> -in {<label>@}<input-file> -out <output-file>]
+1. **Install Java 11+.** Any OS works — macOS, Windows, Linux.
+2. **Download the jar** from the [bnkit releases page](https://github.com/bodenlab/bnkit/releases).
+3. **Sanity-check it:**
+
+   ```console
+   java -jar TreeGazer.jar -h
+   ```
+
+   You should see the full help text print to the console.
+
+---
+
+## Building from Source — Maven
+
+1. Clone [bnkit](https://github.com/bodenlab/bnkit) in full. (JUnit 5 is only needed if you're a developer running the test suite.)
+2. Confirm Maven is installed:
+
+   ```console
+   mvn -h
+   ```
+
+   If that fails, install it from [maven.apache.org](https://maven.apache.org/download.cgi), or via a package manager (`apt` on Ubuntu/Debian, `brew` on macOS).
+
+3. From the repo root, build the jar:
+
+   ```console
+   mvn package -f poms/pomTreeGazer.xml -DskipTests
+   ```
+
+   `-DskipTests` skips the test suite — fine unless you're developing. The jar lands in `target/TreeGazer-<version>.jar`.
+
+---
+
+## Model Background
+
+TreeGazer annotates ancestor (internal) and extant (leaf) nodes in a phylogenetic tree, using a subset of nodes whose properties are already known. Properties can be **discrete** or **continuous**.
+
+| | |
+|---|---|
+| **Continuous variables** | Modelled with latent discrete variables that mix Gaussian distributions over the observable values. Mixture parameters are learned via expectation maximisation (EM) and shared across all nodes in the tree; node states are governed by an evolutionary model. |
+| **Discrete variables** | Latent variables are optional — TreeGazer can map observed values directly onto the tree with **direct mode**, no internal latent states required. |
+
+![TreeGazer model structure](images/TreeGazer_description.png)
+*Figure 1 — Discrete latent nodes (circles) mimic the phylogenetic tree's structure, while continuous, real nodes (squares) hold known values for a property (e.g. a kinetic parameter). Any number of latent states can be specified; each maps to a Gaussian distribution learned from the data.*
+
+### Modes at a glance
+
+| Mode | Outcome | Input data type |
+|---|---|---|
+| Direct | Joint reconstruction | Discrete only |
+| Direct | Marginal reconstruction | Discrete only |
+| Latent | Learning | Discrete and real |
+| Latent | Marginal reconstruction *(learning required first)* | Discrete and real |
+| Latent | Joint reconstruction *(learning required first)* | Discrete and real |
+
+> **Evolutionary model:** Currently limited to a uniform model — an adaptation of Jukes-Cantor for an arbitrary number of states. Real-valued data is learned as a conditional Gaussian mixture; discrete data is learned as a conditional multinomial. Inference is joint by default, or marginal (optionally at a specific branch-point — otherwise all uninstantiated nodes are inferred).
+
+---
+
+## Command-Line Reference
+
+### Required
+
+| Flag | Description |
+|---|---|
+| `-nwk <tree-file>` | Phylogenetic tree, Newick format |
+| `-in {<label>@}<input-file>` | TSV file: node/sequence names in column 1, values in other columns. Blank / `None` / `null` means "not assigned". Prefix with `<label>@` to pick which column to model — otherwise the second column is used |
+| `-out <output-file>` | Prefix for the output file; extension/type set by `-format` |
+
+### Optional flags
+
+| Flag | Description |
+|---|---|
+| `-params <JSON-file>` | Path to save (learning) or load (inference) the learned model parameters |
+| `-latent <#states>` | Number of latent states to use. Max 25 — states are labelled A–Z |
+| `-internal` | Also model internal nodes (default is leaves-only) |
+| `-learn` | Run EM learning instead of inference, using the input data as training data |
+| `-untied` | Learn variance separately per latent state, rather than tied/shared (only for EM-learned GDTs; tied is default) |
+| `-seed <seed>` | Random seed |
+| `-joint` *(default)* / `-marg {<branchpoint-id>}` | Joint inference, or marginal (optionally at one branch-point) |
+| `-format <TSV\|TREE\|STDOUT\|ITOL>` | Output format — `TSV` by default |
+| `-lambda <value>` | Multiplier on the upper confidence bound of predicted values — latent + real-valued mode only. Default `5.0` |
+| `-cmin <value>` / `-cmax <value>` | Min/max for the iTOL colour scale — latent + real-valued mode only. Defaults to the min/max of the input values |
+| `-help` / `-h` | Print help |
+| `-verbose` / `-v` | Print progress messages while running |
+
+### Output formats
+
+| Format | Contains |
+|---|---|
+| `TSV` *(default)* | Both inferred and known node values |
+| `TREE` | Labelled tree, Newick format |
+| `STDOUT` | Printed to console |
+| `ITOL` | Dataset to decorate a tree at [iTOL.embl.de](https://itol.embl.de) |
+
+### Full usage synopsis
+
+```text
+Usage: asr.TreeGazer 
+        [-nwk <tree-file> -in {<label>@}<input-file> -out <output-file>]
         {-params <JSON-file>}
         {-latent <#states>}
         {-internal}
@@ -29,85 +140,17 @@
         {-cmax <value (default max of -in values)>}
         {-help|-h}
         {-verbose|-v}
+```
 
-        where:
-            tree-file is a phylogenetic tree on Newick format
+---
 
-            input-file is a TSV file with sequence or ancestor names in the first column, with corresponding values in the other columns (empty or None or null implies not assigned)
-            
-            label flags that a header is used in the input-file and identifies the column with values to be modelled; if no label is given, values from the second column will be modelled
-            
-            output-file is the prefix of the file, the type of file is changed by -format:
-                - TSV by default containing both inferred and known nodes. 
-                - TREE is a labelled tree on Newick format
-                - ITOL is a dataset to decorate trees in iTOL.embl.de
-            
-            lambda is the multiplier for the upper confidence bound of predicted values (used only when latent mode with real values is applied)
-        
-            latent indicates the number of latent states to use.
-              - The number of latent states to learn should not exceed 25 as latent states are labelled A-Z.
-            
-            internal indicates that internal nodes are also extended with user-specified or learned distributions (default leaves-only).
+## Examples
 
-            learn excludes inference and instead prompts EM learning of parameters, using input data as training data.
-            
-            untied implies that the variance learned is NOT the same across the latent states (only applicable when EM-learning GDTs; default is tied variance).
+### Latent mode — learning
 
-            cmax and cmin specify the maximum and minimum values for the colour scale of iTOL output (only applicable when latent mode with real values is applied; default is to use the max and min of the input values).
+Before running any latent inference, the shared distribution must be learned first.
 
-            help prints out commandline arguments (this screen).
-
-            verbose completes the requested steps while printing out messages about the process.
-
-Evolutionary models of substitution are currently limited to uniform, which is an adaptation of Jukes-Cantor for arbitrary number of states.
-
-If specified values are real, a conditional Gaussian mixture distribution conditioned on latent state is learned.
-
-If specified values are discrete, a multinomial distribution conditioned on latent state is learned.
-
-Inference is either joint (default) or marginal (marginal allows a branch-point to be nominated;
-if one is not given all uninstantiated nodes are inferred)
-
-### Model background
-
-TreeGazer is a tool to annotate ancestors (internal) and extant (leaf) nodes in a phylogenetic tree by
-reference to a subset of nodes with known properties. These properties are represented by either
-discrete or continuous variables.
-
-In the case of continuous variables, TreeGazer uses latent discrete variables
-to mix Gaussian distributions of the observable continuous variables (Figure 1). The parameters for these
-mixtures are learnt via expectation maximisation (EM) and are shared between all nodes in the tree; the 
-states at the nodes are governed by an evolutionary model. The use of latent variables is optional
-for discrete observables. TreeGazer can also perform direct inference whereby observed variables are mapped directly onto the
-tree structure without any internal latent variables.
-
-![TreeGazer_description.png](images%2FTreeGazer_description.png) Figure 1: A visualisation of the 
-TreeGazer model structure when performing latent inference. Discrete latent nodes (circles) mimic the 
-structure of the phylogenetic tree, while continuous, real nodes (squares) are fixed with known values 
-for a given property (for example, a kinetic parameter). Users can specify any number of latent states,
-with each latent state mapping to a Gaussian distribution for which parameters are learned from the data.
-
-The table below summarises the main analyses TreeGazer can perform and the possible data types that can 
-be used. the following sections will detail how to perform each type of analysis.  
-
-| Mode        | Outcome                                           | Input Data Type   |
-|-------------|---------------------------------------------------|-------------------|
-| Direct      | Joint reconstruction                              | Discrete only     |
-| Direct      | Marginal reconstruction                           | Discrete only     |
-| Latent      | Learning                                          | Discrete and real |
-| Latent      | Marginal reconstruction (learning required first) | Discrete and real |
-| Latent      | Joint reconstruction (learning required first)    | Discrete and real |
-
-
-### Examples
-
-#### Latent mode - learning
-
-Before performing any type of latent inference, the distribution shared by all nodes must be first be learnt. Below is
-an example of how the input TSV file should be formatted. Extant nodes are labelled by their accession IDs and 
-internal, ancestor nodes are labelled as per GRASP (N0, N1, etc in a depth first manner). The node names must 
-be in the first column. Note also that when no value is available you just leave that cell blank or use a value 
-like `null`, `None`:
+**Input TSV** — extant nodes labelled by accession ID; internal/ancestor nodes labelled as in GRASP (`N0`, `N1`, … depth-first). Node names go in column 1. Leave a cell blank or use `null` / `None` where no value is available:
 
 ```
 Entry	mean_retained_activity	std_retained_activity	Isobutanol_%
@@ -128,27 +171,26 @@ D3PT81	0.319143403	0.043889298	8
 A0A1V4QSD8	1.3732522796666666	0.039652550084277975	8
 ```
 
-Below is an example command to perform learning: 
+**Run learning:**
 
-`java -jar treegazer.jar -nwk kari.nwk -params kari_demo.params -latent 3 
--in demo.tsv -seed 42 -internal -learn -verbose`
+```console
+java -jar treegazer.jar -nwk kari.nwk -params kari_demo.params -latent 3 \
+  -in demo.tsv -seed 42 -internal -learn -verbose
+```
 
-The model uses three latent states (`-latent 3`) for which it invents three discrete values:
-`mean_retained_activity_1`, `mean_retained_activity_2` and `mean_retained_activity_3`. Here we use a tree `kari.nwk`
-which should contain the same labels as the TSV file. Because we are interested in learning the shared 
-distribution for both internal and external notes, we use the `-internal` flag. If `-internal`isn't specified
-but there are internal node annotations in the TSV file, these will be ignored.
+- `-latent 3` invents three discrete states: `mean_retained_activity_1`, `_2`, `_3`
+- `kari.nwk` must use the same labels as the TSV
+- `-internal` is required to learn from (and later annotate) internal nodes — without it, any internal-node annotations in the TSV are ignored
 
-By default, TreeGazer will assume that the second column of the TSV input contains the values to learn. However, you
-can specify a specific column using the column name before the input file like so: 
+**Modelling a specific column:** by default the second TSV column is used; name a different one with `<column>@<file>`:
 
-`java -jar treegazer.jar -nwk kari.nwk -params kari_demo.params -latent 3 
--in mean_retained_activity@demo.tsv -seed 42 -internal -learn -verbose`
+```console
+java -jar treegazer.jar -nwk kari.nwk -params kari_demo.params -latent 3 \
+  -in mean_retained_activity@demo.tsv -seed 42 -internal -learn -verbose
+```
 
-If in `-verbose` mode, TreeGazer will also print the parameters of the evolutionary model that describe the latent
-variables. "R" specifes the instantaneous rate matrix for the 3 state model and "F" specifies the stationary 
-frequencies of each latent state. TreeGazer assumes a uniform model, where all latent states are equally likely and 
-the probabilities of transitioning between these states are also equally likely. 
+**Verbose output** prints the evolutionary model parameters for the latent variables: `R` is the instantaneous rate matrix for the 3-state model, `F` the stationary frequency of each latent state. TreeGazer assumes a uniform model — all latent states equally likely, all transitions between them equally likely:
+
 ```
 "R" : [-0.66,  0.33,  0.33]
       [ 0.33, -0.66,  0.33]
@@ -157,24 +199,28 @@ the probabilities of transitioning between these states are also equally likely.
 "F" : [ 0.33,  0.33,  0.33]
 ```
 
-After the EM algorithm converges the parameters are saved into the file indicated by `-params`. 
-```
+Once EM converges, parameters are written to the `-params` file:
+
+```json
 {"Condition":[["mean_retained_activity_1"],["mean_retained_activity_2"],["mean_retained_activity_3"]],
 "Pr":[[12.469763536666667,0.11150665525484037],[2.049876146158595,0.11150665525484037],[0.4366513910438917,0.11150665525484037]],
 "Variable":{"Domain":{"Predef":"Real"},"Name":"0_Real"},"Nodetype":"GDT","TieVariance":2,"Index":[0,1,2]}
 ```
-The contents of "Pr" are the mean and variance respectively of each of the latent states. Note that the variance values 
-are the same across all latent states, pooled from all the data. Tied variance used by default and is recommended in
-most cases, especially if the data is sparse. This can be disabled by using the `-untied` flag. 
 
-#### Latent mode - Marginal inference
+`Pr` holds the mean and variance of each latent state. Variance is pooled and shared (**tied**) across states by default — recommended especially for sparse data — and can be disabled with `-untied`.
 
-Now that we have `kari_demo.params` we can perform actual inference. 
+---
 
-`java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -latent 3 
--in demo.tsv -seed 42 -internal -verbose -marg -out kari_demo_marg`
+### Latent mode — marginal inference
 
-By default, TreeGazer will output the results in a TSV file with both known and inferred values.
+With `kari_demo.params` learned, run inference:
+
+```console
+java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -latent 3 \
+  -in demo.tsv -seed 42 -internal -verbose -marg -out kari_demo_marg
+```
+
+Default output is a TSV with both known and inferred values:
 
 ```
 Entry	mean_retained_activity (Mean)	mean_retained_activity (SD)	mean_retained_activity (UCB)
@@ -189,31 +235,25 @@ N6	3.605903787080107	4.956870443119277	28.39025600267649
 N7	3.868271518731236	5.0899309538387705	29.31792628792509
 ```
 
-For nodes that had known values, the mean, standard deviation and upper confidence bound (UCB) are not 
-calculated and so will be left blank. For uninstantiated nodes, the mean, standard 
-deviation and UCB are calculated by sampling from the Gaussian mixture distribution at that node. The UCB is 
-calculated as the mean plus the lambda multiplier of the standard deviation. By default, lambda is 
-set to 5.0, but this can be changed using the `-lambda` flag.
+- Nodes with a **known** value: mean/SD/UCB are left blank (not computed)
+- Nodes **without** a known value: mean, SD, and UCB (upper confidence bound) are computed by sampling the Gaussian mixture at that node. UCB = mean + `lambda` × SD (default `lambda = 5.0`, override with `-lambda`)
 
-To visualise the results in iTOL add `-format ITOL` and the output file will be in the correct
-format to be dropped into the iTOL website. Squares represent the training data and circles represent the 
-inferred values, with the size of circles representing the confidence of the prediction. 
-The colour scale is determined by the maximum and minimum values in the input data, but
-this can be changed by using the `-cmax` and `-cmin` flags. Manually setting the colour 
-scale can be useful when you want your visualisations to be comparable across different datasets.
+**Visualising in iTOL:** add `-format ITOL` — squares represent training data, circles represent inferred values, and circle size reflects prediction confidence. The colour scale defaults to the min/max of the input data; override with `-cmin` / `-cmax` for comparability across datasets.
 
-![kari_vis.png](images%2Fkari_vis.png) 
+![TreeGazer iTOL visualisation](images/kari_vis.png)
 
-#### Latent mode - joint inference
+---
 
-The joint labelling of latent states that explains the data can also be inferred. 
-This is done by using the `-joint` flag instead of `-marg`.
+### Latent mode — joint inference
 
-`java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -latent 3 
--in demo.tsv -seed 42 -internal -verbose -joint -out kari_demo_joint`
+Infer the single joint labelling of latent states that best explains the data, using `-joint` instead of `-marg`:
 
-The file `kari_demo_joint.tsv` will then contain the most likely latent state for each
-node in the tree, which is the same as the most likely Gaussian distribution for that node. 
+```console
+java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -latent 3 \
+  -in demo.tsv -seed 42 -internal -verbose -joint -out kari_demo_joint
+```
+
+`kari_demo_joint.tsv` contains the most likely latent state per node — equivalently, the most likely Gaussian distribution at that node:
 
 ```
 Entry   mean_retained_activity
@@ -228,13 +268,13 @@ N7      mean_retained_activity_3
 A0A2A5QQ65      mean_retained_activity_3
 ```
 
-#### Direct mode - joint inference
+---
 
-Unlike with latent mode, when performing direct inference only a single step is required
-to infer the most likely labelling of the tree. This is because there are no latent
-states and so the observed values are directly mapped onto the tree structure. We have 
-a tab-separated value file (TSV file) with discrete annotations specifying the taxonomic 
-superkingdom of a subset of nodes in the tree. 
+### Direct mode — joint inference
+
+Direct mode has no latent states, so observed values map straight onto the tree — a single inference step, no learning phase.
+
+**Input TSV** — discrete annotations of taxonomic superkingdom for a subset of nodes:
 
 ```
 Entry	PHYLUM	SUPERKINGDOM	
@@ -249,27 +289,27 @@ A0A060DAC6	None	None
 Q47R94	Actinobacteria	Bacteria
 ```
 
-We can infer the joint labeling (`-joint`) of external and internal nodes most likely to explain the labels
-in the matching annotation file.
+**Infer the joint labelling** of external and internal nodes that best explains the known labels:
 
-`java -jar treegazer.jar -out kari_demo -nwk kari.nwk -in superkingdom@demo.tsv -seed 42 -internal -verbose  -out kari_taxa_joint -joint`
+```console
+java -jar treegazer.jar -out kari_demo -nwk kari.nwk -in superkingdom@demo.tsv -seed 42 -internal -verbose -out kari_taxa_joint -joint
+```
 
-The result is here saved as an iTOL dataset file (`-format ITOL`), which we drop in the iTOL webtool once the
-tree file has been uploaded.
+Saved as an iTOL dataset (`-format ITOL`) — drop it into iTOL once the tree file is uploaded.
 
-![SUPERKINGDOM.png](images%2FSUPERKINGDOM.png)
+![Superkingdom iTOL visualisation](images/SUPERKINGDOM.png)
 
-#### Direct mode - marginal inference
+---
 
-Marginal inference can also be performed in direct mode, but only for discrete data. 
-This is done by using the `-marg` flag instead of `-joint`. 
+### Direct mode — marginal inference
 
+Also supported, but for **discrete data only** — use `-marg` instead of `-joint`:
 
-`java -jar treegazer.jar -out kari_demo -nwk kari.nwk -in superkingdom@demo.tsv -seed 42 -internal -verbose  -out kari_taxa_marg -marg`
+```console
+java -jar treegazer.jar -out kari_demo -nwk kari.nwk -in superkingdom@demo.tsv -seed 42 -internal -verbose -out kari_taxa_marg -marg
+```
 
-The output file will then contain the probability of each node being in each state. Note that you cannot make an iTOL 
-visualisation of marginal inference results in direct mode, as the from a direct marginal inference
-is the multinomial distribution of the observed states.
+Output gives the probability of each node being in each state:
 
 ```
 Entry	Eukaryota	Bacteria
@@ -283,3 +323,8 @@ N6	0.6593567657556293	0.3406432342443707
 N7	0.631639943967058	0.368360056032942
 A0A2A5QQ65	0.5573169561287165	0.4426830438712836
 ```
+
+> ⚠️ **No iTOL output for direct-mode marginal inference** — the result is a multinomial distribution over observed states, not a single value, so it can't be rendered as a tree visualisation.
+
+---
+

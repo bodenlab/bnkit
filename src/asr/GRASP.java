@@ -124,7 +124,7 @@ public class GRASP {
                 \t\tSCIP solver (https://www.scipopt.org/). Does not support multi-threading
                 \tGurobi: globally optimal distance sensitive parsimony-based indel history.
                 \t\tRequires local installation of Gurobi to run (https://www.gurobi.com/downloads/)
-                \tAdd '*' to method name for less conservative setting (if available) or to use globally optimal distance based parsimony\s
+                \tAdd '*' to method name for less conservative setting (if available) or to use a default gap opening penalty of 2 for SCIP or Gurobi\s
                 """);
         out.println("""
                 Substitution-models:\s

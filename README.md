@@ -1,53 +1,64 @@
-# Introduction
+<div >
 
-`bnkit` is a collection of classes that aim to help implement a Bayesian network in Java (at least version 11 is required).
-Currently, it allows you to define a Bayesian network structure, use the network for inference,
-and some learning from data. It deals with missing values, both discrete and continuous variables.
-There are reasonably efficient implementations of variable elimination, and expectation-maximisation
-learning. `bnkit` does _not_ do structure learning. It is _not_ implementing dynamic Bayesian networks. 
+# bnkit - Bayesian Network Toolkit
 
-The current version has been used for a number of studies now, but should still be regarded as work-in-progress.
-It is a complete re-write of an earlier (in-house) version the Boden lab has been using for research since 2009 or so.
+</div>
 
-To generate documentation use javadoc. There are a few examples in the code and a very
-brief tutorial in the `bn` package documentation.
+---
 
-# bnkit is part of [GRASP-suite](https://github.com/bodenlab/GRASP-suite)
+## Table of Contents
 
-As part of work funded by the Australian Research Council, the inference engine in bnkit has been bundled with code 
-for phylogenetic analysis. In particular, the `asr` package interfaces with services for ancestral sequence 
-reconstruction (ASR). GRASP (https://github.com/bodenlab/GRASP) implements a web server for ASR. 
-The portal for everything around GRASP is [https://github.com/bodenlab/GRASP-suite](https://github.com/bodenlab/GRASP-suite).
+- [Introduction](#introduction)
+- [What is bnkit used for?](#what-is-bnkit-used-for)
+- [Quick Start](#quick-start)
 
-## Command-line interface to GRASP
+---
 
-In `bnkit` there is a command-line interface of GRASP `asr.GRASP`. This Java application can prove useful if you want 
-to automate tasks, run reconstructions on your own dedicated hardware, and/or access the latest features. 
-This version is essentially a command-line interface to the backend features of the web-based service. 
-It is worth noting that the web-based version has the advantage of a visual user interface, but that it 
-may lack the latest functionality.
+## Introduction
 
-If you want to use `asr.GRASP`, go [here](docs/graspcmd.md).
+`bnkit` is a collection of classes for implementing Bayesian networks in Java (**Java 11+ required**). It lets you:
 
-## JSON API to GRASP
+- Define a Bayesian network structure
+- Run inference over that network
+- Learn from data — including data with missing values, both discrete and continuous
 
-Another way to interact with GRASP is to use the JSON API of `asr.GServer`, 
-documented [here](docs/json-api.md).
+Under the hood it includes reasonably efficient implementations of **variable elimination** and **expectation-maximisation (EM) learning**.
 
-## Configuring GRASP to run in IntelliJ
-- Open IntelliJ IDEA
-- Select File > New > Project From Version Control
-- For URL type http://github.com/bodenlab/bnkit
-- For Directory specify where you want to save the project
-- Under Run > Edit Configurations
-- Use '+' to add Application
-- Give it a name, e.g. 'GRASP'
-- Specify 'asr.GRASP' as the main class
-- Now you can run GRASP (green arrow / ctrl-R / Run > Run GRASP )
-- You may need to upgrade your Java version / SDK in your settings (Version 11 or above)
-- If you want to add command line arguments, you can add these under Run > Edit Configurations and add them to the 'Program arguments' textbox
+> `bnkit` does *not* do structure learning, and does *not* implement dynamic Bayesian networks.
 
-## Generate an external JAR using Maven
-- Click on Maven (on the far right vertical bar)
-- Click on bnkit > Lifecycle > package
-- A jar will be created in the <directory>/target/bnkit.jar
+The current version has been used across a number of published studies, but is still best regarded as **work-in-progress**. It's a complete rewrite of an earlier in-house version the Boden lab has used for research since around 2009.
+
+> 📚 **Docs:** Generate documentation with `javadoc`. A handful of code examples and a brief tutorial live in the `bn` package documentation.
+
+---
+
+## What is bnkit used for?
+
+Two tools currently build on `bnkit`, for two different kinds of analysis:
+
+| Tool | What it does | Docs |
+|---|---|---|
+| **[GRASP](https://github.com/bodenlab/GRASP)** | Graphical Representation of Ancestral Sequence Predictions — ancestral sequence reconstruction by maximum likelihood, scalable to very large datasets. Also implements several algorithms for inferring insertions and deletions | [`docs/graspcmd.md`](docs/graspcmd.md) |
+| **TreeGazer** | Annotates ancestor (internal) and extant (leaf) nodes on a phylogenetic tree, using known properties (discrete or continuous) at a subset of nodes. Also estimates prediction uncertainty and identifies which nodes are most informative about others | [`docs/treegazer.md`](docs/treegazer.md) |
+
+---
+
+## Quick Start
+
+1. **Install Java 11+** — any OS works.
+2. **Get a jar** — download pre-built jars for GRASP and TreeGazer from the [releases page](https://github.com/bodenlab/bnkit/releases).
+
+Want the latest code instead? Clone this repo and build it yourself:
+
+- We recommend [Maven](https://maven.apache.org/) — `pom.xml` files are provided for both GRASP and TreeGazer.
+- Full build steps (Maven and IntelliJ) are in each tool's docs: [GRASP](docs/graspcmd.md) · [TreeGazer](docs/treegazer.md)
+
+---
+
+## bnkit is part of [GRASP-suite](https://github.com/bodenlab/GRASP-suite)
+
+Funded by the Australian Research Council, `bnkit`'s inference engine has been bundled with phylogenetic analysis code. The `asr` package in particular interfaces with services for **ancestral sequence reconstruction (ASR)** — [GRASP](https://github.com/bodenlab/GRASP) implements a web server around it.
+
+The portal for everything GRASP-related: **[github.com/bodenlab/GRASP-suite](https://github.com/bodenlab/GRASP-suite)**
+
+---
