@@ -1,0 +1,1093 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Graspcmd - bnkit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#table-of-contents" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="bnkit" class="md-header__button md-logo" aria-label="bnkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            bnkit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Graspcmd
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="bnkit" class="md-nav__button md-logo" aria-label="bnkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    bnkit
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bnkit documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../travis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tracing Ancestors Via Indels and Substitutions (TrAVIS)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../treegazer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Treegazer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../phylotree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    phylotree
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../json-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-can-grasp-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What can GRASP do?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What can GRASP do?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#main-indel-inference-methods-in-grasp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Main indel inference methods in GRASP
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-setup-download-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Setup — Download &amp; Run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-from-source-maven" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building from Source — Maven
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-from-source-intellij" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building from Source — IntelliJ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-grasp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running GRASP
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running GRASP">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-invocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example invocation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mip-indel-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MIP Indel Inference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#important-command-line-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important Command-Line Options
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#full-cli-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full CLI Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Full CLI Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-optional-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common optional flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indel-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indel methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#substitution-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Substitution models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-usage-synopsis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full usage synopsis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#developing-in-intellij" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Developing in IntelliJ
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>Graspcmd</h1>
+
+<div align="center">
+
+# GRASP — Command-Line Interface
+
+`version 14-Aug-2026`
+
+</div>
+
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#what-can-grasp-do">What can GRASP do?</a></li>
+<li><a href="#quick-setup--download--run">Quick Setup — Download &amp; Run</a></li>
+<li><a href="#building-from-source--maven">Building from Source — Maven</a></li>
+<li><a href="#building-from-source--intellij">Building from Source — IntelliJ</a></li>
+<li><a href="#running-grasp">Running GRASP</a></li>
+<li><a href="#mip-indel-inference">MIP Indel Inference</a></li>
+<li><a href="#important-command-line-options">Important Command-Line Options</a></li>
+<li><a href="#full-cli-reference">Full CLI Reference</a></li>
+<li><a href="#developing-in-intellij-no-jar-build">Developing in IntelliJ</a></li>
+</ul>
+<hr />
+<h2 id="what-can-grasp-do">What can GRASP do?</h2>
+<p>GRASP accepts an alignment (<strong>FASTA</strong> or <strong>Clustal</strong>) and a phylogenetic tree (<strong>Newick</strong>) with matching labels, and infers ancestor sequences by joint or marginal maximum-likelihood reconstruction. Along the way it also infers insertion/deletion (indel) events, represented internally as <strong>partial-order graphs (POGs)</strong>, and identifies the single most-supported path through each ancestor's graph.</p>
+<p>It can save:
+- All ancestor sequences (joint reconstruction), or one sequence with character-state distributions (marginal reconstruction)
+- Partial-order graphs as JSON or DOT (viewable in GraphViz)
+- The tree, re-saved with assigned ancestor labels</p>
+<blockquote>
+<p><strong>Note:</strong> GRASP was built primarily for protein sequences. The CLI also supports DNA models, but DNA-specific functionality (codon-centric analysis, custom background stats, etc.) hasn't been extensively tested or developed yet.</p>
+</blockquote>
+<h3 id="main-indel-inference-methods-in-grasp">Main indel inference methods in GRASP</h3>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Bi-directional edge (BE)</strong> — <em>default</em></td>
+<td>Efficient; can represent ambiguous indel histories in a single POG</td>
+</tr>
+<tr>
+<td><strong>Mixed Integer Programming (MIP)</strong></td>
+<td>More conservative and computationally heavier, but guarantees a globally optimal solution across all sites simultaneously</td>
+</tr>
+</tbody>
+</table>
+<p>On top of BE and MIP, indels can also be coded as <strong>Position Specific (PS)</strong> or <strong>Simple Indel Coding (SIC)</strong>, and inferred by <strong>Parsimony (P)</strong> or <strong>Maximum Likelihood (ML)</strong> — six combined methods in total, plus the two MIP solvers, <strong>SCIP</strong> and <strong>Gurobi</strong> (same optimal answer; Gurobi is commercial and substantially faster).</p>
+<blockquote>
+<p>Under 1,000 sequences usually finishes in under 10 minutes. Up to ~10,000 sequences is doable on a server (a "gappy" alignment slows things down). A clean alignment can run on a modern laptop with 16GB RAM in under a day.</p>
+</blockquote>
+<hr />
+<h2 id="quick-setup-download-run">Quick Setup — Download &amp; Run</h2>
+<ol>
+<li><strong>Install Java 11+.</strong> Any OS works — macOS, Windows, Linux.</li>
+<li><strong>Download the jar</strong> from the <a href="https://github.com/bodenlab/bnkit/releases">bnkit releases page</a>.</li>
+<li><strong>Sanity-check it:</strong></li>
+</ol>
+<p><code>console
+   java -jar bnkit.jar -h</code></p>
+<p>You should see the full help text print to the console.</p>
+<hr />
+<h2 id="building-from-source-maven">Building from Source — Maven</h2>
+<ol>
+<li>Clone <a href="https://github.com/bodenlab/bnkit">bnkit</a> in full. (JUnit 5 is only needed if you're a developer running the test suite.)</li>
+<li>Confirm Maven is installed:</li>
+</ol>
+<p><code>console
+   mvn -h</code></p>
+<p>If that fails, install it from <a href="https://maven.apache.org/download.cgi">maven.apache.org</a>, or via a package manager (<code>apt</code> on Ubuntu/Debian, <code>brew</code> on macOS).</p>
+<ol>
+<li>From the repo root, build the jar:</li>
+</ol>
+<p><code>console
+   mvn package -f poms/pom.xml -DskipTests</code></p>
+<p><code>-DskipTests</code> skips the test suite which is fine unless you're developing. The jar is placed in <code>target/GRASP-&lt;version&gt;.jar</code>.</p>
+<hr />
+<h2 id="building-from-source-intellij">Building from Source — IntelliJ</h2>
+<ol>
+<li><strong>File → New → Project From Version Control</strong></li>
+<li>URL: <code>http://github.com/bodenlab/bnkit</code></li>
+<li>Choose a save directory</li>
+<li><strong>File → Project Structure → Artifacts</strong> → click <code>+</code> → <em>Jar → From modules with dependencies</em></li>
+<li>Select module <code>asr</code>, main class <code>asr.GRASP</code> → <strong>OK</strong> → <strong>Apply</strong></li>
+<li><strong>Build → Build Artifacts → <code>bnkit:jar</code> → Build</strong></li>
+<li>Output lands in <code>out/artifacts/bnkit_jar</code></li>
+</ol>
+<hr />
+<h2 id="running-grasp">Running GRASP</h2>
+<ol>
+<li><strong>Get the jar</strong> — build it or download it (above). You can also run it directly:</li>
+</ol>
+<p><code>console
+   java -jar ~/Downloads/grasp.jar</code></p>
+<ol>
+<li><strong>Wrap it in a launcher script</strong> called <code>grasp</code>:</li>
+</ol>
+<p><code>bash
+   #!/bin/sh
+   java -jar -Xmx16g &lt;/path/to/grasp.jar&gt; $@</code></p>
+<blockquote>
+<p>💡 <strong>Memory tip:</strong> <code>-Xmx</code> sets the max memory heap. For large and/or gappy alignments budget more — <strong>60GB</strong> (<code>-Xmx60000m</code>) is a reasonable recommendation.</p>
+</blockquote>
+<ol>
+<li><strong>Make it executable:</strong></li>
+</ol>
+<p><code>console
+   chmod 755 grasp</code></p>
+<ol>
+<li><strong>Put it on your PATH:</strong></li>
+</ol>
+<p><code>console
+   mv grasp /usr/local/bin</code></p>
+<ol>
+<li><strong>Confirm it works:</strong></li>
+</ol>
+<p><code>console
+   grasp -h</code></p>
+<h3 id="example-invocation">Example invocation</h3>
+<pre><code class="language-console">grasp --aln 500_2112_dhad_18032019.aln \
+      --nwk r_500_2112_dhad_18032019.nwk \
+      --output-folder recon_0500 \
+      --verbose --threads 5
+</code></pre>
+<hr />
+<h2 id="mip-indel-inference">MIP Indel Inference</h2>
+<p>By default GRASP uses <strong>bi-directional edge parsimony (BEP)</strong> — fast and accurate on large datasets, but the paths through ancestral sequences are not guaranteed to be optimal. <strong>MIP</strong> considers every site and branchpoint under one objective function to guarantee a globally optimal solution.</p>
+<table>
+<thead>
+<tr>
+<th>Solver</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SCIP</strong></td>
+<td>Open-source, bundled</td>
+<td>Use <code>--indel-method SCIP</code> — no extra install needed</td>
+</tr>
+<tr>
+<td><strong>Gurobi</strong></td>
+<td>Commercial</td>
+<td>Substantially faster, handles very large datasets. Free academic licenses at <a href="https://www.gurobi.com/">gurobi.com</a>. Install per <a href="https://support.gurobi.com/hc/en-us/articles/14799677517585-Getting-Started-with-Gurobi-Optimizer">Gurobi's setup guide</a>, then use <code>--indel-method Gurobi</code> — GRASP auto-detects it</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="important-command-line-options">Important Command-Line Options</h2>
+<p><strong>Site-specific evolutionary rates</strong> — <code>--rates-file &lt;filename&gt;</code>
+Improves accuracy on diverse families using per-site rates (e.g. from IQ-TREE2). Tab-separated:</p>
+<pre><code># Columns are tab-separated with following meaning:
+#   Site:   Alignment site ID
+#   Rate:   Site rate estimated by maximum likelihood
+Site    Rate
+1       2.51550
+2       12.89129
+3       34.31350
+4       2.44313
+</code></pre>
+<p><strong>Indel inference method</strong> — <code>--indel-method &lt;methodname&gt;</code>
+Default <code>BEP</code>. See the <a href="#indel-methods">method table</a> below.</p>
+<p><strong>Substitution model</strong> — <code>--substitution-model &lt;modelname&gt;</code>
+Default <code>JTT</code>. <code>Dayhoff</code>, <code>LG</code>, <code>WAG</code> also available for protein; <code>JC</code> and <code>Yang</code> for DNA.</p>
+<p><strong>Empirical base frequencies</strong> — <code>--empirical-freqs &lt;filename&gt;</code>
+TSV of stationary character frequencies:</p>
+<pre><code>Character Proportion
+A 0.25
+C 0.25
+T 0.25
+G 0.25
+</code></pre>
+<p><strong>Threads</strong> — <code>--threads &lt;number&gt;</code>
+Default <code>4</code>. More threads only help up to a point.</p>
+<hr />
+<h2 id="full-cli-reference">Full CLI Reference</h2>
+<h3 id="required">Required</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-a, --aln &lt;file&gt;</code></td>
+<td>Multiple-sequence alignment, FASTA or CLUSTAL format</td>
+</tr>
+<tr>
+<td><code>-n, --nwk &lt;file&gt;</code></td>
+<td>Phylogenetic tree, Newick format, with labels matching the alignment</td>
+</tr>
+</tbody>
+</table>
+<h3 id="common-optional-flags">Common optional flags</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-o, --output-folder</code></td>
+<td>Where output files are written (default: cwd, or input folder if set)</td>
+</tr>
+<tr>
+<td><code>-i, --input-folder</code></td>
+<td>Skip indel inference; load a prior reconstruction</td>
+</tr>
+<tr>
+<td><code>-pre, --prefix</code></td>
+<td>Stub prepended to result filenames (default: alignment file's prefix)</td>
+</tr>
+<tr>
+<td><code>-sa, --save-as</code></td>
+<td>Which output formats to generate (see <a href="#output-formats">table</a>)</td>
+</tr>
+<tr>
+<td><code>--save-all</code></td>
+<td>Generate every output format</td>
+</tr>
+<tr>
+<td><code>-rf, --rates-file</code></td>
+<td>Position-specific substitution rates (recommended for diverse/distant trees)</td>
+</tr>
+<tr>
+<td><code>-ef, --empirical-freqs</code></td>
+<td>Stationary character frequencies for the substitution model</td>
+</tr>
+<tr>
+<td><code>-j</code> / <code>-m &lt;branchpoint-id&gt;</code></td>
+<td>Joint reconstruction (default) or marginal at a specific branchpoint</td>
+</tr>
+<tr>
+<td><code>--onlyindel</code></td>
+<td>Skip character-state inference; infer indels only</td>
+</tr>
+<tr>
+<td><code>--include-extants</code></td>
+<td>Include extants in output files, where the format allows</td>
+</tr>
+<tr>
+<td><code>--nogap</code></td>
+<td>Exclude the gap character from output, where allowed</td>
+</tr>
+<tr>
+<td><code>--nonibble</code></td>
+<td>Keep POG indices that can't form a start-to-end path (don't trim them)</td>
+</tr>
+<tr>
+<td><code>--orphans</code></td>
+<td>Keep orphaned indel trees (don't remove them)</td>
+</tr>
+<tr>
+<td><code>--exclude-noedge</code></td>
+<td>Remove "non-existing edge" as a parsimony option in BEP</td>
+</tr>
+<tr>
+<td><code>--solver-time-limit</code></td>
+<td>Minutes before the MIP solver gives up and falls back to BEP</td>
+</tr>
+<tr>
+<td><code>--supported-path</code></td>
+<td><code>DIJKSTRA</code> (default) or <code>ASTAR</code></td>
+</tr>
+<tr>
+<td><code>--save-tree</code></td>
+<td>Skip inference; re-save the tree with GRASP's depth-first ancestor labels (starting <code>N0</code>)</td>
+</tr>
+<tr>
+<td><code>--save-poag { branchpoint-id }</code></td>
+<td>Skip inference; save the input alignment as a POAG under a given ancestor (default <code>N0</code>)</td>
+</tr>
+<tr>
+<td><code>--seed</code></td>
+<td>Random seed</td>
+</tr>
+<tr>
+<td><code>--verbose</code> / <code>--time</code></td>
+<td>Print progress / print total runtime</td>
+</tr>
+<tr>
+<td><code>-h, --help</code></td>
+<td>Print help</td>
+</tr>
+</tbody>
+</table>
+<h3 id="indel-methods">Indel methods</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BEP</code> <em>(default)</em></td>
+<td>Bi-directional edge, maximum parsimony</td>
+</tr>
+<tr>
+<td><code>BEML</code></td>
+<td>Bi-directional edge, maximum likelihood (uniform / JC-like model)</td>
+</tr>
+<tr>
+<td><code>SICP</code></td>
+<td>Simple indel-coding, maximum parsimony (Simmons &amp; Ochoterena)</td>
+</tr>
+<tr>
+<td><code>SICML</code></td>
+<td>Simple indel-coding, maximum likelihood (uniform model)</td>
+</tr>
+<tr>
+<td><code>PSP</code></td>
+<td>Position-specific, maximum parsimony</td>
+</tr>
+<tr>
+<td><code>PSML</code></td>
+<td>Position-specific, maximum likelihood (uniform model)</td>
+</tr>
+<tr>
+<td><code>SCIP</code></td>
+<td>Globally optimal, distance-sensitive parsimony via open-source <a href="https://www.scipopt.org/">SCIP</a>. No multi-threading support</td>
+</tr>
+<tr>
+<td><code>Gurobi</code></td>
+<td>Same guarantee as SCIP, via commercial Gurobi solver — requires local install</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Append <code>*</code> to a method name for a less conservative setting (where available), or a simple gap-opening penalty of 2 for MIP solvers.</p>
+</blockquote>
+<h3 id="substitution-models">Substitution models</h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>JTT</code></td>
+<td>Protein</td>
+<td>Jones–Taylor–Thornton — default</td>
+</tr>
+<tr>
+<td><code>Dayhoff</code></td>
+<td>Protein</td>
+<td>Dayhoff–Schwartz–Orcutt</td>
+</tr>
+<tr>
+<td><code>LG</code></td>
+<td>Protein</td>
+<td>Le–Gasquel</td>
+</tr>
+<tr>
+<td><code>WAG</code></td>
+<td>Protein</td>
+<td>Whelan–Goldman</td>
+</tr>
+<tr>
+<td><code>JC</code></td>
+<td>DNA</td>
+<td>Jukes–Cantor</td>
+</tr>
+<tr>
+<td><code>Yang</code></td>
+<td>DNA</td>
+<td>Yang's general reversible process model</td>
+</tr>
+</tbody>
+</table>
+<h3 id="output-formats">Output formats</h3>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Contains</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FASTA</code></td>
+<td>Most-preferred-path sequences per ancestor, gapped or not</td>
+</tr>
+<tr>
+<td><code>CLUSTAL</code></td>
+<td>Most-preferred-path sequences per ancestor, gapped</td>
+</tr>
+<tr>
+<td><code>TREE</code></td>
+<td>Phylogenetic tree with ancestor nodes labelled</td>
+</tr>
+<tr>
+<td><code>DISTRIB</code></td>
+<td>Per-position character distributions (marginal reconstruction only), indexed by POG</td>
+</tr>
+<tr>
+<td><code>ASR</code></td>
+<td>Full reconstruction as JSON — POGs of ancestors + extants, and tree (<code>ASR.json</code>)</td>
+</tr>
+<tr>
+<td><code>DOT</code></td>
+<td>Ancestor partial-order graphs in DOT format (view with GraphViz)</td>
+</tr>
+<tr>
+<td><code>TREES</code></td>
+<td>Position-specific trees with ancestor states labelled</td>
+</tr>
+</tbody>
+</table>
+<h3 id="full-usage-synopsis">Full usage synopsis</h3>
+<pre><code class="language-text">Usage: asr.GRASP 
+        [-a | --aln &lt;filename&gt;]
+        [-n | --nwk &lt;filename&gt;]
+        {-o | --output-folder &lt;foldername&gt;}
+        {-i | --input-folder &lt;foldername&gt;}
+        {-pre | --prefix &lt;stub&gt;}
+        {-rf | --rates-file &lt;filename&gt;}
+        {-ef | --empirical-freqs &lt;filename&gt;}
+        {-s | --substitution-model &lt;JTT(default)|Dayhoff|LG|WAG|JC|Yang&gt;}
+        {-t | --threads &lt;number&gt;}
+        {-j | --joint (default)}
+        {-m | --marginal &lt;branchpoint-id&gt;}
+        {--indel-method &lt;methodname&gt;}   (BEP default, BEML, SICP, SICML, PSP, PSML, SCIP, Gurobi)
+        {--supported-path &lt;methodname&gt;} (DIJKSTRA default, ASTAR)
+        {--nogap} {--seed &lt;seed&gt;} {--nonibble} {--exclude-noedge}
+        {--save-as &lt;list-of-formats&gt;}   (FASTA CLUSTAL TREE DISTRIB ASR DOT TREES)
+        {--save-all}
+        {--save-tree}
+        {--save-poag { &lt;branchpoint-id&gt; }}
+        {--time} {--verbose} {--help}
+</code></pre>
+<hr />
+<h2 id="developing-in-intellij">Developing in IntelliJ</h2>
+<p>It can be useful to run GRASP from within IntelliJ IDEA without having to build a
+jar file. This is especially useful for debugging and development. The following steps will help you set up GRASP in IntelliJ:</p>
+<ol>
+<li><strong>File → New → Project From Version Control</strong> — URL: <code>http://github.com/bodenlab/bnkit</code></li>
+<li><strong>Run → Edit Configurations → <code>+</code> → Application</strong> — name it (e.g. <em>GRASP</em>), set main class to <code>asr.GRASP</code></li>
+<li><strong>Run it</strong> — green arrow, <code>Ctrl-R</code>, or Run → Run GRASP</li>
+<li><strong>Fix the SDK if needed</strong> — requires Java 11+ in project settings</li>
+<li><strong>Add CLI arguments</strong> — Run → Edit Configurations → "Program arguments" textbox</li>
+</ol>
+<hr />
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

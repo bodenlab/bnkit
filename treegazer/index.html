@@ -1,0 +1,1283 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../travis/">
+      
+      
+        <link rel="next" href="../phylotree/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Treegazer - bnkit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#table-of-contents" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="bnkit" class="md-header__button md-logo" aria-label="bnkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            bnkit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Treegazer
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="bnkit" class="md-nav__button md-logo" aria-label="bnkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    bnkit
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bnkit documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../travis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tracing Ancestors Via Indels and Substitutions (TrAVIS)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Treegazer
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Treegazer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-setup-download-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Setup — Download &amp; Run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-from-source-maven" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building from Source — Maven
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Background
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model Background">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modes-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modes at a glance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#predicting-information-gain-with-marginal-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Predicting information gain with marginal inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-line-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command-Line Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Command-Line Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-usage-synopsis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full usage synopsis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#latent-mode-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latent mode — learning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#latent-mode-marginal-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latent mode — marginal inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#latent-mode-joint-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latent mode — joint inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direct-mode-joint-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direct mode — joint inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direct-mode-marginal-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direct mode — marginal inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../phylotree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    phylotree
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../json-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-setup-download-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Setup — Download &amp; Run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-from-source-maven" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building from Source — Maven
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Background
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model Background">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modes-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modes at a glance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#predicting-information-gain-with-marginal-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Predicting information gain with marginal inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-line-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command-Line Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Command-Line Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optional-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-usage-synopsis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full usage synopsis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#latent-mode-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latent mode — learning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#latent-mode-marginal-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latent mode — marginal inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#latent-mode-joint-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latent mode — joint inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direct-mode-joint-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direct mode — joint inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direct-mode-marginal-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direct mode — marginal inference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>Treegazer</h1>
+
+<div align="center">
+
+# TreeGazer
+
+**Annotate ancestor and extant nodes on a phylogenetic tree by learning from a subset of nodes with known properties.**
+
+`version 1.0.1`
+
+</div>
+
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#quick-setup--download--run">Quick Setup — Download &amp; Run</a></li>
+<li><a href="#building-from-source--maven">Building from Source — Maven</a></li>
+<li><a href="#model-background">Model Background</a></li>
+<li><a href="#command-line-reference">Command-Line Reference</a></li>
+<li><a href="#examples">Examples</a><ul>
+<li><a href="#latent-mode--learning">Latent mode — learning</a></li>
+<li><a href="#latent-mode--marginal-inference">Latent mode — marginal inference</a></li>
+<li><a href="#latent-mode--joint-inference">Latent mode — joint inference</a></li>
+<li><a href="#direct-mode--joint-inference">Direct mode — joint inference</a></li>
+<li><a href="#direct-mode--marginal-inference">Direct mode — marginal inference</a></li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2 id="quick-setup-download-run">Quick Setup — Download &amp; Run</h2>
+<ol>
+<li><strong>Install Java 11+.</strong> Any OS works — macOS, Windows, Linux.</li>
+<li><strong>Download the jar</strong> from the <a href="https://github.com/bodenlab/bnkit/releases">bnkit releases page</a>.</li>
+<li><strong>Sanity-check it:</strong></li>
+</ol>
+<p><code>console
+   java -jar TreeGazer.jar -h</code></p>
+<p>You should see the full help text print to the console.</p>
+<hr />
+<h2 id="building-from-source-maven">Building from Source — Maven</h2>
+<ol>
+<li>
+<p>Clone <a href="https://github.com/bodenlab/bnkit">bnkit</a> in full. (JUnit 5 is only needed if you're a developer running the test suite.)</p>
+</li>
+<li>
+<p>Confirm Maven is installed:</p>
+</li>
+</ol>
+<p><code>console
+   mvn -h</code></p>
+<p>If that fails, install it from <a href="https://maven.apache.org/download.cgi">maven.apache.org</a>, or via a package manager (<code>apt</code> on Ubuntu/Debian, <code>brew</code> on macOS).</p>
+<ol>
+<li>From the repo root, compile the code, make sure you use the <code>poms/pom.xml</code> file:</li>
+</ol>
+<p><code>console
+   mvn compile -f poms/pom.xml</code></p>
+<ol>
+<li>Build the jar, using the <code>poms/pomTreeGazer.xml</code> file:</li>
+</ol>
+<p><code>console
+   mvn package -f poms/pomTreeGazer.xml -DskipTests</code></p>
+<p><code>-DskipTests</code> skips the test suite — fine unless you're developing. The jar lands in <code>target/TreeGazer-&lt;version&gt;.jar</code>.</p>
+<hr />
+<h2 id="model-background">Model Background</h2>
+<p>TreeGazer annotates ancestor (internal) and extant (leaf) nodes in a phylogenetic tree, using a subset of nodes whose properties are already known. Properties can be <strong>discrete</strong> or <strong>continuous</strong>.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Continuous variables</strong></td>
+<td>Modelled with latent discrete variables that mix Gaussian distributions over the observable values. Mixture parameters are learned via expectation maximisation (EM) and shared across all nodes in the tree; node states are governed by an evolutionary model.</td>
+</tr>
+<tr>
+<td><strong>Discrete variables</strong></td>
+<td>Latent variables are optional — TreeGazer can map observed values directly onto the tree with <strong>direct mode</strong>, no internal latent states required.</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="TreeGazer model structure" src="../images/TreeGazer_description.png" />
+<em>Figure 1 — Discrete latent nodes (circles) mimic the phylogenetic tree's structure, while continuous, real nodes (squares) hold known values for a property (e.g. a kinetic parameter). Any number of latent states can be specified; each maps to a Gaussian distribution learned from the data.</em></p>
+<h3 id="modes-at-a-glance">Modes at a glance</h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Outcome</th>
+<th>Input data type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Direct</td>
+<td>Joint reconstruction</td>
+<td>Discrete only</td>
+</tr>
+<tr>
+<td>Direct</td>
+<td>Marginal reconstruction</td>
+<td>Discrete only</td>
+</tr>
+<tr>
+<td>Latent</td>
+<td>Learning</td>
+<td>Discrete and real</td>
+</tr>
+<tr>
+<td>Latent</td>
+<td>Marginal reconstruction <em>(learning required first)</em></td>
+<td>Discrete and real</td>
+</tr>
+<tr>
+<td>Latent</td>
+<td>Joint reconstruction <em>(learning required first)</em></td>
+<td>Discrete and real</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Evolutionary model:</strong> Currently limited to a uniform model — an adaptation of Jukes-Cantor for an arbitrary number of states. Real-valued data is learned as a conditional Gaussian mixture; discrete data is learned as a conditional multinomial. Inference is joint by default, or marginal (optionally at a specific branch-point — otherwise all uninstantiated nodes are inferred).</p>
+</blockquote>
+<h3 id="predicting-information-gain-with-marginal-inference">Predicting information gain with marginal inference</h3>
+<p>It is possible to use TreeGazer to identify which nodes are most informative about others within a local 
+phylogenetic neighbourhood. This is done by calculating the Kullback–Leibler (KL) metric for each node, 
+which measures the information gain at neighbouring nodes when a prediction is made at that node.</p>
+<blockquote>
+<p>Currently, this feature is only supported for leaf nodes, and only for continuous data. </p>
+</blockquote>
+<p>Figure 2 demonstrates the calculation of the Kullback–Leibler (KL) metric for a node, $n$. 
+We first identify all uninstantiated nodes within one evolutionary distance, indicated by the red
+dashed circle. The initial marginal distribution for the neighbouring node $m$ is calculated and represented 
+by $P(X)$. The prediction for node $n$ is then added to evidence and the marginal distribution for $m$ is
+recalculated as $Q_m$. The total KL metric is simply the sum of all neighbouring nodes. Since this toy 
+example contains only one neighbouring node, the total metric reduces to $D_{KL_m}$.</p>
+<p><img alt="TreeGazer model structure" src="../images/kl_metric.jpg" />
+Figure 2 — Measuring the local sensitivity of a phylogenetic Bayesian network to predictions.</p>
+<hr />
+<h2 id="command-line-reference">Command-Line Reference</h2>
+<h3 id="required">Required</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-nwk &lt;tree-file&gt;</code></td>
+<td>Phylogenetic tree, Newick format</td>
+</tr>
+<tr>
+<td><code>-in {&lt;label&gt;@}&lt;input-file&gt;</code></td>
+<td>TSV file: node/sequence names in column 1, values in other columns. Blank / <code>None</code> / <code>null</code> means "not assigned". Prefix with <code>&lt;label&gt;@</code> to pick which column to model — otherwise the second column is used</td>
+</tr>
+<tr>
+<td><code>-out &lt;output-file&gt;</code></td>
+<td>Prefix for the output file; extension/type set by <code>-format</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="optional-flags">Optional flags</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-params &lt;JSON-file&gt;</code></td>
+<td>Path to save (learning) or load (inference) the learned model parameters</td>
+</tr>
+<tr>
+<td><code>-latent &lt;#states&gt;</code></td>
+<td>Number of latent states to use. Max 25 — states are labelled A–Z</td>
+</tr>
+<tr>
+<td><code>-internal</code></td>
+<td>Also model internal nodes (default is leaves-only)</td>
+</tr>
+<tr>
+<td><code>-learn</code></td>
+<td>Run EM learning instead of inference, using the input data as training data</td>
+</tr>
+<tr>
+<td><code>-untied</code></td>
+<td>Learn variance separately per latent state, rather than tied/shared (only for EM-learned GDTs; tied is default)</td>
+</tr>
+<tr>
+<td><code>-seed &lt;seed&gt;</code></td>
+<td>Random seed</td>
+</tr>
+<tr>
+<td><code>-joint</code> <em>(default)</em> / <code>-marg {&lt;branchpoint-id&gt;}</code></td>
+<td>Joint inference, or marginal (optionally at one branch-point)</td>
+</tr>
+<tr>
+<td><code>-format &lt;TSV\|TREE\|STDOUT\|ITOL&gt;</code></td>
+<td>Output format — <code>TSV</code> by default</td>
+</tr>
+<tr>
+<td><code>-cmin &lt;value&gt;</code> / <code>-cmax &lt;value&gt;</code></td>
+<td>Min/max for the iTOL colour scale — latent + real-valued mode only. Defaults to the min/max of the input values</td>
+</tr>
+<tr>
+<td><code>-help</code> / <code>-h</code></td>
+<td>Print help</td>
+</tr>
+<tr>
+<td><code>-verbose</code> / <code>-v</code></td>
+<td>Print progress messages while running</td>
+</tr>
+</tbody>
+</table>
+<h3 id="output-formats">Output formats</h3>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Contains</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TSV</code> <em>(default)</em></td>
+<td>Both inferred and known node values</td>
+</tr>
+<tr>
+<td><code>TREE</code></td>
+<td>Labelled tree, Newick format</td>
+</tr>
+<tr>
+<td><code>STDOUT</code></td>
+<td>Printed to console</td>
+</tr>
+<tr>
+<td><code>ITOL</code></td>
+<td>Dataset to decorate a tree at <a href="https://itol.embl.de">iTOL.embl.de</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="full-usage-synopsis">Full usage synopsis</h3>
+<pre><code class="language-text">Usage: asr.TreeGazer 
+        [-nwk &lt;tree-file&gt; -in {&lt;label&gt;@}&lt;input-file&gt; -out &lt;output-file&gt;]
+        {-params &lt;JSON-file&gt;}
+        {-latent &lt;#states&gt;}
+        {-internal}
+        {-learn}
+        {-untied} 
+        {-seed &lt;seed&gt;} 
+        {-joint (default) | -marg {&lt;branchpoint-id&gt;} } 
+        {-format &lt;TSV(default), TREE, STDOUT, ITOL&gt;}
+        {-cmin &lt;value (default: min of -in values)&gt;}
+        {-cmax &lt;value (default max of -in values)&gt;}
+        {-help|-h}
+        {-verbose|-v}
+</code></pre>
+<hr />
+<h2 id="examples">Examples</h2>
+<h3 id="latent-mode-learning">Latent mode — learning</h3>
+<p>Before running any latent inference, the shared distribution must be learned first.</p>
+<p><strong>Input TSV</strong> — extant nodes labelled by accession ID; internal/ancestor nodes labelled as in GRASP (<code>N0</code>, <code>N1</code>, … depth-first). Node names go in column 1. Leave a cell blank or use <code>null</code> / <code>None</code> where no value is available:</p>
+<pre><code>Entry   mean_retained_activity  std_retained_activity   Isobutanol_%
+A0A2M7A7S6  0.3990116080000001  0.19623674311255804 8
+N1  0.17249387866666666 0.038831346745923825    8
+N227    0.4221575046666666  0.001622404 8
+N28 0.8627858626666667  0.031306071743960474    8
+N29 0.5615638736666667  0.008130065 8
+N459    0.39025134166666664 0.013820733111537073    8
+N608    0.10784281966666666 0.005627829 8
+N615    0.6278029940000001  0.025805765715013116    8
+N78 12.469763536666667  1.1619048626436186  8
+N79 2.6974158083333335  0.051390714599450736    8
+N82 2.074187615 0.2004342392387551  8
+N95 0.3724682653333333  0.022329334151059477    8
+A0A0K9HJH1  0.5610371706666667  0.029527957919090055    8
+D3PT81  0.319143403 0.043889298 8
+A0A1V4QSD8  1.3732522796666666  0.039652550084277975    8
+</code></pre>
+<p><strong>Run learning:</strong></p>
+<pre><code class="language-console">java -jar treegazer.jar -nwk kari.nwk -params kari_demo.params -latent 3 \
+  -in demo.tsv -seed 42 -internal -learn -verbose
+</code></pre>
+<ul>
+<li><code>-latent 3</code> invents three discrete states: <code>mean_retained_activity_1</code>, <code>_2</code>, <code>_3</code></li>
+<li><code>kari.nwk</code> must use the same labels as the TSV</li>
+<li><code>-internal</code> is required to learn from (and later annotate) internal nodes — without it, any internal-node annotations in the TSV are ignored</li>
+</ul>
+<p><strong>Modelling a specific column:</strong> by default the second TSV column is used; name a different one with <code>&lt;column&gt;@&lt;file&gt;</code>:</p>
+<pre><code class="language-console">java -jar treegazer.jar -nwk kari.nwk -params kari_demo.params -latent 3 \
+  -in mean_retained_activity@demo.tsv -seed 42 -internal -learn -verbose
+</code></pre>
+<p><strong>Verbose output</strong> prints the evolutionary model parameters for the latent variables: <code>R</code> is the instantaneous rate matrix for the 3-state model, <code>F</code> the stationary frequency of each latent state. TreeGazer assumes a uniform model — all latent states equally likely, all transitions between them equally likely:</p>
+<pre><code>&quot;R&quot; : [-0.66,  0.33,  0.33]
+      [ 0.33, -0.66,  0.33]
+      [ 0.33,  0.33, -0.66]
+
+&quot;F&quot; : [ 0.33,  0.33,  0.33]
+</code></pre>
+<p>Once EM converges, parameters are written to the <code>-params</code> file:</p>
+<pre><code class="language-json">{&quot;Condition&quot;:[[&quot;mean_retained_activity_1&quot;],[&quot;mean_retained_activity_2&quot;],[&quot;mean_retained_activity_3&quot;]],
+&quot;Pr&quot;:[[12.469763536666667,0.11150665525484037],[2.049876146158595,0.11150665525484037],[0.4366513910438917,0.11150665525484037]],
+&quot;Variable&quot;:{&quot;Domain&quot;:{&quot;Predef&quot;:&quot;Real&quot;},&quot;Name&quot;:&quot;0_Real&quot;},&quot;Nodetype&quot;:&quot;GDT&quot;,&quot;TieVariance&quot;:2,&quot;Index&quot;:[0,1,2]}
+</code></pre>
+<p><code>Pr</code> holds the mean and variance of each latent state. Variance is pooled and shared (<strong>tied</strong>) across states by default — recommended especially for sparse data — and can be disabled with <code>-untied</code>.</p>
+<hr />
+<h3 id="latent-mode-marginal-inference">Latent mode — marginal inference</h3>
+<p>With <code>kari_demo.params</code> learned, run inference:</p>
+<pre><code class="language-console">java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -latent 3 \
+  -in demo.tsv -seed 42 -internal -verbose -marg -out kari_demo_marg
+</code></pre>
+<p>Default output is a TSV with both <strong>known</strong> and <strong>inferred</strong> values:</p>
+<pre><code>Entry mean_retained_activity (Mean) mean_retained_activity (SD) mean_retained_activity (KL) mean_retained_activity (marginal) mean_retained_activity (BSV)                                                                       
+N0  0.293431578545634 0.07340834030679089 0.0 2.3489238872480037E-4;2.3489507100154052E-4;0.9995302125402736; 0.0013925313719196696                                                                                              
+N1  0.17249387866666666                                                                                                                                                                                                          
+N2  0.3445732575732776  0.3282714039412337  0.0 0.020434353498567374;0.020434357595775318;0.9591312889056574; 0.11642601315501197                                                                                                
+N3  0.4474292277588679  0.5623361193401997  0.0 0.054622058066518694;0.05462206171606096;0.8907558802174205;  0.29759397607094196                                                                                                
+N4  0.5608174952028746  0.7250736809780182  0.0 0.0856382739531645;0.08563827719656965;0.8287234488502659;  0.44851434848338384                                                                                                  
+N5  0.6848013845798004  0.8463842384944851  0.0 0.1362126020229125;0.13621260460407997;0.7275747933730075;  0.6623723798958735                                                                                                   
+A0A0A7GET6  0.9220826617773531  0.9900263579231979  0.0 0.22839704477979955;0.2283970461538719;0.5432059090663285;  0.9580840288287659                                                                                           
+N6  0.9167581628894823  0.9950341237275492  0.0 0.2270954894962467;0.227095490887362;0.5458090196163912;  0.954719722764416                                                                                                      
+N7  0.9791732141494087  1.0206093510686716  0.0 0.24557337068862806;0.24557337183778755;0.5088532574735843; 1.0000597860107487          
+</code></pre>
+<p>A few notes on the output:
+- Nodes with a <strong>known</strong> value will have that value in the <code>mean</code> column, all other columns will be blank (e.g. N1).
+- Nodes <strong>without</strong> a known value: mean and standard deviation are computed by sampling the Gaussian mixture at that node. </p>
+<p>As well as the actual prediction, the output includes:
+- <strong>KL</strong> — the Kullback–Leibler metric for that node, which measures how much information is gained at neighbouring nodes
+- <strong>marginal</strong> — the probability of each latent state at that node, separated by semicolons
+- <strong>BSV</strong> — Between-State Variance. For each Gaussian in the mixture, the squared deviation between that Gaussian's mean and the 
+prediction is calculated and weighted by the marginal probability of that latent state. Summing these 
+weighted squared deviations across all components yields the between-state variance, representing
+the portion of the total predictive variance attributable to uncertainty over which discrete state
+generated the observation.</p>
+<p><strong>Visualising in iTOL:</strong> add <code>-format ITOL</code> — squares represent training data, circles represent inferred values, and 
+circle size reflects prediction confidence as measured with standard deviation. The size of the circles are determined 
+by binning all the standard deviations into 3 equally sized bins, and scaling the circle size accordingly. A smaller 
+circle indicates a <strong>lower confidence</strong> prediction. </p>
+<p>The colour scale
+defaults to the min/max of the input data; override with <code>-cmin</code> / <code>-cmax</code> for comparability across datasets.</p>
+<p><img alt="TreeGazer iTOL visualisation" src="../images/kari_vis.png" /></p>
+<hr />
+<h3 id="latent-mode-joint-inference">Latent mode — joint inference</h3>
+<p>Infer the single joint labelling of latent states that best explains the data, using <code>-joint</code> instead of <code>-marg</code>:</p>
+<pre><code class="language-console">java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -latent 3 \
+  -in demo.tsv -seed 42 -internal -verbose -joint -out kari_demo_joint
+</code></pre>
+<p><code>kari_demo_joint.tsv</code> contains the most likely latent state per node — equivalently, the most likely Gaussian distribution at that node:</p>
+<pre><code>Entry   mean_retained_activity
+N0      mean_retained_activity_3
+N2      mean_retained_activity_3
+N3      mean_retained_activity_3
+N4      mean_retained_activity_3
+N5      mean_retained_activity_3
+A0A0A7GET6      mean_retained_activity_3
+N6      mean_retained_activity_3
+N7      mean_retained_activity_3
+A0A2A5QQ65      mean_retained_activity_3
+</code></pre>
+<hr />
+<h3 id="direct-mode-joint-inference">Direct mode — joint inference</h3>
+<p>Direct mode has no latent states, so observed values map straight onto the tree — a single inference step, no learning phase.</p>
+<p><strong>Input TSV</strong> — discrete annotations of taxonomic superkingdom for a subset of nodes:</p>
+<pre><code>Entry   PHYLUM  SUPERKINGDOM    
+A5ILB0  Thermotogae Bacteria    
+P08144  Arthropoda  Eukaryota   
+P29957  Proteobacteria  Bacteria
+H2N0D4  Chordata    Eukaryota   
+T1WDH2  Ciliophora  Eukaryota   
+T1WE96  Ciliophora  Eukaryota   
+H9B4I9  Firmicutes  Bacteria    
+A0A060DAC6  None    None    
+Q47R94  Actinobacteria  Bacteria
+</code></pre>
+<p><strong>Infer the joint labelling</strong> of external and internal nodes that best explains the known labels:</p>
+<pre><code class="language-console">java -jar treegazer.jar -out kari_demo -nwk kari.nwk -in superkingdom@demo.tsv -seed 42 -internal -verbose -out kari_taxa_joint -joint
+</code></pre>
+<p>Saved as an iTOL dataset (<code>-format ITOL</code>) — drop it into iTOL once the tree file is uploaded.</p>
+<p><img alt="Superkingdom iTOL visualisation" src="../images/SUPERKINGDOM.png" /></p>
+<hr />
+<h3 id="direct-mode-marginal-inference">Direct mode — marginal inference</h3>
+<p>Also supported, but for <strong>discrete data only</strong> — use <code>-marg</code> instead of <code>-joint</code>:</p>
+<pre><code class="language-console">java -jar treegazer.jar -out kari_demo -nwk kari.nwk -in superkingdom@demo.tsv -seed 42 -internal -verbose -out kari_taxa_marg -marg
+</code></pre>
+<p>Output gives the probability of each node being in each state:</p>
+<pre><code>Entry   Eukaryota   Bacteria
+N0  0.5 0.5
+N2  0.9693484697521487  0.030651530247851267
+N3  0.9180669129002216  0.0819330870997784
+N4  0.8715425890702533  0.12845741092974677
+N5  0.7956810969656312  0.20431890303436887
+A0A0A7GET6  0.6574044328303008  0.3425955671696993
+N6  0.6593567657556293  0.3406432342443707
+N7  0.631639943967058   0.368360056032942
+A0A2A5QQ65  0.5573169561287165  0.4426830438712836
+</code></pre>
+<blockquote>
+<p>⚠️ <strong>No iTOL output for direct-mode marginal inference</strong> — the result is a multinomial distribution over observed states, not a single value, so it can't be rendered as a tree visualisation.</p>
+</blockquote>
+<hr />
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
