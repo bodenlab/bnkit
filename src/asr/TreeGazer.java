@@ -93,13 +93,13 @@ public class TreeGazer {
     private static final int VALUE = 1;
     private static final int MEAN = 1;
     private static final int SD = 2;
-    private static final int UCB_VAL = 3;
+    private static final int KL_VAL = 3;
     private static final int DEFAULT_VALUES_IDX = 1;
     private static final int DEFAULT_ENTRIES_IDX = 0;
     private static final String[] FORMATS = new String[] {"TSV", "TREE", "STDOUT", "ITOL"};
     private static final String[] MODELS = new String[] {"uniform"};
-    public static String VERSION = "1.0.0";
-    public static String DATE = "12-May-2026";
+    public static String VERSION = "1.0.1";
+    public static String DATE = "25-Aug-2026";
 
 
     public static void main(String[] args) {
@@ -805,7 +805,7 @@ public class TreeGazer {
     private static String[] buildTsvHeader(PhyloBN pbn, BNode exampleNode, TSVFile tsv, int valCol) {
         String[] headers;
         if (pbn.getMasterCPT() == null && pbn.getMasterGDT() != null) { // Gaussian, so real value
-            headers = new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valCol)+" (Mean)", tsv.getHeader(valCol)+" (SD)", tsv.getHeader(valCol)+" (UCB)", tsv.getHeader(valCol)+" (marginal)", tsv.getHeader(valCol)+" (BSV)"};
+            headers = new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valCol)+" (Mean)", tsv.getHeader(valCol)+" (SD)", tsv.getHeader(valCol)+" (KL)", tsv.getHeader(valCol)+" (marginal)", tsv.getHeader(valCol)+" (BSV)"};
 
         } else if (pbn.getMasterCPT() != null && pbn.getMasterGDT() == null) { // Discrete
 
@@ -845,7 +845,7 @@ public class TreeGazer {
                 save[bpcnt][NODE] = (tree.isLeaf(bpidx) ? "" : "N") + tree.getLabel(bpidx);
                 save[bpcnt][MEAN] = gd.getMean();
                 save[bpcnt][SD] = Math.sqrt(gd.getVariance()); // standard deviation
-                save[bpcnt][UCB_VAL] = gd.getMean() + LAMBDA * Math.sqrt(gd.getVariance());
+                save[bpcnt][KL_VAL] = gd.getMean() + LAMBDA * Math.sqrt(gd.getVariance());
 
 
                 MixtureDistrib md = (MixtureDistrib) anydistrib;
@@ -854,7 +854,7 @@ public class TreeGazer {
                 for (double weight : weights) {
                     sb.append(weight).append(";");
                 }
-                save[bpcnt][UCB_VAL + 1] = sb.toString();
+                save[bpcnt][KL_VAL + 1] = sb.toString();
 
                 double betweenStateVariance = 0.0;
                 for (int i = 0; i < md.getMixtureSize(); i++) {
@@ -864,7 +864,7 @@ public class TreeGazer {
                     double varMeanGivenComponent = weight * ((gd.getMean() - componentMean) * (gd.getMean() - componentMean));
                     betweenStateVariance += varMeanGivenComponent;
                 }
-                save[bpcnt][UCB_VAL + 2] = betweenStateVariance; // capture between state variance
+                save[bpcnt][KL_VAL + 2] = betweenStateVariance; // capture between state variance
 
             } catch (ClassCastException ee) {
 
@@ -951,9 +951,8 @@ public class TreeGazer {
             ti.setInstance(bpidx, save[bpcnt][MEAN]); // replace the value in the with predicted value
 
             double totalKL = 0.0;
-            Integer nodesCounted = 0;
+            int nodesCounted = 0;
             double maxDist = 1.0;
-            int maxAttempts = 3;
             for (int leafBpidx : leafIndices) {
 
                 if (save[leafBpidx][SD] == null) {
@@ -970,7 +969,7 @@ public class TreeGazer {
                     Distrib anydistrib = inf.getDecoration(leafBpidx);
                     MixtureDistrib md = (MixtureDistrib) anydistrib;
                     double[] weights = md.getAllWeights();
-                    double[] prevWeights = Arrays.stream(save[leafBpidx][UCB_VAL + 1].toString().split(";"))
+                    double[] prevWeights = Arrays.stream(save[leafBpidx][KL_VAL + 1].toString().split(";"))
                             .mapToDouble(Double::parseDouble)
                             .toArray();
                     double kl = 0.0;
@@ -989,70 +988,7 @@ public class TreeGazer {
                 }
             }
 
-            /*
-
-
-            for (int attempt = 0; attempt < maxAttempts; attempt++) {
-                totalKL = 0.0;
-                nodesCounted = 0;
-
-                for (int leafBpidx : leafIndices) {
-
-                    if (save[leafBpidx][SD] == null) {
-                        continue;
-                    }
-                    double leaf2LeafDist = distances[bpidx][leafBpidx];
-                    if (leaf2LeafDist < maxDist && leaf2LeafDist > 0.0) {
-                        // inference below; first create the inference instance
-                        nodesCounted += 1;
-                        MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal<>(leafBpidx, pbn);
-                        // perform marginal inference
-                        inf.decorate(ti);
-                        // retrieve the distribution at the node previously nominated
-                        Distrib anydistrib = inf.getDecoration(leafBpidx);
-                        MixtureDistrib md = (MixtureDistrib) anydistrib;
-                        double[] weights = md.getAllWeights();
-                        double[] prevWeights = Arrays.stream(save[leafBpidx][UCB_VAL + 1].toString().split(";"))
-                                .mapToDouble(Double::parseDouble)
-                                .toArray();
-                        double kl = 0.0;
-                        for (int i = 0; i < weights.length; i++) {
-                            double p = weights[i];
-                            if (p < 1e-12) {
-                                p = 1e-12;
-                            }
-                            double q = prevWeights[i];
-                            if (q < 1e-12) {
-                                q = 1e-12;
-                            }
-                            kl += (p * Math.log(p / q));
-                        }
-                        totalKL += kl;
-                    }
-                }
-
-                if (nodesCounted > 0) {
-                    break;
-                }
-
-//                if (foundLeaf) {
-//                    break;
-//                }
-
-                // no leaves found within range; widen the search and try again
-                maxDist += 0.5;
-            }
-
-             */
-
-//            save[bpcnt][UCB_VAL] = totalKL;
-            if (nodesCounted > 0) {
-                save[bpcnt][UCB_VAL] = totalKL;// / nodesCounted; // average KL divergence for leaves within 1 branch length
-                foundLeaf = true;
-            } else {
-                save[bpcnt][UCB_VAL] = 0.0;
-            }
-
+            save[bpcnt][KL_VAL] = totalKL;
             ti.setInstance(bpidx, null); // remove predicted value
             bpcnt += 1;
         }
@@ -1061,60 +997,6 @@ public class TreeGazer {
         TSVFile tempTsv = new TSVFile(headers, save);
         // now we go through every
         saveDirectOutput(FORMAT_IDX, OUTPUT, tree, tsv, valcol, tempTsv, NBINS, ENTRY_VALUES, CMAX, CMIN);
-
-//        bpcnt = 0; // count nodes that are inferred (excl those that are null)
-//        for (int bpidx : bpidxs) { // go through all nodes to be inferred
-//
-//            // ignore instantiated nodes
-//            if (save[bpcnt][SD] == null) {
-//                bpcnt++;
-//                continue;
-//            }
-//
-//            // look for nodes that were previously inferred
-//            ti.setInstance(bpidx, save[bpcnt][MEAN]); // replace the value in the with predicted value
-//
-//            double totalKL = 0.0;
-//            nodesCounted = 0;
-//
-//            for (int leafBpidx : leafIndices) {
-//
-//                if (save[leafBpidx][SD] == null) {
-//                    continue;
-//                }
-//                double leaf2LeafDist = distances[bpidx][leafBpidx];
-//                if (leaf2LeafDist < maxDist && leaf2LeafDist > 0.0) {
-//                    // inference below; first create the inference instance
-//                    nodesCounted += 1;
-//                    MaxLhoodMarginal<EnumDistrib> inf = new MaxLhoodMarginal<>(leafBpidx, pbn);
-//                    // perform marginal inference
-//                    inf.decorate(ti);
-//                    // retrieve the distribution at the node previously nominated
-//                    Distrib anydistrib = inf.getDecoration(leafBpidx);
-//                    MixtureDistrib md = (MixtureDistrib) anydistrib;
-//                    double[] weights = md.getAllWeights();
-//                    double[] prevWeights = Arrays.stream(save[leafBpidx][UCB_VAL + 1].toString().split(";"))
-//                            .mapToDouble(Double::parseDouble)
-//                            .toArray();
-//                    double kl = 0.0;
-//                    for (int i = 0; i < weights.length; i++) {
-//                        double p = weights[i];
-//                        if (p < 1e-12) {
-//                            p = 1e-12;
-//                        }
-//                        double q = prevWeights[i];
-//                        if (q < 1e-12) {
-//                            q = 1e-12;
-//                        }
-//                        kl += (p * Math.log(p / q));
-//                    }
-//                    totalKL += kl;
-//                }
-//            }
-
-
-//            save[bpcnt][UCB_VAL] = totalKL;
-
 
     }
 }

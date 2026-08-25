@@ -13,10 +13,8 @@ import bn.node.GDT;
 import bn.prob.EnumDistrib;
 import bn.prob.GaussianDistrib;
 import dat.EnumVariable;
-import dat.Enumerable;
 import dat.Variable;
 import dat.file.TSVFile;
-import json.JSONArray;
 import json.JSONObject;
 
 import java.util.*;

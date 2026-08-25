@@ -4,7 +4,7 @@
 
 **Annotate ancestor and extant nodes on a phylogenetic tree by learning from a subset of nodes with known properties.**
 
-`version 1.0.0`
+`version 1.0.1`
 
 </div>
 
@@ -42,6 +42,8 @@
 ## Building from Source — Maven
 
 1. Clone [bnkit](https://github.com/bodenlab/bnkit) in full. (JUnit 5 is only needed if you're a developer running the test suite.)
+
+
 2. Confirm Maven is installed:
 
    ```console
@@ -50,7 +52,14 @@
 
    If that fails, install it from [maven.apache.org](https://maven.apache.org/download.cgi), or via a package manager (`apt` on Ubuntu/Debian, `brew` on macOS).
 
-3. From the repo root, build the jar:
+
+3. From the repo root, compile the code, make sure you use the `poms/pom.xml` file:
+
+   ```console
+   mvn compile -f poms/pom.xml
+   ```
+
+4. Build the jar, using the `poms/pomTreeGazer.xml` file:
 
    ```console
    mvn package -f poms/pomTreeGazer.xml -DskipTests
@@ -84,6 +93,24 @@ TreeGazer annotates ancestor (internal) and extant (leaf) nodes in a phylogeneti
 
 > **Evolutionary model:** Currently limited to a uniform model — an adaptation of Jukes-Cantor for an arbitrary number of states. Real-valued data is learned as a conditional Gaussian mixture; discrete data is learned as a conditional multinomial. Inference is joint by default, or marginal (optionally at a specific branch-point — otherwise all uninstantiated nodes are inferred).
 
+### Predicting information gain with marginal inference
+
+It is possible to use TreeGazer to identify which nodes are most informative about others within a local 
+phylogenetic neighbourhood. This is done by calculating the Kullback–Leibler (KL) metric for each node, 
+which measures the information gain at neighbouring nodes when a prediction is made at that node.
+
+> Currently, this feature is only supported for leaf nodes, and only for continuous data. 
+
+Figure 2 demonstrates the calculation of the Kullback–Leibler (KL) metric for a node, $n$. 
+We first identify all uninstantiated nodes within one evolutionary distance, indicated by the red
+dashed circle. The initial marginal distribution for the neighbouring node $m$ is calculated and represented 
+by $P(X)$. The prediction for node $n$ is then added to evidence and the marginal distribution for $m$ is
+recalculated as $Q_m$. The total KL metric is simply the sum of all neighbouring nodes. Since this toy 
+example contains only one neighbouring node, the total metric reduces to $D_{KL_m}$.
+
+![TreeGazer model structure](images/kl_metric.jpg)
+Figure 2 — Measuring the local sensitivity of a phylogenetic Bayesian network to predictions.
+
 ---
 
 ## Command-Line Reference
@@ -108,7 +135,6 @@ TreeGazer annotates ancestor (internal) and extant (leaf) nodes in a phylogeneti
 | `-seed <seed>` | Random seed |
 | `-joint` *(default)* / `-marg {<branchpoint-id>}` | Joint inference, or marginal (optionally at one branch-point) |
 | `-format <TSV\|TREE\|STDOUT\|ITOL>` | Output format — `TSV` by default |
-| `-lambda <value>` | Multiplier on the upper confidence bound of predicted values — latent + real-valued mode only. Default `5.0` |
 | `-cmin <value>` / `-cmax <value>` | Min/max for the iTOL colour scale — latent + real-valued mode only. Defaults to the min/max of the input values |
 | `-help` / `-h` | Print help |
 | `-verbose` / `-v` | Print progress messages while running |
@@ -135,7 +161,6 @@ Usage: asr.TreeGazer
         {-seed <seed>} 
         {-joint (default) | -marg {<branchpoint-id>} } 
         {-format <TSV(default), TREE, STDOUT, ITOL>}
-        {-lambda <value (default 5.0)>}
         {-cmin <value (default: min of -in values)>}
         {-cmax <value (default max of -in values)>}
         {-help|-h}
@@ -220,25 +245,40 @@ java -jar treegazer.jar -out kari_demo -nwk kari.nwk -params kari_demo.params -l
   -in demo.tsv -seed 42 -internal -verbose -marg -out kari_demo_marg
 ```
 
-Default output is a TSV with both known and inferred values:
+Default output is a TSV with both **known** and **inferred** values:
 
 ```
-Entry	mean_retained_activity (Mean)	mean_retained_activity (SD)	mean_retained_activity (UCB)
-N0	0.4159883877711853	0.3399206669380877	2.1155917224616236
-N1	0.17249387866666666		
-N2	0.6965149831920605	1.6692858637489851	9.042944301936986
-N3	1.252269881963146	2.83445639799529	15.424551871939595
-N4	1.7435295250035734	3.579176033836374	19.639409694185446
-N5	2.403442216905911	4.237785076700372	23.592367600407773
-A0A0A7GET6	3.6236493368774387	4.9655733305662855	28.451515989708867
-N6	3.605903787080107	4.956870443119277	28.39025600267649
-N7	3.868271518731236	5.0899309538387705	29.31792628792509
+Entry mean_retained_activity (Mean) mean_retained_activity (SD) mean_retained_activity (KL) mean_retained_activity (marginal) mean_retained_activity (BSV)                                                                       
+N0  0.293431578545634 0.07340834030679089 0.0 2.3489238872480037E-4;2.3489507100154052E-4;0.9995302125402736; 0.0013925313719196696                                                                                              
+N1  0.17249387866666666                                                                                                                                                                                                          
+N2  0.3445732575732776  0.3282714039412337  0.0 0.020434353498567374;0.020434357595775318;0.9591312889056574; 0.11642601315501197                                                                                                
+N3  0.4474292277588679  0.5623361193401997  0.0 0.054622058066518694;0.05462206171606096;0.8907558802174205;  0.29759397607094196                                                                                                
+N4  0.5608174952028746  0.7250736809780182  0.0 0.0856382739531645;0.08563827719656965;0.8287234488502659;  0.44851434848338384                                                                                                  
+N5  0.6848013845798004  0.8463842384944851  0.0 0.1362126020229125;0.13621260460407997;0.7275747933730075;  0.6623723798958735                                                                                                   
+A0A0A7GET6  0.9220826617773531  0.9900263579231979  0.0 0.22839704477979955;0.2283970461538719;0.5432059090663285;  0.9580840288287659                                                                                           
+N6  0.9167581628894823  0.9950341237275492  0.0 0.2270954894962467;0.227095490887362;0.5458090196163912;  0.954719722764416                                                                                                      
+N7  0.9791732141494087  1.0206093510686716  0.0 0.24557337068862806;0.24557337183778755;0.5088532574735843; 1.0000597860107487          
 ```
+A few notes on the output:
+- Nodes with a **known** value will have that value in the `mean` column, all other columns will be blank (e.g. N1).
+- Nodes **without** a known value: mean and standard deviation are computed by sampling the Gaussian mixture at that node. 
 
-- Nodes with a **known** value: mean/SD/UCB are left blank (not computed)
-- Nodes **without** a known value: mean, SD, and UCB (upper confidence bound) are computed by sampling the Gaussian mixture at that node. UCB = mean + `lambda` × SD (default `lambda = 5.0`, override with `-lambda`)
+As well as the actual prediction, the output includes:
+- **KL** — the Kullback–Leibler metric for that node, which measures how much information is gained at neighbouring nodes
+- **marginal** — the probability of each latent state at that node, separated by semicolons
+- **BSV** — Between-State Variance. For each Gaussian in the mixture, the squared deviation between that Gaussian's mean and the 
+prediction is calculated and weighted by the marginal probability of that latent state. Summing these 
+weighted squared deviations across all components yields the between-state variance, representing
+the portion of the total predictive variance attributable to uncertainty over which discrete state
+generated the observation.
 
-**Visualising in iTOL:** add `-format ITOL` — squares represent training data, circles represent inferred values, and circle size reflects prediction confidence. The colour scale defaults to the min/max of the input data; override with `-cmin` / `-cmax` for comparability across datasets.
+**Visualising in iTOL:** add `-format ITOL` — squares represent training data, circles represent inferred values, and 
+circle size reflects prediction confidence as measured with standard deviation. The size of the circles are determined 
+by binning all the standard deviations into 3 equally sized bins, and scaling the circle size accordingly. A smaller 
+circle indicates a **lower confidence** prediction. 
+
+The colour scale
+defaults to the min/max of the input data; override with `-cmin` / `-cmax` for comparability across datasets.
 
 ![TreeGazer iTOL visualisation](images/kari_vis.png)
 
