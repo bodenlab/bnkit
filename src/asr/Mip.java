@@ -55,6 +55,7 @@ public class Mip {
     private final HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
     private final HashMap<DiffKey, MPVariable> diff = new HashMap<>();
     private final int virtualEndIdx;
+    private HashSet<Integer> deadNodes;
 
     public Mip(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
                int nThreads, boolean useBranchLengths) {
@@ -72,14 +73,37 @@ public class Mip {
         this.nodeWeights = new int[nPos];
         this.virtualEndIdx = nPos;
         Arrays.fill(this.nodeWeights, 1);
+        this.deadNodes = this.identifyDeadNodes();
         this.identifyNodesToSkip();
         this.createTreeNeighbourAlphaPen();
 
     }
 
+    /**
+     * Identify columns in the alignment that only have gap characters. These columns are "dead"
+     * and will be skipped in the MIP model.
+     * @return A set of indices representing the dead columns in the alignment.
+     */
+    private HashSet<Integer> identifyDeadNodes() {
+
+        HashSet<Integer> deadNodes = new HashSet<>();
+        for (int i = 0; i < nPos; i++) {
+            if (aln.getOccupancy(i) == 0) {
+                deadNodes.add(i);
+            }
+        }
+
+        return deadNodes;
+    }
+
     private void identifyNodesToSkip() {
         int previousNode = 0;
         for (int nodeIdx = 0; nodeIdx < nPos - 1; nodeIdx++) {
+
+            if (this.deadNodes.contains(nodeIdx)) {
+                previousNode += 1;
+                continue;
+            }
 
             if ((getForwardEdges(nodeIdx).length == 1)
                     && Arrays.stream(getForwardEdges(nodeIdx)).min().orElseThrow() == (nodeIdx + 1)
@@ -435,6 +459,10 @@ public class Mip {
 
         objective = solver.objective();
 
+        if (!this.deadNodes.isEmpty()) {
+            System.out.println("WARNING: input alignment has columns with only gap characters. ");
+        }
+
         createAncestralPositionVariables();
         createEdgeVariables();
         addPenaltyConstraints();
@@ -453,7 +481,7 @@ public class Mip {
             solver.setNumThreads(1);
             actualThreadsUsed = 1;
         } else if (solverName.equalsIgnoreCase("Gurobi")) {
-            solver.setSolverSpecificParametersAsString("Presolve=-1, FeasibilityTol=1e-06, IntFeasTol=1e-05, OptimalityTol=1e-06, Method=1, DegenMoves=0, Threads=" + this.nThreads);
+            solver.setSolverSpecificParametersAsString("Presolve=-1,FeasibilityTol=1e-06, IntFeasTol=1e-05, OptimalityTol=1e-06, Method=1, DegenMoves=0, Threads=" + this.nThreads);
             //solver.setSolverSpecificParametersAsString("Presolve=-1,Threads=" + this.nThreads);
         }
 
@@ -617,6 +645,13 @@ public class Mip {
                     seqVars[j] = solver.makeBoolVar("");
                 }
             }
+
+            for (int j = 0; j < nPos; j++) {
+                // any node where all extant sequences have a gap must also be a gap in the ancestor
+                if (this.deadNodes.contains(j)) {
+                    seqVars[j].setUb(0);
+                }
+            }
             ancestorSeqVars.put(ancestorIdx, seqVars);
         }
 
@@ -635,7 +670,6 @@ public class Mip {
         int[] startIndices = alnPog.getStarts();
         this.nodesConnectedToPreviousNode.remove(VIRTUAL_START + 1);
         this.nodesConnectedToPreviousNode.remove(virtualEndIdx);
-
 
         for (int ancestorIdx : tree.getAncestors()) {
 
@@ -656,51 +690,73 @@ public class Mip {
                 // first go through and find nodes where we actually need edge variables
                 if (!this.nodesToSkip.contains(nodeIdx + 1)) { // next node is not skipped
                     if (!this.nodesConnectedToPreviousNode.contains(nodeIdx + 1)) { // current node not connected to adjacent node
-                        if (getForwardEdges(nodeIdx).length == 1) {
-                            for (int posTo : getForwardEdges(nodeIdx)) {
-                                // node has one outgoing edge, outgoing edge is implicit on this node being activated
-                                EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
-                                this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
-                            }
-                        } else {
-                            for (int posTo : getForwardEdges(nodeIdx)) {
-                                EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
-                                MPVariable edge;
-                                if (getBackwardEdges(posTo).length == 1) {
-                                    edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
-                                } else {
-                                    edge = solver.makeBoolVar("");
-                                }
-                                this.edges.put(edgeKey, edge);
-                            }
 
-                            addEdgeConstraint(ancestorIdx, nodeIdx);
+                        int[] fwdEdges = null;
+                        if (!this.deadNodes.contains(nodeIdx)) {
+                            fwdEdges = getForwardEdges(nodeIdx);
+                        }
+
+                        if (fwdEdges != null) {
+                            if (fwdEdges.length == 1) {
+                                for (int posTo : fwdEdges) {
+                                    // node has one outgoing edge, outgoing edge is implicit on this node being activated
+                                    EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
+                                    this.edges.put(edgeKey, this.ancestorPositionVars.get(ancestorIdx)[nodeIdx]);
+                                }
+                            } else {
+                                for (int posTo : fwdEdges) {
+                                    EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
+                                    MPVariable edge;
+                                    if (getBackwardEdges(posTo).length == 1) {
+                                        edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
+                                    } else {
+                                        edge = solver.makeBoolVar("");
+                                    }
+                                    this.edges.put(edgeKey, edge);
+                                }
+
+                                addEdgeConstraint(ancestorIdx, nodeIdx);
+                            }
                         }
                     } else { // connected to the adjacent node
                         List<MPVariable> all_edges_from_pos = new ArrayList<>();
                         List<MPVariable> all_edges_to_pos1 = new LinkedList<>();
 
-                        for (int posTo : getForwardEdges(nodeIdx)) {
-                            if (posTo == (nodeIdx + 1)) {
-                                continue;
-                            }
-                            MPVariable edge;
-                            if (getBackwardEdges(posTo).length == 1) {
-                                edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
-                            } else {
-                                EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
-                                edge = solver.makeBoolVar("");
-                                this.edges.put(edgeKey, edge);
-                            }
-                            all_edges_from_pos.add(edge);
+                        int[] fwdEdges = null;
+                        if (!this.deadNodes.contains(nodeIdx)) {
+                            fwdEdges = getForwardEdges(nodeIdx);
                         }
 
-                        for (int posFrom : getBackwardEdges(nodeIdx + 1)) {
-                            if (posFrom == nodeIdx) {
-                                continue;
+                        if (fwdEdges != null) {
+                            for (int posTo : fwdEdges) {
+                                if (posTo == (nodeIdx + 1)) {
+                                    continue;
+                                }
+                                MPVariable edge;
+                                if (getBackwardEdges(posTo).length == 1) {
+                                    edge = this.ancestorPositionVars.get(ancestorIdx)[posTo];
+                                } else {
+                                    EdgeKey edgeKey = new EdgeKey(nodeIdx, posTo, ancestorIdx);
+                                    edge = solver.makeBoolVar("");
+                                    this.edges.put(edgeKey, edge);
+                                }
+                                all_edges_from_pos.add(edge);
                             }
-                            MPVariable edge = this.edges.get(new EdgeKey(posFrom, nodeIdx + 1, ancestorIdx));
-                            all_edges_to_pos1.add(edge);
+                        }
+
+                        int[] bkwdEdges = null;
+                        if (!this.deadNodes.contains(nodeIdx + 1)) {
+                            bkwdEdges = getBackwardEdges(nodeIdx + 1);
+                        }
+
+                        if (bkwdEdges != null) {
+                            for (int posFrom : bkwdEdges) {
+                                if (posFrom == nodeIdx) {
+                                    continue;
+                                }
+                                MPVariable edge = this.edges.get(new EdgeKey(posFrom, nodeIdx + 1, ancestorIdx));
+                                all_edges_to_pos1.add(edge);
+                            }
                         }
 
                         MPConstraint constraint = solver.makeConstraint(0, 0);
@@ -714,7 +770,8 @@ public class Mip {
                     }
                 }
 
-                if (!this.nodesToSkip.contains(nodeIdx) && !this.nodesConnectedToPreviousNode.contains(nodeIdx)) {
+                if (!this.deadNodes.contains(nodeIdx) && !this.nodesToSkip.contains(nodeIdx)
+                        && !this.nodesConnectedToPreviousNode.contains(nodeIdx)) {
                     if (getBackwardEdges(nodeIdx).length > 1 ||
                             getForwardEdges(Arrays.stream(getBackwardEdges(nodeIdx)).min().orElseThrow()).length == 1) {
                         addEdgeConstraint(ancestorIdx, nodeIdx);
@@ -846,6 +903,11 @@ public class Mip {
 
                     diffPos = new MPVariable[nPos];
                     for (int pos = 0; pos < nPos; pos++) {
+
+                        if (this.deadNodes.contains(pos)) {
+                            continue;
+                        }
+
                         if (this.nodesToSkip.contains(pos)) {
                             diffPos[pos] = lastVar;
                         } else {
@@ -856,6 +918,11 @@ public class Mip {
                 }
 
                 for (int pos = 0; pos < nPos; pos++) {
+
+                    if (this.deadNodes.contains(pos)) {
+                        continue;
+                    }
+
                     if (isExtant) {
 
                         if (this.nodesToSkip.contains(pos)) {
@@ -964,25 +1031,34 @@ public class Mip {
                             MPConstraint c0 = solver.makeConstraint(0, Double.POSITIVE_INFINITY);
                             c0.setCoefficient(pen[pos], 1);
                             c0.setCoefficient(diffPos[pos], -1);
-                            c0.setCoefficient(diffPos[pos - 1], 1);
+
+                            // dead columns have no diff variable (diff is always 0 there)
+                            if (!this.deadNodes.contains(pos - 1)) {
+                                c0.setCoefficient(diffPos[pos - 1], 1);
+                            }
+
+//                            c0.setCoefficient(diffPos[pos - 1], 1);
 
                             List<MPVariable> parentEdgesBypassingI = new LinkedList<>();
                             List<MPVariable> childEdgesBypassingI = new LinkedList<>();
                             // get the set of edges that leave i-1 AND BYPASS i
-                            for (int posTo : getForwardEdges(pos - 1)) {
 
-                                if (posTo > pos) {
-                                    MPVariable parentEdge;
-                                    MPVariable childEdge;
-                                    if (getBackwardEdges(posTo).length == 1) {
-                                        parentEdge = nodePosVar[posTo];
-                                        childEdge = nodeNeighborPosVarAncestor[posTo];
-                                    } else {
-                                        parentEdge = this.edges.get(new EdgeKey(pos - 1, posTo, ancestralIdx));
-                                        childEdge = this.edges.get(new EdgeKey(pos - 1, posTo, childIdx));
+                            if (!this.deadNodes.contains(pos - 1)) {
+                                for (int posTo : getForwardEdges(pos - 1)) {
+
+                                    if (posTo > pos) {
+                                        MPVariable parentEdge;
+                                        MPVariable childEdge;
+                                        if (getBackwardEdges(posTo).length == 1) {
+                                            parentEdge = nodePosVar[posTo];
+                                            childEdge = nodeNeighborPosVarAncestor[posTo];
+                                        } else {
+                                            parentEdge = this.edges.get(new EdgeKey(pos - 1, posTo, ancestralIdx));
+                                            childEdge = this.edges.get(new EdgeKey(pos - 1, posTo, childIdx));
+                                        }
+                                        parentEdgesBypassingI.add(parentEdge);
+                                        childEdgesBypassingI.add(childEdge);
                                     }
-                                    parentEdgesBypassingI.add(parentEdge);
-                                    childEdgesBypassingI.add(childEdge);
                                 }
                             }
 
@@ -990,22 +1066,24 @@ public class Mip {
                             List<MPVariable> parentEdgesBypassingIMinus1 = new LinkedList<>();
                             List<MPVariable> childEdgesBypassingIMinus1 = new LinkedList<>();
 
-                            for (int posFrom : getBackwardEdges(pos)) {
+                            if (!this.deadNodes.contains(pos)) {
+                                for (int posFrom : getBackwardEdges(pos)) {
 
-                                if (posFrom < pos - 1) {
+                                    if (posFrom < pos - 1) {
 
-                                    MPVariable parentEdge;
-                                    MPVariable childEdge;
-                                    if (getBackwardEdges(pos).length == 1) {
-                                        parentEdge = nodePosVar[pos];
-                                        childEdge = nodeNeighborPosVarAncestor[pos];
-                                    } else {
-                                        parentEdge = this.edges.get(new EdgeKey(posFrom, pos, ancestralIdx));
-                                        childEdge = this.edges.get(new EdgeKey(posFrom, pos, childIdx));
+                                        MPVariable parentEdge;
+                                        MPVariable childEdge;
+                                        if (getBackwardEdges(pos).length == 1) {
+                                            parentEdge = nodePosVar[pos];
+                                            childEdge = nodeNeighborPosVarAncestor[pos];
+                                        } else {
+                                            parentEdge = this.edges.get(new EdgeKey(posFrom, pos, ancestralIdx));
+                                            childEdge = this.edges.get(new EdgeKey(posFrom, pos, childIdx));
+                                        }
+
+                                        parentEdgesBypassingIMinus1.add(parentEdge);
+                                        childEdgesBypassingIMinus1.add(childEdge);
                                     }
-
-                                    parentEdgesBypassingIMinus1.add(parentEdge);
-                                    childEdgesBypassingIMinus1.add(childEdge);
                                 }
                             }
 
