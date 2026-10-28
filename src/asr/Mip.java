@@ -55,7 +55,7 @@ public class Mip {
     private final HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
     private final HashMap<DiffKey, MPVariable> diff = new HashMap<>();
     private final int virtualEndIdx;
-    private HashSet<Integer> deadNodes;
+    private final HashSet<Integer> deadNodes;
 
     public Mip(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
                int nThreads, boolean useBranchLengths) {
@@ -635,6 +635,8 @@ public class Mip {
      */
     private void createAncestralPositionVariables() {
 
+
+
         HashMap<Integer, MPVariable[]> ancestorSeqVars = new HashMap<>();
         for (int ancestorIdx : tree.getAncestors()) {
             MPVariable[] seqVars = new MPVariable[nPos];
@@ -656,6 +658,24 @@ public class Mip {
         }
 
         this.ancestorPositionVars = ancestorSeqVars;
+    }
+
+    private void findParsimoniousInsertionPoints() {
+        Set[] nonGappedLeaveSets = new Set[aln.getWidth()];
+        HashMap<Integer, Set> forcedZero = new HashMap<>();
+
+        Map<String, Integer> alnMap = aln.getMap();
+        for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+
+            if (this.deadNodes.contains(colIdx)) {
+                forcedZero.put(colIdx, new HashSet<>());
+                continue;
+            }
+
+            Set<Integer> S = IdxTree.findNonGappedLeaves(tree, aln, colIdx, alnMap);
+            nonGappedLeaveSets[colIdx] = S;
+            int mrca = IdxTree.findMRCA(tree, S);
+        }
     }
 
     public static int[] append(int[] arr, int val) {
