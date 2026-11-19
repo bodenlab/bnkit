@@ -88,7 +88,7 @@ TreeGazer annotates ancestor (internal) and extant (leaf) nodes in a phylogeneti
 | Direct | Joint reconstruction | Discrete only |
 | Direct | Marginal reconstruction | Discrete only |
 | Latent | Learning | Discrete and real |
-| Latent | Marginal reconstruction *(learning required first)* | Discrete and real |
+| Latent | Marginal reconstruction *(learning required first)* | Real only |
 | Latent | Joint reconstruction *(learning required first)* | Discrete and real |
 
 > **Evolutionary model:** Currently limited to a uniform model — an adaptation of Jukes-Cantor for an arbitrary number of states. Real-valued data is learned as a conditional Gaussian mixture; discrete data is learned as a conditional multinomial. Inference is joint by default, or marginal (optionally at a specific branch-point — otherwise all uninstantiated nodes are inferred).
