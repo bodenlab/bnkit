@@ -47,7 +47,7 @@ public class GRASP {
                 \t{-pre | --prefix <stub>}
                 \t{-rf | --rates-file <filename>}
                 \t{-ef | --empirical-freqs <filename>}
-                \t{-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}
+                \t{-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|QPFAM|JC|Yang>}
                 \t{-t | --threads <number>}
                 \t{-j | --joint (default)}
                 \t{-m | --marginal <branchpoint-id>}
@@ -132,6 +132,7 @@ public class GRASP {
                 \tDayhoff: Dayhoff-Schwartz-Orcutt (protein)
                 \tLG: Le-Gasquel (protein)
                 \tWAG: Whelan-Goldman (protein)
+                \tQPFAM: QPFAM (protein)
                 \tJC: Jukes-Cantor (DNA)
                 \tYang: Yang's general reversible process model (DNA)
                 """);
@@ -162,11 +163,11 @@ public class GRASP {
     public static double[] RATES = null;
     private static String EMPIRICAL_FREQS_FILE = null;
     private static double[] EMPIRICAL_FREQS = null;
-    private static final String[] MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "Yang", "JC"};
+    private static final String[] MODELS = new String[]{"JTT", "Dayhoff", "LG", "WAG", "QPFAM", "Yang", "JC"};
     private static int MODEL_IDX = 0; // default model is that above indexed 0
     public static SubstModel MODEL = null;
     // Alphabet is decided by MODEL_IDX
-    private static final Enumerable[] ALPHAS = new Enumerable[]{Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
+    private static final Enumerable[] ALPHAS = new Enumerable[]{Enumerable.aacid, Enumerable.aacid, Enumerable.aacid, Enumerable.aacid,  Enumerable.aacid, Enumerable.nacid, Enumerable.nacid};
 
     // COLUMN INFERENCE SETTINGS
     private static Inference MODE = Inference.JOINT; // default inference mode
