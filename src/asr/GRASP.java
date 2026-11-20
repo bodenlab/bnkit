@@ -863,7 +863,12 @@ public class GRASP {
                 usage(2, MARG_NODE + " is not a valid ancestor number");
             indelpred.getMarginal(MARG_NODE, MODEL, RATES);
         } else if (ONLYINDEL) {
-            indelpred.saveIndelSolutionAsFasta(OUTPUT, PREFIX);
+            try  {
+                indelpred.saveIndelSolutionAsFasta(OUTPUT, PREFIX);
+            } catch (IOException e) {
+                usage(2, "Failed to read or write files: " + e.getMessage());
+            }
+
         }
     }
 
