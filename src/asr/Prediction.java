@@ -24,6 +24,7 @@ import json.JSONException;
 import json.JSONObject;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.util.*;
 
 /**
@@ -80,44 +81,31 @@ public class Prediction {
         this.distribs = new EnumDistrib[phylotree.getSize()][];
     }
 
-    public void saveIndelSolutionAsFasta(String output, String prefix) {
+    public void saveIndelSolutionAsFasta(String output, String prefix) throws IOException {
 
         //String fastaFilePath = prefix + "_ancestral_indel.fasta";
+        Files.createDirectories(new File(output).toPath());
         File file = new File(output, prefix + "_ancestral_indel.fa");
-
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
 
             for (int ancestralIdx : phylotree.getAncestors()) {
-                POGraph ancestralPOG = ancarr[ancestralIdx];
-
-                // Write FASTA header
-                writer.write(">N" + phylotree.getLabel(ancestralIdx));
-                writer.newLine();
-
-                StringBuilder sequenceLine = new StringBuilder();
-                for (int pos = 0; pos < ancestralPOG.maxsize(); pos++) {
-
-                    if (ancestralPOG.isNode(pos)) {
-                        sequenceLine.append("X");
-                    } else {
-                        sequenceLine.append("-");
-                    }
-
-                    // Optional: Add line breaks every 80 characters (standard FASTA format)
-                    if ((pos + 1) % 80 == 0 && pos < ancestralPOG.maxsize() - 1) {
-                        writer.write(sequenceLine.toString());
-                        writer.newLine();
-                        sequenceLine = new StringBuilder();
-                    }
+                int[] path = getConsensus(ancestralIdx);
+                if (path == null) {
+                    throw new ASRRuntimeException("Failed to find optimal path for ancestor ID: " + phylotree.getLabel(ancestralIdx));
+                }
+                char[] sequence = new char[getPositions()];
+                Arrays.fill(sequence, '-');
+                for (int pos : path) {
+                    sequence[pos] = 'X'; // Mark the positions in the optimal path with 'X'
                 }
 
-                // Write any remaining sequence
-                if (!sequenceLine.isEmpty()) {
-                    writer.write(sequenceLine.toString());
+                writer.write(">N" + phylotree.getLabel(ancestralIdx));
+                writer.newLine();
+                for (int start = 0; start < sequence.length; start += 80) {
+                    writer.write(sequence, start, Math.min(80, sequence.length - start));
                     writer.newLine();
                 }
             }
-
 
         } catch (IOException e) {
             System.err.println("Error writing ancestral sequences to file: " + e.getMessage());

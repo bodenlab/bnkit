@@ -55,7 +55,8 @@ public class Mip {
     private final HashMap<EdgeKey, MPVariable> edges = new HashMap<>();
     private final HashMap<DiffKey, MPVariable> diff = new HashMap<>();
     private final int virtualEndIdx;
-    private HashSet<Integer> deadNodes;
+    private final HashSet<Integer> deadNodes;
+    HashMap<Integer, Set<Integer>> nodesForcedToZero;
 
     public Mip(POGTree pogTree, EnumSeq.Alignment<Enumerable> aln, String solverName, String substModelName,
                int nThreads, boolean useBranchLengths) {
@@ -450,6 +451,7 @@ public class Mip {
 
     public HashMap<Integer, Integer[]> runMPSolverIndelInference() {
 
+
         Loader.loadNativeLibraries(); // link to Google-OR Tools
         this.solver = MPSolver.createSolver(solverName);
 
@@ -463,6 +465,7 @@ public class Mip {
             System.out.println("WARNING: input alignment has columns with only gap characters. ");
         }
 
+        this.nodesForcedToZero = this.findParsimoniousInsertionPoints();
         createAncestralPositionVariables();
         createEdgeVariables();
         addPenaltyConstraints();
@@ -635,6 +638,8 @@ public class Mip {
      */
     private void createAncestralPositionVariables() {
 
+
+
         HashMap<Integer, MPVariable[]> ancestorSeqVars = new HashMap<>();
         for (int ancestorIdx : tree.getAncestors()) {
             MPVariable[] seqVars = new MPVariable[nPos];
@@ -651,11 +656,48 @@ public class Mip {
                 if (this.deadNodes.contains(j)) {
                     seqVars[j].setUb(0);
                 }
+
+                if (!this.nodesToSkip.contains(j) && this.nodesForcedToZero.containsKey(j) && this.nodesForcedToZero.get(j).contains(ancestorIdx)) {
+                    seqVars[j].setUb(0);
+                }
             }
             ancestorSeqVars.put(ancestorIdx, seqVars);
         }
 
         this.ancestorPositionVars = ancestorSeqVars;
+    }
+
+    private HashMap<Integer, Set<Integer>> findParsimoniousInsertionPoints() {
+
+        HashMap<Integer, Set<Integer>> forcedZero = new HashMap<>();
+        Map<String, Integer> alnMap = aln.getMap();
+
+        for (int colIdx = 0; colIdx < aln.getWidth(); colIdx++) {
+
+            if (this.deadNodes.contains(colIdx)) {
+                forcedZero.put(colIdx, new HashSet<>());
+                continue;
+            }
+
+            Set<Integer> S = IdxTree.findNonGappedLeaves(tree, aln, colIdx, alnMap);
+            int commonAncestor = IdxTree.findMRCA(tree, S);
+
+            if (commonAncestor == 0) {
+                forcedZero.put(colIdx, new HashSet<>());
+            } else {
+                Set<Integer> allAncestors = new HashSet<>();
+                for (int ancestorIdx : tree.getAncestors()) {
+                    allAncestors.add(ancestorIdx);
+                }
+
+                Set<Integer> subtreeNodes = tree.getSubtreeIndices(commonAncestor);
+                HashSet<Integer> nodesOutSideSubtree = new HashSet<>(allAncestors);
+                nodesOutSideSubtree.removeAll(subtreeNodes);
+                forcedZero.put(colIdx, nodesOutSideSubtree);
+            }
+        }
+
+        return forcedZero;
     }
 
     public static int[] append(int[] arr, int val) {

@@ -1361,7 +1361,7 @@ public class TrAVIS {
                         double p = Math.exp(-(colIndelRates[paridx][i] * t));
 
                         // make decision of what happens in child for the current site i
-                        if (toss < p) { // 1. no indel (so match) with prob p = e^-rt, so consider substitution (r is evolutionary rate and t is branch distance)
+                        if (toss < p) { // 1. no indel (so match) so consider substitution
                             EnumDistrib d = params.substmodel.getDistrib(parseq[i], substRates[paridx][i]*t); // probability of child states GIVEN parent state
                             Object nchar = null;
                             double tossagain = params.rand.nextDouble();

@@ -1665,6 +1665,14 @@ public class IdxTree implements Iterable<Integer> {
         return A;
     }
 
+    /**
+     * Find the set of leaves in the tree that have non-gap characters in the specified column.
+     * @param tree the phylogenetic tree
+     * @param aln the alignment
+     * @param colIdx the index of the column in the alignment
+     * @param alnMap mapping from sequence names to their indices in the alignment
+     * @return a set of indices of leaves that have non-gap characters in the specified column
+     */
     public static Set<Integer> findNonGappedLeaves(IdxTree tree, EnumSeq.Alignment<Enumerable> aln, int colIdx,
                                                    Map<String, Integer> alnMap ) {
         // Find the set of leaves that are non-gapped

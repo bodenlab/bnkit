@@ -353,6 +353,9 @@ public abstract class SubstModel {
         predef_reverse.put(WAG, "WAG");
         SubstModel LG = new LG();
         predef.put("LG", LG);
+        SubstModel QPFAM = new QPFAM();
+        predef.put("QPFAM", QPFAM);
+        predef_reverse.put(QPFAM, "QPFAM");
         predef_reverse.put(LG, "LG");
         SubstModel JTT = new JTT();
         predef.put("JTT", JTT);
@@ -380,6 +383,7 @@ public abstract class SubstModel {
             case "LG" -> model = new LG(empiricalFreqs);
             case "Dayhoff" -> model = new Dayhoff(empiricalFreqs);
             case "Yang" -> model = new Yang(empiricalFreqs);
+            case "QPFAM" -> model = new QPFAM(empiricalFreqs);
             case "JC" -> model = new JC(1, Enumerable.nacid);
             default -> model = null;
         }

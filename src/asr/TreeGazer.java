@@ -607,6 +607,10 @@ public class TreeGazer {
                 Object state = inf.getDecoration(bpidx); // retrieve the already inferred state for the specified node
                 saveInstantiatedNode(tree, FORMAT_IDX, save, bpcnt, bpidx, state);
                 bpcnt += 1;
+            } else {
+                Object state = ti.getInstance(bpidx);
+                saveInstantiatedNode(tree, FORMAT_IDX, save, bpcnt, bpidx, state);
+                bpcnt += 1;
             }
         }
         TSVFile tempTsv = new TSVFile(new String[] {tsv.getHeader(DEFAULT_ENTRIES_IDX), tsv.getHeader(valcol)}, save);
