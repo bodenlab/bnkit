@@ -2,7 +2,7 @@
 
 # GRASP — Command-Line Interface
 
-`version 14-Aug-2026`
+`version 22-Nov-2026`
 
 </div>
 
@@ -170,7 +170,7 @@ Site    Rate
 Default `BEP`. See the [method table](#indel-methods) below.
 
 **Substitution model** — `--substitution-model <modelname>`
-Default `JTT`. `Dayhoff`, `LG`, `WAG` also available for protein; `JC` and `Yang` for DNA.
+Default `JTT`. `Dayhoff`, `LG`, `WAG`, `Q.PFAM` also available for protein; `JC` and `Yang` for DNA.
 
 **Empirical base frequencies** — `--empirical-freqs <filename>`
 TSV of stationary character frequencies:
@@ -246,6 +246,7 @@ Default `4`. More threads only help up to a point.
 | `Dayhoff` | Protein | Dayhoff–Schwartz–Orcutt |
 | `LG` | Protein | Le–Gasquel |
 | `WAG` | Protein | Whelan–Goldman |
+| `QPFAM` | Protein | Q.PFAM |
 | `JC` | DNA | Jukes–Cantor |
 | `Yang` | DNA | Yang's general reversible process model |
 
@@ -272,7 +273,7 @@ Usage: asr.GRASP
         {-pre | --prefix <stub>}
         {-rf | --rates-file <filename>}
         {-ef | --empirical-freqs <filename>}
-        {-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|JC|Yang>}
+        {-s | --substitution-model <JTT(default)|Dayhoff|LG|WAG|QPFAM|JC|Yang>}
         {-t | --threads <number>}
         {-j | --joint (default)}
         {-m | --marginal <branchpoint-id>}
